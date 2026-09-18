@@ -1,0 +1,19 @@
+.{
+    .name = .zilc,
+    .version = "0.1.0",
+    .fingerprint = 0x7f337b02f7aa97ab, // Changing this has security and trust implications.
+    // Pinned to the Zig whose bundled LLVM matches Fil-C's (0.15.2 = LLVM 20). See cmem/known-issues.md KI-3.
+    .minimum_zig_version = "0.15.2",
+    .dependencies = .{},
+    .paths = .{
+        "build.zig",
+        "build.zig.zon",
+        "src",
+        "include",
+        "third_party",
+        "LICENSE-MIT",
+        "LICENSE-APACHE",
+        "NOTICE",
+        "README.md",
+    },
+}
