@@ -70,7 +70,9 @@ These shape everything else. Listed roughly in order of how much they constrain 
   shim, which is **0.16.0**, and wazmrt still needs that. So invoke by full path, or put
   `C:\zig\0.15.2` first on PATH for the session.
 - `ZIG_LOCAL_CACHE_DIR=C:\zig-cache\zilc` is required (KI-2).
-- The repo lives on exFAT, so git reports *dubious ownership*. Use
-  `git -c safe.directory='*' …`, or add the path to the global `safe.directory` once.
+- The repo lives on exFAT, so git reports *dubious ownership*. ✅ **Fixed on this machine
+  2026-09-18**: the owner added the repo path to the global `safe.directory`, so plain `git` works.
+  On a new machine or clone location, run
+  `git config --global --add safe.directory <path-to-zilc>` once.
 - Writing Zig multiline strings (`\\`) through a bash heredoc can drop a backslash. Write Zig
   sources with the file tools instead.
