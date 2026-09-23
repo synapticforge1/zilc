@@ -21,6 +21,9 @@ const usage =
     \\  -O <mode>        Zig optimize mode (default: ReleaseSafe)
     \\  --target <t>     Zig target (default: x86_64-linux-musl)
     \\  -c               emit an object instead of linking
+    \\  --entry <who>    who owns main: auto (default), zig, or c.
+    \\                   `zig` wraps your `pub fn main` in a generated C-ABI entry,
+    \\                   because Zig's own start code cannot run under Fil-C (KI-5).
     \\  --zig <path>     zig binary    (env ZILC_ZIG)
     \\  --filc <path>    Fil-C's clang (env ZILC_FILC)
     \\  --keep-temps     keep the intermediate .ll/.o files
@@ -80,6 +83,7 @@ fn run(arena: std.mem.Allocator, args: []const []const u8) !u8 {
     var optimize: []const u8 = "ReleaseSafe";
     var target: []const u8 = "x86_64-linux-musl";
     var emit: @FieldType(driver.Options, "emit") = .exe;
+    var entry: driver.Entry = .auto;
     var keep_temps = false;
     var verbose = false;
     var zig_path = std.process.getEnvVarOwned(arena, "ZILC_ZIG") catch @as([]u8, @constCast("zig"));
@@ -90,7 +94,7 @@ fn run(arena: std.mem.Allocator, args: []const []const u8) !u8 {
         const a = args[i];
         const takes_value = std.mem.eql(u8, a, "-o") or std.mem.eql(u8, a, "-O") or
             std.mem.eql(u8, a, "--target") or std.mem.eql(u8, a, "--zig") or
-            std.mem.eql(u8, a, "--filc");
+            std.mem.eql(u8, a, "--filc") or std.mem.eql(u8, a, "--entry");
         if (takes_value and i + 1 >= args.len) {
             std.debug.print("zilc: '{s}' needs a value\n", .{a});
             return exit_usage;
@@ -110,6 +114,12 @@ fn run(arena: std.mem.Allocator, args: []const []const u8) !u8 {
         } else if (std.mem.eql(u8, a, "--filc")) {
             i += 1;
             filc_path = @constCast(args[i]);
+        } else if (std.mem.eql(u8, a, "--entry")) {
+            i += 1;
+            entry = std.meta.stringToEnum(driver.Entry, args[i]) orelse {
+                std.debug.print("zilc: --entry must be auto, zig or c (got '{s}')\n", .{args[i]});
+                return exit_usage;
+            };
         } else if (std.mem.eql(u8, a, "-c")) {
             emit = .obj;
         } else if (std.mem.eql(u8, a, "--keep-temps")) {
@@ -151,6 +161,7 @@ fn run(arena: std.mem.Allocator, args: []const []const u8) !u8 {
     try driver.build(arena, .{
         .inputs = inputs.items,
         .output = output,
+        .entry = entry,
         .optimize = optimize,
         .target = target,
         .emit = emit,

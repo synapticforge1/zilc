@@ -189,7 +189,11 @@ automatically and announced:
 📏 **The cost is size: 13,766,024 bytes vs 127,424 for ReleaseSafe — 108×.** Same panic, same line.
 `tools/p2/debug-mode.sh` runs both.
 
-## 🔴 KI-5 — Zig's libc start code TRAPS under Fil-C: it walks the aux vector (2026-09-23)
+## ✅ KI-5 — Zig's start code traps under Fil-C. **SOLVED 2026-09-23 with a generated entry shim**
+
+> ⚠️ **The cause below was stated wrongly at first.** "It walks off the end of `envp` to find auxv"
+> was a guess from the function name. Reading `start.zig` shows the real mechanism, which is both
+> simpler and more fundamental — see **What it actually is**.
 
 A whole Zig program (`zig build-exe … -lc`, musl target) now **links and runs** under Fil-C — and
 then panics **before reaching `main`**, in Zig's own start code:
@@ -202,20 +206,53 @@ semantic origin:
     start.zig:599:24: main
 ```
 
-**Why it is not a bug in Fil-C:** `expandStackSize` reads the ELF **auxiliary vector**, which is
-found by walking off the end of `envp`. Fil-C gives `envp` a capability bounded to `envp` itself, so
-stepping past its end is exactly the access the model forbids. Zig assumes a flat address space where
-`argv`/`envp`/`auxv` are contiguous; **under Fil-C they are three separate capabilities.**
+### 🔑 What it actually is: **Zig forges a pointer from an integer**
 
-**This is the FIRST GENUINE Zig-vs-Fil-C SEMANTIC CONFLICT** — not a build-config problem.
+`lib/std/start.zig`, the libc entry path:
 
-Options, cheapest first:
-1. ✅ **Avoid Zig's start code** — export a C-ABI `main` from Zig (`zig build-obj`) and let C, compiled
-   by Fil-C, own startup. **This works today** (`roadmap.md` P2 Test 1) and is the shape zilc should
-   ship first.
-2. Patch `start.zig` for a Fil-C target so it does not touch auxv (upstream Zig has no such target;
-   this is the "zilc target" in the long run).
-3. Ask upstream Fil-C for an auxv accessor (`stdfil.h` may already expose one — **unchecked**).
+```zig
+const at_phdr = std.c.getauxval(elf.AT_PHDR);
+const at_phnum = std.c.getauxval(elf.AT_PHNUM);
+const phdrs = (@as([*]elf.Phdr, @ptrFromInt(at_phdr)))[0..at_phnum];
+expandStackSize(phdrs);            // ← first read of phdrs traps
+```
+
+`getauxval` returns an **integer**. `@ptrFromInt` turns it into a pointer, and under InvisiCap a
+pointer made from an integer has **no capability at all** — hence `cannot read pointer with null
+object`. This is not a bounds violation; it is the single thing the capability model forbids
+outright, and it is what "integers cannot be forged into pointers" means in practice
+(`security-model.md`).
+
+**It is the FIRST GENUINE Zig-vs-Fil-C SEMANTIC CONFLICT**, and it is not fixable by configuration:
+any code that reconstructs a pointer from an integer address is unrunnable under Fil-C, by design.
+⚠️ **Worth remembering for P4:** Zig's `@ptrFromInt` is legal Zig, used across `std` for exactly this
+kind of platform plumbing. Each use is a potential trap site.
+
+### ✅ The fix that shipped: a generated C-ABI entry shim
+
+`zilc build hello.zig` now works with **no C file**. The driver writes `zilc_entry.zig`, makes *it*
+the root module and the user's file a module named `user`, so **Zig never pulls `start.zig` in**:
+
+```
+zig build-obj … -lc --dep user -Mroot=<tmp>/zilc_entry.zig -Muser=hello.zig
+```
+
+The shim exports a plain C `main`, sets `std.os.argv`, and calls the user's `main`, handling `void`,
+`u8` and error-union returns. Fil-C's musl start-up calls it like any C program. Measured:
+
+```
+$ zilc build examples/whole_program/hello.zig -o hello && ./hello
+hello from a whole Zig program
+filc safety error: cannot read pointer with ptr >= upper.
+semantic origin:  hello.zig:25:6: hello.main (inlined)  ←  zilc_entry.zig:16:22: main      exit 133
+```
+
+`--entry auto|zig|c` overrides the choice; `auto` picks the shim when a lone `.zig` input declares
+`pub fn main` and no C/C++ input is present. `tools/p2/whole-program.sh` runs it.
+
+⚠️ **What this does NOT do:** the program gets no `std.os.environ`, no Zig stack-size expansion, and
+no Zig segfault handler. Nothing that has been tested needs them, and Fil-C's own checks replace the
+last one — but a program that reads `std.os.environ` will find it empty until the shim sets it.
 
 ## 🟡 KI-6 — Zig must target **musl**, not gnu, or the link fails on `*64` symbols (2026-09-23)
 

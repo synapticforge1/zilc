@@ -25,5 +25,9 @@ echo "== run it"
 echo "run exit=$?"
 
 echo
-echo "== guardrail: Debug must be refused, not crash the pass"
-"$ZILC" build bounds.zig -O Debug -o dbg 2>&1 | head -5
+echo "== Debug mode: supported, with the -O0 + -fno-stack-check concessions (KI-4)"
+"$ZILC" build c_caller.c bounds.zig -O Debug -o interop-debug 2>&1 | head -4
+./interop-debug > dbg-run.log 2>&1
+echo "   run exit=$?  (expect 133)"
+grep -m1 "semantic origin" -A1 dbg-run.log | sed 's/^/   /'
+ls -l interop interop-debug | awk '{print "   " $NF ":", $5, "bytes"}'

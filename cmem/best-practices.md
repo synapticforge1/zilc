@@ -37,6 +37,15 @@ citation to the incident.
   falsified two of three integration routes for zilc and found the real constraint (KI-4). Reading
   the pass source had suggested the opposite — that "GIMSO accepts any LLVM module" meant any
   *producer's* module. It means any module **in Fil-C's dialect**. (zilc P1, 2026-09-23.)
+- **⚠️ A function's NAME is not its mechanism — open it.** zilc wrote "Zig walks off the end of
+  `envp` to find auxv" into a known-issues entry, inferred from the name `expandStackSize`. The code
+  does `@ptrFromInt(getauxval(AT_PHDR))`: it **forges a pointer from an integer**, which is a
+  different and far more fundamental conflict. The wrong write-up would have sent the fix hunting
+  for a bounds problem. (zilc KI-5, 2026-09-23.)
+- **Check for the boring explanation before the interesting one.** A print that "should" have
+  appeared was missing before a trap, which looked like Fil-C hoisting checks across side effects —
+  a serious semantic claim. Adding `fflush` showed both lines present: it was stdio buffering.
+  (zilc, 2026-09-23.)
 - **Automate the reduction; a 189,740-line crash is not a bug report.** Delta debugging took zilc's
   crash to 8 functions in 1,648 runs, unattended, and named the guilty subsystem
   (`std.compress.flate`) — something no amount of reading would have found. ⚠️ **Check the

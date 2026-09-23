@@ -43,12 +43,26 @@ check scheduled at:
 The memory was allocated in C and overflowed in Zig, and the capability survived the call. Exit
 code 133, no corruption.
 
+## Or a whole Zig program, with no C at all
+
+```sh
+zilc build examples/whole_program/hello.zig -o hello
+./hello
+```
+
+```
+hello from a whole Zig program
+filc safety error: cannot read pointer with ptr >= upper.
+semantic origin:
+    (hello) hello.zig:25:6: hello.main
+```
+
 ### Using it
 
 ```sh
 export ZILC_ZIG=/path/to/zig-0.15.2/zig          # stock Zig
 export ZILC_FILC=/path/to/filc/build/bin/clang   # Fil-C's clang
-zilc build [-O ReleaseSafe] [--target x86_64-linux-musl] [-o out] <inputs...>
+zilc build [-O ReleaseSafe] [--target x86_64-linux-musl] [--entry auto|zig|c] [-o out] <inputs...>
 ```
 
 `.zig` inputs go through Zig and the Fil-C pass; `.c`, `.cpp`, `.o` and `.a` go straight to Fil-C.
@@ -63,8 +77,10 @@ Each has a reason recorded in [cmem/known-issues.md](cmem/known-issues.md):
   compiles it at `-O0` (and passes `-fno-stack-check`). It works and traps correctly; the binary is
   13.8 MB instead of 127 KB. ReleaseSafe keeps Zig's own safety checks on and is the better default.
 - **Target musl** — Fil-C's libc is musl; a gnu target fails to link.
-- **C owns `main`** — Zig's start code walks the ELF aux vector, which Fil-C forbids. Export C-ABI
-  functions from Zig and link a C `main`.
+- **Zig's own start code cannot run** — it builds a pointer out of an integer address
+  (`@ptrFromInt(getauxval(AT_PHDR))`), which is precisely what the capability model forbids. zilc
+  works around it by generating a C-ABI entry that calls your `main` directly, so whole Zig programs
+  work; your program just gets no `std.os.environ` and no Zig stack-size expansion.
 
 ### Where it is going
 

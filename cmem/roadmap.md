@@ -145,7 +145,10 @@ semantic origin:  bounds.zig:13:6: zig_add   ←  c_caller.c:26:5: main      exi
    compiling the instrumented IR at `-O0` and passing `-fno-stack-check`, at a **108× size cost**
    (13.8 MB vs 127 KB). ▶️ Remaining: reduce the crash with `tools/p2/llreduce.ts` and report it
    upstream — a compiler segfault on valid input is Fil-C's bug, not ours. Detail: KI-4.
-3. **Startup** — KI-5: either keep C `main`, or patch `start.zig`.
+3. ✅ **Startup — DONE 2026-09-23.** Whole Zig programs run: the driver generates a C-ABI entry shim
+   (`zilc_entry.zig` as root module, user file as `user`), so `start.zig` never enters the build.
+   The real cause was **`@ptrFromInt(getauxval(AT_PHDR))`** — a pointer forged from an integer, which
+   InvisiCap forbids outright — not the aux-vector walk first written down. Detail: KI-5.
 4. **Only if 1–3 hit a wall:** build Zig against Fil-C's LLVM (the heavy route, now clearly *not*
    the first thing to try).
 

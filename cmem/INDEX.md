@@ -27,9 +27,14 @@ semantic origin:  tiny.zig:4:6: zig_add   ←  c_caller.c:15:5: main
 boundary. ✅ **And it needs no Zig fork and no LLVM build**: stock Zig emits IR, a two-line
 `target datalayout` rewrite puts it in Fil-C's dialect, Fil-C's clang does the rest.
 
-⚠️ **Three limits, all recorded:** Release modes only (Debug IR still crashes the pass, KI-4);
-`-target x86_64-linux-musl` required (KI-6); **C must own `main`**, because Zig's start code walks
-the aux vector and trips Fil-C (KI-5 — the first genuine Zig-vs-Fil-C semantic conflict).
+✅ **Two of the three limits are gone as of 2026-09-23 evening:** `-O Debug` works (compiled at `filc -O0`,
+108× size, KI-4) and **whole Zig programs run** via a generated C-ABI entry shim (KI-5). The
+remaining requirement is `-target x86_64-linux-musl` (KI-6).
+
+🔑 **KI-5's cause, once read rather than guessed: Zig forges a pointer from an integer** —
+`@ptrFromInt(getauxval(AT_PHDR))` in `start.zig`. InvisiCap forbids that outright, so the fix is to
+keep `start.zig` out of the build, not to bound anything. ⚠️ **`@ptrFromInt` is ordinary Zig, used
+across `std`** — every use is a potential trap site, which is P4's problem.
 
 ⚠️ **The morning's verdict, "the cheap route is dead", was WRONG and is kept in `roadmap.md` P1 step 3
 as a cautionary tale.** Every failing run had used Zig's default Debug mode; nobody varied it.
