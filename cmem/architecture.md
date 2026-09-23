@@ -27,10 +27,15 @@ target datalayout = "e-m:e-ni:0-p270:32:32-…-S128"          ; "before": AS0 no
 target datalayout_after_filc = "e-m:e-p270:32:32-…-S128"     ; "after": plain
 ```
 
-`ni:0` is inexpressible in stock LLVM, and `datalayout_after_filc` is read through Fil-C's added
-`Module::getDataLayoutAfterFilC()`. This is why capabilities cannot be forged: with AS 0 non-integral,
-LLVM's own optimizer is forbidden from round-tripping pointers through integers behind the pass's
-back. Full evidence and consequences: `known-issues.md` KI-4.
+`ni:0` is inexpressible in stock LLVM (`address space 0 cannot be non-integral`), and
+`datalayout_after_filc` is read through Fil-C's added `Module::getDataLayoutAfterFilC()`. This is why
+capabilities cannot be forged: with AS 0 non-integral, LLVM's own optimizer is forbidden from
+round-tripping pointers through integers behind the pass's back.
+
+⚖️ **Measured scope of the divergence (2026-09-23):** Fil-C's *output* is ordinary LLVM IR once that
+single extra line is removed — stock clang compiles it. `ni` itself is standard LLVM; only `ni:0` is
+the extension. So this is a two-line dialect, not a different IR. Full evidence: `known-issues.md`
+KI-4.
 
 ## The two core runtime components
 

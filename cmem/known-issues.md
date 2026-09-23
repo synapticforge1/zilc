@@ -94,3 +94,26 @@ string was recovered from the error emitted by `clang -Xclang -disable-llvm-pass
 **The route that survives:** build Zig against Fil-C's LLVM fork so Zig's own codegen emits the
 dialect and runs the pass in-process. **Reopen condition:** if upstream ever documents an IR-level
 entry point (or a `-fno-filc`-style pre-pass emit), re-test — it would restore the cheap route.
+
+### ⚖️ How far from standard IR is it, exactly? (measured 2026-09-23, and it is NARROWER than the above implies)
+
+Stock LLVM here = Zig 0.15.2's bundled clang (LLVM 21), fed each module by `.ll` extension:
+
+| input | stock LLVM verdict |
+| --- | --- |
+| Fil-C's emitted IR, unmodified | ❌ `unknown target property` — **the `datalayout_after_filc` line, and nothing else** |
+| the same file with only that line deleted | ✅ **accepted** |
+| any module whose layout contains `ni:0` | ❌ `address space 0 cannot be non-integral` |
+| the same with `ni:1` | ✅ accepted — **`ni` is standard; only `ni:0` is Fil-C's extension** |
+
+🔑 **So Fil-C does NOT emit or consume "invalid" IR.** Its output is ordinary LLVM IR plus one extra
+target-property line; its *input* requirement (`ni:0`) is the one thing stock LLVM refuses to
+express — deliberately, since non-integral AS 0 is what forbids the optimizer from round-tripping
+pointers through integers behind the pass's back. And Fil-C not re-reading its own output is a
+**round-trip** mismatch (output carries the *after* layout, the pass wants the *before* one), not
+malformedness.
+
+🙂 **This is encouraging for P2:** if the divergence really is two layout lines plus the pass, then
+teaching Zig's LLVM backend to emit them may be a small change, with everything else ordinary IR.
+⚠️ Do not assume it — hand-patching those two lines still segfaulted inside the pass, so something
+beyond the layout differs. Finding out *what* is P2's first experiment.
