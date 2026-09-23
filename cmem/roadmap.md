@@ -119,10 +119,27 @@ aux vector — three separate capabilities under Fil-C, one flat array under Zig
 ▶️ **So zilc's first shipping shape is clear:** Zig exports C-ABI functions, C owns `main`.
 Whole-Zig-program startup needs `start.zig` work, which is what "a zilc *target*" will eventually mean.
 
-### ▶️ P2 remaining work
+### ✅ Experiment 4 — **the `zilc` driver exists** (2026-09-23). One command, not a script
 
-1. **`zilc` driver** — automate emit → layout rewrite → `filc clang`, so the milestone reproduces
-   with one command instead of hand-run scripts. **This is the next code to write.**
+```
+$ zilc build c_caller.c bounds.zig -o interop      # ZILC_ZIG / ZILC_FILC point at the tools
+$ ./interop
+in bounds ok, sum=6
+filc safety error: cannot write pointer with ptr >= upper.
+semantic origin:  bounds.zig:13:6: zig_add   ←  c_caller.c:26:5: main      exit 133
+```
+
+- `src/ir.zig` — the rewrite, **unit-tested** (9/9 green). Idempotent, and derives *both* layouts
+  from the plain one. ⚠️ Two bugs the tests caught before any Linux run: a double `-ni:0` on
+  re-rewrite, and a stray trailing newline.
+- `src/driver.zig` — `.zig` → `zig build-obj -femit-llvm-ir` → rewrite → `filc clang -c`; `.c/.cpp/.o/.a`
+  straight to Fil-C; then one link. `--keep-temps` leaves every intermediate.
+- `src/main.zig` — `zilc build`, with the guardrails as first-class behavior: **Debug is refused
+  with an explanation** rather than passed through to a compiler segfault, and a non-musl target
+  warns (KI-4, KI-6).
+- `examples/interop/` — the milestone as a real example, not a scratch file.
+
+### ▶️ P2 remaining work
 2. **Debug mode** — find what crashes the pass (inline asm suspected). Debug is where Zig's own
    safety checks live, so it cannot stay unsupported.
 3. **Startup** — KI-5: either keep C `main`, or patch `start.zig`.

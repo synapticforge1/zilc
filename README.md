@@ -3,8 +3,9 @@
 **A Fil-C-style memory-safe compilation target for the Zig toolchain**, covering Zig, C and C++ with
 one compiler binary.
 
-> ⚠️ **Status: scaffold (v0.1.0).** The build, C ABI and test harness exist. No memory-safety
-> instrumentation is implemented yet.
+> **Status: working prototype (v0.1.0), Linux x86_64 only.** `zilc build` compiles Zig and C into
+> one binary where out-of-bounds access traps — using Fil-C's existing pass and runtime. See
+> [Limits](#limits).
 
 ## What it is
 
@@ -13,17 +14,62 @@ pointer an invisible *capability* (InvisiCap) holding its allocation bounds, and
 with an accurate, non-moving garbage collector (FUGC). Out-of-bounds accesses and use-after-free
 become deterministic panics instead of memory corruption.
 
-zilc aims to bring that model into the Zig toolchain:
-
-- **An LLVM IR pass** (derived from Fil-C's `FilPizlonator`) run by `zig cc`, `zig c++` and
-  `zig build-exe`, so all three languages compile to the same safe target.
-- **A runtime written in Zig** (`zilc_runtime`): the collector, the capability metadata and the
-  syscall shims.
-- **Safety across the FFI boundary.** A Zig slice passed to C keeps its bounds, so an overflow inside
-  a legacy C library panics instead of corrupting Zig memory.
+zilc brings that model to Zig. Today it does so by **rewriting Zig's LLVM IR into Fil-C's dialect**
+and handing it to Fil-C's compiler — no Zig fork, no LLVM build. Two lines of `target datalayout` are
+the whole difference.
 
 The cost is runtime speed, which is the same trade Fil-C makes (roughly 1.5×–4× slower, depending on
 the workload).
+
+## It works: C allocates, Zig overflows, Fil-C traps
+
+```sh
+zilc build examples/interop/c_caller.c examples/interop/bounds.zig -o interop
+./interop
+```
+
+```
+in bounds ok, sum=6
+filc safety error: cannot write pointer with ptr >= upper.
+    expected 4 writable bytes.
+semantic origin:
+    (interop) bounds.zig:13:6: zig_add        <-- the fault is named in the ZIG source
+check scheduled at:
+    (interop) bounds.zig:13:6: zig_add
+    (interop) c_caller.c:26:5: main
+[502] filc panic: thwarted a futile attempt to violate memory safety.
+```
+
+The memory was allocated in C and overflowed in Zig, and the capability survived the call. Exit
+code 133, no corruption.
+
+### Using it
+
+```sh
+export ZILC_ZIG=/path/to/zig-0.15.2/zig          # stock Zig
+export ZILC_FILC=/path/to/filc/build/bin/clang   # Fil-C's clang
+zilc build [-O ReleaseSafe] [--target x86_64-linux-musl] [-o out] <inputs...>
+```
+
+`.zig` inputs go through Zig and the Fil-C pass; `.c`, `.cpp`, `.o` and `.a` go straight to Fil-C.
+`-v` prints every command it runs.
+
+### Limits
+
+Each has a reason recorded in [cmem/known-issues.md](cmem/known-issues.md):
+
+- **Linux x86_64 only** — that is what Fil-C supports.
+- **No `-O Debug`** — Zig's Debug IR crashes the Fil-C pass; zilc refuses it rather than hand you a
+  compiler segfault. ReleaseSafe keeps Zig's own safety checks on.
+- **Target musl** — Fil-C's libc is musl; a gnu target fails to link.
+- **C owns `main`** — Zig's start code walks the ELF aux vector, which Fil-C forbids. Export C-ABI
+  functions from Zig and link a C `main`.
+
+### Where it is going
+
+- An LLVM pass usable from `zig cc`/`zig build-exe` directly, rather than through an IR rewrite.
+- A runtime written in Zig (`zilc_runtime`), replacing Fil-C's C runtime.
+- Whole Zig programs, then C++.
 
 ## Building
 
@@ -33,10 +79,13 @@ a newer Zig when Fil-C moves to a newer LLVM.
 
 ```sh
 zig build                # CLI (zig-out/bin/zilc) + static runtime (zig-out/lib) + zilc.h
-zig build test           # unit tests
+zig build test           # unit tests (includes the IR-rewrite tests)
 zig build capi-smoke     # C client linked against the runtime through zilc.h
 zig build baseline       # bug examples built with PLAIN zig cc (unsafe, for comparison)
 zig build run -- --help
+
+# the driver runs on Linux, where Fil-C is; cross-compile it from anywhere:
+zig build -Dtarget=x86_64-linux-musl -Doptimize=ReleaseSafe
 ```
 
 **On an exFAT drive, put the Zig cache on an NTFS path.** A `.zig-cache` on exFAT works for one

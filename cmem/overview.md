@@ -17,15 +17,22 @@ zilc/
 ├── include/
 │   └── zilc.h             # C ABI of the runtime (the contract capi.zig implements)
 ├── src/
-│   ├── root.zig           # zilc_runtime library surface (version only, so far)
+│   ├── root.zig           # library surface; re-exports `ir`
+│   ├── ir.zig             # 🔑 the IR rewrite into Fil-C's dialect (unit-tested)
+│   ├── driver.zig         # the pipeline: zig build-obj → rewrite → filc clang
 │   ├── capi.zig           # C ABI exports: zilc_version()
-│   └── main.zig           # `zilc` CLI placeholder: -h/--help, -v/--version
+│   └── main.zig           # `zilc` CLI: `zilc build [options] <inputs…>`
 ├── tests/
 │   └── capi_smoke.c       # C client linking the runtime through zilc.h
 ├── examples/
 │   ├── oob_write.c        # heap out-of-bounds write (must panic under zilc)
-│   └── use_after_free.c   # UAF read (must panic under zilc)
-├── tools/                 # developer tooling (empty; future: upstream sync, corpus runners)
+│   ├── use_after_free.c   # UAF read (must panic under zilc)
+│   └── interop/           # 🎯 the milestone: C allocates, Zig overflows, Fil-C traps
+│       ├── c_caller.c     #   owns main (KI-5) and calls into Zig
+│       └── bounds.zig     #   C-ABI functions whose stores are capability-checked
+├── tools/
+│   ├── p1/                # feasibility scripts: install, reference behavior, IR spike
+│   └── p2/                # integration scripts: dialect probe, opt-mode matrix, milestone
 ├── third_party/
 │   ├── LICENSES.md        # Compliance ledger (EMPTY) + adoption checklist + inventory
 │   ├── fil-c/             # LLVM-LICENSE.txt, PAS-LICENSE.txt, MUSL-LICENSE.txt (staged)

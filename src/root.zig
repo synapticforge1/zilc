@@ -8,6 +8,9 @@
 
 const std = @import("std");
 
+/// Rewriting stock LLVM IR into Fil-C's dialect — the core of the zilc driver.
+pub const ir = @import("ir.zig");
+
 /// Semantic version of zilc. Keep in sync with `build.zig.zon` (see `cmem/releasing.md`).
 pub const version = std.SemanticVersion{ .major = 0, .minor = 1, .patch = 0 };
 
@@ -16,4 +19,8 @@ pub const version_string = std.fmt.comptimePrint("{d}.{d}.{d}", .{ version.major
 
 test "version string matches version" {
     try std.testing.expectEqualStrings("0.1.0", version_string);
+}
+
+test {
+    _ = ir;
 }
