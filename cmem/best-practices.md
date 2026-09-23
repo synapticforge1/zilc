@@ -29,6 +29,10 @@ citation to the incident.
 
 ## 3. Upstreams and claims
 
+- **⚠️ A DEFAULT IS A VARIABLE. Vary it before declaring anything impossible.** zilc spent a session
+  concluding "Zig IR cannot enter Fil-C's pass" from runs that were all in Zig's **default Debug
+  mode**. ReleaseSmall/Fast/Safe all work, and the milestone fell out within the hour. The route
+  declared dead was the one that shipped. (zilc P1→P2, 2026-09-23.)
 - **Run the cheapest experiment that can KILL the plan, first.** One afternoon of shell scripts
   falsified two of three integration routes for zilc and found the real constraint (KI-4). Reading
   the pass source had suggested the opposite — that "GIMSO accepts any LLVM module" meant any

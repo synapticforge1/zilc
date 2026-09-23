@@ -59,9 +59,12 @@ The installed binary reports **clang 20.1.2**. When the switch condition fires, 
 the reverse of that change.** `main.zig` goes back to `std.process.Init`/`std.Io`,
 `minimum_zig_version` becomes `0.16.0`, and the Zig API notes in `design-decisions.md` get updated.
 
-## 🔑 KI-4 — Fil-C's IR is a PATCHED-LLVM DIALECT, so stock IR cannot enter it (2026-09-23)
+## 🔑 KI-4 — Fil-C's IR is a PATCHED-LLVM DIALECT. ⚠️ **PARTLY REVERSED SAME DAY — stock IR CAN enter it**
 
-**This is the most consequential finding so far; it killed one integration route and picked another.**
+> ⚠️ **READ THE REVERSAL AT THE END OF THIS ENTRY BEFORE ACTING ON ANYTHING ABOVE IT.** The dialect
+> facts below are all correct and still load-bearing. The *conclusion* drawn from them — "externally
+> produced IR is not an entry point" — was **wrong**, and was falsified the same afternoon by the
+> first P2 experiment. Kept in full, because the mistake is the lesson.
 
 Fil-C's `FilPizlonatorPass` asserts on its input module (`FilPizlonator.cpp:16041-16046`):
 
@@ -117,3 +120,58 @@ malformedness.
 teaching Zig's LLVM backend to emit them may be a small change, with everything else ordinary IR.
 ⚠️ Do not assume it — hand-patching those two lines still segfaulted inside the pass, so something
 beyond the layout differs. Finding out *what* is P2's first experiment.
+
+### ✅ THE REVERSAL (2026-09-23, P2 experiment 1) — **the two layout lines ARE enough**
+
+| experiment | result |
+| --- | --- |
+| **hand-written** `.ll` (never touched by Fil-C's frontend) carrying both layout lines | ✅ **ACCEPTED** at `-O0` and `-O1` |
+| Zig IR, layouts patched, **ReleaseSmall / ReleaseFast / ReleaseSafe** | ✅ **ACCEPTED** (37 / 161 / 4,007 lines) |
+| Zig IR, layouts patched, **Debug** | ❌ segfault — 189,740 lines, **1,110 functions, 114 inline-asm blocks** |
+
+🎓 **The segfault was never about "Zig IR" or about frontend provenance. It was about DEBUG-MODE
+Zig IR**, and every earlier test happened to use Debug because that is Zig's default. One variable —
+the optimization mode — was never varied, and a structural conclusion was drawn from a single
+setting. *This is `best-practices.md` §2's "vary one thing at a time" all over again.*
+
+**So the wrapper-driver route is ALIVE**: emit IR with stock Zig → rewrite two `target datalayout`
+lines → hand it to Fil-C's clang. No Zig fork, no LLVM build. See `roadmap.md` P1/P2 for what that
+already achieves, and KI-5/KI-6 for the two limits that remain.
+
+**Still open:** *why* Debug IR crashes (inline asm is the prime suspect at 114 occurrences, all of
+which Fil-C must reject or lower). Debug mode is where Zig's safety checks live, so this matters.
+
+## 🔴 KI-5 — Zig's libc start code TRAPS under Fil-C: it walks the aux vector (2026-09-23)
+
+A whole Zig program (`zig build-exe … -lc`, musl target) now **links and runs** under Fil-C — and
+then panics **before reaching `main`**, in Zig's own start code:
+
+```
+filc safety error: cannot read pointer with null object.
+    pointer: 0x…040,<null>            expected 4 bytes.
+semantic origin:
+    start.zig:547:21: start.expandStackSize (inlined)
+    start.zig:599:24: main
+```
+
+**Why it is not a bug in Fil-C:** `expandStackSize` reads the ELF **auxiliary vector**, which is
+found by walking off the end of `envp`. Fil-C gives `envp` a capability bounded to `envp` itself, so
+stepping past its end is exactly the access the model forbids. Zig assumes a flat address space where
+`argv`/`envp`/`auxv` are contiguous; **under Fil-C they are three separate capabilities.**
+
+**This is the FIRST GENUINE Zig-vs-Fil-C SEMANTIC CONFLICT** — not a build-config problem.
+
+Options, cheapest first:
+1. ✅ **Avoid Zig's start code** — export a C-ABI `main` from Zig (`zig build-obj`) and let C, compiled
+   by Fil-C, own startup. **This works today** (`roadmap.md` P2 Test 1) and is the shape zilc should
+   ship first.
+2. Patch `start.zig` for a Fil-C target so it does not touch auxv (upstream Zig has no such target;
+   this is the "zilc target" in the long run).
+3. Ask upstream Fil-C for an auxv accessor (`stdfil.h` may already expose one — **unchecked**).
+
+## 🟡 KI-6 — Zig must target **musl**, not gnu, or the link fails on `*64` symbols (2026-09-23)
+
+Fil-C's libc is **musl**. With `-target x86_64-linux-gnu`, Zig emits glibc-style names and the link
+fails with `undefined reference to pizlonated_getrlimit64 / setrlimit64 / mmap64 / getcontext`.
+**Use `-target x86_64-linux-musl`** and they resolve. (The `pizlonated_` prefix in the error is just
+the pass's renaming — a plain "missing libc symbol", not a Fil-C-specific failure.)

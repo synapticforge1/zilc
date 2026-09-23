@@ -33,6 +33,23 @@ Both end with `filc panic: thwarted a futile attempt to violate memory safety.` 
 🔑 **The gate should assert the fault KIND and the file:line, not the exit code.** Fil-C gives both,
 and 133 alone would accept a crash for the wrong reason.
 
+### ✅ The Zig ⇄ C gate, measured 2026-09-23 (`tools/p2/milestone.sh`)
+
+`c_caller.c` allocates 4 ints and calls Zig's `zig_add(a, 4, 99)`. Exit **133**:
+
+```
+in bounds ok, sum=6
+filc safety error: cannot write pointer with ptr >= upper.   expected 4 writable bytes.
+semantic origin:      tiny.zig:4:6: zig_add
+check scheduled at:   tiny.zig:4:6: zig_add  ←  c_caller.c:15:5: main
+```
+
+🎯 **The fault is attributed to the Zig line, from a C call site.** That two-frame trace is the real
+assertion for the interop gate — it proves the capability crossed the language boundary intact.
+
+⚠️ **Gate-building constraints, all load-bearing (see `known-issues.md`):** build ReleaseSafe/Small/Fast,
+**not Debug** (KI-4); target **musl** (KI-6); let **C own `main`** (KI-5).
+
 ## Planned gates
 
 1. **Bug-example gate** (invariant 2 in `design-decisions.md`): every `examples/*.c` built with the

@@ -13,7 +13,28 @@ for structure and policy.
 
 ---
 
-## 🏁 STATE — 2026-09-23. **P1 RAN. The cheap integration route is DEAD, and the surviving one is a compiler build.**
+## 🏁 STATE — 2026-09-23. ✅ **THE P1 MILESTONE IS MET. Zig ⇄ C memory safety works through Fil-C today.**
+
+🎯 **Proven end to end (`roadmap.md` P2, `tools/p2/milestone.sh`):** C `malloc`s 4 ints, calls a
+**Zig** function that writes one past the end, and Fil-C panics with
+
+```
+filc safety error: cannot write pointer with ptr >= upper.
+semantic origin:  tiny.zig:4:6: zig_add   ←  c_caller.c:15:5: main
+```
+
+**The fault is attributed to the Zig line from a C call site** — the capability survived the language
+boundary. ✅ **And it needs no Zig fork and no LLVM build**: stock Zig emits IR, a two-line
+`target datalayout` rewrite puts it in Fil-C's dialect, Fil-C's clang does the rest.
+
+⚠️ **Three limits, all recorded:** Release modes only (Debug IR still crashes the pass, KI-4);
+`-target x86_64-linux-musl` required (KI-6); **C must own `main`**, because Zig's start code walks
+the aux vector and trips Fil-C (KI-5 — the first genuine Zig-vs-Fil-C semantic conflict).
+
+⚠️ **The morning's verdict, "the cheap route is dead", was WRONG and is kept in `roadmap.md` P1 step 3
+as a cautionary tale.** Every failing run had used Zig's default Debug mode; nobody varied it.
+
+## ~~STATE — 2026-09-23 (morning)~~ — superseded by the section above
 
 **2026-09-18 (session 1):** scaffold + dual license + staged upstream licenses (`0.1.0`); goals
 discussion settled the first milestone and 3 of 6 open questions; repo pinned to **Zig 0.15.2**.
@@ -47,15 +68,15 @@ $env:ZIG_LOCAL_CACHE_DIR = 'C:\zig-cache\zilc'
 & C:\zig\0.15.2\zig.exe build test
 ```
 
-### 🎯 NEXT — size P2: can Zig be built against Fil-C's LLVM? (owner decision pending)
+### 🎯 NEXT — write the `zilc` driver, then Debug mode and startup
 
-The milestone (a Zig program + a C library panicking correctly under Fil-C) is **unchanged and not
-yet reached**. What changed is the only way to get there: **build the Zig compiler against Fil-C's
-`llvm-project-deluge`**, emit Fil-C's two data layouts from Zig's codegen, and run the pass there.
-Before committing, size it: does Fil-C's LLVM build as the libraries Zig's `find_package(llvm 20)`
-wants, and how much of Zig's `codegen/llvm.zig` must change? See [`roadmap.md`](roadmap.md) P2.
-
-*Note: the **C half** of the milestone needs none of this — Fil-C compiles C and C++ today.*
+1. **The driver.** Automate emit → layout rewrite → `filc clang` so the milestone reproduces with
+   one command instead of `tools/p2/*.sh`. **This is the next code to write**, and the placeholder
+   CLI in `src/main.zig` is where it goes.
+2. **Debug mode** (KI-4): find what crashes the pass — 114 inline-asm blocks are the suspect. Debug
+   is where Zig's own safety checks live, so it cannot stay unsupported.
+3. **Startup** (KI-5): keep C `main`, or patch `start.zig` for a Fil-C target.
+4. Building Zig against Fil-C's LLVM is now a **reserve** option, not the entry price.
 
 ### 🔒 Three things to know before touching anything
 

@@ -1,18 +1,20 @@
 # Roadmap
 
-> **Updated 2026-09-23.** WSL is available now, and **P1 steps 1–2 are DONE**. Step 3 ran and
-> **falsified the wrapper-driver route** — see the results below. The later phases are still a sketch.
+> **Updated 2026-09-23 (twice — read the P2 section).** WSL arrived, P1 ran, and its step-3 verdict
+> ("the wrapper-driver route is dead") was **REVERSED by P2 the same afternoon**. ✅ **THE P1
+> MILESTONE IS MET:** a Zig object and a C caller, both through Fil-C's pass, panic correctly with
+> the fault located **inside the Zig source**. No Zig fork and no LLVM build were needed.
 
 ## ✅ P0 — Scaffold (`0.1.0`, 2026-09-18)
 
 Repo layout, dual license + staged upstream licenses, compliance ledger, `cmem/`, build graph with
 `test` / `capi-smoke` / `baseline`, two bug examples.
 
-## ◐ P1 — The feasibility milestone. Steps 1–2 ✅ 2026-09-23. Step 3 ran and **answered the route question**.
+## ✅ P1 — The feasibility milestone. **MET 2026-09-23** (see P2 below for how; step 3's verdict was reversed).
 
 > **Milestone:** a Zig program plus a C library, compiled through Fil-C's *existing* pass and
-> runtime, panics correctly on out-of-bounds and use-after-free. **Not reached** — and the reason
-> is structural, not a bug in our test.
+> runtime, panics correctly on out-of-bounds and use-after-free. ✅ **Reached** — via the
+> ReleaseSafe/Small/Fast path, with Zig exporting a C-ABI function and C owning `main`.
 
 ### ✅ Step 1 — environment (2026-09-23, WSL2 Ubuntu 26.04)
 
@@ -43,7 +45,11 @@ both → [pid] filc panic: thwarted a futile attempt to violate memory safety.
 The panic names the **source file, line and column**, so the future gate can assert the fault kind
 *and* its location, not just a non-zero exit (`testing.md`).
 
-### ❌ Step 3 — Zig IR does NOT go through Fil-C's clang. **The wrapper-driver route is dead.**
+### ⚠️ Step 3 — "Zig IR does NOT go through Fil-C's clang" — **WRONG, and corrected below in P2.**
+
+> Everything in this step is reported as it happened. Every run used Zig's **default Debug mode**,
+> and that — not "Zig IR" — is what crashes the pass. Read it as the cautionary tale it is; the
+> corrected picture is in P2 and `known-issues.md` KI-4's reversal.
 
 What was tried, in order, and what each attempt proved:
 
@@ -70,31 +76,58 @@ What was tried, in order, and what each attempt proved:
    requires. Getting past the assert by hand-patching the layout only reaches a segfault, because
    the layout string is a symptom of the dialect, not the whole of it.
 
-**Therefore:** option (c), "stock Zig emits IR, Fil-C's clang runs the pass", **cannot work**, and
-option (b), an LLVM pass plugin in a stock LLVM, is equally blocked — `ni:0` and
-`datalayout_after_filc` do not exist there. See `design-decisions.md` open question 1, now settled.
+**What was concluded (and is wrong):** that options (b) and (c) were both impossible. The dialect
+facts are right; the inference from them was not. ▶️ **P2 varied the one variable nobody had varied.**
 
-### ▶️ Step 4 — the remaining route: **Zig built against Fil-C's LLVM**
+## ◐ P2 — Integrate the pass with Zig. **Started 2026-09-23. The cheap route WORKS.**
 
-Zig's compiler links LLVM's C++ API, and Zig 0.15.2 wants **LLVM 20** — which is exactly what Fil-C
-is (20.1.8). So the viable shape is: build the Zig compiler against Fil-C's `llvm-project-deluge`,
-teach Zig's codegen to emit the Fil-C data layout (both lines) and to run `FilPizlonatorPass`.
-**That is a compiler build, not a script**, and it is the next thing to size (P2).
+### 🔑 Experiment 1 — the segfault was Zig's DEBUG mode, not Zig IR
 
-Not yet tried, and worth an hour before committing to that: **`zig cc` cannot be the frontend, but
-Fil-C's clang can be** — Fil-C compiles C and C++ today, so the C half of the milestone is already
-available. Only the *Zig* half needs the custom build.
+| input to the pass | result |
+| --- | --- |
+| **hand-written** `.ll` with both layout lines, no Fil-C frontend involved | ✅ accepted (`-O0` and `-O1`) |
+| Zig IR, layouts patched — **ReleaseSmall** (37 lines) / **ReleaseFast** (161) / **ReleaseSafe** (4,007) | ✅ **all accepted** |
+| Zig IR, layouts patched — **Debug** (189,740 lines, 1,110 functions, **114 inline-asm blocks**) | ❌ segfault |
 
-## P2 — Integrate the pass with Zig (route now known)
+**So the whole integration is:** stock Zig emits IR → rewrite two `target datalayout` lines →
+Fil-C's clang. **No Zig fork. No LLVM build.** `tools/p2/` has the scripts.
 
-Build Zig against Fil-C's LLVM 20 fork; emit Fil-C's data layout; run the pass in Zig's pipeline.
-We do not port the pass to a newer LLVM ourselves (owner, 2026-09-18), so the Zig version stays
-0.15.2 until Fil-C moves. **Exit criterion:** the P1 milestone reproduces through zilc's own
-tooling instead of hand-run commands.
+### ✅ Experiment 2 — THE MILESTONE. Zig object + C caller, both instrumented
 
-**First questions for P2 sizing:** can Fil-C's LLVM be built as the libraries Zig links against
-(`find_package(llvm 20)`), and how much of Zig's `codegen/llvm.zig` has to change to set two data
-layouts and add one pass?
+`tiny.zig` (ReleaseSafe) → IR → layout rewrite → `filc clang -c`, linked with `c_caller.c` which
+`malloc`s 4 ints and calls Zig's `zig_add(a, 4, 99)` — one past the end. Exit **133**:
+
+```
+in bounds ok, sum=6
+filc safety error: cannot write pointer with ptr >= upper.   expected 4 writable bytes.
+semantic origin:
+    (prog1) tiny.zig:4:6: zig_add          <-- the fault is located IN THE ZIG SOURCE
+check scheduled at:
+    (prog1) tiny.zig:4:6: zig_add
+    (prog1) c_caller.c:15:5: main
+```
+
+🎯 **This is the P1 milestone**: C allocates, Zig overflows, Fil-C traps, and the panic names the
+Zig file, line and column. Cross-language capability enforcement, working today.
+
+### ◐ Experiment 3 — a WHOLE Zig program links and runs, then traps in Zig's start code
+
+With `-target x86_64-linux-musl` (KI-6) all three Release modes **link and run**. They panic before
+`main`, inside `start.zig:547 expandStackSize`, which walks off the end of `envp` to find the ELF
+aux vector — three separate capabilities under Fil-C, one flat array under Zig's assumption (KI-5).
+
+▶️ **So zilc's first shipping shape is clear:** Zig exports C-ABI functions, C owns `main`.
+Whole-Zig-program startup needs `start.zig` work, which is what "a zilc *target*" will eventually mean.
+
+### ▶️ P2 remaining work
+
+1. **`zilc` driver** — automate emit → layout rewrite → `filc clang`, so the milestone reproduces
+   with one command instead of hand-run scripts. **This is the next code to write.**
+2. **Debug mode** — find what crashes the pass (inline asm suspected). Debug is where Zig's own
+   safety checks live, so it cannot stay unsupported.
+3. **Startup** — KI-5: either keep C `main`, or patch `start.zig`.
+4. **Only if 1–3 hit a wall:** build Zig against Fil-C's LLVM (the heavy route, now clearly *not*
+   the first thing to try).
 
 ## P3 — `zilc_runtime` in Zig
 
