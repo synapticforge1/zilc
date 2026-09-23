@@ -29,6 +29,13 @@ citation to the incident.
 
 ## 3. Upstreams and claims
 
+- **Run the cheapest experiment that can KILL the plan, first.** One afternoon of shell scripts
+  falsified two of three integration routes for zilc and found the real constraint (KI-4). Reading
+  the pass source had suggested the opposite — that "GIMSO accepts any LLVM module" meant any
+  *producer's* module. It means any module **in Fil-C's dialect**. (zilc P1, 2026-09-23.)
+- **When a tool rejects your input, make it tell you what it wanted.** The exact data layout Fil-C
+  requires came out of an error message from `-Xclang -disable-llvm-passes`, after three guesses
+  from reading source had failed. (zilc, 2026-09-23.)
 - **A "Benefit" line asserting what another project does is a HYPOTHESIS.** Open that project's
   source and grep for it before relying on it. (wazmrt wasm-c-api removal, 2026-08-11.) This applies
   directly to the vision's unverified claims (`vision.md`).

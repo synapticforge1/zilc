@@ -13,11 +13,20 @@ for structure and policy.
 
 ---
 
-## 🏁 STATE — 2026-09-18. **SCAFFOLD COMPLETE. Goals set, first milestone agreed, and P1 waits for a Linux machine.**
+## 🏁 STATE — 2026-09-23. **P1 RAN. The cheap integration route is DEAD, and the surviving one is a compiler build.**
 
-**Done 2026-09-18, the first session:** scaffold + dual license + staged upstream licenses
-(`0.1.0`). A goals discussion settled the first milestone and 3 of 6 open questions (LLVM version,
-platform, Zig-first). The whole repo moved to **Zig 0.15.2** to match Fil-C's LLVM.
+**2026-09-18 (session 1):** scaffold + dual license + staged upstream licenses (`0.1.0`); goals
+discussion settled the first milestone and 3 of 6 open questions; repo pinned to **Zig 0.15.2**.
+
+**2026-09-23 (session 2): WSL2 arrived, so P1 ran the same day.** Fil-C 0.685 + Zig 0.15.2 are
+installed under `~/zilc-work/` in WSL, Fil-C's panics on our two bug examples are **recorded as the
+gate's expected output** (`testing.md`), and the spike answered open question 1 **by experiment**:
+
+🔑 **Fil-C's IR is a patched-LLVM dialect** — it demands `ni:0` (non-integral address space 0) plus a
+`datalayout_after_filc` directive, and Fil-C's clang cannot even re-consume its own emitted IR. So
+"stock Zig emits IR → `filcc` runs the pass" **cannot work**, and neither can a pass plugin in a
+stock LLVM. ▶️ **The surviving route is building Zig against Fil-C's LLVM 20 fork.** Full evidence:
+`known-issues.md` **KI-4** and `roadmap.md` P1 step 3.
 
 | gate (all on Zig 0.15.2) | value | note |
 | --- | --- | --- |
@@ -38,19 +47,22 @@ $env:ZIG_LOCAL_CACHE_DIR = 'C:\zig-cache\zilc'
 & C:\zig\0.15.2\zig.exe build test
 ```
 
-### 🎯 NEXT — P1 feasibility milestone, ⏸️ ON HOLD for a Linux machine (owner, 2026-09-18)
+### 🎯 NEXT — size P2: can Zig be built against Fil-C's LLVM? (owner decision pending)
 
-**Agreed milestone:** a Zig program plus a C library, compiled through Fil-C's *existing* pass and
-runtime, panics correctly on OOB/UAF. It runs on a **separate Linux x86_64 machine at a later
-date**, using **Zig 0.15.2** (LLVM 20 = Fil-C's 20.1.8) and Fil-C's **prebuilt release**. Steps and
-expected breakages: [`roadmap.md`](roadmap.md) P1. Remaining open questions:
-[`design-decisions.md`](design-decisions.md).
+The milestone (a Zig program + a C library panicking correctly under Fil-C) is **unchanged and not
+yet reached**. What changed is the only way to get there: **build the Zig compiler against Fil-C's
+`llvm-project-deluge`**, emit Fil-C's two data layouts from Zig's codegen, and run the pass there.
+Before committing, size it: does Fil-C's LLVM build as the libraries Zig's `find_package(llvm 20)`
+wants, and how much of Zig's `codegen/llvm.zig` must change? See [`roadmap.md`](roadmap.md) P2.
 
-### 🔒 Two things to know before touching anything
+*Note: the **C half** of the milestone needs none of this — Fil-C compiles C and C++ today.*
 
-1. **Fil-C upstream is Linux-only** (x86_64/ARM64), and this dev machine is **Windows 11**.
-   🚫 **WSL is NOT permitted here (IT policy). Never propose installing it.** Fil-C work happens
-   on a separate Linux machine. See `known-issues.md` KI-1.
+### 🔒 Three things to know before touching anything
+
+1. **Fil-C work happens in WSL2** (Ubuntu 26.04), under `~/zilc-work/`. ⚠️ **`sudo` needs an
+   interactive password**, so install prebuilt binaries into `$HOME` rather than using `apt`. ⚠️
+   **Pass shell text to WSL as a FILE** (`wsl.exe -e sh <file>`); PowerShell mangles it inline.
+   See `known-issues.md` KI-1.
 2. **D: is exFAT. Set `ZIG_LOCAL_CACHE_DIR=C:\zig-cache\zilc` before any `zig build`.** A
    `.zig-cache` on exFAT works for exactly one build, then fails with `error: Unexpected` until it
    is deleted. This was learned the hard way in wazmrt and reconfirmed here 2026-09-18. See
@@ -104,7 +116,7 @@ the runtime-linking rule checked.
 | [roadmap.md](roadmap.md) | P0 scaffold ✅ → **P1 feasibility milestone (agreed 2026-09-18, ⏸️ awaiting a Linux machine)** → P2 integrate the pass with Zig → P3 Zig runtime → P4 Zig-language fidelity → P5 C++. P1 lists the expected first breakages. |
 | [security-model.md](security-model.md) | The safety guarantees being targeted (spatial, temporal, thread-safe capability updates), and what is explicitly out of scope. |
 | [testing.md](testing.md) | Current gates (all green on Zig 0.15.2, with the exact commands) and the planned "every bug example must panic" gate. |
-| [known-issues.md](known-issues.md) | KI-1 Fil-C is Linux-only (**no WSL allowed here**; prebuilt releases exist); KI-2 exFAT zig-cache; KI-3 LLVM 20 vs 21 skew → **Zig 0.15.2 = LLVM 20**, verified at source. |
+| [known-issues.md](known-issues.md) | 🔑 **KI-4 (2026-09-23): Fil-C's IR is a PATCHED-LLVM DIALECT** (`ni:0` + `datalayout_after_filc`), so stock IR cannot enter the pass — this decided the integration route. KI-1 ✅ resolved (WSL2 installed; `sudo` needs a password); KI-2 exFAT zig-cache; KI-3 LLVM 20 vs 21 skew. |
 | [releasing.md](releasing.md) | Version (`0.1.0`), where the number lives, cadence. |
 | [best-practices.md](best-practices.md) | Method rules. Seeded from wazmrt, plus zilc's own (2026-09-18): verify toolchain versions in the build files **and** the binary; a minimum-version field is not a pin; no heredocs; Deno/Bun for scripts. |
 

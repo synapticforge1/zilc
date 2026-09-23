@@ -18,11 +18,26 @@ $env:ZIG_LOCAL_CACHE_DIR = 'C:\zig-cache\zilc'
 & C:\zig\0.15.2\zig.exe build baseline
 ```
 
+## 🎯 THE EXPECTED OUTPUT IS RECORDED (2026-09-23) — Fil-C 0.685 on our two examples
+
+Measured in WSL with `build/bin/clang -O2 -g` (`roadmap.md` P1 step 2). **Both exit 133** (SIGTRAP):
+
+| example | fault line | Fil-C's message |
+| --- | --- | --- |
+| `oob_write.c:15:14` | store one past a 4-int allocation | `cannot write pointer with ptr >= upper.` / `expected 4 writable bytes.` |
+| `use_after_free.c:13:20` | read after `free` | `cannot access pointer to free object.` / `expected valid capability.` |
+
+Both end with `filc panic: thwarted a futile attempt to violate memory safety.` and print a
+`semantic origin` with **file:line:column** plus a stack of `check scheduled at:` frames.
+
+🔑 **The gate should assert the fault KIND and the file:line, not the exit code.** Fil-C gives both,
+and 133 alone would accept a crash for the wrong reason.
+
 ## Planned gates
 
 1. **Bug-example gate** (invariant 2 in `design-decisions.md`): every `examples/*.c` built with the
-   zilc target must exit with the runtime's panic status, **and** its panic message must name the
-   right fault (OOB vs UAF). Checking the exit code alone would pass a crash for the wrong reason.
+   zilc target must reproduce the table above — same fault kind, same line. Checking the exit code
+   alone would pass a crash for the wrong reason.
 2. **Fil-C differential.** Run the same program under upstream Fil-C (Linux) and zilc. The panic
    kind and location must match.
 3. **Upstream test corpus.** `filc/tests` from Fil-C, adopted under the ledger.

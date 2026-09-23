@@ -9,7 +9,8 @@
 | ~~2026-09-18~~ | ~~Target Zig **0.16.0**~~. **Superseded the same day**, see the full-compatibility row below | Was: installed toolchain; matched wazmrt |
 | 2026-09-18 | Upstream = Fil-C `deluge` branch; not fetched into this repo yet | The Fil-C tree is a full llvm-project fork (multi-GB). How to consume it is an open question below |
 | 2026-09-18 | **First milestone (owner-agreed):** a Zig program plus a C library, compiled through Fil-C's *existing* pass and runtime, panics correctly on OOB/UAF | Tests the premise (Zig IR survives GIMSO) before any zilc code. The Zig runtime rewrite and C++ come later |
-| 2026-09-18 | **No WSL on the Windows dev machine** (not permitted by IT). Fil-C work happens on a **separate Linux machine**, at a later date | Owner. Windows stays the dev box for zilc's own Zig code and cmem |
+| ~~2026-09-18~~ | ~~No WSL on the Windows dev machine~~ | **Superseded 2026-09-23: WSL2 Ubuntu 26.04 is installed and is where Fil-C runs** (KI-1) |
+| 2026-09-23 | **Integration route: build Zig against Fil-C's LLVM fork.** The wrapper-driver and pass-plugin routes are ruled OUT | Experiment, not opinion: Fil-C's IR is a patched-LLVM dialect (`ni:0` + `datalayout_after_filc`) that stock IR cannot satisfy — KI-4, `roadmap.md` P1 step 3 |
 | 2026-09-18 | **The WHOLE repo is on Zig 0.15.2**, not just the experiments ("for full compatibility", owner). `minimum_zig_version = "0.15.2"`, and `main.zig` was ported off the 0.16 APIs | 0.15.2 bundles **clang 20.1.2** (checked with `zig cc --version`), the same major as Fil-C 20.1.8. One Zig for everything: nothing in the repo can drift onto an LLVM the pass cannot read |
 | 2026-09-18 | **Follow Fil-C's LLVM version; never port the pass ahead of upstream.** zilc stays on Zig 0.15.2 until Fil-C moves to LLVM 21, then the whole repo converts to 0.16.0 | Owner. Porting 17k lines of FilPizlonator to a newer LLVM ourselves would fork us from upstream. **Switch condition:** Fil-C's `cmake/Modules/LLVMVersion.cmake` reports major 21 (checked at every upstream sync, `upstream.md`) |
 
@@ -26,14 +27,14 @@
 
 These shape everything else. Listed roughly in order of how much they constrain the rest.
 
-1. **How does the pass get into Zig?**
-   - (a) **Patch the Zig compiler** and ship a custom `zig`. This matches the "single binary" goal
-     but means maintaining a fork of Zig *and* Fil-C.
-   - (b) **An LLVM pass plugin** (`-fpass-plugin=` for `zig cc`). Zig's own codegen does not expose
-     a plugin hook today, so this covers C/C++ only.
-   - (c) **A wrapper driver** (`zilc cc …`). It emits bitcode via `zig cc -emit-llvm` /
-     `zig build-obj -femit-llvm-bc`, runs the pass with a separately-built LLVM, then links.
-     Nothing is patched, but it needs its own LLVM build.
+1. **How does the pass get into Zig?** ✅ **SETTLED BY EXPERIMENT 2026-09-23 — only (a) survives.**
+   - ✅ (a) **Build Zig against Fil-C's LLVM fork** and teach Zig's codegen to emit Fil-C's two data
+     layouts and run `FilPizlonatorPass`. Heavy (a compiler build), but it is the only route the
+     evidence leaves standing. Zig 0.15.2 wants LLVM 20 and Fil-C *is* LLVM 20.1.8.
+   - ❌ (b) **LLVM pass plugin in a stock LLVM.** Impossible: the pass requires `ni:0` on address
+     space 0 and a `datalayout_after_filc` directive, neither of which exists in stock LLVM (KI-4).
+   - ❌ (c) **Wrapper driver over stock `zig` + `filcc`.** Falsified: Zig's `.ll`/`.bc` is rejected,
+     and Fil-C's clang cannot even re-consume its own emitted IR (KI-4).
 2. **LLVM version skew.** ✅ *Settled 2026-09-18 (owner).* zilc follows Fil-C's LLVM version and
    does not port the pass itself. Zig 0.15.2 (LLVM 20) is used until Fil-C moves to a clang that
    Zig 0.16.0 covers (LLVM 21), and the conversion happens then. See the decision table above.

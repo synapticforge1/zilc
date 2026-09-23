@@ -17,6 +17,21 @@ allocator, no GC.
 | libc | ? | Fil-C ships a patched musl (`projects/usermusl`, `yolomusl`) and a glibc variant |
 | C++ runtime | ? | Fil-C's `libcxx/`, `libcxxabi/` |
 
+## 🔑 The Fil-C IR dialect (measured 2026-09-23 — this constrains every integration option)
+
+The pass does not consume stock LLVM IR. A module entering it must declare **address space 0 as
+non-integral** and carry a second, Fil-C-only layout directive:
+
+```llvm
+target datalayout = "e-m:e-ni:0-p270:32:32-…-S128"          ; "before": AS0 non-integral
+target datalayout_after_filc = "e-m:e-p270:32:32-…-S128"     ; "after": plain
+```
+
+`ni:0` is inexpressible in stock LLVM, and `datalayout_after_filc` is read through Fil-C's added
+`Module::getDataLayoutAfterFilC()`. This is why capabilities cannot be forged: with AS 0 non-integral,
+LLVM's own optimizer is forbidden from round-tripping pointers through integers behind the pass's
+back. Full evidence and consequences: `known-issues.md` KI-4.
+
 ## The two core runtime components
 
 1. **InvisiCap (capability bounds).** Every pointer carries hidden lower/upper bounds and type
