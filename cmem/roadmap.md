@@ -140,8 +140,11 @@ semantic origin:  bounds.zig:13:6: zig_add   ←  c_caller.c:26:5: main      exi
 - `examples/interop/` — the milestone as a real example, not a scratch file.
 
 ### ▶️ P2 remaining work
-2. **Debug mode** — find what crashes the pass (inline asm suspected). Debug is where Zig's own
-   safety checks live, so it cannot stay unsupported.
+2. ✅ **Debug mode — DONE 2026-09-23.** Not inline asm (exonerated); it is an **optimizer × pass**
+   interaction, since the same IR compiles at `filc -O0`. The driver now supports `-O Debug` by
+   compiling the instrumented IR at `-O0` and passing `-fno-stack-check`, at a **108× size cost**
+   (13.8 MB vs 127 KB). ▶️ Remaining: reduce the crash with `tools/p2/llreduce.ts` and report it
+   upstream — a compiler segfault on valid input is Fil-C's bug, not ours. Detail: KI-4.
 3. **Startup** — KI-5: either keep C `main`, or patch `start.zig`.
 4. **Only if 1–3 hit a wall:** build Zig against Fil-C's LLVM (the heavy route, now clearly *not*
    the first thing to try).

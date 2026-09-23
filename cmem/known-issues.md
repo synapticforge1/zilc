@@ -138,8 +138,34 @@ setting. *This is `best-practices.md` §2's "vary one thing at a time" all over 
 lines → hand it to Fil-C's clang. No Zig fork, no LLVM build. See `roadmap.md` P1/P2 for what that
 already achieves, and KI-5/KI-6 for the two limits that remain.
 
-**Still open:** *why* Debug IR crashes (inline asm is the prime suspect at 114 occurrences, all of
-which Fil-C must reject or lower). Debug mode is where Zig's safety checks live, so this matters.
+### ✅ DEBUG MODE IS SUPPORTED NOW (2026-09-23, P2 item 1) — two concessions, and the cause is upstream's
+
+**❌ Inline asm was NOT the cause.** Fil-C accepts `__asm__` in ordinary C *and* an `asm sideeffect`
+call in a hand-written dialect module. 114 occurrences, all innocent — the prime suspect named in the
+original entry was wrong.
+
+**The actual shape of it, measured on identical Debug IR (189,741 lines, 1,110 functions):**
+
+| what changed | result |
+| --- | --- |
+| `filc -O0` | ✅ **compiles** |
+| `filc -O1` / `-O2` | ❌ segfault inside the pass |
+| Zig `-fstrip` (11,326 lines, 163 defines) at `-O1` | ✅ compiles — but it removes **code as well as** the 54,636 `!DI` lines, so it proves nothing on its own |
+
+🔑 **So it is an interaction between LLVM's OPTIMIZER and the pass on this module, not a construct
+Fil-C refuses.** At `-O0` the same IR is fine. **The crash is upstream's**, and `tools/p2/llreduce.ts`
+exists to shrink it into a report worth sending.
+
+**What zilc does about it (`src/driver.zig`):** `-O Debug` now *works*, with two concessions applied
+automatically and announced:
+
+1. **`filc -O0`** for the instrumented IR — the segfault above.
+2. **`-fno-stack-check`** on the Zig side. Zig's `__zig_probe_stack` lives in its compiler-rt, which
+   never goes through the pass, so the link fails on it. Dropping probes is honest here: Fil-C's
+   checks are what make the program safe and they do not rely on guard pages.
+
+📏 **The cost is size: 13,766,024 bytes vs 127,424 for ReleaseSafe — 108×.** Same panic, same line.
+`tools/p2/debug-mode.sh` runs both.
 
 ## 🔴 KI-5 — Zig's libc start code TRAPS under Fil-C: it walks the aux vector (2026-09-23)
 

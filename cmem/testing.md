@@ -47,8 +47,18 @@ check scheduled at:   tiny.zig:4:6: zig_add  ←  c_caller.c:15:5: main
 🎯 **The fault is attributed to the Zig line, from a C call site.** That two-frame trace is the real
 assertion for the interop gate — it proves the capability crossed the language boundary intact.
 
-⚠️ **Gate-building constraints, all load-bearing (see `known-issues.md`):** build ReleaseSafe/Small/Fast,
-**not Debug** (KI-4); target **musl** (KI-6); let **C own `main`** (KI-5).
+⚠️ **Gate-building constraints, all load-bearing (see `known-issues.md`):** target **musl** (KI-6);
+let **C own `main`** (KI-5); **Debug works but costs ~108× in size** (KI-4), so gates should run
+ReleaseSafe by default and Debug only where the size is acceptable.
+
+| optimize mode | binary | same panic? |
+| --- | --- | --- |
+| ReleaseSafe | 127,424 B | ✅ `bounds.zig:13:6` |
+| Debug (`filc -O0` + `-fno-stack-check`) | 13,766,024 B | ✅ identical |
+
+⚠️ **When scripting a gate, capture the exit status before piping.** `./prog | sed …` reports
+*sed's* status, and the exit code is half of what these tests assert. (Cost us one confusing
+"run exit=0" on a run that had clearly trapped.)
 
 ## Planned gates
 

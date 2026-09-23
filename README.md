@@ -59,8 +59,9 @@ zilc build [-O ReleaseSafe] [--target x86_64-linux-musl] [-o out] <inputs...>
 Each has a reason recorded in [cmem/known-issues.md](cmem/known-issues.md):
 
 - **Linux x86_64 only** — that is what Fil-C supports.
-- **No `-O Debug`** — Zig's Debug IR crashes the Fil-C pass; zilc refuses it rather than hand you a
-  compiler segfault. ReleaseSafe keeps Zig's own safety checks on.
+- **`-O Debug` costs ~100× in size** — Debug IR crashes the Fil-C pass at clang `-O1`, so zilc
+  compiles it at `-O0` (and passes `-fno-stack-check`). It works and traps correctly; the binary is
+  13.8 MB instead of 127 KB. ReleaseSafe keeps Zig's own safety checks on and is the better default.
 - **Target musl** — Fil-C's libc is musl; a gnu target fails to link.
 - **C owns `main`** — Zig's start code walks the ELF aux vector, which Fil-C forbids. Export C-ABI
   functions from Zig and link a C `main`.

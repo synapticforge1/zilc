@@ -37,6 +37,13 @@ citation to the incident.
   falsified two of three integration routes for zilc and found the real constraint (KI-4). Reading
   the pass source had suggested the opposite — that "GIMSO accepts any LLVM module" meant any
   *producer's* module. It means any module **in Fil-C's dialect**. (zilc P1, 2026-09-23.)
+- **Exonerate the prime suspect before building the case on it.** zilc named inline asm as the cause
+  of the Debug-IR crash in a written-up entry; two three-line probes showed Fil-C compiles inline asm
+  fine in both C and IR. The real cause was an optimizer interaction, found by varying `-O` on the
+  *consumer* side. (zilc P2, 2026-09-23.)
+- **In a pipeline, `$?` is the LAST command's status.** `./prog | sed …` reports sed's exit code, so
+  a test that asserts on the exit status silently asserts nothing. Redirect to a file, check the
+  status, then format. (zilc, 2026-09-23.)
 - **When a tool rejects your input, make it tell you what it wanted.** The exact data layout Fil-C
   requires came out of an error message from `-Xclang -disable-llvm-passes`, after three guesses
   from reading source had failed. (zilc, 2026-09-23.)

@@ -31,6 +31,21 @@ pub const Options = struct {
 
 pub const Error = error{ ToolFailed, NoInputs, UnsupportedInput };
 
+/// Debug needs two concessions, both measured 2026-09-23 (KI-4):
+///
+///  * **`filc -O0`.** Debug IR segfaults Fil-C's pass at `-O1`/`-O2` and compiles
+///    fine at `-O0`. The crash is upstream's, in the optimizer's interaction
+///    with the pass, and we cannot fix it from here.
+///  * **`-fno-stack-check`.** Zig's stack probe (`__zig_probe_stack`) lives in
+///    Zig's compiler-rt, which never goes through the pass, so the link fails
+///    on it. Turning probing off is honest here: Fil-C's own checks are what
+///    make the program safe, and they do not rely on guard pages.
+///
+/// The cost is size — a Debug object runs to tens of megabytes.
+pub fn isDebug(optimize: []const u8) bool {
+    return std.mem.eql(u8, optimize, "Debug");
+}
+
 /// What a given input file needs: Zig compiles it to IR first, or Fil-C takes it directly.
 fn classify(path: []const u8) !enum { zig, native } {
     const ext = std.fs.path.extension(path);
@@ -84,11 +99,17 @@ fn compileZig(
     // 1. Stock Zig emits plain LLVM IR. `-fno-emit-bin`: we only want the IR.
     const emit_arg = try std.fmt.allocPrint(gpa, "-femit-llvm-ir={s}", .{ll_path});
     defer gpa.free(emit_arg);
-    try run(gpa, &.{
-        opts.zig,    "build-obj", src,       "-target", opts.target,
-        "-O",        opts.optimize,          "-fno-emit-bin",
-        emit_arg,
-    }, opts.verbose);
+
+    var zig_args: std.ArrayListUnmanaged([]const u8) = .{};
+    defer zig_args.deinit(gpa);
+    try zig_args.appendSlice(gpa, &.{
+        opts.zig, "build-obj", src,
+        "-target", opts.target,
+        "-O",      opts.optimize,
+        "-fno-emit-bin", emit_arg,
+    });
+    if (isDebug(opts.optimize)) try zig_args.append(gpa, "-fno-stack-check");
+    try run(gpa, zig_args.items, opts.verbose);
 
     // 2. The rewrite: two lines, and the whole reason this driver exists.
     const plain = try std.fs.cwd().readFileAlloc(gpa, ll_path, 512 * 1024 * 1024);
@@ -106,8 +127,9 @@ fn compileZig(
     // driver is `…-linux-gnu`, so clang warns that it is overriding ours. It is
     // expected, not a mismatch to fix — Fil-C's libc *is* musl whatever its
     // triple says, which is why the musl target is the one that links (KI-6).
+    const filc_opt: []const u8 = if (isDebug(opts.optimize)) "-O0" else "-O1";
     try run(gpa, &.{
-        opts.filc, "-O1", "-g", "-Wno-override-module", "-c", "-o", obj_path, filc_ll_path,
+        opts.filc, filc_opt, "-g", "-Wno-override-module", "-c", "-o", obj_path, filc_ll_path,
     }, opts.verbose);
     return obj_path;
 }

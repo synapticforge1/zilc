@@ -29,7 +29,8 @@ const usage =
     \\      --version    version
     \\
     \\Today's limits, each with a reason in cmem/known-issues.md:
-    \\  * Debug mode crashes the Fil-C pass (KI-4) — zilc refuses it.
+    \\  * -O Debug works, but compiles at clang -O0 with -fno-stack-check and
+    \\    produces very large objects (KI-4).
     \\  * Fil-C's libc is musl; a gnu target fails to link (KI-6).
     \\  * Zig's start code trips Fil-C, so C must own main (KI-5):
     \\    export C-ABI functions from Zig and link a C main.
@@ -128,17 +129,16 @@ fn run(arena: std.mem.Allocator, args: []const []const u8) !u8 {
         return exit_usage;
     }
 
-    // Refuse Debug rather than hand the user a segfaulting clang. The crash is
-    // upstream's, deep in the pass, and its message explains nothing (KI-4).
-    if (std.mem.eql(u8, optimize, "Debug")) {
+    // Debug works, but only with two concessions the driver applies for you.
+    // Say so rather than letting the size and the missing probes surprise people.
+    if (driver.isDebug(optimize)) {
         std.debug.print(
-            \\zilc: -O Debug is not supported yet.
-            \\  Zig's Debug IR crashes Fil-C's pass (189k lines, 114 inline-asm blocks).
-            \\  Use ReleaseSafe (Zig's own safety checks stay on), ReleaseSmall or ReleaseFast.
+            \\zilc: note: Debug builds compile the instrumented IR at clang -O0 and pass
+            \\  -fno-stack-check, because Debug IR crashes Fil-C's pass at -O1 and Zig's
+            \\  stack probe never goes through it. Expect large objects.
             \\  Detail: cmem/known-issues.md KI-4.
             \\
         , .{});
-        return exit_usage;
     }
     if (std.mem.indexOf(u8, target, "-musl") == null) {
         std.debug.print(
