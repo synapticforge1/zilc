@@ -6,10 +6,10 @@ the upstream license files **and** source headers on 2026-09-18.
 
 | Project | License (SPDX) | Lang | What to mine it for | Status |
 | --- | --- | --- | --- | --- |
-| [Fil-C](https://github.com/pizlonator/fil-c) — compiler pass | `Apache-2.0 WITH LLVM-exception` | C++ | `FilPizlonator.cpp`: the IR transformation itself | Evaluating (**primary upstream**) |
-| Fil-C — runtime (libpas, filc runtime) | `BSD-2-Clause` | C | FUGC, capability layout, syscall/libc shims, `stdfil.h` API | Evaluating |
-| Fil-C — musl (`usermusl`/`yolomusl`) | `MIT` | C | The two-level libc approach | Evaluating |
-| Fil-C — docs | n/a | — | `invisicap.txt`, `invisicaps_by_example.md`, `gimso_semantics.md`, `Manifesto.md` | **Read first** |
+| [Fil-C](https://github.com/pizlonator/fil-c) — compiler pass | `Apache-2.0 WITH LLVM-exception` | C++ | `FilPizlonator.cpp`: the IR transformation itself | ✅ **USED AS A TOOL** (2026-09-23): invoked by `zilc build`, **never vendored**, nothing copied |
+| Fil-C — runtime (libpas, filc runtime) | `BSD-2-Clause` | C | FUGC, capability layout, syscall/libc shims, `stdfil.h` API | ✅ **linked into zilc-built binaries by Fil-C itself**; not vendored here. P3 would replace it with Zig |
+| Fil-C — musl (`usermusl`/`yolomusl`) | `MIT` | C | The two-level libc approach | ✅ in use — it is why `-target …-musl` is required (KI-6) |
+| Fil-C — docs | n/a | — | `invisicap.txt`, `invisicaps_by_example.md`, `gimso_semantics.md`, `Manifesto.md` | **Read first** — `gimso_semantics.md` explained the `ni:0` requirement |
 | [LLVM](https://github.com/llvm/llvm-project) | `Apache-2.0 WITH LLVM-exception` | C++ | Pass infrastructure, plugin API, clang 20→21 deltas | Evaluating |
 | [Zig](https://codeberg.org/ziglang/zig) | `MIT` | Zig | LLVM backend, `zig cc` driver, bundled libcs, `std.heap` | Evaluating |
 

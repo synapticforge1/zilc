@@ -13,55 +13,52 @@ for structure and policy.
 
 ---
 
-## 🏁 STATE — 2026-09-23. ✅ **THE P1 MILESTONE IS MET. Zig ⇄ C memory safety works through Fil-C today.**
+## 🏁 STATE AT PAUSE — 2026-09-23. ✅ **P1 AND P2 ARE COMPLETE (`0.3.0`). zilc WORKS.**
 
-🎯 **Proven end to end (`roadmap.md` P2, `tools/p2/milestone.sh`):** C `malloc`s 4 ints, calls a
-**Zig** function that writes one past the end, and Fil-C panics with
+**Read this first; it is the shortest true summary of where the project stands.**
+
+🎯 **One command compiles Zig and C into a binary where memory-safety violations trap at a named
+source line** — and it needs **no Zig fork and no LLVM build**:
 
 ```
+$ zilc build examples/interop/c_caller.c examples/interop/bounds.zig -o interop && ./interop
+in bounds ok, sum=6
 filc safety error: cannot write pointer with ptr >= upper.
-semantic origin:  tiny.zig:4:6: zig_add   ←  c_caller.c:15:5: main
+semantic origin:  bounds.zig:13:6: zig_add   ←  c_caller.c:26:5: main      exit 133
 ```
 
-**The fault is attributed to the Zig line from a C call site** — the capability survived the language
-boundary. ✅ **And it needs no Zig fork and no LLVM build**: stock Zig emits IR, a two-line
-`target datalayout` rewrite puts it in Fil-C's dialect, Fil-C's clang does the rest.
+C allocated the memory, **Zig** overflowed it, and the capability survived the language boundary.
 
-✅ **Two of the three limits are gone as of 2026-09-23 evening:** `-O Debug` works (compiled at `filc -O0`,
-108× size, KI-4) and **whole Zig programs run** via a generated C-ABI entry shim (KI-5). The
-remaining requirement is `-target x86_64-linux-musl` (KI-6).
-
-🔑 **KI-5's cause, once read rather than guessed: Zig forges a pointer from an integer** —
-`@ptrFromInt(getauxval(AT_PHDR))` in `start.zig`. InvisiCap forbids that outright, so the fix is to
-keep `start.zig` out of the build, not to bound anything. ⚠️ **`@ptrFromInt` is ordinary Zig, used
-across `std`** — every use is a potential trap site, which is P4's problem.
-
-⚠️ **The morning's verdict, "the cheap route is dead", was WRONG and is kept in `roadmap.md` P1 step 3
-as a cautionary tale.** Every failing run had used Zig's default Debug mode; nobody varied it.
-
-## ~~STATE — 2026-09-23 (morning)~~ — superseded by the section above
-
-**2026-09-18 (session 1):** scaffold + dual license + staged upstream licenses (`0.1.0`); goals
-discussion settled the first milestone and 3 of 6 open questions; repo pinned to **Zig 0.15.2**.
-
-**2026-09-23 (session 2): WSL2 arrived, so P1 ran the same day.** Fil-C 0.685 + Zig 0.15.2 are
-installed under `~/zilc-work/` in WSL, Fil-C's panics on our two bug examples are **recorded as the
-gate's expected output** (`testing.md`), and the spike answered open question 1 **by experiment**:
-
-🔑 **Fil-C's IR is a patched-LLVM dialect** — it demands `ni:0` (non-integral address space 0) plus a
-`datalayout_after_filc` directive, and Fil-C's clang cannot even re-consume its own emitted IR. So
-"stock Zig emits IR → `filcc` runs the pass" **cannot work**, and neither can a pass plugin in a
-stock LLVM. ▶️ **The surviving route is building Zig against Fil-C's LLVM 20 fork.** Full evidence:
-`known-issues.md` **KI-4** and `roadmap.md` P1 step 3.
-
-| gate (all on Zig 0.15.2) | value | note |
+| gate | value | note |
 | --- | --- | --- |
-| version | `0.1.0` | `build.zig.zon` + `src/root.zig` |
-| `zig build` | green | CLI `zilc` + static `zilc_runtime.lib` + `zilc.h` |
-| `zig build test` | 1/1 | version-string test only |
+| version | **`0.3.0`** | P1 + P2 shipped; cadence in `releasing.md` |
+| **`zig build gate`** | **4/4** | 🎯 **the safety gate** — every example traps at the right file:line. **Inversion-tested.** ⚠️ SKIPS (exit 0) without Fil-C |
+| `zig build test` | 9/9 | incl. the IR-rewrite unit tests, which caught two real bugs |
+| `zig build` | green | CLI `zilc` + static `zilc_runtime` + `zilc.h` |
 | `zig build capi-smoke` | green | C client links the runtime via `zilc.h` |
-| `zig build baseline` | green | bug examples compiled with plain `zig cc`: **OOB write runs "fine", exit 0** (the bug zilc exists to catch) |
-| third-party code | **none incorporated** | license texts staged; ledger EMPTY |
+| `zig build baseline` | green | the same bugs under plain `zig cc`: **exit 0, undetected** — the contrast the project exists for |
+| third-party code | **none incorporated** | zilc *invokes* Fil-C and Zig; it ships neither. Ledger EMPTY |
+
+### How it works, in three lines
+
+1. Stock **Zig** emits LLVM IR (`zig build-obj -femit-llvm-ir`).
+2. zilc rewrites **two `target datalayout` lines** into Fil-C's dialect (`src/ir.zig`).
+3. **Fil-C's clang** runs the GIMSO pass and links. C/C++ inputs go straight to it.
+
+### What was learned that the code does not say
+
+- 🔑 **Fil-C's IR is a two-line dialect, not a different IR.** `ni:0` on address space 0 (which stock
+  LLVM refuses on purpose) plus `datalayout_after_filc`. Everything else is ordinary LLVM IR — KI-4.
+- 🔑 **Zig's `start.zig` cannot run under Fil-C**: `@ptrFromInt(getauxval(AT_PHDR))` forges a pointer
+  from an integer, which InvisiCap forbids outright. zilc generates a C-ABI entry instead — KI-5.
+  ⚠️ **`@ptrFromInt` is ordinary Zig used across `std`; every use is a potential trap site.** That is
+  P4's problem, and the most likely source of future surprises.
+- ⚠️ **A Debug-mode crash in Fil-C's pass is upstream's bug**, reduced from 1,110 functions to 8 and
+  written up in `tools/p2/repro/`. **The owner will file it** (owner, 2026-09-23).
+- 🎓 **Two wrong conclusions were published in this very file during the day and later overturned**
+  ("the cheap route is dead"; "Zig walks off the end of envp"). Both are kept with their corrections,
+  in `roadmap.md` P1 step 3 and KI-5. *The failure mode was the same twice: reasoning from one
+  unvaried default, and from a function's name instead of its body.*
 
 **Toolchain: Zig 0.15.2, for the whole repo** (owner, 2026-09-18). It bundles clang **20.1.2**,
 the same major as Fil-C's LLVM **20.1.8**. ⚠️ **It is at `C:\zig\0.15.2\zig.exe`, not on PATH.**
@@ -73,21 +70,18 @@ $env:ZIG_LOCAL_CACHE_DIR = 'C:\zig-cache\zilc'
 & C:\zig\0.15.2\zig.exe build test
 ```
 
-### ✅ ALL FOUR P2 ITEMS ARE DONE (2026-09-23). **`zig build gate` is 4/4 green.**
+### 🎯 NEXT — **P4: Zig language fidelity** (nothing is blocked; this is a fresh start)
 
-The driver exists (`zilc build`), Debug mode works, whole Zig programs run, and the safety gate
-asserts all four examples trap at the right line — inversion-tested. ▶️ **Next: P4 (Zig language
-fidelity)**, plus the owner filing `tools/p2/repro/UPSTREAM-REPORT.md`.
+P1 and P2 are closed. The next work is making Zig's *language* safe under the target rather than
+just its output: how slices, optionals, `allowzero`, `@ptrCast` and above all **`@ptrFromInt`** map
+onto capabilities, and what breaks when real `std` code runs. See `roadmap.md` P4.
 
-### ~~NEXT — write the `zilc` driver, then Debug mode and startup~~ (done; kept for the order it took)
+**Two loose ends, neither blocking:** the owner files the upstream report when ready, and the entry
+shim leaves `std.os.environ` unset (nothing tested needs it yet — KI-5).
 
-1. **The driver.** Automate emit → layout rewrite → `filc clang` so the milestone reproduces with
-   one command instead of `tools/p2/*.sh`. **This is the next code to write**, and the placeholder
-   CLI in `src/main.zig` is where it goes.
-2. **Debug mode** (KI-4): find what crashes the pass — 114 inline-asm blocks are the suspect. Debug
-   is where Zig's own safety checks live, so it cannot stay unsupported.
-3. **Startup** (KI-5): keep C `main`, or patch `start.zig` for a Fil-C target.
-4. Building Zig against Fil-C's LLVM is now a **reserve** option, not the entry price.
+**Where to start next session:** `zig build gate` must be 4/4 before anything is believed. Run
+`tools/run-gate-wsl.sh`, and read the first line — it prints `SKIPPED` rather than failing when the
+Fil-C toolchain is missing.
 
 ### 🔒 Three things to know before touching anything
 
@@ -149,7 +143,7 @@ the runtime-linking rule checked.
 | [security-model.md](security-model.md) | The safety guarantees being targeted (spatial, temporal, thread-safe capability updates), and what is explicitly out of scope. |
 | [testing.md](testing.md) | Current gates (all green on Zig 0.15.2, with the exact commands) and the planned "every bug example must panic" gate. |
 | [known-issues.md](known-issues.md) | 🔑 **KI-4 (2026-09-23): Fil-C's IR is a PATCHED-LLVM DIALECT** (`ni:0` + `datalayout_after_filc`), so stock IR cannot enter the pass — this decided the integration route. KI-1 ✅ resolved (WSL2 installed; `sudo` needs a password); KI-2 exFAT zig-cache; KI-3 LLVM 20 vs 21 skew. |
-| [releasing.md](releasing.md) | Version (`0.1.0`), where the number lives, cadence. |
+| [releasing.md](releasing.md) | **Version `0.3.0`** (P1 + P2 shipped), the four places the number lives, and the minor-per-phase cadence. |
 | [best-practices.md](best-practices.md) | Method rules. Seeded from wazmrt, plus zilc's own (2026-09-18): verify toolchain versions in the build files **and** the binary; a minimum-version field is not a pin; no heredocs; Deno/Bun for scripts. |
 
 ## Related files outside cmem

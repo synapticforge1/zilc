@@ -1,5 +1,17 @@
 # Vision
 
+## 📊 Scoreboard — what the vision claimed vs. what was measured (2026-09-23)
+
+| the claim | status |
+| --- | --- |
+| One toolchain compiles safe Zig **and** safe C | ✅ **done** — `zilc build a.c b.zig` links them into one checked binary |
+| A Zig ⇄ C pointer keeps its bounds across the call | ✅ **done** — C allocates, Zig overflows, the panic names `bounds.zig:13:6` under `c_caller.c:26:5` |
+| No heavyweight custom toolchain needed | ✅ **better than hoped** — stock Zig + a **two-line IR rewrite**; no Zig fork, no LLVM build |
+| Safe C++ | ◻️ untried (Fil-C does it; zilc has not) |
+| The runtime written in Zig | ◻️ not started — today the program links **Fil-C's** C runtime (P3) |
+| "Safe calls into ordinary, uninstrumented C libraries" | ❌ **false as stated** — the pass renames every symbol; both sides must be compiled by it |
+| 1.5×–4× slowdown | ❓ **unmeasured by us.** Fil-C's figure, inherited untested. ⚠️ Do not quote it as zilc's |
+
 ## The primary goal (owner, 2026-09-18)
 
 > Create a **Zig-based Fil-C runtime and target that unifies Zig, C and C++ under a single

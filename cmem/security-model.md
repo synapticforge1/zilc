@@ -12,6 +12,21 @@
 **A violation is a deterministic panic**, never silent corruption. Fil-C's precise formulation is
 "GIMSO" (see upstream `gimso_semantics.md`). Quote that, not the "100% exploit-proof" summary.
 
+## ✅ What is MEASURED as of 2026-09-23 (`zig build gate`, 4/4)
+
+Not inherited claims — these were run:
+
+| property | evidence |
+| --- | --- |
+| Spatial safety **in Zig code** | `bounds.zig:13:6` traps on a store one past a C-allocated buffer |
+| Spatial safety **across the FFI boundary** | the same panic names the **C** call site beneath the Zig frame |
+| Spatial safety **in C** | `oob_write.c:15` traps where plain `zig cc` runs it to completion, exit 0 |
+| Temporal safety | `use_after_free.c:13` → *"cannot access pointer to free object"* |
+| **Integers cannot become pointers** | Zig's own `start.zig` is unrunnable *because* it does `@ptrFromInt(getauxval(…))` — the model refusing a real program, not a toy (KI-5) |
+
+🎓 **That last row is the most convincing evidence in the project**: the guarantee bit hard enough to
+break legitimate upstream code on its first contact with it.
+
 ## Explicitly NOT guaranteed (to be confirmed as P1 reads the docs)
 
 - Logic bugs, integer overflow that stays in bounds, and data races on *non-pointer* data.

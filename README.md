@@ -3,9 +3,9 @@
 **A Fil-C-style memory-safe compilation target for the Zig toolchain**, covering Zig, C and C++ with
 one compiler binary.
 
-> **Status: working prototype (v0.1.0), Linux x86_64 only.** `zilc build` compiles Zig and C into
-> one binary where out-of-bounds access traps — using Fil-C's existing pass and runtime. See
-> [Limits](#limits).
+> **Status: working prototype (v0.3.0), Linux x86_64 only.** `zilc build` compiles Zig and C into
+> one binary where out-of-bounds access and use-after-free trap at a named source line — using
+> Fil-C's existing pass and runtime, with no Zig fork and no LLVM build. See [Limits](#limits).
 
 ## What it is
 
@@ -136,6 +136,11 @@ at your option. `SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception OR MIT`
 
 Code derived from Fil-C, LLVM or Zig keeps its original license (Apache-2.0 WITH LLVM-exception,
 BSD-2-Clause, or MIT). See [NOTICE](NOTICE) and [third_party/LICENSES.md](third_party/LICENSES.md).
+
+**zilc bundles none of those toolchains** — it invokes the Zig and Fil-C you point it at. Note,
+though, that a binary *produced* by `zilc build` contains Fil-C's runtime (BSD-2-Clause) and musl
+(MIT), because Fil-C links them. If you distribute programs built with zilc, their notices travel
+with those programs.
 
 Unless you explicitly state otherwise, any contribution intentionally submitted for inclusion in
 this work, as defined in the Apache-2.0 license, is dual-licensed as above, without any additional

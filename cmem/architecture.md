@@ -1,10 +1,28 @@
 # Architecture
 
-## What exists today (2026-09-18)
+## What exists today (2026-09-23, `0.3.0`) — **the pipeline is real**
 
-Only the scaffold: `src/root.zig` (the runtime module, holding just the version), `src/capi.zig`
-(`zilc_version()`), `include/zilc.h`, and the `zilc` CLI placeholder. No instrumentation, no
-allocator, no GC.
+```
+  user.zig ──► zig build-obj -femit-llvm-ir ──► plain LLVM IR
+                                                     │  src/ir.zig rewrites TWO lines
+                                                     ▼
+                                          Fil-C-dialect IR (ni:0 + datalayout_after_filc)
+                                                     │  filc clang: FilPizlonatorPass
+  user.c ─────────────────────────────────────────►  ▼
+                                              safe object ──► link ──► a binary that traps
+```
+
+| piece | file | state |
+| --- | --- | --- |
+| The IR rewrite | `src/ir.zig` | ✅ done, unit-tested (idempotent; `ni:0` after the `m:` component) |
+| The pipeline | `src/driver.zig` | ✅ done — Zig→IR→rewrite→`filc clang`, C straight through, one link |
+| The CLI | `src/main.zig` | ✅ `zilc build`, with KI-4/5/6 encoded as behavior, not just documented |
+| Entry shim for whole Zig programs | generated `zilc_entry.zig` | ✅ done (KI-5) |
+| The safety gate | `tools/gate.zig` | ✅ 4/4, inversion-tested |
+| `zilc_runtime` (the Zig runtime) | `src/root.zig`, `src/capi.zig` | ◻️ **still a stub** — binaries link **Fil-C's** C runtime. That is P3 |
+
+⚠️ **So zilc today is a DRIVER, not a runtime.** The safety comes entirely from Fil-C; zilc's
+contribution is making Zig's output acceptable to it, and making that one command.
 
 ## Target pipeline
 

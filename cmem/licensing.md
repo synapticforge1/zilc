@@ -27,6 +27,23 @@ portions embedded in object code, which is exactly why LLVM adopted it. Plain MI
 MIT arm, but MIT also asks for the notice "in all copies or substantial portions". A user who picks
 the Apache+exception arm is fully clear.
 
+## ⚡ Status 2026-09-23 — **zilc still vendors NOTHING, and that is a design property now**
+
+The driver **invokes** Fil-C's clang and stock Zig; it does not embed, bundle or redistribute either.
+So the ledger stays EMPTY and zilc is `Apache-2.0 WITH LLVM-exception OR MIT` end to end, even though
+the *compiler pipeline* a user runs includes Apache-2.0-with-LLVM-exception, BSD-2-Clause and MIT
+code. Invoking a tool is not distributing it.
+
+⚠️ **The moment that changes:** if zilc ever ships a Fil-C build, a `pizfix`, or a copy of Fil-C's
+runtime, every obligation in this file attaches at once — including the **runtime-linking rule
+below**, since Fil-C's runtime (BSD-2-Clause) ends up inside every binary a user compiles. Bundling
+for convenience is therefore a **licensing decision**, not a packaging one.
+
+⚠️ **Already true and worth knowing:** a binary built by `zilc build` today *does* contain Fil-C's
+BSD-2-Clause runtime and musl (MIT) — because Fil-C linked them. Anyone **distributing programs built
+with zilc** owes those notices. That obligation is the user's, not ours, but the README should say
+so before anyone ships something.
+
 ## The runtime-linking rule — ⚠️ the one that is easy to miss
 
 The dual license only covers **our** code. If `zilc_runtime` incorporates **BSD-2-Clause (libpas)**

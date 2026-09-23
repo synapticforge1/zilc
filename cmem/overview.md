@@ -12,7 +12,7 @@ bundled LLVM/clang. See `vision.md` for the why and `architecture.md` for the ho
 ```text
 zilc/
 ├── build.zig              # Build graph: CLI, static runtime lib, tests, capi-smoke, baseline
-├── build.zig.zon          # Package manifest (name .zilc, v0.1.0, min zig 0.15.2, no deps)
+├── build.zig.zon          # Package manifest (name .zilc, v0.3.0, min zig 0.15.2, no deps)
 ├── cmem/                  # Portable project memory (this folder)
 ├── include/
 │   └── zilc.h             # C ABI of the runtime (the contract capi.zig implements)
