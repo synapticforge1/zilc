@@ -37,6 +37,12 @@ citation to the incident.
   falsified two of three integration routes for zilc and found the real constraint (KI-4). Reading
   the pass source had suggested the opposite — that "GIMSO accepts any LLVM module" meant any
   *producer's* module. It means any module **in Fil-C's dialect**. (zilc P1, 2026-09-23.)
+- **Automate the reduction; a 189,740-line crash is not a bug report.** Delta debugging took zilc's
+  crash to 8 functions in 1,648 runs, unattended, and named the guilty subsystem
+  (`std.compress.flate`) — something no amount of reading would have found. ⚠️ **Check the
+  interestingness test first:** the first run reported "nothing to reduce" because clang's *driver*
+  exits 1 when its frontend dies on a signal, so the 139 never reached the reducer. A reducer with a
+  broken oracle fails silently and convincingly. (zilc P2, 2026-09-23.)
 - **Exonerate the prime suspect before building the case on it.** zilc named inline asm as the cause
   of the Debug-IR crash in a written-up entry; two three-line probes showed Fil-C compiles inline asm
   fine in both C and IR. The real cause was an optimizer interaction, found by varying `-O` on the

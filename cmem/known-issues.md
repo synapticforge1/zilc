@@ -153,8 +153,30 @@ original entry was wrong.
 | Zig `-fstrip` (11,326 lines, 163 defines) at `-O1` | ✅ compiles — but it removes **code as well as** the 54,636 `!DI` lines, so it proves nothing on its own |
 
 🔑 **So it is an interaction between LLVM's OPTIMIZER and the pass on this module, not a construct
-Fil-C refuses.** At `-O0` the same IR is fine. **The crash is upstream's**, and `tools/p2/llreduce.ts`
-exists to shrink it into a report worth sending.
+Fil-C refuses.** At `-O0` the same IR is fine. **The crash is upstream's.**
+
+#### 🔬 Reduced to 8 functions — and four hypotheses died on the way (2026-09-23)
+
+`tools/p2/llreduce.ts` (delta debugging, 1,648 compiler runs) took the module from **1,110 functions
+to 8**, then a metadata strip took it from 60,602 lines to **9,773**. A second pass confirms all 8
+are required. The repro and its reproduction steps: **`tools/p2/repro/`**.
+
+**The 8 are Zig's `std.compress.flate.Decompress` Huffman decoder** — Debug builds pull it in because
+Zig's stack-trace printer decompresses DWARF.
+
+| hypothesis | verdict |
+| --- | --- |
+| inline asm | ❌ Fil-C compiles `__asm__` in C and `asm sideeffect` in IR |
+| debug metadata / `!DI` records | ❌ stripped every one; **still crashes** |
+| odd-width ints (`i46` in an `sret`) | ❌ a hand-written `i46`-through-`sret` module builds at `-O0/-O1/-O2` |
+| "this Zig code is unsupported" | ❌ the same flate code in **ReleaseSafe** (146,488 lines) compiles fine |
+
+**What is left:** the *unoptimized shape* of that code plus LLVM's `-O1` pipeline around the pass.
+Narrowing further needs line-level reduction or a debug build of Fil-C's clang — neither of which
+zilc needs, since the driver compiles Debug IR at `-O0`.
+
+📤 **A draft upstream issue is written but NOT filed** (`tools/p2/repro/UPSTREAM-REPORT.md`).
+Filing it is the owner's call.
 
 **What zilc does about it (`src/driver.zig`):** `-O Debug` now *works*, with two concessions applied
 automatically and announced:
