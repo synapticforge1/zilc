@@ -31,8 +31,10 @@ zilc/
 │       ├── c_caller.c     #   owns main (KI-5) and calls into Zig
 │       └── bounds.zig     #   C-ABI functions whose stores are capability-checked
 ├── tools/
+│   ├── gate.zig           # 🎯 the safety gate's runner (`zig build gate`)
+│   ├── run-gate-wsl.sh    # run that gate inside WSL, where Fil-C lives
 │   ├── p1/                # feasibility scripts: install, reference behavior, IR spike
-│   └── p2/                # integration scripts: dialect probe, opt-mode matrix, milestone
+│   └── p2/                # integration scripts, the Debug-crash repro, llreduce.ts
 ├── third_party/
 │   ├── LICENSES.md        # Compliance ledger (EMPTY) + adoption checklist + inventory
 │   ├── fil-c/             # LLVM-LICENSE.txt, PAS-LICENSE.txt, MUSL-LICENSE.txt (staged)
@@ -47,7 +49,8 @@ zilc/
 | Step | What it does |
 | --- | --- |
 | `zig build` | Installs `zilc` exe, `zilc_runtime` static lib, `zilc.h` |
-| `zig build test` | Unit tests (runtime module + CLI module) |
+| `zig build gate` | 🎯 **The safety gate** — builds every example with zilc, asserts each traps at the right line. Needs Fil-C; skips with guidance otherwise |
+| `zig build test` | Unit tests (runtime module + CLI module + the IR rewrite) |
 | `zig build capi-smoke` | Builds and runs `tests/capi_smoke.c` against the runtime (gnu ABI) |
 | `zig build baseline` | Builds `examples/*.c` with plain `zig cc`, the unsafe reference behavior |
 | `zig build run -- …` | Runs the CLI |

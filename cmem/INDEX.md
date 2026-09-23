@@ -73,7 +73,13 @@ $env:ZIG_LOCAL_CACHE_DIR = 'C:\zig-cache\zilc'
 & C:\zig\0.15.2\zig.exe build test
 ```
 
-### 🎯 NEXT — write the `zilc` driver, then Debug mode and startup
+### ✅ ALL FOUR P2 ITEMS ARE DONE (2026-09-23). **`zig build gate` is 4/4 green.**
+
+The driver exists (`zilc build`), Debug mode works, whole Zig programs run, and the safety gate
+asserts all four examples trap at the right line — inversion-tested. ▶️ **Next: P4 (Zig language
+fidelity)**, plus the owner filing `tools/p2/repro/UPSTREAM-REPORT.md`.
+
+### ~~NEXT — write the `zilc` driver, then Debug mode and startup~~ (done; kept for the order it took)
 
 1. **The driver.** Automate emit → layout rewrite → `filc clang` so the milestone reproduces with
    one command instead of `tools/p2/*.sh`. **This is the next code to write**, and the placeholder

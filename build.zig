@@ -85,6 +85,30 @@ pub fn build(b: *std.Build) void {
         }
     }
 
+    // ---- The safety gate (`zig build gate`) --------------------------------
+    // Builds every example with the zilc driver and asserts that each one traps
+    // at the right source line. Needs Fil-C, so it SKIPS (exit 0) with guidance
+    // where the toolchain is absent — a build that never had a chance to pass
+    // should not read as a failure.
+    {
+        const gate = b.addExecutable(.{
+            .name = "gate",
+            .root_module = b.createModule(.{
+                .root_source_file = b.path("tools/gate.zig"),
+                .target = target,
+                .optimize = optimize,
+            }),
+        });
+        const run_gate = b.addRunArtifact(gate);
+        run_gate.addFileArg(exe.getEmittedBin()); // the zilc driver to exercise
+        run_gate.addArg(b.build_root.path orelse ".");
+        // The examples and the driver's output both change what this proves.
+        run_gate.has_side_effects = true;
+
+        const gate_step = b.step("gate", "Build every example with zilc and assert it traps (needs Fil-C)");
+        gate_step.dependOn(&run_gate.step);
+    }
+
     // ---- Tests -------------------------------------------------------------
     const mod_tests = b.addTest(.{ .root_module = b.createModule(.{
         .root_source_file = b.path("src/root.zig"),

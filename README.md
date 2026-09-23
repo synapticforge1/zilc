@@ -96,6 +96,7 @@ a newer Zig when Fil-C moves to a newer LLVM.
 
 ```sh
 zig build                # CLI (zig-out/bin/zilc) + static runtime (zig-out/lib) + zilc.h
+zig build gate           # build every example with zilc, assert each one traps (needs Fil-C)
 zig build test           # unit tests (includes the IR-rewrite tests)
 zig build capi-smoke     # C client linked against the runtime through zilc.h
 zig build baseline       # bug examples built with PLAIN zig cc (unsafe, for comparison)

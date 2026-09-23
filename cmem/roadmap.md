@@ -149,8 +149,19 @@ semantic origin:  bounds.zig:13:6: zig_add   ←  c_caller.c:26:5: main      exi
    (`zilc_entry.zig` as root module, user file as `user`), so `start.zig` never enters the build.
    The real cause was **`@ptrFromInt(getauxval(AT_PHDR))`** — a pointer forged from an integer, which
    InvisiCap forbids outright — not the aux-vector walk first written down. Detail: KI-5.
-4. **Only if 1–3 hit a wall:** build Zig against Fil-C's LLVM (the heavy route, now clearly *not*
-   the first thing to try).
+4. ✅ **The safety gate — DONE 2026-09-23.** `zig build gate` builds all four examples with the
+   driver and asserts each traps at the right file:line, with the right fault kind, on SIGTRAP.
+   **4/4 green, and inversion-tested.** Skips with guidance where Fil-C is absent. Detail:
+   `testing.md`.
+5. **Only if the above hit a wall:** build Zig against Fil-C's LLVM (the heavy route, now clearly
+   *not* the first thing to try).
+
+### ▶️ What P2 has left
+
+- **Upstream report** for the Debug/-O1 crash — drafted at `tools/p2/repro/UPSTREAM-REPORT.md`,
+  **owner will file it** (owner, 2026-09-23).
+- `std.os.environ` is unset by the entry shim (KI-5); nothing tested needs it yet.
+- Then **P4**: Zig language fidelity, where `@ptrFromInt` across `std` is the interesting problem.
 
 ## P3 — `zilc_runtime` in Zig
 

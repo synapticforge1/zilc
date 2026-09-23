@@ -1,10 +1,43 @@
 # Testing
 
-## Current gates (2026-09-18)
+## 🎯 `zig build gate` — THE SAFETY GATE (new 2026-09-23). **4/4 green**
+
+Builds every example with the zilc driver and asserts each one **traps at the right source line**.
+This is the gate the whole project exists to keep green.
+
+| # | case | traps at | fault |
+| --- | --- | --- | --- |
+| 1 | interop: C allocates, Zig overflows | `bounds.zig:13:6` | `ptr >= upper` |
+| 2 | whole Zig program (generated entry shim) | `hello.zig:25:6` | `ptr >= upper` |
+| 3 | C out-of-bounds write | `oob_write.c:15` | `ptr >= upper` |
+| 4 | C use-after-free | `use_after_free.c:13` | `free object` |
+
+**Each case asserts four things**, because any one alone is fakeable: the process died on **SIGTRAP**;
+the output contains `filc safety error`; the `semantic origin` names **that file:line**; and the
+violation is of the expected **kind**. ⚠️ *Exit status alone accepts a crash for the wrong reason —
+and a `-O0` link failure earlier in this very session produced an equally non-zero exit for a
+completely unrelated reason (a missing stack probe).*
+
+✅ **Inversion-tested 2026-09-23:** with one expected origin changed to a line that does not exist,
+the gate **failed** and printed the real panic. A gate that cannot fail proves nothing.
+
+```powershell
+wsl.exe -e sh /mnt/d/…/zilc/tools/run-gate-wsl.sh            # from Windows
+```
+```sh
+ZILC_FILC=…/build/bin/clang ZILC_ZIG=…/zig zig build gate    # from Linux
+```
+
+⚠️ **Where Fil-C is absent the gate SKIPS and exits 0**, printing what to set. A build that never had
+a chance to pass must not read as a failure — but that also means *a green `zig build gate` on
+Windows means nothing*. Read the first line.
+
+## Current gates (2026-09-23)
 
 | Step | Checks | State |
 | --- | --- | --- |
-| `zig build test` | Runtime module + CLI module unit tests | 1/1 pass |
+| `zig build gate` | Every example traps at the right line (needs Fil-C) | **4/4** |
+| `zig build test` | Runtime module + CLI module + the IR rewrite | 9/9 pass |
 | `zig build capi-smoke` | `tests/capi_smoke.c` links `zilc_runtime` via `zilc.h` and calls it | pass |
 | `zig build baseline` | Builds `examples/*.c` with plain `zig cc` | builds. `baseline_oob_write` prints `a[3] = 3`, exit 0: **the undetected bug** |
 
