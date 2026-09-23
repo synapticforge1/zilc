@@ -1,0 +1,10 @@
+# Scripts that run inside WSL/Linux must keep LF endings. Checked out with CRLF,
+# `sh` fails on the trailing \r. See cmem/known-issues.md KI-1.
+*.sh text eol=lf
+
+# Source and docs: normalize to LF in the repo.
+*.zig text eol=lf
+*.c text eol=lf
+*.h text eol=lf
+*.md text eol=lf
+*.zon text eol=lf
