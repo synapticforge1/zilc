@@ -178,6 +178,22 @@ Fil-C's and the rest still come from Fil-C. Every gate case is built under both 
 match on output, exit code, fault kind and fault file:line. The measured contract (294 `filc_*`, 1,032
 allocator/GC, 335 `zsys_*`) is in `architecture.md` "The runtime contract".
 
+🎯 **Two phases (owner, 2026-09-30): fidelity first, then streamline.**
+
+1. **Fidelity.** Match upstream exactly before improving anything:
+   - **User-program binaries byte-identical** under both runtimes. Same pass, same objects, same
+     link line; only the runtime library differs. Check it with a hash comparison in the
+     side-by-side gate. That also proves `--runtime zig` changed nothing but the runtime.
+   - **The runtime held to identical observable results:** output, exit code, fault kind and
+     file:line on every gate case and every `tests/basics` program. The runtime library itself
+     cannot be byte-identical (new code, new compiler).
+   - No optimisation, cleverness or "improvement" is allowed in this phase, even an obvious one.
+     Record it as a candidate for phase 2.
+2. **Streamline**, only after phase 1 is proven. Go beyond upstream, **smaller binaries** first.
+   Binaries may then differ from Fil-C's freely, provided **the safety-guarantee results stay
+   identical** (the same gate, the same traps, the same corpus results). Byte-identity with Fil-C
+   stops mattering; the gate's results are what count.
+
 **Switch:** `zilc build --runtime filc|zig` ✅ **exists 2026-09-30**. `zig` is reserved and refused
 until ready. To be added: a gate option `-Druntime=filc|zig|both`, where `both` is the
 side-by-side comparison, and a line from `--runtime zig` saying how many entry points are native,

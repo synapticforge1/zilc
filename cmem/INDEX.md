@@ -47,6 +47,11 @@ for structure and policy.
   release and names it as its **basis** (`0.16.2-1`, basis `0.15.2-100`). Port notes go in
   `cmem/ports/`. ⚠️ There's no release-notes file yet, and `zilc --version` should show the
   user-code Zig and the Fil-C release.
+- 🎯 **FIDELITY FIRST, THEN STREAMLINE (owner):** the Fil-C → Zig port first reproduces upstream
+  exactly (user-program binaries byte-identical, runtime results identical), and only then optimises
+  beyond it, e.g. smaller binaries. At that point byte-identity no longer matters, but identical
+  safety-guarantee results always do (`roadmap.md` P3, `design-decisions.md`). ◐ The byte-identity
+  scope is an interpretation, to confirm.
 - 🧪 **`tests/basics`: 156 correct programs (owner's C + Zig lessons), 2026-09-30 → `testing.md`.**
   **C: 78/78 build and 77/78 run identically under zilc** (the one difference is `abort()` exiting
   133). **Zig 0.15.2: all 78 build and run with plain Zig, but only 24/78 run under zilc**, all
