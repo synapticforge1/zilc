@@ -61,7 +61,11 @@ for structure and policy.
   cc buffers; the header word at `lower−8` holds the aux pointer and object kind. **This reorders P3:
   the shared ABI core is step 0**, before any `zsys_*`. Overriding by linking looks workable (not
   yet run). It's also evidence that a **clean-room** runtime is feasible (open question #3).
-  **Next:** read upstream's design docs to close the 🔸 gaps. Probes: `tools/p3/`.
+  ✅ **Design docs read** (`invisicap.txt`, `gimso_semantics.md`, `Manifesto.md`), closing most
+  gaps: the header is `{size, aux}`, aux holds lowers or atomic boxes, `inttoptr` loses capabilities
+  across loads and calls, and the **FUGC protocol requires exiting before any blocking call**. So
+  KI-7's raw syscalls would also stall the GC. **Next:** one probe for the pollcheck word and the
+  enter/exit entry points. Probes: `tools/p3/`.
 - 🔒 **STAY ON ZIG 0.15.2 UNTIL THERE IS A STABLE BASE (owner).** A 0.16.0 trial port was
   stopped. Its facts are in `ports/README.md` "Scouting": Fil-C head is still LLVM 20.1.8, latest
   Zig is 0.16.0 (clang 21), and Fil-C ships ARM64 builds.

@@ -205,10 +205,15 @@ the GC it is leaving managed code.
 3. **The allocator + GC, all at once**, because it holds global state. The only check against Fil-C
    is whole-program (the gate plus side-by-side runs), with `lib_gcverify` as a GC reference.
 
-▶️ **Next, after the scoping:** read upstream's **design docs** (`invisicap.txt`,
-`invisicaps_by_example.md`, `gimso_semantics.md`) to fill the 🔸 gaps in `filc-abi.md` (upper
-bound, the freed flag, aux layout, GC entry/exit around system calls). Docs, not runtime source.
-Then the spike below, **re-aimed at step 0**.
+✅ **Design docs read 2026-09-30** (`invisicap.txt`, `gimso_semantics.md`, `Manifesto.md`), which
+closed most gaps in `filc-abi.md`. The header is `{size, aux}`; the aux array holds lowers or atomic
+boxes; the exact checks; `inttoptr`'s capability rule; and the **FUGC protocol**: pollchecks, soft
+handshakes, a store barrier, and **exit/enter around anything that blocks**. So step 0 also needs
+the **thread state machine and pollcheck callbacks**; even a blocking `write()` touches the GC.
+
+▶️ **Next:** one more observation probe, a loop plus a blocking call, to read the **pollcheck
+word's location** and the **enter/exit entry points** from the pass's output. Then the spike below,
+**re-aimed at step 0**.
 
 ▶️ **The spike, waiting for the owner's go-ahead:** the **`zsys_write` spike**. Override
 `pizlonated_zsys_write` from a Zig static library in one gate case, confirm our version is the one

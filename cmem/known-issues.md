@@ -279,6 +279,9 @@ Hello-world's backtrace: `std.debug.print` → `debug.lockStderrWriter` → `Pro
 
 - **Why it's P4:** it is Zig std talking to the kernel behind libc's back, which a checked world
   cannot allow. The same family as KI-5.
+- ⚠️ **It is also a GC hazard (from the design docs, `filc-abi.md` §5b):** a raw `futex` or
+  `clock_nanosleep` blocks **without exiting**, so FUGC's soft handshakes would wait on that thread
+  forever. Routing through the runtime is **required**.
 - **Most zilc-shaped fix (to verify):** extend the IR rewrite (`src/ir.zig`) to replace
   `asm sideeffect "syscall"` with a call to libc's `syscall(n, …)`, which in Fil-C goes through the
   checked `zsys_*` layer (`filc-abi.md`). It needs checking that Fil-C's `syscall()` accepts these
@@ -305,7 +308,9 @@ functions) built through the pass. P3/P4.
 `33_mutexes` and one more threading example: `cannot read pointer with null object` in musl's
 `__pthread_timedjoin_np`. Most likely Zig's std keeps the `pthread_t` it got from `pthread_create`
 in a form that loses its capability (an integer round trip). The same family as KI-5 and P4's
-`@ptrFromInt` question. Unverified.
+`@ptrFromInt` question. ◐ **The mechanism is confirmed by the design docs** (`gimso_semantics.md`,
+`filc-abi.md` "inttoptr"): an integer that comes from a **load or a call** always turns back into a
+pointer with a **null capability**. The exact Zig code path is still unverified.
 
 Also seen, not yet analysed: `42_panic` hits `stack overflow` in Zig's panic path under zilc, and
 `76_signals` accesses a pointer with no capability.
