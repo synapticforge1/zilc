@@ -50,6 +50,10 @@ below 20 or at 21 and above, and its bundled libc++ is `_LIBCPP_VERSION 200100` 
 `cmake/Modules/LLVMVersion.cmake` is **20.1.8**. Same major version, so the IR is compatible.
 Experiments use 0.15.2.
 
+🎯 **Owner goal 2026-09-30:** after the initial work, zilc moves to the *latest* Zig with minimal
+layout rework. The LLVM match binds only the Zig that compiles **user code**, not the one that
+builds zilc (`design-decisions.md` invariant 4).
+
 **Owner decision 2026-09-18: we do not port the pass to LLVM 21 ourselves.** When Fil-C moves to
 a clang that Zig 0.16.0 covers, the whole repo converts to 0.16.0. **Reopen condition:** Fil-C's
 `LLVMVersion.cmake` major becomes 21, checked at every upstream sync (`upstream.md` step 1).

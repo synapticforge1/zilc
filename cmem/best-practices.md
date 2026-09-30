@@ -73,6 +73,17 @@ citation to the incident.
 - **A minimum-version field is not a pin.** `minimum_zig_version` only rejects *older* Zigs. A
   newer one runs and fails with ordinary compile errors that look like code bugs. Name the required
   toolchain wherever build commands appear. (zilc, 2026-09-18.)
+- **Measure the contract before planning the port.** Running `nm` over the prebuilt runtime
+  turned "port Fil-C to Zig" from a guess into 294 + 1,032 + 335 named symbols in separable layers.
+  That showed which layer could be swapped a function at a time and which could only be swapped
+  whole. It took ten minutes and needed no source tree. (zilc, 2026-09-30, `architecture.md`.)
+- **A parser that ACCEPTS your input may not have understood it. Print what it produced.**
+  `std.SemanticVersion.parse("0.15.2_3")` succeeds, because `_` is a digit separator, and yields
+  patch **23**, silently equal to `0.15.23`. Only printing the parsed fields exposed it. (zilc
+  versioning, 2026-09-30.)
+- **Reserve a switch by refusing it, never by falling back.** `--runtime zig` exists but refuses
+  to run, so no build can claim the new path while quietly using the old one. The same rule applied
+  to Debug before it was supported. (zilc, 2026-09-30.)
 - **Verify licenses per file, not per badge.** (Fil-C = `NOASSERTION` on GitHub, three licenses in
   practice; wasmtime's badge omitted its LLVM exception.)
 - **Ask where the artifact goes, not where the file sits.** License obligations attach to what you

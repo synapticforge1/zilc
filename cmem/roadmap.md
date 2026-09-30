@@ -1,5 +1,9 @@
 # Roadmap
 
+> **Updated 2026-09-30.** P3 has a plan (Linux first, the Zig runtime checked against Fil-C, the
+> `--runtime` switch already in the CLI), and a proposed **P6 — other platforms**. Next step: the
+> `zsys_write` spike, or P4, whichever the owner picks.
+
 > **Updated 2026-09-23 (twice — read the P2 section).** WSL arrived, P1 ran, and its step-3 verdict
 > ("the wrapper-driver route is dead") was **REVERSED by P2 the same afternoon**. ✅ **THE P1
 > MILESTONE IS MET:** a Zig object and a C caller, both through Fil-C's pass, panic correctly with
@@ -163,10 +167,42 @@ semantic origin:  bounds.zig:13:6: zig_add   ←  c_caller.c:26:5: main      exi
 - `std.os.environ` is unset by the entry shim (KI-5); nothing tested needs it yet.
 - Then **P4**: Zig language fidelity, where `@ptrFromInt` across `std` is the interesting problem.
 
-## P3 — `zilc_runtime` in Zig
+## P3 — `zilc_runtime` in Zig. **Plan set 2026-09-30: Linux first, checked against Fil-C**
 
 Replace the C runtime with Zig, piece by piece, behind the same ABI the pass emits calls to.
 **Exit criterion:** P2's gate still passes with no Fil-C C code linked.
+
+**Method (owner, 2026-09-30).** Keep Fil-C's pass and its checked musl fixed and swap only the
+runtime. The Zig runtime is linked **ahead of** `libpizlo`, so each function it defines replaces
+Fil-C's and the rest still come from Fil-C. Every gate case is built under both runtimes and must
+match on output, exit code, fault kind and fault file:line. The measured contract (294 `filc_*`, 1,032
+allocator/GC, 335 `zsys_*`) is in `architecture.md` "The runtime contract".
+
+**Switch:** `zilc build --runtime filc|zig` ✅ **exists 2026-09-30**. `zig` is reserved and refused
+until ready. To be added: a gate option `-Druntime=filc|zig|both`, where `both` is the
+side-by-side comparison, and a line from `--runtime zig` saying how many entry points are native,
+so a mixed run is never mistaken for a fully native one.
+
+**Order, easiest to check first:**
+
+1. **The `zsys_*` OS boundary, one function at a time.** Each can be swapped and checked on its own,
+   and it is the per-OS layer that P6 needs. ⚠️ To verify: whether Fil-C's exported checking helpers
+   (`filc_check_*`, `filc_native_*`) are enough for a Zig wrapper.
+2. **The pass → runtime entry points (`filc_*`):** check failures, reporting, calling-convention
+   checks. Mostly stateless.
+3. **The allocator + GC, all at once**, because it holds global state. The only check against Fil-C
+   is whole-program (the gate plus side-by-side runs), with `lib_gcverify` as a GC reference.
+
+▶️ **First step, waiting for the owner's go-ahead:** the **`zsys_write` spike**. Override
+`pizlonated_zsys_write` from a Zig static library in one gate case, confirm our version is the one
+called, and require the gate to pass 4/4 under both runtimes. It answers two questions that decide
+the link line: **(a) Fil-C's internal calling convention** (the `pizlonated_*` functions are not
+normal C calls; `filc_cc_args_check_failure` is part of it), and **(b) linking**: Fil-C links its
+libc as a shared library, so a replacement in a static archive may not get pulled in without
+`--whole-archive` or passing object files directly.
+
+⚠️ **Prerequisites:** open question #3 (port vs. clean-room rewrite) must be settled before runtime
+code, and the Zig runtime must match Fil-C 0.685's object layout exactly (`design-decisions.md`).
 
 ## P4 — Zig language fidelity
 
@@ -179,3 +215,22 @@ Zig ⇄ C program where C overflows a Zig-owned slice and panics, across the ful
 
 libc++/libc++abi under the target, exceptions/unwinding, threads with atomic capability updates,
 performance measurement against Fil-C.
+
+## P6 — Other platforms. **Proposed 2026-09-30, not yet adopted as a goal**
+
+Target: **safe Zig on the major 64-bit OSes, safe C on Linux first.** Reasoning and limits are in
+`design-decisions.md` open question #4. Order:
+
+1. **Linux ARM64.** Fil-C supports it upstream. zilc hard-codes x86_64 as the default target
+   (`driver.zig` `Options.target`, `main.zig`), and the IR tests only use an x86 triple. The `ni:0`
+   insertion goes after the `m:` part of the layout, so it should carry over, but that is unverified.
+   Also unverified: whether Fil-C publishes an ARM64 release.
+2. **P3 finished on Linux**, since a portable runtime is what makes any other OS reachable.
+3. **Count the OS functions Zig's std references** for `x86_64-windows` and `aarch64-macos`. That
+   count is the wrapper workload, and it should be known before committing to either target.
+4. **The first non-Linux target, Zig code only.** Expect KI-5-style traps wherever std's OS layer
+   builds pointers from integers.
+
+**Host side (separate from targets):** zilc's own code is portable Zig, but it needs Fil-C's clang,
+which only ships for Linux. Running zilc on other hosts needs Fil-C's clang built for those hosts
+(clang is already a cross-compiler), or P2 route (a), linking Zig against Fil-C's LLVM.

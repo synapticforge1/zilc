@@ -13,6 +13,48 @@ for structure and policy.
 
 ---
 
+## 🆕 2026-09-30 — the Zig runtime and other platforms now have a plan (no version bump)
+
+- **Decided (owner):** the Zig-native runtime (P3) is built **on Linux first, checked against
+  Fil-C**. Fil-C's pass and checked musl stay fixed; the runtime is swapped one layer at a time, and
+  every gate case must match under both runtimes. The pass is **not** ported (`design-decisions.md`).
+- **Shipped:** `zilc build --runtime filc|zig`. `filc` is the default; **`zig` is reserved and
+  refused** until the Zig runtime is ready for testing. Tests **10/10**, gate **4/4** re-run.
+- **Measured:** Fil-C's runtime contract. `libpizlo` exports 294 `filc_*` (pass → runtime), 1,032
+  allocator/GC, and 335 `zsys_*` (the OS boundary). Details: `architecture.md` "The runtime contract".
+- **Proposed, not adopted:** **P6 — other platforms**. Safe Zig on the major 64-bit OSes, safe C on
+  Linux first. Zig's portability covers the runtime, but not the per-OS checked wrappers or a safe
+  libc (`roadmap.md` P6, `design-decisions.md` open question #4).
+- ▶️ **NEXT, the owner picks:** the **`zsys_write` spike** (`roadmap.md` P3: learns Fil-C's
+  internal calling convention and the linking question) or **P4**. ⚠️ Before any runtime code:
+  settle open question #3, port vs. clean-room rewrite.
+- 🎯 **Goal (owner):** after the initial work, move to the **latest Zig with the least rework of
+  the file layout**. Design for it now (`design-decisions.md` invariant 4): keep version-sensitive
+  std calls few (about 31 sites today), and remember there are **two Zigs**, the one that builds
+  zilc and the one that compiles user code, and only the second is pinned by Fil-C's LLVM.
+- 🔄 **Upgrade procedure (owner):** **A** follow Fil-C to the Zig with the matching LLVM (the
+  reference) → **B** port to the latest Zig if different, and require identical gate results →
+  **C** benchmark comparison between versions. `upstream.md` "Upgrade procedure". The benchmark
+  suite doesn't exist yet (`testing.md`).
+- 🔖 **Versioning (owner), APPLIED: the version is now `0.15.2-3`**, `<Zig line>-<zilc
+  release>` (was `0.3.0`). Spelling verified with Zig's parser (`0.15.2_3` rejected: Zig reads it as
+  `0.15.23`). **No 1.0, ever**: only `-N` advances, and **`N` restarts at 1 for every new Zig
+  version, patch releases included** (e.g. `0.16.1-1`, `0.16.2-1`). Scheme fully settled
+  (`releasing.md`).
+- 🧭 **Lines and basis (owner):** the Zig part names the Zig a line is **built with**, not the Zig
+  user code needs (corrected the same day; `root.zig`'s constant is now `zig_line`). The
+  **reference line** tracks Fil-C's LLVM. Each **latest line** is ported from the newest reference
+  release and names it as its **basis** (`0.16.2-1`, basis `0.15.2-100`). Port notes go in
+  `cmem/ports/`. ⚠️ There's no release-notes file yet, and `zilc --version` should show the
+  user-code Zig and the Fil-C release.
+- 🌿 **One git branch per Zig line (owner), named `v<zig>`:** `main` is the base (the reference
+  line), and **`cmem/` is authoritative on `main` only**, with port notes in `cmem/ports/`. The
+  first release tag is **`v0.15.2-3`**, and branch **`v0.15.2`** was cut from the same commit
+  (local, not pushed). ⚠️ Never create a tag named just `v0.15.2`; it would clash with the branch
+  (`releasing.md`).
+  Tests **11/11**, gate 4/4 after the change.
+- **Loose ends unchanged:** the upstream Debug report (owner files it) and `std.os.environ` (KI-5).
+
 ## 🏁 STATE AT PAUSE — 2026-09-23. ✅ **P1 AND P2 ARE COMPLETE (`0.3.0`). zilc WORKS.**
 
 **Read this first; it is the shortest true summary of where the project stands.**
@@ -31,9 +73,9 @@ C allocated the memory, **Zig** overflowed it, and the capability survived the l
 
 | gate | value | note |
 | --- | --- | --- |
-| version | **`0.3.0`** | P1 + P2 shipped; cadence in `releasing.md` |
+| version | **`0.15.2-3`** | zilc release 3, for Zig 0.15.2 (was `0.3.0`; scheme changed 2026-09-30, `releasing.md`) |
 | **`zig build gate`** | **4/4** | 🎯 **the safety gate** — every example traps at the right file:line. **Inversion-tested.** ⚠️ SKIPS (exit 0) without Fil-C |
-| `zig build test` | 9/9 | incl. the IR-rewrite unit tests, which caught two real bugs |
+| `zig build test` | 11/11 | incl. the IR-rewrite unit tests, which caught two real bugs, the `--runtime zig` refusal, and the version round-trip (2026-09-30) |
 | `zig build` | green | CLI `zilc` + static `zilc_runtime` + `zilc.h` |
 | `zig build capi-smoke` | green | C client links the runtime via `zilc.h` |
 | `zig build baseline` | green | the same bugs under plain `zig cc`: **exit 0, undetected** — the contrast the project exists for |
@@ -134,17 +176,18 @@ the runtime-linking rule checked.
 | --- | --- |
 | [overview.md](overview.md) | What zilc is, repo layout, key files, build steps. |
 | [vision.md](vision.md) | The goal: one `zig` binary that compiles Zig, C and C++ to a single memory-safe target. Owner's framing (via a Gemini discussion, 2026-09-18), with the claims that still need verifying marked. |
-| [architecture.md](architecture.md) | Target pipeline (frontend → LLVM IR → zilc pass → `zilc_runtime`), the InvisiCap and FUGC components, and what exists today. |
-| [design-decisions.md](design-decisions.md) | Invariants, decisions made so far, and the **open questions** that must be settled with the owner. Zig 0.15.2 API + Windows build notes (0.15.2 is at `C:\zig\0.15.2`, not on PATH). |
-| [upstream.md](upstream.md) | How zilc relates to Fil-C upstream: what to track, which files matter, pinned commit, and how to sync. |
+| [architecture.md](architecture.md) | Target pipeline (frontend → LLVM IR → zilc pass → `zilc_runtime`), the InvisiCap and FUGC components, what exists today, and 🔑 **the runtime contract measured 2026-09-30** (`libpizlo`'s four layers, by symbol count). |
+| [design-decisions.md](design-decisions.md) | Invariants, decisions made so far, and the **open questions** that must be settled with the owner. **2026-09-30: Linux-first Zig runtime checked against Fil-C, `--runtime filc\|zig`, the pass not ported; #4 platform analysis; #3 now blocks runtime code.** Zig 0.15.2 API + Windows build notes (0.15.2 is at `C:\zig\0.15.2`, not on PATH). |
+| [upstream.md](upstream.md) | How zilc relates to Fil-C upstream: what to track, which files matter, pinned commit, and 🔄 **the three-stage upgrade procedure (2026-09-30)**: Fil-C + compatible Zig → latest Zig → benchmarks. |
 | [licensing.md](licensing.md) | **License = `Apache-2.0 WITH LLVM-exception OR MIT`** (2026-09-18). Why, the runtime-linking rule, the copyleft exclusion. |
 | [reference-projects.md](reference-projects.md) | Fil-C, LLVM, Zig: verified licenses, what to mine each for, adoption status. |
-| [roadmap.md](roadmap.md) | P0 scaffold ✅ → **P1 feasibility milestone (agreed 2026-09-18, ⏸️ awaiting a Linux machine)** → P2 integrate the pass with Zig → P3 Zig runtime → P4 Zig-language fidelity → P5 C++. P1 lists the expected first breakages. |
+| [roadmap.md](roadmap.md) | P0 ✅ → P1 ✅ → P2 ✅ (`0.3.0`) → **P3 Zig runtime (plan 2026-09-30: Linux first, checked against Fil-C, `zsys_*` first; next step the `zsys_write` spike)** → P4 Zig-language fidelity → P5 C++ → **P6 other platforms (proposed 2026-09-30)**. |
 | [security-model.md](security-model.md) | The safety guarantees being targeted (spatial, temporal, thread-safe capability updates), and what is explicitly out of scope. |
-| [testing.md](testing.md) | Current gates (all green on Zig 0.15.2, with the exact commands) and the planned "every bug example must panic" gate. |
+| [testing.md](testing.md) | Current gates (gate 4/4, tests 10/10 on 2026-09-30, with the exact commands), the recorded expected panics, and the planned gates: `-Druntime=both`, the between-versions comparison, and the benchmark suite. |
 | [known-issues.md](known-issues.md) | 🔑 **KI-4 (2026-09-23): Fil-C's IR is a PATCHED-LLVM DIALECT** (`ni:0` + `datalayout_after_filc`), so stock IR cannot enter the pass — this decided the integration route. KI-1 ✅ resolved (WSL2 installed; `sudo` needs a password); KI-2 exFAT zig-cache; KI-3 LLVM 20 vs 21 skew. |
-| [releasing.md](releasing.md) | **Version `0.3.0`** (P1 + P2 shipped), the four places the number lives, and the minor-per-phase cadence. |
-| [best-practices.md](best-practices.md) | Method rules. Seeded from wazmrt, plus zilc's own (2026-09-18): verify toolchain versions in the build files **and** the binary; a minimum-version field is not a pin; no heredocs; Deno/Bun for scripts. |
+| [releasing.md](releasing.md) | 🔖 **Version `0.15.2-3`** (applied 2026-09-30): `<Zig line>-<release>`, the **basis** each latest-line release names, how to bump it, why `.` and `_` were rejected, no 1.0, `-N` restarts at 1 per Zig version, the four places the number lives. The old minor-per-phase cadence is retired. |
+| [ports/](ports/README.md) | 🆕 2026-09-30. **Port notes: one file per new Zig line, named by its first release** (`ports/0.16.2-1.md`): its basis, each API change and fix, the sites touched. `ports/README.md` holds the guide, the template, and, seeded with the 2026-09-18 0.16 → 0.15.2 move, whose API list is the 0.15.2 → 0.16 port in reverse. |
+| [best-practices.md](best-practices.md) | Method rules. Seeded from wazmrt, plus zilc's own: verify toolchain versions in the build files **and** the binary; a minimum-version field is not a pin; no heredocs; Deno/Bun for scripts; (2026-09-30) measure the contract before planning a port; reserve a switch by refusing, never by falling back. |
 
 ## Related files outside cmem
 

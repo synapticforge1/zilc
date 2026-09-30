@@ -23,6 +23,15 @@ const ir = @import("zilc").ir;
 /// `main` directly, and Zig's `start.zig` never enters the build.
 pub const Entry = enum { auto, c, zig };
 
+/// Which runtime the program links.
+///
+///  * `.filc` — Fil-C's `libpizlo`, the runtime every gate run uses today.
+///  * `.zig`  — zilc's own Zig runtime (P3), linked ahead of `libpizlo` so each
+///    entry point it defines overrides Fil-C's and the rest fall through.
+///    ⚠️ Reserved: it is refused until the runtime is ready for testing, so a
+///    build can never claim the Zig runtime while silently linking Fil-C's.
+pub const Runtime = enum { filc, zig };
+
 pub const Options = struct {
     inputs: []const []const u8,
     output: []const u8,
@@ -33,13 +42,14 @@ pub const Options = struct {
     target: []const u8 = "x86_64-linux-musl",
     /// Emit a linked executable, or stop at objects.
     emit: enum { exe, obj } = .exe,
+    runtime: Runtime = .filc,
     zig: []const u8,
     filc: []const u8,
     keep_temps: bool = false,
     verbose: bool = false,
 };
 
-pub const Error = error{ ToolFailed, NoInputs, UnsupportedInput };
+pub const Error = error{ ToolFailed, NoInputs, UnsupportedInput, RuntimeNotReady };
 
 /// Debug needs two concessions, both measured 2026-09-23 (KI-4):
 ///
@@ -215,6 +225,14 @@ fn compileZig(
 
 pub fn build(gpa: std.mem.Allocator, opts: Options) !void {
     if (opts.inputs.len == 0) return Error.NoInputs;
+    if (opts.runtime == .zig) {
+        std.debug.print(
+            \\zilc: --runtime zig is reserved: the Zig runtime is not ready for testing
+            \\  yet (cmem/roadmap.md P3). Use --runtime filc, the default.
+            \\
+        , .{});
+        return Error.RuntimeNotReady;
+    }
 
     // Temps live beside the output so a failed build leaves them inspectable
     // with --keep-temps, which is how KI-4/KI-5 were diagnosed in the first place.
@@ -284,4 +302,16 @@ pub fn build(gpa: std.mem.Allocator, opts: Options) !void {
 
     try link_args.appendSlice(gpa, &.{ "-o", opts.output });
     try run(gpa, link_args.items, opts.verbose);
+}
+
+test "--runtime zig is refused before anything runs" {
+    // No tool is invoked and no temp dir is made: the refusal comes first,
+    // so the paths here never need to exist.
+    try std.testing.expectError(Error.RuntimeNotReady, build(std.testing.allocator, .{
+        .inputs = &.{"never-read.zig"},
+        .output = "never-written",
+        .runtime = .zig,
+        .zig = "zig",
+        .filc = "clang",
+    }));
 }

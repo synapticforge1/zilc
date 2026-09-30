@@ -32,12 +32,12 @@ ZILC_FILC=…/build/bin/clang ZILC_ZIG=…/zig zig build gate    # from Linux
 a chance to pass must not read as a failure — but that also means *a green `zig build gate` on
 Windows means nothing*. Read the first line.
 
-## Current gates (2026-09-23)
+## Current gates (re-run 2026-09-30)
 
 | Step | Checks | State |
 | --- | --- | --- |
-| `zig build gate` | Every example traps at the right line (needs Fil-C) | **4/4** |
-| `zig build test` | Runtime module + CLI module + the IR rewrite | 9/9 pass |
+| `zig build gate` | Every example traps at the right line (needs Fil-C) | **4/4** (2026-09-30, after `--runtime` was added) |
+| `zig build test` | Runtime module + CLI module + the IR rewrite + the `--runtime zig` refusal + the version round-trip | **11/11** pass |
 | `zig build capi-smoke` | `tests/capi_smoke.c` links `zilc_runtime` via `zilc.h` and calls it | pass |
 | `zig build baseline` | Builds `examples/*.c` with plain `zig cc` | builds. `baseline_oob_write` prints `a[3] = 3`, exit 0: **the undetected bug** |
 
@@ -98,8 +98,19 @@ ReleaseSafe by default and Debug only where the size is acceptable.
 1. **Bug-example gate** (invariant 2 in `design-decisions.md`): every `examples/*.c` built with the
    zilc target must reproduce the table above — same fault kind, same line. Checking the exit code
    alone would pass a crash for the wrong reason.
-2. **Fil-C differential.** Run the same program under upstream Fil-C (Linux) and zilc. The panic
-   kind and location must match.
-3. **Upstream test corpus.** `filc/tests` from Fil-C, adopted under the ledger.
-4. **ABI completeness.** As in wazmrt, a C file that takes the address of every function declared in
+2. **Fil-C differential → `zig build gate -Druntime=filc|zig|both`** (shape set 2026-09-30,
+   `roadmap.md` P3). Each case is built under Fil-C's runtime and zilc's (`zilc build --runtime`).
+   Output, exit code, fault kind and file:line must match. This becomes the proof of P3, and it
+   stays meaningless until `--runtime zig` is enabled.
+3. **Version comparison (2026-09-30).** Stage B of an upgrade (`upstream.md`): zilc built by the
+   latest Zig must produce **identical gate results** to the stage-A reference built by the
+   compatible Zig. The gate already takes `ZILC_ZIG`/`ZILC_FILC`, so this needs two zilc builds
+   and a comparison of the two reports, not a new gate. Worth automating once it has been done by
+   hand once.
+4. **Benchmark suite (2026-09-30), for upgrade stage C.** Does not exist yet. Needed: a small set of
+   programs (Zig, C, and Zig ⇄ C) that run long enough to time, run under zilc and plain `zig`, with
+   repeats and a stated noise floor. Output: run time, build time and binary size per version pair.
+   Its first run also produces zilc's **own** slowdown figure (`vision.md`). Scripts in Deno/Bun.
+5. **Upstream test corpus.** `filc/tests` from Fil-C, adopted under the ledger.
+6. **ABI completeness.** As in wazmrt, a C file that takes the address of every function declared in
    `zilc.h`, so a declared-but-undefined symbol breaks the build.

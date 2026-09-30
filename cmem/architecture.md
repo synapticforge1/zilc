@@ -16,7 +16,7 @@
 | --- | --- | --- |
 | The IR rewrite | `src/ir.zig` | ✅ done, unit-tested (idempotent; `ni:0` after the `m:` component) |
 | The pipeline | `src/driver.zig` | ✅ done — Zig→IR→rewrite→`filc clang`, C straight through, one link |
-| The CLI | `src/main.zig` | ✅ `zilc build`, with KI-4/5/6 encoded as behavior, not just documented |
+| The CLI | `src/main.zig` | ✅ `zilc build`, with KI-4/5/6 encoded as behavior, not just documented. `--runtime filc\|zig` (2026-09-30; `zig` reserved and refused) |
 | Entry shim for whole Zig programs | generated `zilc_entry.zig` | ✅ done (KI-5) |
 | The safety gate | `tools/gate.zig` | ✅ 4/4, inversion-tested |
 | `zilc_runtime` (the Zig runtime) | `src/root.zig`, `src/capi.zig` | ◻️ **still a stub** — binaries link **Fil-C's** C runtime. That is P3 |
@@ -54,6 +54,33 @@ round-tripping pointers through integers behind the pass's back.
 single extra line is removed — stock clang compiles it. `ni` itself is standard LLVM; only `ni:0` is
 the extension. So this is a two-line dialect, not a different IR. Full evidence: `known-issues.md`
 KI-4.
+
+## 🔑 The runtime contract (measured 2026-09-30, Fil-C 0.685, `nm` in WSL)
+
+Fil-C's runtime is **not built into the compiler**. It is a separate library linked against a fixed
+set of named symbols, which is what makes swapping it one layer at a time possible (P3). The
+prebuilt release's `pizfix/lib/` holds:
+
+| file | role |
+| --- | --- |
+| `libpizlo.so` / `.a` (9.1 / 14 MB) | **the runtime**: capabilities, checks, allocator, GC, OS boundary |
+| `libc.so` / `.a` | **checked musl**, compiled *with* the pass |
+| `libyoloc.a`/`.so`, `libyolort.a`, `libyolounwind.a` | the **trusted** libc/runtime/unwinder beneath `libpizlo` |
+| `lib_gcverify/`, `lib_test/`, `lib_test_gcverify/` | alternative `libpizlo.so` builds, e.g. with GC verification. Useful as references for the GC port |
+| `stdfil-include/*.h` (1,850 lines) | the declared API: `stdfil.h`, `pizlonated_syscalls.h` (419 lines), `pizlonated_runtime.h`, … |
+
+`libpizlo.so` exports **2,496** symbols in four layers:
+
+| layer | size | what it is |
+| --- | --- | --- |
+| **pass → runtime** | **294** `filc_*` (excluding `filc_native_*`) | allocation, access-check failures, call checks (`filc_cc_args_check_failure`), global init. A small malloc/memcpy/printf C program calls only **11** |
+| **allocator + GC** | **1,032** `pas_*` / `bmalloc_*` / `verse_*` | libpas (WebKit's allocator) + `verse_heap` (FUGC). Largest, and it holds **global state**: two GCs cannot share one heap, so this layer can only be swapped all at once |
+| **OS boundary** | **335** `pizlonated_zsys_*`; checked musl uses **224** of them (of 283 external needs) | `long zsys_read(int fd, void* buf, size_t size)` etc. Implemented by 455 `filc_native_*`. **Fil-C has already drawn the narrow OS boundary a cross-platform port needs**, though it is shaped like Linux (`ioctl`, `readv`, …) |
+| **beneath** | `libpizlo.so` imports **337** symbols | from the trusted libc — where the runtime actually reaches the kernel |
+
+⚠️ **Code compiled by the pass calls `pizlonated_*` with Fil-C's own internal calling convention**,
+not the normal C one. A Zig replacement must implement that convention. It is the first thing the
+`zsys_write` spike has to learn (`roadmap.md` P3).
 
 ## The two core runtime components
 

@@ -24,6 +24,9 @@ const usage =
     \\  --entry <who>    who owns main: auto (default), zig, or c.
     \\                   `zig` wraps your `pub fn main` in a generated C-ABI entry,
     \\                   because Zig's own start code cannot run under Fil-C (KI-5).
+    \\  --runtime <rt>   runtime to link: filc (default), or zig.
+    \\                   `zig` is reserved for zilc's own runtime and is refused
+    \\                   until that runtime is ready for testing (roadmap P3).
     \\  --zig <path>     zig binary    (env ZILC_ZIG)
     \\  --filc <path>    Fil-C's clang (env ZILC_FILC)
     \\  --keep-temps     keep the intermediate .ll/.o files
@@ -52,8 +55,8 @@ pub fn main() !void {
 
     const args = try std.process.argsAlloc(arena);
     const code: u8 = run(arena, args) catch |e| blk: {
-        // driver.run already reported what failed; don't bury it under a trace.
-        if (e == driver.Error.ToolFailed) break :blk 1;
+        // The driver already reported these; don't bury them under an error name.
+        if (e == driver.Error.ToolFailed or e == driver.Error.RuntimeNotReady) break :blk 1;
         std.debug.print("zilc: {s}\n", .{@errorName(e)});
         break :blk 1;
     };
@@ -84,6 +87,7 @@ fn run(arena: std.mem.Allocator, args: []const []const u8) !u8 {
     var target: []const u8 = "x86_64-linux-musl";
     var emit: @FieldType(driver.Options, "emit") = .exe;
     var entry: driver.Entry = .auto;
+    var runtime: driver.Runtime = .filc;
     var keep_temps = false;
     var verbose = false;
     var zig_path = std.process.getEnvVarOwned(arena, "ZILC_ZIG") catch @as([]u8, @constCast("zig"));
@@ -94,7 +98,8 @@ fn run(arena: std.mem.Allocator, args: []const []const u8) !u8 {
         const a = args[i];
         const takes_value = std.mem.eql(u8, a, "-o") or std.mem.eql(u8, a, "-O") or
             std.mem.eql(u8, a, "--target") or std.mem.eql(u8, a, "--zig") or
-            std.mem.eql(u8, a, "--filc") or std.mem.eql(u8, a, "--entry");
+            std.mem.eql(u8, a, "--filc") or std.mem.eql(u8, a, "--entry") or
+            std.mem.eql(u8, a, "--runtime");
         if (takes_value and i + 1 >= args.len) {
             std.debug.print("zilc: '{s}' needs a value\n", .{a});
             return exit_usage;
@@ -118,6 +123,12 @@ fn run(arena: std.mem.Allocator, args: []const []const u8) !u8 {
             i += 1;
             entry = std.meta.stringToEnum(driver.Entry, args[i]) orelse {
                 std.debug.print("zilc: --entry must be auto, zig or c (got '{s}')\n", .{args[i]});
+                return exit_usage;
+            };
+        } else if (std.mem.eql(u8, a, "--runtime")) {
+            i += 1;
+            runtime = std.meta.stringToEnum(driver.Runtime, args[i]) orelse {
+                std.debug.print("zilc: --runtime must be filc or zig (got '{s}')\n", .{args[i]});
                 return exit_usage;
             };
         } else if (std.mem.eql(u8, a, "-c")) {
@@ -165,6 +176,7 @@ fn run(arena: std.mem.Allocator, args: []const []const u8) !u8 {
         .optimize = optimize,
         .target = target,
         .emit = emit,
+        .runtime = runtime,
         .zig = zig_path,
         .filc = filc_path,
         .keep_temps = keep_temps,

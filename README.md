@@ -3,7 +3,7 @@
 **A Fil-C-style memory-safe compilation target for the Zig toolchain**, covering Zig, C and C++ with
 one compiler binary.
 
-> **Status: working prototype (v0.3.0), Linux x86_64 only.** `zilc build` compiles Zig and C into
+> **Status: working prototype (v0.15.2-3: zilc release 3, for Zig 0.15.2), Linux x86_64 only.** `zilc build` compiles Zig and C into
 > one binary where out-of-bounds access and use-after-free trap at a named source line — using
 > Fil-C's existing pass and runtime, with no Zig fork and no LLVM build. See [Limits](#limits).
 
@@ -62,11 +62,12 @@ semantic origin:
 ```sh
 export ZILC_ZIG=/path/to/zig-0.15.2/zig          # stock Zig
 export ZILC_FILC=/path/to/filc/build/bin/clang   # Fil-C's clang
-zilc build [-O ReleaseSafe] [--target x86_64-linux-musl] [--entry auto|zig|c] [-o out] <inputs...>
+zilc build [-O ReleaseSafe] [--target x86_64-linux-musl] [--entry auto|zig|c] [--runtime filc] [-o out] <inputs...>
 ```
 
 `.zig` inputs go through Zig and the Fil-C pass; `.c`, `.cpp`, `.o` and `.a` go straight to Fil-C.
-`-v` prints every command it runs.
+`-v` prints every command it runs. `--runtime zig` is reserved for zilc's own runtime and is refused
+until that runtime is ready for testing; `filc` (the default) links Fil-C's.
 
 ### Limits
 
