@@ -183,9 +183,21 @@ until ready. To be added: a gate option `-Druntime=filc|zig|both`, where `both` 
 side-by-side comparison, and a line from `--runtime zig` saying how many entry points are native,
 so a mixed run is never mistaken for a fully native one.
 
-**Order, easiest to check first:**
+🔭 **Scoping, 2026-09-30 (`filc-abi.md`, `tools/p3/`). It REORDERS the plan below.** Fil-C's
+calling convention was decoded from post-pass IR. `pizlonated_X` is a *getter* that returns a
+capability to a **function object**, and calls go through a fast or a generic entry using the
+thread's cc buffers. So even one `zsys_*` replacement needs the **object-header format**,
+**function objects** and the **generic calling convention**. **That shared layer is step 0.**
+Linking looks straightforward: a `libzilc_rt.so` ahead of `-lpizlo` should override Fil-C's symbols
+under standard ELF lookup, but that is not yet run. Open: whether a blocking system call must tell
+the GC it is leaving managed code.
 
-1. **The `zsys_*` OS boundary, one function at a time.** Each can be swapped and checked on its own,
+**Revised order (2026-09-30):**
+
+0. **The ABI core:** object header, capability checks, function objects, the generic calling
+   convention, the thread's frame push/pop. No `libpizlo` symbol is replaced yet. Tested by building
+   a function object in Zig that Fil-C-compiled C code can call and get checked results from.
+1. **The `zsys_*` OS boundary, one function at a time**, now on top of step 0. Each can be swapped and checked on its own,
    and it is the per-OS layer that P6 needs. ⚠️ To verify: whether Fil-C's exported checking helpers
    (`filc_check_*`, `filc_native_*`) are enough for a Zig wrapper.
 2. **The pass → runtime entry points (`filc_*`):** check failures, reporting, calling-convention
@@ -193,7 +205,12 @@ so a mixed run is never mistaken for a fully native one.
 3. **The allocator + GC, all at once**, because it holds global state. The only check against Fil-C
    is whole-program (the gate plus side-by-side runs), with `lib_gcverify` as a GC reference.
 
-▶️ **First step, waiting for the owner's go-ahead:** the **`zsys_write` spike**. Override
+▶️ **Next, after the scoping:** read upstream's **design docs** (`invisicap.txt`,
+`invisicaps_by_example.md`, `gimso_semantics.md`) to fill the 🔸 gaps in `filc-abi.md` (upper
+bound, the freed flag, aux layout, GC entry/exit around system calls). Docs, not runtime source.
+Then the spike below, **re-aimed at step 0**.
+
+▶️ **The spike, waiting for the owner's go-ahead:** the **`zsys_write` spike**. Override
 `pizlonated_zsys_write` from a Zig static library in one gate case, confirm our version is the one
 called, and require the gate to pass 4/4 under both runtimes. It answers two questions that decide
 the link line: **(a) Fil-C's internal calling convention** (the `pizlonated_*` functions are not

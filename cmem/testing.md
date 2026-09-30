@@ -32,6 +32,41 @@ ZILC_FILC=…/build/bin/clang ZILC_ZIG=…/zig zig build gate    # from Linux
 a chance to pass must not read as a failure — but that also means *a green `zig build gate` on
 Windows means nothing*. Read the first line.
 
+## 🧪 `tests/basics`: 156 CORRECT programs (C + Zig), added 2026-09-30
+
+The owner's "Basics of Coding" lessons, 78 in C and the same 78 in Zig (provenance, licence and every
+change: `tests/basics/README.md`). The gate proves **bugs trap**. This corpus proves **correct
+programs don't**, and gives size numbers against plain Zig. Tools in `tools/basics/`.
+
+| check | C | Zig 0.15.2 |
+| --- | --- | --- |
+| compiles + links, plain Zig 0.15.2, `-lc`, musl | **78/78** (after 5 portability fixes) | **78/78** (after converting 60 files from 0.13/0.14) |
+| runs as designed, plain ReleaseSafe | **78/78** | **78/78** (exit codes; outputs not yet diffed) |
+| **builds with zilc** | **78/78** | ReleaseSafe **50/78** (KI-8, KI-9) · ReleaseSmall **77/78** (KI-9) |
+| **runs the same under zilc** | **77/78**: only `42_panic` differs, `abort()` exits 133 not 134 | **24/78**: KI-7 raw syscalls (~23), KI-10 pthread_join (2), other (2) |
+
+**C already works under zilc across the whole corpus. Zig's gaps are all in std**, not the pipeline:
+raw system calls, stack probes, f128 helpers, thread handles. That is P4, now with a
+measured to-do list.
+
+### Binary sizes (2026-09-30, x86_64-linux-musl, bytes, medians)
+
+Zig's musl binaries are **static**. zilc's are **dynamic** and load Fil-C's shared runtime:
+**`libc.so` 7.3 MB + `libpizlo.so` 9.1 MB + `libyoloc.so` 3.6 MB ≈ 20 MB**, installed once per
+machine, not per program. zilc passes `-g`, so stripped sizes are the fair comparison.
+
+| | Zig ReleaseSmall | Zig ReleaseSafe | zilc ReleaseSafe | zilc ReleaseSmall |
+| --- | --- | --- | --- | --- |
+| **C** (78), raw | 19,800 | 938,960 | 27,976 | n/a (C ignores `-O`) |
+| **C**, stripped | 19,800 | 20,536 | **18,592** | n/a |
+| **Zig** (the 50 all flavours built), raw | 16,832 | 2,330,200 | 565,624 | 89,632 |
+| **Zig**, stripped | 16,832 | 270,512 | 341,360 | 76,896 |
+
+Per-program ratios (median): C zilc/ReleaseSmall **0.86** stripped (smaller, since libc is not
+inside). Zig zilc ReleaseSafe/ReleaseSafe **1.26** stripped; zilc ReleaseSmall/ReleaseSmall **4.36**
+stripped (instrumentation plus Fil-C's calling-convention thunks). Tools:
+`tools/basics/size-compare.sh`, `size-report.sh`.
+
 ## Current gates (re-run 2026-09-30)
 
 | Step | Checks | State |

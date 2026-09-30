@@ -80,10 +80,34 @@ Run this **before** incorporating code from any project.
 
 ## Component Ledger
 
-**EMPTY as of 2026-09-18 — zilc has incorporated no third-party code yet.** The license texts are
-staged so the first adoption is compliant on day one.
+~~EMPTY as of 2026-09-18.~~ **First entry 2026-09-30:** test programs only. **Still no third-party
+code in zilc's toolchain or runtime.**
 
 Newest first. Copy the template for each adopted component.
+
+### basics-of-coding (C and Zig example programs, used as TESTS)
+- **Source:** https://github.com/jrmarcum/BasicsOfCodingC and https://github.com/jrmarcum/BasicsOfCodingZig
+  (the owner's own repositories)
+- **Version / commit:** C `0503871a87ef7d5f80f1ade1e5d653fe7bae1299`; Zig `d85cc5f7ac19232b240bf890dcd1b915449de789`
+- **Upstream path(s):** `NN_name/name.c` and `NN_name/name.zig`, 78 of each. Source files only; not the
+  lesson `.md` files or build outputs
+- **License (SPDX):** `CC-BY-3.0` for the lesson code, which derives (via "Basics of Coding Go") from
+  **"Go by Example" by Mark McGranaghan**; `CC0-1.0` for the owner's original contributions
+- **License file:** `tests/basics/c/LICENSE` + `NOTICE`, `tests/basics/zig/LICENSE` + `NOTICE`
+  (copied verbatim; each NOTICE carries the CC BY 3.0 attribution)
+- **What we reused:** the example programs, as a corpus of *correct* programs that zilc must build
+  and run without false traps
+- **Where it lives in zilc:** `tests/basics/c/`, `tests/basics/zig/` (converted to Zig 0.15.2),
+  `tests/basics/zig-0.16.2/` (being converted to Zig 0.16.0; rename to `zig-0.16.0` pending)
+- **Artifact destination:** **test-only.** Never linked into zilc, its runtime or user programs
+- **Modifications:** yes. Each non-obvious change is marked with a `// zilc:` or `/* zilc: */`
+  comment; the full list is in `tests/basics/README.md`
+- **Obligations satisfied:** [x] license present  [x] NOTICE (attribution) present  [x] change-notes
+  [n/a] SPDX headers (upstream uses none; attribution is centralised in NOTICE, as upstream does)
+  [n/a] binary-distribution notice (test-only)
+- **Benefit / drawback note:** 156 paired C/Zig programs covering most of each language's standard
+  library, owned by the project owner. CC BY 3.0 only asks for attribution, which the copied NOTICE
+  files provide.
 
 <!--
 ### <component-name>

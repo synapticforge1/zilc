@@ -264,3 +264,48 @@ Fil-C's libc is **musl**. With `-target x86_64-linux-gnu`, Zig emits glibc-style
 fails with `undefined reference to pizlonated_getrlimit64 / setrlimit64 / mmap64 / getcontext`.
 **Use `-target x86_64-linux-musl`** and they resolve. (The `pizlonated_` prefix in the error is just
 the pass's renaming — a plain "missing libc symbol", not a Fil-C-specific failure.)
+
+## 🔴 KI-7 — Zig's std makes RAW `syscall` asm even with `-lc`; Fil-C refuses it (2026-09-30)
+
+Found by the `tests/basics` corpus: **~23 of 78 Zig programs trap at run time**, even
+`01_hello-world`. Fil-C: `cannot handle inline asm (unsupported mnemonic for safe inline asm: syscall)`.
+The system call numbers show which paths bypass libc on Linux even when libc is linked:
+**186 `gettid`**, **202 `futex`**, **230 `clock_nanosleep`**.
+
+Hello-world's backtrace: `std.debug.print` → `debug.lockStderrWriter` → `Progress.lockStderrWriter`
+→ `Thread.Mutex.Recursive.lock` → `Thread.getCurrentId` → `LinuxThreadImpl.getCurrentId` →
+`linux.gettid` → `syscall0`. **So `std.debug.print` itself cannot run under zilc today.** The gate's
+`hello.zig` passes only because it never takes that lock.
+
+- **Why it's P4:** it is Zig std talking to the kernel behind libc's back, which a checked world
+  cannot allow. The same family as KI-5.
+- **Most zilc-shaped fix (to verify):** extend the IR rewrite (`src/ir.zig`) to replace
+  `asm sideeffect "syscall"` with a call to libc's `syscall(n, …)`, which in Fil-C goes through the
+  checked `zsys_*` layer (`filc-abi.md`). It needs checking that Fil-C's `syscall()` accepts these
+  numbers, and that pointer arguments (futex addresses) keep their capabilities.
+
+## 🟡 KI-8 — `__zig_probe_stack` undefined in ReleaseSafe too, not only Debug (2026-09-30)
+
+**27 of 28 ReleaseSafe build failures** in `tests/basics` (38 references): functions with large
+frames (`std/debug/SelfInfo.zig` stack traces, `std/fs/Dir.zig` path buffers) get Zig's stack probe,
+which lives in compiler-rt and never goes through the pass. The driver passes `-fno-stack-check`
+**only for Debug** (KI-4). ReleaseSmall avoids most of it because it drops stack-trace code (77/78
+built). **Fix: pass `-fno-stack-check` in every mode.** It's safe, because Fil-C checks the stack at
+every function entry (`cmp rsp, [thread]`, `filc-abi.md` §3).
+
+## 🟡 KI-9 — 128-bit float helpers missing (`__multf3`, `roundq`, …) (2026-09-30)
+
+`48_json` (float parsing uses `f128`) fails to link: `pizlonated___multf3`, `__divtf3`, `__fixtfti`,
+`__floatuntitf`, comparison helpers and `roundq`. These live in compiler-rt, which is not compiled
+through the pass, and Fil-C's libc does not provide them. The fix needs compiler-rt (or those
+functions) built through the pass. P3/P4.
+
+## 🟡 KI-10 — `pthread_join` traps on a pointer with no capability (2026-09-30)
+
+`33_mutexes` and one more threading example: `cannot read pointer with null object` in musl's
+`__pthread_timedjoin_np`. Most likely Zig's std keeps the `pthread_t` it got from `pthread_create`
+in a form that loses its capability (an integer round trip). The same family as KI-5 and P4's
+`@ptrFromInt` question. Unverified.
+
+Also seen, not yet analysed: `42_panic` hits `stack overflow` in Zig's panic path under zilc, and
+`76_signals` accesses a pointer with no capability.

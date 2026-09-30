@@ -47,6 +47,24 @@ for structure and policy.
   release and names it as its **basis** (`0.16.2-1`, basis `0.15.2-100`). Port notes go in
   `cmem/ports/`. ⚠️ There's no release-notes file yet, and `zilc --version` should show the
   user-code Zig and the Fil-C release.
+- 🧪 **`tests/basics`: 156 correct programs (owner's C + Zig lessons), 2026-09-30 → `testing.md`.**
+  **C: 78/78 build and 77/78 run identically under zilc** (the one difference is `abort()` exiting
+  133). **Zig 0.15.2: all 78 build and run with plain Zig, but only 24/78 run under zilc**, all
+  because of std: **KI-7** raw `syscall` asm (even `std.debug.print`), **KI-8** `__zig_probe_stack`
+  in ReleaseSafe (an easy driver fix), **KI-9** f128 helpers, **KI-10** `pthread_join`. Sizes: C
+  zilc is 0.86× Zig ReleaseSmall stripped. Zig zilc is 1.26× ReleaseSafe and 4.36× ReleaseSmall,
+  stripped. Every zilc program also needs a ~20 MB shared runtime. Licence: CC BY 3.0 via Go by
+  Example, test-only, first ledger entry.
+- 🔭 **P3 SCOPING STARTED (2026-09-30), on 0.15.2 → `filc-abi.md`.** Fil-C's runtime ABI was
+  decoded from post-pass IR, headers and binaries, **not runtime source**. `pizlonated_X` is a
+  *getter* returning a **function object**; calls use a fast or generic entry through the thread's
+  cc buffers; the header word at `lower−8` holds the aux pointer and object kind. **This reorders P3:
+  the shared ABI core is step 0**, before any `zsys_*`. Overriding by linking looks workable (not
+  yet run). It's also evidence that a **clean-room** runtime is feasible (open question #3).
+  **Next:** read upstream's design docs to close the 🔸 gaps. Probes: `tools/p3/`.
+- 🔒 **STAY ON ZIG 0.15.2 UNTIL THERE IS A STABLE BASE (owner).** A 0.16.0 trial port was
+  stopped. Its facts are in `ports/README.md` "Scouting": Fil-C head is still LLVM 20.1.8, latest
+  Zig is 0.16.0 (clang 21), and Fil-C ships ARM64 builds.
 - 🌿 **One git branch per Zig line (owner), named `v<zig>`:** `main` is the base (the reference
   line), and **`cmem/` is authoritative on `main` only**, with port notes in `cmem/ports/`. The
   first release tag is **`v0.15.2-3`**, and branch **`v0.15.2`** was cut from the same commit
@@ -186,6 +204,7 @@ the runtime-linking rule checked.
 | [testing.md](testing.md) | Current gates (gate 4/4, tests 10/10 on 2026-09-30, with the exact commands), the recorded expected panics, and the planned gates: `-Druntime=both`, the between-versions comparison, and the benchmark suite. |
 | [known-issues.md](known-issues.md) | 🔑 **KI-4 (2026-09-23): Fil-C's IR is a PATCHED-LLVM DIALECT** (`ni:0` + `datalayout_after_filc`), so stock IR cannot enter the pass — this decided the integration route. KI-1 ✅ resolved (WSL2 installed; `sudo` needs a password); KI-2 exFAT zig-cache; KI-3 LLVM 20 vs 21 skew. |
 | [releasing.md](releasing.md) | 🔖 **Version `0.15.2-3`** (applied 2026-09-30): `<Zig line>-<release>`, the **basis** each latest-line release names, how to bump it, why `.` and `_` were rejected, no 1.0, `-N` restarts at 1 per Zig version, the four places the number lives. The old minor-per-phase cadence is retired. |
+| [filc-abi.md](filc-abi.md) | 🆕 2026-09-30. **Fil-C 0.685's runtime ABI as OBSERVED** (post-pass IR, headers, binaries; no runtime source): flight pointers, the object-header word, function objects and getters, the fast and generic calling convention, the thread layout, linking and overriding. What P3 must match, and its scoping consequences. |
 | [ports/](ports/README.md) | 🆕 2026-09-30. **Port notes: one file per new Zig line, named by its first release** (`ports/0.16.2-1.md`): its basis, each API change and fix, the sites touched. `ports/README.md` holds the guide, the template, and, seeded with the 2026-09-18 0.16 → 0.15.2 move, whose API list is the 0.15.2 → 0.16 port in reverse. |
 | [best-practices.md](best-practices.md) | Method rules. Seeded from wazmrt, plus zilc's own: verify toolchain versions in the build files **and** the binary; a minimum-version field is not a pin; no heredocs; Deno/Bun for scripts; (2026-09-30) measure the contract before planning a port; reserve a switch by refusing, never by falling back. |
 

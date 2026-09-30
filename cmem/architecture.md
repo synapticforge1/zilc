@@ -79,8 +79,8 @@ prebuilt release's `pizfix/lib/` holds:
 | **beneath** | `libpizlo.so` imports **337** symbols | from the trusted libc — where the runtime actually reaches the kernel |
 
 ⚠️ **Code compiled by the pass calls `pizlonated_*` with Fil-C's own internal calling convention**,
-not the normal C one. A Zig replacement must implement that convention. It is the first thing the
-`zsys_write` spike has to learn (`roadmap.md` P3).
+not the normal C one. ✅ **Decoded 2026-09-30 → `filc-abi.md`:** `pizlonated_X` is a getter
+returning a function object, and calls use a fast or generic entry through the thread's cc buffers.
 
 ## The two core runtime components
 

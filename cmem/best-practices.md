@@ -77,6 +77,10 @@ citation to the incident.
   turned "port Fil-C to Zig" from a guess into 294 + 1,032 + 335 named symbols in separable layers.
   That showed which layer could be swapped a function at a time and which could only be swapped
   whole. It took ten minutes and needed no source tree. (zilc, 2026-09-30, `architecture.md`.)
+  ⚠️ **But symbol counts show SIZE, not COUPLING.** The same day, decoding one real call showed the
+  "separable" OS layer depends on the object format shared with the GC, which reordered the plan.
+  **Before sequencing a port by layer, trace one call end to end through the compiler's output.**
+  (`filc-abi.md` §6.)
 - **A parser that ACCEPTS your input may not have understood it. Print what it produced.**
   `std.SemanticVersion.parse("0.15.2_3")` succeeds, because `_` is a digit separator, and yields
   patch **23**, silently equal to `0.15.23`. Only printing the parsed fields exposed it. (zilc
