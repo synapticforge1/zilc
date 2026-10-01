@@ -1,0 +1,172 @@
+diff --git a/llvm/lib/Transforms/Instrumentation/FilPizlonator.cpp b/llvm/lib/Transforms/Instrumentation/FilPizlonator.cpp
+index d8812aa74..5b54a34d0 100644
+--- a/llvm/lib/Transforms/Instrumentation/FilPizlonator.cpp
++++ b/llvm/lib/Transforms/Instrumentation/FilPizlonator.cpp
+@@ -341,6 +341,17 @@ namespace {
+ 
+ static constexpr size_t NumSpecialFrameObjects = 0;
+ 
++// zilc (KI-22): with ZILC_VERIFY_COLOURING=1 in the environment, every frame slot is also found
++// by the original search and the compile aborts if the two differ. Off by default; it restores
++// the original's cost.
++static bool zilcVerifyColouring() {
++  static const bool On = [] {
++    const char* V = getenv("ZILC_VERIFY_COLOURING");
++    return V && V[0] == '1';
++  }();
++  return On;
++}
++
+ enum class MATokenKind {
+   None,
+   Error,
+@@ -3054,14 +3065,38 @@ class Pizlonator {
+ 
+     for (ValuePtr IP : Order) {
+       const std::unordered_set<ValuePtr>& Adjacency = Interference[IP];
+-      for (size_t FrameIndex = NumSpecialFrameObjects; ; FrameIndex++) {
+-        bool Ok = true;
+-        for (ValuePtr AIP : Adjacency) {
+-          if (FrameIndexMap.count(AIP) && FrameIndexMap[AIP].Index == FrameIndex) {
+-            Ok = false;
+-            break;
++      // zilc (KI-22): mark the indices the neighbours hold, then take the lowest free one.
++      // The original rescanned every neighbour for each candidate index (cubic on large
++      // functions); this picks the same index.
++      std::vector<bool> Taken(Adjacency.size() + 1, false);
++      for (ValuePtr AIP : Adjacency) {
++        auto Found = FrameIndexMap.find(AIP);
++        if (Found != FrameIndexMap.end() && Found->second.Index >= NumSpecialFrameObjects
++            && Found->second.Index - NumSpecialFrameObjects < Taken.size())
++          Taken[Found->second.Index - NumSpecialFrameObjects] = true;
++      }
++      size_t FirstFree = 0;
++      while (Taken[FirstFree])
++        FirstFree++;
++      if (zilcVerifyColouring()) {
++        // The original search, kept to prove the two agree (ZILC_VERIFY_COLOURING=1).
++        size_t Expected = NumSpecialFrameObjects;
++        for (;; Expected++) {
++          bool Clash = false;
++          for (ValuePtr AIP : Adjacency) {
++            if (FrameIndexMap.count(AIP) && FrameIndexMap[AIP].Index == Expected) {
++              Clash = true;
++              break;
++            }
+           }
++          if (!Clash)
++            break;
+         }
++        if (Expected != NumSpecialFrameObjects + FirstFree)
++          report_fatal_error("zilc (KI-22): frame-slot colouring differs from the original");
++      }
++      for (size_t FrameIndex = NumSpecialFrameObjects + FirstFree; ; FrameIndex++) {
++        bool Ok = true;
+         if (Ok) {
+           FrameEntryKind FEK;
+           PointerKind PK = pointerKindDirect(IP.V);
+@@ -3145,15 +3180,36 @@ class Pizlonator {
+ 
+     for (AllocaInst* AI : StackAuxOrder) {
+       const std::unordered_set<AllocaInst*>& Adjacency = StackAuxInterference[AI];
+-      for (size_t FrameIndex = FrameSize; ; FrameIndex++) {
+-        bool Ok = true;
+-        for (AllocaInst* AAI : Adjacency) {
+-          if (FrameIndexMap.count(ValuePtr(AAI, 0))
+-              && FrameIndexMap[ValuePtr(AAI, 0)].Index == FrameIndex) {
+-            Ok = false;
+-            break;
++      // zilc (KI-22): same lowest-free-index choice as the original, without rescanning.
++      std::vector<bool> Taken(Adjacency.size() + 1, false);
++      for (AllocaInst* AAI : Adjacency) {
++        auto Found = FrameIndexMap.find(ValuePtr(AAI, 0));
++        if (Found != FrameIndexMap.end() && Found->second.Index >= FrameSize
++            && Found->second.Index - FrameSize < Taken.size())
++          Taken[Found->second.Index - FrameSize] = true;
++      }
++      size_t FirstFree = 0;
++      while (Taken[FirstFree])
++        FirstFree++;
++      if (zilcVerifyColouring()) {
++        size_t Expected = FrameSize;
++        for (;; Expected++) {
++          bool Clash = false;
++          for (AllocaInst* AAI : Adjacency) {
++            if (FrameIndexMap.count(ValuePtr(AAI, 0))
++                && FrameIndexMap[ValuePtr(AAI, 0)].Index == Expected) {
++              Clash = true;
++              break;
++            }
+           }
++          if (!Clash)
++            break;
+         }
++        if (Expected != FrameSize + FirstFree)
++          report_fatal_error("zilc (KI-22): stack-aux colouring differs from the original");
++      }
++      for (size_t FrameIndex = FrameSize + FirstFree; ; FrameIndex++) {
++        bool Ok = true;
+         if (Ok) {
+           if (verbose) {
+             errs() << "For explicit local " << AI->getName() << " using lowers index " << FrameIndex
+@@ -14488,6 +14544,60 @@ class Pizlonator {
+         Twine(IBr->getAddress()->getName()) + ".switch_cast", IBr);
+     };
+ 
++    if (IndirectBrs.size() > 1) {
++      // zilc (KI-4): lower each indirectbr in place, over its own destinations only, instead of
++      // merging them into one switch_bb (which broke the destinations' phis and dominance).
++      DenseMap<BasicBlock*, unsigned> BlockNumber;
++      for (unsigned Index = 0; Index < BBs.size(); Index++)
++        BlockNumber[BBs[Index]] = Index + 1;
++      for (auto *IBr : IndirectBrs) {
++        BasicBlock* From = IBr->getParent();
++        SmallPtrSet<BasicBlock*, 8> Succs;
++        for (BasicBlock* Succ : IBr->successors())
++          Succs.insert(Succ);
++        SmallVector<BasicBlock*, 8> Dests; // address-taken successors, once each, in BBs order
++        for (BasicBlock* BB : BBs)
++          if (Succs.count(BB))
++            Dests.push_back(BB);
++        SmallPtrSet<BasicBlock*, 8> Kept(Dests.begin(), Dests.end());
++        // One edge From -> Dest remains per kept destination: keep exactly one phi entry for From
++        // there, and none in successors that lose their edge.
++        for (BasicBlock* Succ : Succs) {
++          SmallVector<PHINode*, 8> Phis;
++          for (PHINode& Phi : Succ->phis())
++            Phis.push_back(&Phi);
++          for (PHINode* Phi : Phis) {
++            bool Seen = false;
++            Phi->removeIncomingValueIf(
++              [&] (unsigned Index) {
++                if (Phi->getIncomingBlock(Index) != From)
++                  return false;
++                if (Kept.count(Succ) && !Seen) {
++                  Seen = true;
++                  return false;
++                }
++                return true;
++              },
++              /*DeletePHIIfEmpty=*/false);
++            if (!Phi->getNumIncomingValues()) {
++              Phi->replaceAllUsesWith(PoisonValue::get(Phi->getType()));
++              Phi->eraseFromParent();
++            }
++          }
++        }
++        if (Dests.empty()) {
++          (void)new UnreachableInst(F.getContext(), IBr);
++          IBr->eraseFromParent();
++          continue;
++        }
++        auto *SI = SwitchInst::Create(GetSwitchValue(IBr), Dests[0], Dests.size(), IBr);
++        for (unsigned Index = 1; Index < Dests.size(); Index++)
++          SI->addCase(ConstantInt::get(CommonITy, BlockNumber[Dests[Index]]), Dests[Index]);
++        IBr->eraseFromParent();
++      }
++      return;
++    }
++
+     if (IndirectBrs.size() == 1) {
+       // If we only have one indirectbr, we can just directly replace it within
+       // its block.

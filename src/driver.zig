@@ -52,18 +52,12 @@ pub const Options = struct {
 
 pub const Error = error{ ToolFailed, NoInputs, UnsupportedInput, RuntimeNotReady };
 
-/// Debug needs two concessions, both measured 2026-09-23 (KI-4):
-///
-///  * **`filc -O0`.** Debug IR segfaults Fil-C's pass at `-O1`/`-O2` and compiles
-///    fine at `-O0`. The crash is upstream's, in the optimizer's interaction
-///    with the pass, and we cannot fix it from here.
-///  * **`-fno-stack-check`.** Zig's stack probe (`__zig_probe_stack`) lives in
-///    Zig's compiler-rt, which never goes through the pass, so the link fails
-///    on it. Turning probing off is honest here: Fil-C's own checks are what
-///    make the program safe, and they do not rely on guard pages. Since
-///    2026-09-30 this applies in every mode, not only Debug (KI-8).
-///
-/// The cost is size — a Debug object runs to tens of megabytes.
+/// Debug's Fil-C step runs at `-O1` like every mode since 2026-10-01. From 2026-09-23 it ran at
+/// `-O0`, because Debug IR segfaulted Fil-C's pass at `-O1` (KI-4). The cause is Fil-C's
+/// `indirectbr` lowering, which breaks phis when a function has several `indirectbr`s (Zig emits
+/// one per `continue :label`). zilc's patched Fil-C clang fixes it (`tools/filc/`). `-O0` was not
+/// free: it left syscall pointer arguments without capabilities (KI-19) and made Fil-C's pass
+/// several times slower (KI-22). With the prebuilt clang, Debug builds now fail on KI-4.
 pub fn isDebug(optimize: []const u8) bool {
     return std.mem.eql(u8, optimize, "Debug");
 }
@@ -422,10 +416,16 @@ fn compileZig(
     // driver is `…-linux-gnu`, so clang warns that it is overriding ours. It is
     // expected, not a mismatch to fix — Fil-C's libc *is* musl whatever its
     // triple says, which is why the musl target is the one that links (KI-6).
-    const filc_opt: []const u8 = if (isDebug(opts.optimize)) "-O0" else "-O1";
-    try run(gpa, &.{
-        opts.filc, filc_opt, "-g", "-Wno-override-module", "-c", "-o", obj_path, filc_ll_path,
-    }, opts.verbose);
+    run(gpa, &.{
+        opts.filc, "-O1", "-g", "-Wno-override-module", "-c", "-o", obj_path, filc_ll_path,
+    }, opts.verbose) catch |e| {
+        if (isDebug(opts.optimize)) std.debug.print(
+            \\zilc: Debug builds need zilc's patched Fil-C clang, which fixes Fil-C's crash on
+            \\  several indirectbr in one function (cmem/known-issues.md KI-4; tools/filc/).
+            \\
+        , .{});
+        return e;
+    };
     return obj_path;
 }
 

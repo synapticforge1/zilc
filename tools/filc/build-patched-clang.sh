@@ -1,6 +1,6 @@
 #!/bin/sh
 # Build Fil-C's clang from source WITH zilc's local pass fixes, for local use only
-# (cmem/workarounds.md KI-22; ledger `filc-pass-colouring-fix` in third_party/LICENSES.md).
+# (cmem/workarounds.md KI-22; ledger `filc-pass-fixes` in third_party/LICENSES.md).
 #
 #   wsl.exe -e sh /mnt/d/…/zilc/tools/filc/build-patched-clang.sh
 #
@@ -39,7 +39,10 @@ if [ ! -f build.ninja ]; then
     -DLLVM_ENABLE_CURL=OFF -DLLVM_ENABLE_HTTPLIB=OFF \
     -DLLVM_STATIC_LINK_CXX_STDLIB=ON -DCMAKE_EXE_LINKER_FLAGS=-static-libgcc
 fi
-ninja clang
+# ⚠️ Not ninja's default (one job per core): 32 parallel RelWithDebInfo compiles of clang's largest
+# files exhausted the 31 GB WSL VM and crashed the WSL service twice (2026-10-01,
+# Wsl/Service/E_UNEXPECTED). The job count changes build speed only, never the result.
+ninja -j "${JOBS:-12}" clang
 
 # Install: the prebuilt tree (headers, runtime, libc) with our clang binary in place.
 rm -rf "$OUT"

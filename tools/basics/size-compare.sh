@@ -12,7 +12,11 @@
 WORK=${WORK:-$HOME/zilc-work}
 REPO=$(cd "$(dirname "$0")/../.." && pwd)
 export ZILC_ZIG=${ZILC_ZIG:-$WORK/tools/zig-0.15.2/zig}
-export ZILC_FILC=${ZILC_FILC:-$WORK/tools/filc-0.685-linux-x86_64/build/bin/clang}
+# Default: the locally patched Fil-C clang (KI-22, tools/filc/build-patched-clang.sh); the prebuilt
+# if it is not built. The prebuilt stays for comparison (tools/filc/compare-clangs.sh).
+ZILC_FILC_DEFAULT=$WORK/tools/filc-0.685-zilc/build/bin/clang
+[ -x "$ZILC_FILC_DEFAULT" ] || ZILC_FILC_DEFAULT=$WORK/tools/filc-0.685-linux-x86_64/build/bin/clang
+export ZILC_FILC=${ZILC_FILC:-$ZILC_FILC_DEFAULT}
 export ZIG_LOCAL_CACHE_DIR=${ZIG_LOCAL_CACHE_DIR:-$HOME/.cache/zilc-basics}
 OUT=$WORK/basics-size
 rm -rf "$OUT"; mkdir -p "$OUT"

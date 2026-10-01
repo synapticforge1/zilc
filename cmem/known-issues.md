@@ -69,6 +69,13 @@ the reverse of that change.** `main.zig` goes back to `std.process.Init`/`std.Io
 
 ## 🔑 KI-4 — Fil-C's IR is a PATCHED-LLVM DIALECT. ⚠️ **PARTLY REVERSED SAME DAY — stock IR CAN enter it**
 
+> ✅ **2026-10-01: the Debug `-O1` CRASH recorded in this entry is FIXED** by zilc's patched Fil-C
+> clang. The cause was Fil-C's `indirectbr` lowering (copied from LLVM's `IndirectBrExpandPass`):
+> with several `indirectbr`s in one function (Zig emits one per `continue :label`) it merged them
+> into one `switch_bb` and left the destinations' phis stale. Debug now compiles at `-O1` like
+> every mode, which also fixed KI-19. Full why, the failed first attempt, and the fix:
+> `workarounds.md` KI-4. The dialect facts below are unaffected.
+
 > ⚠️ **READ THE REVERSAL AT THE END OF THIS ENTRY BEFORE ACTING ON ANYTHING ABOVE IT.** The dialect
 > facts below are all correct and still load-bearing. The *conclusion* drawn from them — "externally
 > produced IR is not an entry point" — was **wrong**, and was falsified the same afternoon by the
@@ -498,7 +505,17 @@ On the unoptimized route (KI-17), **2 of 78 programs crash Fil-C's clang in ever
 - Reduced module: `~/zilc-work/csize/csize-reduced.ll` (WSL); input `…/runes.zilc-tmp/
   strings-and-runes.filc.ll`.
 
-## 🔴 KI-22 — Build time: Fil-C's frame-slot colouring is cubic on big Zig functions (2026-10-01). **Option 2 in progress: a locally patched Fil-C clang**
+## ◐ KI-22 — Build time: Fil-C's frame-slot colouring is cubic on big Zig functions (2026-10-01). **Option 2 DONE (patched Fil-C clang, the default); option 3 research next**
+
+**Status 2026-10-01 (evening):** the patched clang is built and is the default in zilc's scripts
+(prebuilt kept for comparison). Its colouring was verified equal to the original's on every build
+of the corpus in all 4 modes (`ZILC_VERIFY_COLOURING=1`). Together with the KI-4 fix (Debug at
+`-O1`), `69`'s builds under full corpus load: ReleaseSafe 214 → **112 s**, ReleaseFast 742 →
+**154 s**, ReleaseSmall 178 → **87 s**, Debug timeout → **83 s**. Corpus medians: Debug 19 s,
+ReleaseSafe 4 s, ReleaseFast 3 s, ReleaseSmall 2 s. **Still open for option 3:** `69` alone is
+~54 s in Fil-C's clang vs native Zig's 20 s total, and Debug's median is ~5× Release's.
+
+Original entry:
 
 `69_http-client`: ReleaseSafe 132 s alone (native Zig 20 s), ReleaseFast 754 s under corpus load;
 Debug times out (30 min). 75% of it is in `FilPizlonatorPass`, almost all in one greedy colouring
@@ -506,7 +523,7 @@ loop that rescans every neighbour per candidate frame index, which is cubic when
 IR keeps hundreds of escaping allocas live together (no lifetime markers). Found by synthetic
 scaling, gdb sampling and the pass source (allowed, owner 2026-10-01). **Owner chose option 2**:
 build Fil-C's clang locally from the prebuilt's own commit with an output-identical fix
-(`tools/filc/`, `third_party/filc-patches/`, ledger `filc-pass-colouring-fix`), **then research
+(`tools/filc/`, `third_party/filc-patches/`, ledger `filc-pass-fixes`), **then research
 option 3** (zilc-inserted lifetime markers). The full why, what was ruled out, and the options:
 `workarounds.md` KI-22. Open data: why ReleaseFast compiles 69 3.5× slower than ReleaseSafe, and
 why trivial Debug programs take ~36 s under load.
@@ -527,7 +544,16 @@ CSPRNG deliberately passes `0xffffffff` to detect QEMU and expects `EINVAL`; Fil
 CSPRNG on every fill, fork-safe). 69 now completes a real HTTPS request in every Release mode.
 Library mode is not covered (pre-publish checklist). Details: `workarounds.md` KI-20.
 
-## 🔴 KI-19 — Debug only: syscall POINTER arguments arrive without a capability (2026-09-30)
+## ✅ KI-19 — Debug only: syscall POINTER arguments arrive without a capability (2026-09-30). **FIXED 2026-10-01 by moving Debug to `filc -O1`**
+
+**Fix (2026-10-01):** the hypothesis below was right. The cause was `filc -O0`: no stack-slot
+promotion, so integers loaded back from Zig's Debug stack slots reached the syscall wrappers with
+no capability. Debug ran at `-O0` only because of KI-4's crash; the KI-4 patch (Fil-C's
+`indirectbr` lowering, `workarounds.md` KI-4) lets Debug use `-O1` like every mode. **All 12
+programs now run; the corpus is 78/78 as designed in Debug, as in every mode.** No zilc-side
+rewrite (candidate fix (a)) was needed. Candidate (b) below is the one that worked.
+
+Original entry:
 
 On the default (unoptimized) route, Debug is 63/78 as designed against 76 in every Release mode.
 **All 13 Debug-only traps are the same thing:** a system call's pointer argument has no

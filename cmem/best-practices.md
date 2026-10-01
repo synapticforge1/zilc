@@ -28,6 +28,17 @@ citation to the incident.
   bug.** Teach it the missing unit (functions, then globals), then sweep the minimal shape's
   neighbours by hand with tiny probes until the rule is exact. (KI-18, 2026-10-01: a function-only
   reduction kept an innocent `syscall4`; adding globals found `i21` in 11 runs.)
+- **To prove a compiler change is output-identical, compare INSIDE one run, not two binaries.**
+  Fil-C's pass is not reproducible under ASLR, and two different builds of it lay out the heap
+  differently, so byte comparison of their objects proves nothing on large inputs. Keep the old
+  computation behind a switch and abort if the two disagree (KI-22's `ZILC_VERIFY_COLOURING`).
+  Check the reproducibility of the BASELINE first (`setarch -R`, two runs).
+- **Cap build parallelism to memory, not to cores.** 32 parallel `RelWithDebInfo` compiles of
+  clang crashed the 31 GB WSL VM, and with it the WSL service, twice. `ninja -j 12` was fine.
+  (2026-10-01.)
+- **KI-1 again: never pass shell text containing `|` inline through PowerShell to WSL**, even in
+  a "simple" wait loop. A `grep -E "a|b"` became shell pipes, and the watcher looped on errors
+  for an hour. Put it in a script file. (2026-10-01.)
 - **Write the WHY of a workaround when you make it** (`workarounds.md`), keeping measured facts and
   surmises apart, and listing what was ruled out. (Owner rule, 2026-10-01.)
 - **A reopen condition is not self-checking.** Re-test it when you *price* the entry, not just when

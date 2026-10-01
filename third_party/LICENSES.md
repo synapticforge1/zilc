@@ -88,33 +88,42 @@ third-party runtime code in zilc.**
 
 Newest first. Copy the template for each adopted component.
 
-### filc-pass-colouring-fix (a local patch to Fil-C's compiler pass; LOCAL USE ONLY)
+### filc-pass-fixes (local patches to Fil-C's compiler pass; LOCAL USE ONLY)
 - **Source:** https://github.com/pizlonator/llvm-project-deluge (Fil-C's LLVM fork)
 - **Version / commit:** `bb0d0a64eed297ab8e171002033208fb08ad9941`, the commit the Fil-C **0.685**
   prebuilt names in `clang --version`
-- **Upstream path(s):** `llvm/lib/Transforms/Instrumentation/FilPizlonator.cpp`, the two frame-slot
-  colouring loops (about lines 3054–3076 and 3146–3160 at that commit)
+- **Upstream path(s):** `llvm/lib/Transforms/Instrumentation/FilPizlonator.cpp`: the two frame-slot
+  colouring loops (about lines 3054–3076 and 3146–3160 at that commit), and
+  `lowerIndirectBrForFunction` (Fil-C's copy of LLVM's `IndirectBrExpandPass`)
 - **License (SPDX):** `Apache-2.0 WITH LLVM-exception` (the file's own header)
 - **License file:** upstream `LLVM-LICENSE.txt` / `llvm/LICENSE.TXT`; nothing copied into zilc's
   source beyond the diff context
 - **What we changed:** the greedy colouring picks the lowest frame index no neighbour holds by marking
   the neighbours' indices once, instead of rescanning every neighbour per candidate index. Same
   visiting order, same choice, so **the same colouring and the same output**, at O(degree) instead
-  of O(degree × colours) per value (KI-22, `cmem/workarounds.md`)
+  of O(degree × colours) per value (KI-22, `cmem/workarounds.md`). **Added 2026-10-01 (KI-4):**
+  with several `indirectbr`s in one function, each is lowered in place into its own `switch` over
+  its own destinations, instead of all being merged into one `switch_bb` (which broke the
+  destinations' phis and dominance, and crashed). The single-`indirectbr` path is unchanged
 - **Where it lives in zilc:** `tools/filc/patch-pass.ts` (exact-match edit script, the diff
-  context), `third_party/filc-patches/0001-ki22-frame-slot-colouring.patch` (the resulting diff),
+  context), `third_party/filc-patches/zilc-filc-pass.patch` (the resulting diff, all edits),
   `tools/filc/build-patched-clang.sh` (build recipe mirroring Fil-C's `configure_llvm.sh`)
 - **Artifact destination:** **toolchain-only, and local only.** The patched clang lives in
-  `~/zilc-work/tools/filc-0.685-zilc/` and is **not distributed**. It emits the same code as the
-  prebuilt, so user binaries carry nothing new
-- **Modifications:** each changed block is marked `// zilc (KI-22): …` in the patched source
+  `~/zilc-work/tools/filc-0.685-zilc/` and is **not distributed**. It is the default for zilc's
+  scripts (owner, 2026-10-01); the prebuilt stays for comparison. The colouring fix emits the same
+  code; the KI-4 fix only changes functions that crashed before. User binaries carry no new code
+- **Modifications:** each changed block is marked `// zilc (KI-22): …` or `// zilc (KI-4): …` in the
+  patched source. Also
+  adds `zilcVerifyColouring()`: with `ZILC_VERIFY_COLOURING=1` the original search runs too and the
+  compile aborts on any difference (off by default)
 - **Obligations satisfied:** [n/a] while local: Apache-2.0 §4 applies only on redistribution.
   **If the patched clang is ever distributed:** [ ] include the Apache-2.0 + LLVM-exception licence
-  [ ] carry Fil-C's NOTICE/attribution files [ ] keep the `zilc (KI-22)` change marks (§4(b)
+  [ ] carry Fil-C's NOTICE/attribution files [ ] keep the `zilc (KI-…)` change marks (§4(b)
   prominent notice of modification) [ ] state the base commit
 - **Benefit / drawback note:** removes the cubic cost that made big Zig functions (TLS, crypto) and
-  Debug builds impractically slow; drawback: zilc must rebuild the patched clang at every Fil-C
-  upgrade until upstream changes the loop (`cmem/upstream.md` stage A)
+  Debug builds impractically slow, and lets Debug compile at `-O1`, which fixed KI-19's 12 Debug
+  programs. Drawback: zilc must rebuild the patched clang at every Fil-C upgrade until upstream
+  changes both (`cmem/upstream.md` stage A)
 
 ### zig-std-backports (Zig standard-library backports applied by `src/stdpatch.zig`)
 - **Source:** https://codeberg.org/ziglang/zig (the Zig 0.16.0 release, as installed: `lib/std/mem.zig`)

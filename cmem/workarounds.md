@@ -49,7 +49,7 @@ Every workaround gets an entry **when it is made**, not later. Use these heading
 | symptom text (search for it) | entry |
 | --- | --- |
 | `Assertion '!(CSize % WordSize)' failed` (`FilPizlonator.cpp:16714`) | [KI-18](#ki-18--globals-with-a-3-byte-value-type) |
-| segfault in `FilPizlonatorPass` on Debug IR at `-O1` | KI-4 (`known-issues.md`, `tools/p2/repro/`) |
+| segfault in `FilPizlonatorPass` on Debug IR at `-O1` (`SplitKnownCriticalEdge`, `PHINode::setIncomingBlock`) | [KI-4](#ki-4--fil-cs-pass-segfaults-on-debug-ir-at--o1-and-why-debug-was-at--o0) |
 | `cannot handle inline asm (unsupported mnemonic for safe inline asm: syscall)` | KI-7 |
 | `literal register %rdi not covered` (Valgrind sequence) | KI-14 |
 | `undefined reference to pizlonated___zig_probe_stack` | KI-8 |
@@ -220,6 +220,70 @@ unknown advice, the option can stay anyway.
 
 ---
 
+## KI-4 — Fil-C's pass segfaults on Debug IR at `-O1` (and why Debug was at `-O0`)
+
+**Symptom.** `clang -O1` on Zig Debug IR: `clang frontend command failed with exit code 139`
+(segfault) while running `FilPizlonatorPass`; the same IR compiles at `-O0`. From 2026-09-23 until
+2026-10-01 zilc therefore compiled Debug at `filc -O0`, which caused KI-19 (12 Debug programs
+trapping on syscall pointers) and much of KI-22's Debug build time.
+
+**Class.** Upstream defect, **inherited by Fil-C from LLVM's own `IndirectBrExpandPass`**, which has
+the same code. It lies in a path clang never exercises; Zig does.
+
+**Root cause, measured** (patched clang built with debug info + gdb, then the pass source,
+2026-10-01):
+
+- Crash site: `prepare()` (`FilPizlonator.cpp` ~16004) → `SplitAllCriticalEdges` →
+  `SplitKnownCriticalEdge` → `PHINode::setIncomingBlock(-1)`: a phi had no entry for one of its
+  block's predecessors.
+- The dumped block showed why: phis Fil-C added matched the predecessors (`switch_bb.Case1_crit_edge`,
+  `Else7`, `Block8`, `Case11`), but the phi `%.1445` still named `Then`, `Then11`, `Then35`,
+  `Then38`, which were no longer predecessors.
+- `lowerIndirectBrForFunction` (a copy of `IndirectBrExpandPass`): with **two or more**
+  `indirectbr`s in a function it creates one shared `switch_bb`, redirects every `indirectbr` to
+  it, and **never updates the destination blocks' phis**.
+- **Why clang never hits it:** clang compiles every computed `goto` in a function through ONE
+  shared `indirectbr` block, so the merged path never runs. **Zig emits one `indirectbr` per
+  `continue :label`** (labeled-switch dispatch; std's `compress.flate`, and std code present in
+  every Debug program: 6 per program in the corpus, 8 in `69`).
+- **Why only Debug:** Zig's Release IR (unoptimized route) has **no** `indirectbr`; Debug IR does.
+- **Why only `-O1`:** at `-O1`, Fil-C promotes stack slots to SSA (its `filc-optimize` step) before
+  this lowering, which creates the phis that go stale. At `-O0` the destinations have no phis.
+
+**The fix, and a first attempt that was wrong.** Both are patches in `tools/filc/patch-pass.ts`.
+
+- ❌ **First attempt (discarded):** keep the shared `switch_bb` and route each stale phi value
+  through a new phi in it. It stopped the segfault but tripped the pass's liveness assertion
+  (`Unexpected live: … getelementptr`, `isa<Argument>(V)`), because **merging changes
+  dominance**: every destination becomes reachable from EVERY `indirectbr` site, so a value that
+  dominated a destination before no longer does. No phi repair can fix that.
+- ✅ **The fix:** with several `indirectbr`s, lower **each one in place into its own `switch`** over
+  its own address-taken destinations, using the same global block numbering. Every CFG edge is
+  preserved, so phis and dominance stay valid. Only edges to never-address-taken blocks and
+  duplicate edges are dropped, together with their phi entries. **The single-`indirectbr` path is
+  untouched, so no C output changes**, and at `-O0` (no phis) the result is equivalent.
+
+**Result.** The KI-4 repro compiles at `-O1`. Debug at `-O1`: **all 13 failing Debug programs
+behave as designed** (the 12 KI-19 traps are gone; `76_signals` waits as designed), and Debug `69`
+compiles in 68 s and runs, where it used to time out at 30 min. The driver now compiles Debug at
+`-O1` like every mode, and if Fil-C fails on a Debug build it says the patched clang is needed.
+
+**Recognising a relative.** A Fil-C crash in `SplitCriticalEdge`/phi code, or a liveness
+assertion about a value "live at entry": suspect a CFG rewrite that **merged edges**. Look for Zig
+constructs clang never emits (`indirectbr` per `continue :label`). Debug-only failures: compare
+the Debug IR with the Release IR first. Here Zig's Debug IR has `indirectbr` and the Release IR
+has none.
+
+**Cost and exit.** Needs the patched clang (`tools/filc/`). Remove when Fil-C (or LLVM's
+`IndirectBrExpandPass`) handles several `indirectbr`s. Re-test the KI-4 repro at every Fil-C
+upgrade.
+
+**Where.** `tools/filc/patch-pass.ts` (edit "one switch per indirectbr"),
+`third_party/filc-patches/zilc-filc-pass.patch`, `src/driver.zig` (`-O1` for every mode, and the
+Debug hint), repro `tools/p2/repro/filc-0.685-O1-crash.ll`.
+
+---
+
 ## KI-21 — std's stack-trace code compiled into every program (build time)
 
 **Symptom.** Builds many times slower than native Zig: `62_directories` ReleaseSafe 40 s under
@@ -322,6 +386,30 @@ harder. Re-check list: `ports/README.md`.
 4. **Accept it for now.** Typical programs are near native after KI-21; only functions with
    hundreds of escaping locals (TLS, big crypto) are slow, and Debug builds of them are impractical.
 
+**Option 2, carried out (2026-10-01).** Fil-C's clang was built from the prebuilt's own commit with
+the patch (`tools/filc/build-patched-clang.sh`; ~1 h; GCC 15.2 and CMake 4.2.3 from apt, Ninja
+1.12.1 release binary). The version string matches the prebuilt exactly (the source remote must be
+`git@github.com:…`, and the generated `VCSVersion.inc`/`VCSRevision.h` deleted to regenerate).
+`69` at `-O1`: **112 s → 54 s** for Fil-C's clang alone.
+
+**How the patch was proved output-identical, and why byte comparison could not do it:**
+
+- 🔑 **Fil-C 0.685 is NOT reproducible run to run.** The SAME prebuilt clang compiling the SAME
+  `62` IR twice gives different objects with ASLR on (Linux's default), and identical ones under
+  `setarch -R`. The pass iterates hash tables keyed by pointer addresses, so heap addresses decide
+  the emitted order. ⚠️ **This bears on the owner's FIDELITY FIRST goal** (user binaries
+  byte-identical to upstream, `roadmap.md` P3): upstream itself is only reproducible with ASLR
+  off, and probably only for one exact build of the compiler. Any byte-identity check must run
+  with `setarch -R`, and between two DIFFERENT compiler binaries it can still differ on large
+  inputs (heap layout differs).
+- Under those rules (`tools/filc/compare-clangs.sh`), prebuilt vs patched is **identical** for the
+  gate's C examples, `zilc_syscall.c`, the KI-18 repro (both assert) and the 2,000-alloca stress
+  test at `-O0` and `-O1`, but **different** for `62` and `69`: two different binaries.
+- So equivalence is checked **inside one run**: with `ZILC_VERIFY_COLOURING=1`, the patched pass
+  also runs the original search for every frame slot and aborts on any difference. It passed on
+  the stress test, `62` (`-O0`, `-O1`) and `69` (`-O1`, where it restored the original cost:
+  108 s, proof it really ran), then on the whole corpus in all 4 modes (results in `testing.md`).
+
 **Where.** Measurement scripts: this session's scratchpad (`scale.ts`, `scale2.ts`, `split.ts`,
 `sample.sh` + `sampler.py`, gdb from `apt-get download` into `~/zilc-work/tools/gdb`, needs
 `LD_LIBRARY_PATH`). Pass source: `~/zilc-work/filc-src/FilPizlonator.cpp` (reading the pass is
@@ -331,7 +419,7 @@ allowed, owner 2026-10-01).
 
 ## Earlier workarounds (short form; expand to the full template when next touched)
 
-- **KI-4, Debug compiled at `filc -O0`.** *Why:* Fil-C's pass segfaults on Zig's Debug IR at
+- ~~**KI-4, Debug compiled at `filc -O0`.**~~ **Superseded 2026-10-01** by the KI-4 patch (full entry above); Debug is now at `-O1`. *Original why:* Fil-C's pass segfaults on Zig's Debug IR at
   `-O1`/`-O2` (reduced to 8 `std.compress.flate` functions, `tools/p2/repro/`). Upstream defect, F1.
   *Cost:* no inlining in Debug, which also exposes KI-13 #2 and KI-19. *Exit:* the repro compiles at
   `-O1`.

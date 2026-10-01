@@ -23,14 +23,20 @@ for structure and policy.
 - **Owner decisions today** (`design-decisions.md`): "clean-room" meant **licence compliance**, not
   a ban on reading Fil-C's source; compliance is **documentation only**; **KI-22: option 2, then
   research option 3.**
-- **In progress: KI-22 option 2.** A patched Fil-C clang is being built in WSL from the prebuilt's
-  commit `bb0d0a64` with an output-identical colouring fix (`tools/filc/build-patched-clang.sh`,
-  log `~/zilc-work/filc-build.log`, install `~/zilc-work/tools/filc-0.685-zilc/`). **Next:** prove
-  byte-identical objects against the prebuilt, time `69` in every mode, then research option 3
-  (lifetime markers) against those numbers. Then the rest of the **PRE-PUBLISH CHECKLIST**.
-- **State:** today's work is **uncommitted**; last commit `0185e3e` on `main`, nothing pushed.
-  WSL now has `build-essential` + `cmake` (owner installed; `ninja` 1.12.1 and gdb in
-  `~/zilc-work/tools/`, no sudo needed).
+- ✅ **KI-22 option 2 done:** a **patched Fil-C clang** (`~/zilc-work/tools/filc-0.685-zilc/`, built
+  by `tools/filc/build-patched-clang.sh` from the prebuilt's own commit `bb0d0a64`) is now the
+  **default** in zilc's scripts; the prebuilt stays for comparison (`tools/filc/compare-clangs.sh`).
+  Two fixes in it: the cubic frame-slot colouring (KI-22, verified equal to the original on the whole
+  corpus) and Fil-C's `indirectbr` lowering (**KI-4**). KI-4's fix lets **Debug compile at `-O1`**,
+  which **fixed KI-19**. **The corpus is 78/78 as designed in ALL FOUR MODES**, gate 4/4, tests 24/24.
+- 🔑 **Found:** Fil-C's output is **not reproducible under ASLR** (bears on the fidelity goal;
+  `roadmap.md` P3, `workarounds.md` KI-22).
+- **Next:** **research option 3** (zilc-inserted lifetime markers) against the new numbers: `69` is
+  ~54 s in Fil-C vs native Zig's 20 s, and Debug's median build is ~5× Release's. Then the rest of
+  the **PRE-PUBLISH CHECKLIST**.
+- **State:** committed through today's work (see `git log`), nothing pushed. WSL has
+  `build-essential` + `cmake` (owner installed; `ninja` 1.12.1 and gdb in `~/zilc-work/tools/`, no
+  sudo needed). ⚠️ Build LLVM with `JOBS` ≤ 12 (32 crashed the WSL VM).
 - **How to run things:** `tools/run-gate-wsl.sh` (gate); `tools/basics/zilc-check.sh` (`MODE=…`) and
   `all-modes.sh` (corpus); Windows-side builds need `C:\zig\0.15.2\zig.exe` and
   `ZIG_LOCAL_CACHE_DIR=C:\zig-cache\zilc`. Pass shell text to WSL as a **file** (KI-1).
@@ -115,8 +121,11 @@ for structure and policy.
   - [x] **KI-18**: Fil-C assertion on 2 programs (every mode). ✅ 2026-10-01, `ir.wrapThreeByteGlobals`
   - [x] **KI-20**: `madvise` probe in `std.crypto.random`. ✅ 2026-10-01, `crypto_always_getrandom`
   - [x] **KI-21**: dead stack-trace code compiled into every program. ✅ 2026-10-01, std-overlay guards
-  - [ ] **KI-22**: build time on big functions and Debug (option 2 in progress, then research option 3)
-  - [ ] **KI-19**: Debug syscall pointer arguments (12 programs)
+  - [ ] **KI-22**: build time on big functions and Debug. ✅ Option 2 done (patched clang, default);
+    research option 3 next
+  - [x] **KI-19**: Debug syscall pointer arguments (12 programs). ✅ 2026-10-01, Debug at `-O1` via the
+    KI-4 patch
+  - [x] **KI-4** (Debug `-O1` crash), the root of KI-19. ✅ 2026-10-01, patched `indirectbr` lowering
   - [ ] **Output comparison**: corpus output vs native, not just exit codes
   - [ ] **Library mode** (C owns `main`): panic handler, page-allocator hook and (KI-20)
     `crypto_always_getrandom` not applied

@@ -150,17 +150,6 @@ fn run(arena: std.mem.Allocator, args: []const []const u8) !u8 {
         return exit_usage;
     }
 
-    // Debug works, but only with two concessions the driver applies for you.
-    // Say so rather than letting the size and the missing probes surprise people.
-    if (driver.isDebug(optimize)) {
-        std.debug.print(
-            \\zilc: note: Debug builds compile the instrumented IR at clang -O0 and pass
-            \\  -fno-stack-check, because Debug IR crashes Fil-C's pass at -O1 and Zig's
-            \\  stack probe never goes through it. Expect large objects.
-            \\  Detail: cmem/known-issues.md KI-4.
-            \\
-        , .{});
-    }
     if (std.mem.indexOf(u8, target, "-musl") == null) {
         std.debug.print(
             \\zilc: warning: target '{s}' is not musl. Fil-C's libc is musl, and a

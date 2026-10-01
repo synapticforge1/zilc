@@ -192,6 +192,14 @@ allocator/GC, 335 `zsys_*`) is in `architecture.md` "The runtime contract".
    - 🔑 **The acceptance test (owner, 2026-09-30):** compile `hello.zig` with zilc against Fil-C's
      runtime, and again against the Zig port. **The two output binaries must be byte-identical.**
      Then the same check for every gate case and every `tests/basics` program.
+   - ⚠️ **Found 2026-10-01 (KI-22): Fil-C's pass is NOT reproducible under ASLR.** The same
+     prebuilt clang on the same IR gives different objects run to run, because the pass iterates
+     hash tables keyed by pointer addresses. So every byte-identity check here must compile with
+     ASLR off (`setarch -R`), use the **same compiler binary** for both sides, and still be
+     re-checked for reproducibility first (two runs, same side). The acceptance test above is
+     unaffected in principle (the two sides differ only in the runtime, not the compiler), but
+     run naively it would fail for reasons unrelated to the runtime. Details:
+     `workarounds.md` KI-22.
    - ⚠️ **Consequence for how the Zig runtime is linked:** a program embeds its runtime's soname
      (`NEEDED libpizlo.so`), the RUNPATH and the loader path (`filc-abi.md` §5). An *extra*
      `libzilc_rt.so` ahead of `-lpizlo`, as first planned, adds a `NEEDED` entry and breaks
