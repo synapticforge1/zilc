@@ -13,13 +13,21 @@ for structure and policy.
 
 ---
 
-## ▶️ 2026-10-01 — IN PROGRESS. START HERE
+## ⏸️ PAUSED 2026-10-01 (end of day). START HERE NEXT SESSION
 
-- **Done today:** **KI-18** fixed (3-byte globals wrapped in a struct; `i21` and `<3 x i8>`),
+- ▶️ **Next task (owner-approved, end of day): the three BUILD-SPEED options** for `69`-class
+  programs (`design-decisions.md` 2026-10-01, `workarounds.md` KI-22 "Levers that remain"):
+  **(a)** split each module and run Fil-C's clang on the parts in parallel (the biggest gain);
+  **(b)** an output-identical faster interference build in the patched pass (lines ~2959–2998,
+  with a `ZILC_VERIFY_…` check like the colouring fix); **(c)** an object cache keyed by IR hash.
+  Baseline to beat: `69` ReleaseSafe **55.9 s** alone vs native Zig **16.9 s**; Fil-C's pass is
+  11.4 s of it. Measure with the stage script pattern in `workarounds.md` KI-22 (F6 family).
+- **Then** the rest of the **PRE-PUBLISH CHECKLIST**: output comparison, library mode, KI-5,
+  `--version` and release notes, the platforms scope pass.
+- **Done 2026-10-01:** **KI-18** fixed (3-byte globals wrapped in a struct; `i21` and `<3 x i8>`),
   **KI-20** fixed (`crypto_always_getrandom`), **KI-21** fixed (std's stack-trace code no longer
-  compiled: `62` 40 s → 8 s). Release modes **78/78 as designed** each, Debug 65/78. Tests 24/24,
-  gate 4/4. New: `workarounds.md` (the why of every workaround, owner rule) and
-  `UPSTREAM-ISSUES.md` (documentation only; reporting not planned).
+  compiled: `62` 40 s → 8 s; Debug route too). New: `workarounds.md` (the why of every workaround,
+  owner rule) and `UPSTREAM-ISSUES.md` (documentation only; reporting not planned).
 - **Owner decisions today** (`design-decisions.md`): "clean-room" meant **licence compliance**, not
   a ban on reading Fil-C's source; compliance is **documentation only**; **KI-22: option 2, then
   research option 3.**
@@ -35,10 +43,9 @@ for structure and policy.
   its liveness runs, so zilc-inserted markers could not help (`workarounds.md` KI-22). Debug's slow
   builds were a third KI-21 route (`unexpectedErrno` → stack-trace dump), now guarded (overlay v5):
   **Debug median 19 s → 4 s, same as ReleaseSafe; 78/78 in all modes.** Remaining: `69`-class
-  programs (55.9 s vs native 16.9 s), inherent to instrumented code; further levers (parallel
-  per-part compile, faster interference build, object cache) await the owner.
-- **Next:** the rest of the **PRE-PUBLISH CHECKLIST**.
-- **State:** committed through today's work (see `git log`), nothing pushed. WSL has
+  programs (55.9 s vs native 16.9 s), inherent to instrumented code; the three levers were
+  **approved by the owner at end of day** (next task, above).
+- **State:** everything committed on `main`, **nothing pushed**. WSL has
   `build-essential` + `cmake` (owner installed; `ninja` 1.12.1 and gdb in `~/zilc-work/tools/`, no
   sudo needed). ⚠️ Build LLVM with `JOBS` ≤ 12 (32 crashed the WSL VM).
 - **How to run things:** `tools/run-gate-wsl.sh` (gate); `tools/basics/zilc-check.sh` (`MODE=…`) and
@@ -126,8 +133,9 @@ for structure and policy.
   - [x] **KI-20**: `madvise` probe in `std.crypto.random`. ✅ 2026-10-01, `crypto_always_getrandom`
   - [x] **KI-21**: dead stack-trace code compiled into every program. ✅ 2026-10-01, std-overlay guards
   - [x] **KI-22**: build time on big functions and Debug. ✅ Option 2 done (patched clang, default);
-    option 3 researched and rejected; Debug builds now as fast as Release. `69`-class speed-ups
-    beyond this are optional (owner)
+    option 3 researched and rejected; Debug builds now as fast as Release
+  - [ ] **Build-speed options (a) parallel parts, (b) faster interference, (c) object cache** for
+    `69`-class programs (owner approved 2026-10-01; next task)
   - [x] **KI-19**: Debug syscall pointer arguments (12 programs). ✅ 2026-10-01, Debug at `-O1` via the
     KI-4 patch
   - [x] **KI-4** (Debug `-O1` crash), the root of KI-19. ✅ 2026-10-01, patched `indirectbr` lowering

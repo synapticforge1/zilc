@@ -419,7 +419,8 @@ option 2).**
   costly live range. **Option 3 cannot help build time.** It would also need CFG, dominator and
   loop analysis in `src/ir.zig`, with miscompile risk.
 - **What did help instead:** the Debug-only std route above (KI-21, third route).
-- **Levers that remain, if `69`-class builds must get faster** (owner's call, not started):
+- **Levers that remain** (✅ **all three approved by the owner, 2026-10-01**; not started; next
+  task):
   (a) split the module and run Fil-C's clang on the parts in parallel. Fil-C already compiles C
   one translation unit at a time, and 32 cores sit idle. (b) A faster interference build in the
   patched pass that produces the same graph. (c) Cache objects by IR hash for unchanged rebuilds.
