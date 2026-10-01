@@ -282,6 +282,18 @@ this for the project"), do all of the following:
 2. **Sync `README.md` only where the change is user-relevant** (build, usage, status).
 3. **If the work produced a transferable METHOD lesson, add it to
    [`best-practices.md`](best-practices.md)** as one bold rule plus a citation to the incident.
+4. **Keep the patched Fil-C clang archived in the project (owner, 2026-10-01).** Run
+   `wsl.exe -e sh /mnt/d/…/zilc/tools/filc/check-toolchain.sh`. If it reports STALE (a new patch
+   or workaround in Fil-C's source in WSL, a rebuilt compiler, or an archive from an older patch),
+   do what it says before finishing. In order:
+   1. Every change to Fil-C's source goes into `tools/filc/patch-pass.ts`, the source of truth.
+   2. Rebuild with `build-patched-clang.sh`.
+   3. Save the diff to `third_party/filc-patches/zilc-filc-pass.patch`.
+   4. Re-archive with `archive-patched-clang.sh`.
+   5. Update the ledger entry `filc-pass-fixes` and `workarounds.md`.
+
+   `toolchain/` is gitignored, so the archive itself is never committed, but the patch, the
+   scripts and the checksum line in the ledger are.
 
 ### The "workaround" rule (binding on every agent; owner, 2026-10-01)
 

@@ -14,5 +14,8 @@ and bring the obligations listed in `third_party/LICENSES.md`, ledger entry `fil
   to `~/zilc-work/tools/filc-0.685-zilc/`, where zilc's scripts look first.
 - **Re-create after changing the patch:** `tools/filc/build-patched-clang.sh`, then
   `tools/filc/archive-patched-clang.sh`.
+- **Is it current?** `tools/filc/check-toolchain.sh` (exit 0 = yes). It runs on every "update the
+  project memory" (`cmem/INDEX.md` policy, step 4). It detects unsaved edits to the WSL source, a
+  patch newer than this archive, and a compiler rebuilt after it.
 - Why a tarball: this drive is exFAT, which has no symlinks (`clang` → `clang-20`) and no Unix
   permissions.
