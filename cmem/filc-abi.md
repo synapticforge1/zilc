@@ -114,9 +114,12 @@ and `0, s.lower, 0` at `+384/+392/+400`, then calls with `arg_bytes = 24`.
 | ✅ link order | `crt… filc_crt.o <objects> -lc -lpizlo -lyolort -lyoloc -lyolom -lyolort -lyolounwind crt…` |
 | ✅ **overridable** | `pizlonated_zsys_write` is `GLOBAL DEFAULT` in `libpizlo.so`, with no `DT_SYMBOLIC`. `libc.so` imports it by name (`UND`) |
 
-🔑 **So `--runtime zig` should work by putting a `libzilc_rt.so` before `-lpizlo`**, or by
-defining the symbols in the executable. Under standard ELF symbol lookup, the first definition
-found wins. 🔸 One real run must confirm that `ld-fil1` follows standard lookup order (it is
+~~🔑 So `--runtime zig` should work by putting a `libzilc_rt.so` before `-lpizlo`.~~
+**Superseded 2026-09-30 by the fidelity rule** (`roadmap.md` P3): an extra library changes the
+program's `NEEDED` list and breaks byte-identity. **The Zig runtime must be a drop-in
+`libpizlo.so`** (same soname, same exported symbols, same path). Overriding a single symbol by
+linking an extra library is still useful as a **development scaffold** during step 0, but it is never
+the shipped form. 🔸 One real run must confirm that `ld-fil1` follows standard lookup order (it is
 presumably musl's loader).
 
 ## 5b. The GC protocol a runtime must implement (📄 `Manifesto.md`, FUGC)

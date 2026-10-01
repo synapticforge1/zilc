@@ -33,6 +33,36 @@ checkout and its caches were removed. The facts gathered are kept for when the p
 | first source error | `src/main.zig:56`: `std.process.argsAlloc` is gone. 0.16 passes `main(init: std.process.Init)` and args come from `init.minimal.args.toSlice(arena)` |
 | the 0.16 idioms to use | wazmrt's `src/main.zig`: `init.io`, `Io.Dir.cwd().readFileAlloc(io, path, arena, .limited(n))`, `Io.Dir.cwd().writeFile(io, …)`, `std.ArrayList(T) = .empty` |
 
+### What 0.16 changes, from converting 78 example programs to it (2026-09-30)
+
+`tests/basics/zig-0.16.0/` was converted from 0.13/0.14-era code to **0.16.0**, building 78/78 for
+Linux and Windows. That gives the list zilc's own 0.15.2 → 0.16 port will meet, with file counts
+from that corpus:
+
+| change | files |
+| --- | --- |
+| **`pub fn main(init: std.process.Init)`**, `const io = init.io` | 64 |
+| stdio: `std.Io.File.stdout().writerStreaming(io, &.{})` + `.interface` (stderr and stdin alike) | 54 + 2 + 1 |
+| `GeneralPurposeAllocator(.{}){}` → `DebugAllocator(.{}) = .init` | 27 |
+| **`io` threaded into helpers and thread entry points**; `Thread.spawn` args carry `io` | 12 / 9 |
+| `std.Thread.Mutex`/`Condition` → **`std.Io.Mutex`/`Condition`** (`lockUncancelable(io)`, `unlock(io)`, `waitUncancelable(io, &m)`); `timedWait` → `Io.Event` + `waitTimeout` | 5 / 4 / 1 |
+| `std.time.sleep(ns)` → `io.sleep(.fromNanoseconds(ns), .awake)` | 9 |
+| clocks → `std.Io.Timestamp.now(io, .real)` (`.nanoseconds`, `.toSeconds()`, `.toMilliseconds()`) | 8 |
+| **`std.fs` → `std.Io.Dir`**, and every call takes `io` (`openFile`, `createFile`, `writeFile`, `readFileAlloc(io, p, a, .limited(n))`, `statFile`, `openDir`, `iterate().next(io)`, `deleteTree`, `close(io)`); `makeDir` → `createDir(io, p, .default_dir)`, `makePath` → `createDirPath`; `*Absolute` variants move to `Io.Dir` | 6 |
+| `File.read`/`seekTo` → a `File.Reader`; `bufferedReader`/`bufferedWriter` → `reader`/`writerStreaming(io, &buf)`; `sync(io)` | 5 |
+| `std.io.fixedBufferStream` → `std.Io.Writer.fixed(&buf)` | 1 |
+| **args**: `init.minimal.args.toSlice(arena)`; **env**: `Environ.getAlloc` / `Environ.createMap`; `changeCurDir` → `setCurrentPath(io, …)` | 3 / 2 / 1 |
+| `std.fs.path.relative` gains `cwd` + `environ_map` args | 1 |
+| **processes**: `std.process.spawn(io, .{ .argv, .stdout = .pipe })` + `wait(io)`; `Term` tags lowercase; `execveZ` gone → `std.c.execve` | 2 |
+| **net**: `std.net` → `std.Io.net` (`IpAddress.parse`, `listen(io, …)`, `accept(io)` returns a `Stream`); `http.Server.init(&reader.interface, &writer.interface)`; `http.Client` needs `.io` | 4 |
+| `std.mem.trimRight` → `trimEnd` | 3 |
+| `std.posix.SIG` is an enum; dropped kernel32 bindings (`SetEnvironmentVariableW`, `SetConsoleCtrlHandler`) → local `extern` | 1 / 2 |
+
+🔑 **For zilc's own port:** the counted version-sensitive sites (`design-decisions.md` invariant 4:
+`std.fs` 10, `std.process` 13, `ArrayListUnmanaged` 8) all fall in the rows above, most of them
+behind **`io`**. `driver.zig`'s `std.process.Child` use is the "processes" row. Expect `io` to need
+threading through `driver.build` and `compileZig`.
+
 ⚠️ Zig reports errors in waves as analysis reaches them, so one error is **not** the scope. The
 complete list comes from a trial port carried to green: a throwaway checkout of the latest reference
 tag, fixed until it builds and passes the tests.

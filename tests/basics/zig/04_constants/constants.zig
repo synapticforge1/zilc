@@ -3,7 +3,7 @@ const std = @import("std");
 const s: []const u8 = "constant";
 
 pub fn main() !void {
-    var stdout_writer = std.fs.File.stdout().writer(&.{});
+    var stdout_writer = std.fs.File.stdout().writerStreaming(&.{}); // zilc: streaming, so redirected output appends like the original
     const stdout = &stdout_writer.interface;
 
     try stdout.print("{s}\n", .{s});

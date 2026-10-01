@@ -5,7 +5,7 @@ pub fn main() !void {
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
-    var stdout_writer = std.fs.File.stdout().writer(&.{});
+    var stdout_writer = std.fs.File.stdout().writerStreaming(&.{}); // zilc: streaming, so redirected output appends like the original
     const stdout = &stdout_writer.interface;
 
     // Join constructs paths portably using the OS separator

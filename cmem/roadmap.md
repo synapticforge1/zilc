@@ -189,6 +189,16 @@ allocator/GC, 335 `zsys_*`) is in `architecture.md` "The runtime contract".
      cannot be byte-identical (new code, new compiler).
    - No optimisation, cleverness or "improvement" is allowed in this phase, even an obvious one.
      Record it as a candidate for phase 2.
+   - 🔑 **The acceptance test (owner, 2026-09-30):** compile `hello.zig` with zilc against Fil-C's
+     runtime, and again against the Zig port. **The two output binaries must be byte-identical.**
+     Then the same check for every gate case and every `tests/basics` program.
+   - ⚠️ **Consequence for how the Zig runtime is linked:** a program embeds its runtime's soname
+     (`NEEDED libpizlo.so`), the RUNPATH and the loader path (`filc-abi.md` §5). An *extra*
+     `libzilc_rt.so` ahead of `-lpizlo`, as first planned, adds a `NEEDED` entry and breaks
+     byte-identity. **So the Zig runtime must be a drop-in `libpizlo.so`: the same soname, the same
+     exported symbols, the same install path.** `--runtime` then selects which `libpizlo.so` is
+     installed at that path, not what is on the link line. ⚠️ Also: exported **data** symbols must
+     keep their sizes, or the linker's copy relocations will differ.
 2. **Streamline**, only after phase 1 is proven. Go beyond upstream, **smaller binaries** first.
    Binaries may then differ from Fil-C's freely, provided **the safety-guarantee results stay
    identical** (the same gate, the same traps, the same corpus results). Byte-identity with Fil-C

@@ -50,8 +50,9 @@ for structure and policy.
 - 🎯 **FIDELITY FIRST, THEN STREAMLINE (owner):** the Fil-C → Zig port first reproduces upstream
   exactly (user-program binaries byte-identical, runtime results identical), and only then optimises
   beyond it, e.g. smaller binaries. At that point byte-identity no longer matters, but identical
-  safety-guarantee results always do (`roadmap.md` P3, `design-decisions.md`). ◐ The byte-identity
-  scope is an interpretation, to confirm.
+  safety-guarantee results always do (`roadmap.md` P3, `design-decisions.md`). ✅ **Scope confirmed
+  by the owner: byte-identity means the end user's COMPILED BINARIES**, not the libraries used to
+  build them.
 - 🧪 **`tests/basics`: 156 correct programs (owner's C + Zig lessons), 2026-09-30 → `testing.md`.**
   **C: 78/78 build and 77/78 run identically under zilc** (the one difference is `abort()` exiting
   133). **Zig 0.15.2: all 78 build and run with plain Zig, but only 24/78 run under zilc**, all

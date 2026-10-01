@@ -11,7 +11,7 @@ pub fn main() !void {
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
-    var stdout_writer = std.fs.File.stdout().writer(&.{});
+    var stdout_writer = std.fs.File.stdout().writerStreaming(&.{}); // zilc: streaming, so redirected output appends like the original
     const stdout = &stdout_writer.interface;
 
     // Start an HTTP server on port 8090
@@ -43,7 +43,7 @@ fn handleConnection(allocator: std.mem.Allocator, connection: std.net.Server.Con
 
     var request = http_server.receiveHead() catch return;
 
-    var stdout_writer = std.fs.File.stdout().writer(&.{});
+    var stdout_writer = std.fs.File.stdout().writerStreaming(&.{}); // zilc: streaming, so redirected output appends like the original
     const stdout = &stdout_writer.interface;
     stdout.print("server: hello handler started\n", .{}) catch return;
     defer stdout.print("server: hello handler ended\n", .{}) catch {};

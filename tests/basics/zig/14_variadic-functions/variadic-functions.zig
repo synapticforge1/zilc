@@ -1,7 +1,7 @@
 const std = @import("std");
 
 fn sum(nums: []const i64) !void {
-    var stdout_writer = std.fs.File.stdout().writer(&.{});
+    var stdout_writer = std.fs.File.stdout().writerStreaming(&.{}); // zilc: streaming, so redirected output appends like the original
     const stdout = &stdout_writer.interface;
     try stdout.print("[", .{});
     for (nums, 0..) |n, i| {

@@ -10,7 +10,7 @@ fn intMin(a: i64, b: i64) i64 {
 
 pub fn main() !void {
     // This file is primarily for testing. Run with: zig test testing-and-benchmarking.zig
-    var stdout_writer = std.fs.File.stdout().writer(&.{});
+    var stdout_writer = std.fs.File.stdout().writerStreaming(&.{}); // zilc: streaming, so redirected output appends like the original
     const stdout = &stdout_writer.interface;
     try stdout.print("intMin(2, -2) = {d}\n", .{intMin(2, -2)});
 }

@@ -98,7 +98,7 @@ Newest first. Copy the template for each adopted component.
 - **What we reused:** the example programs, as a corpus of *correct* programs that zilc must build
   and run without false traps
 - **Where it lives in zilc:** `tests/basics/c/`, `tests/basics/zig/` (converted to Zig 0.15.2),
-  `tests/basics/zig-0.16.2/` (being converted to Zig 0.16.0; rename to `zig-0.16.0` pending)
+  `tests/basics/zig-0.16.0/` (converted to Zig 0.16.0)
 - **Artifact destination:** **test-only.** Never linked into zilc, its runtime or user programs
 - **Modifications:** yes. Each non-obvious change is marked with a `// zilc:` or `/* zilc: */`
   comment; the full list is in `tests/basics/README.md`

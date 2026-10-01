@@ -8,9 +8,9 @@ pub fn main() !void {
     // zilc: 0.15 readers take a caller-supplied buffer, and a line lives in that buffer until
     // the next read, so it is not allocated or freed. Lines are limited to the buffer's size.
     var stdin_buf: [64 * 1024]u8 = undefined;
-    var stdin_reader = std.fs.File.stdin().reader(&stdin_buf);
+    var stdin_reader = std.fs.File.stdin().readerStreaming(&stdin_buf); // zilc: streaming, like the original
     const stdin = &stdin_reader.interface;
-    var stdout_writer = std.fs.File.stdout().writer(&.{});
+    var stdout_writer = std.fs.File.stdout().writerStreaming(&.{}); // zilc: streaming, so redirected output appends like the original
     const stdout = &stdout_writer.interface;
 
     // Read lines from stdin and print them uppercased

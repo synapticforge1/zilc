@@ -1,7 +1,7 @@
 const std = @import("std");
 
 fn printArray(comptime T: type, comptime N: usize, arr: [N]T) !void {
-    var stdout_writer = std.fs.File.stdout().writer(&.{});
+    var stdout_writer = std.fs.File.stdout().writerStreaming(&.{}); // zilc: streaming, so redirected output appends like the original
     const stdout = &stdout_writer.interface;
     try stdout.print("[", .{});
     for (arr, 0..) |v, i| {
@@ -12,7 +12,7 @@ fn printArray(comptime T: type, comptime N: usize, arr: [N]T) !void {
 }
 
 fn printArray2D(comptime T: type, comptime R: usize, comptime C: usize, arr: [R][C]T) !void {
-    var stdout_writer = std.fs.File.stdout().writer(&.{});
+    var stdout_writer = std.fs.File.stdout().writerStreaming(&.{}); // zilc: streaming, so redirected output appends like the original
     const stdout = &stdout_writer.interface;
     try stdout.print("[", .{});
     for (arr, 0..) |row, i| {
@@ -23,7 +23,7 @@ fn printArray2D(comptime T: type, comptime R: usize, comptime C: usize, arr: [R]
 }
 
 pub fn main() !void {
-    var stdout_writer = std.fs.File.stdout().writer(&.{});
+    var stdout_writer = std.fs.File.stdout().writerStreaming(&.{}); // zilc: streaming, so redirected output appends like the original
     const stdout = &stdout_writer.interface;
 
     var a = [5]i64{ 0, 0, 0, 0, 0 };

@@ -9,7 +9,7 @@ it gives size and speed numbers against plain Zig.
 | --- | --- | --- |
 | `c/` | the C lessons | `zig cc -lc` (Zig 0.15.2), and zilc |
 | `zig/` | the Zig lessons, **converted to Zig 0.15.2** | Zig 0.15.2 with `-lc`, and zilc |
-| `zig-0.16.2/` | the Zig lessons, being converted to **Zig 0.16.0** (the folder will be renamed `zig-0.16.0`) | Zig 0.16.0, for the future 0.16 line |
+| `zig-0.16.0/` | the Zig lessons, **converted to Zig 0.16.0**, for the future 0.16 line | Zig 0.16.0 with `-lc` |
 
 ## Where they come from, and the licence
 
@@ -43,8 +43,8 @@ Every non-obvious change carries a `zilc:` comment in the file.
 
 | change | files |
 | --- | --- |
-| `std.io.getStdOut().writer()` → `std.fs.File.stdout().writer(&.{})` + `.interface` (**unbuffered**, as before, so no flush is needed) | 54 |
-| same for `getStdErr` | 2 |
+| `std.io.getStdOut().writer()` → `std.fs.File.stdout().writerStreaming(&.{})` + `.interface`: **unbuffered**, as before, so no flush is needed, and **streaming**. ⚠️ The first conversion used `writer(&.{})`, which writes at its own position starting from 0, so with output redirected to a file each new writer overwrote earlier output (`08_arrays` printed `[1]2 3]4 5]`). Found by the 0.16 conversion's output diff and fixed the same day | 54 |
+| same for `getStdErr`; stdin likewise uses `readerStreaming` | 2 + 1 |
 | `std.time.sleep` → `std.Thread.sleep` | 9 |
 | `std.ArrayList(T).init(a)` → `std.array_list.Managed(T).init(a)` (keeps the managed API) | 7 |
 | `@typeInfo` tags lowercased (`.Pointer` → `.pointer`) | 1 |
@@ -55,6 +55,15 @@ Every non-obvious change carries a `zilc:` comment in the file.
 | maps serialised through `std.json.ArrayHashMap` | 1 |
 | readers/writers with caller-supplied buffers: `58_reading-files` (`peek`), `59_writing-files` (**`writerStreaming`**, which appends as the original did; plain `writer()` would overwrite from offset 0), `60_line-filters`, `75_spawning-processes` | 4 |
 | HTTP: `http.Client` → `request`/`sendBodiless`/`receiveHead` (compression off, so the body stays text); `http.Server` over a stream reader/writer pair | 3 |
+
+**Zig → 0.16.0 (`zig-0.16.0/`), 2026-09-30.** Converted from the same originals: the 0.15 changes
+above (comments `zilc: 0.15 …`) plus 0.16's (comments `zilc: 0.16 …`), above all **`std.Io`
+threaded through everything**: `main(init: std.process.Init)`, `io` passed to every file, directory,
+clock, sleep, mutex, process and network call. **All 78 build for Linux and Windows, and every
+Windows run behaves as the original intends.** The servers were smoke-tested with curl. The full
+API list is in `cmem/ports/README.md`, as notes for zilc's own future 0.16 port. Not run:
+POSIX-only paths (67's live environment, 74's `execve`, 75's grep pipe, 76's `sigaction`), and 71
+and 76 at all.
 
 ## Tools
 
