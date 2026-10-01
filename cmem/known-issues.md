@@ -191,7 +191,8 @@ Narrowing further needs line-level reduction or a debug build of Fil-C's clang �
 zilc needs, since the driver compiles Debug IR at `-O0`.
 
 📤 **A draft upstream issue is written but NOT filed** (`tools/p2/repro/UPSTREAM-REPORT.md`).
-Filing it is the owner's call.
+~~Filing it is the owner's call.~~ **Settled 2026-10-01:** upstream reporting is optional and not
+planned (`design-decisions.md`), and this crash is fixed in zilc's patched clang (top of KI-4).
 
 **What zilc does about it (`src/driver.zig`):** `-O Debug` now *works*, with two concessions applied
 automatically and announced:
@@ -525,17 +526,16 @@ it. A full `git repack -a -d` consolidated six packs to one, but the next repack
 
 **Mitigation (repo-local config, not committed):** `maintenance.geometric-repack.enabled=false`,
 `maintenance.gc.enabled=true`. The automatic run after commits is now clean. `gc` only runs when
-loose objects pass `gc.auto` (~6,700), so the error is rare, and harmless when it occurs. **Full fix:**
-keep repos on NTFS, the same remedy as KI-2 (zig-cache on exFAT). Owner's call.
+loose objects pass `gc.auto` (~6,700), so the error is rare, and harmless when it occurs. This is
+the final answer (owner decision above). ~~Full fix: keep repos on NTFS~~: rejected, because the
+projects stay on D: for portability.
 
-**Not covered by the projects' NTFS cache setup (owner asked, 2026-10-01).** wazmrt's NTFS setup
-(`working-rules.md`: `ZIG_LOCAL_CACHE_DIR=C:\zig-cache\wazmrt`, plus an NTFS cwd for
-`test-security`) is the **Zig cache**. zilc already does the same (`C:\zig-cache\zilc`, KI-2).
-Neither moves **git's** object store: wazmrt's `.git` is on D: too, with no maintenance config, so
-it is likely exposed to the same error. **The git equivalent, proposed and not done:** move
-`.git` to NTFS (`C:\git\zilc.git`), leaving a one-line `.git` file `gitdir: C:/git/zilc.git` (the
-mechanism worktrees and submodules use). The project stays on D:, and this cures KI-23 fully. It is
-reversible, but awaits the owner's go-ahead, per repo.
+*History (2026-10-01).* The owner pointed to wazmrt's NTFS setup (`working-rules.md`:
+`ZIG_LOCAL_CACHE_DIR=C:\zig-cache\wazmrt`, plus an NTFS cwd for `test-security`). That covers the
+**Zig cache**, which zilc already handles the same way (`C:\zig-cache\zilc`, KI-2); it does not
+move git's object store. Moving `.git` to NTFS behind a `gitdir:` pointer file was proposed and
+**rejected** (portability). Other projects on D: are outside zilc's scope and are not tracked here.
+**Nothing about KI-23 is open.**
 
 ## ◐ KI-22 — Build time: Fil-C's frame-slot colouring is cubic on big Zig functions (2026-10-01). **Option 2 DONE (patched Fil-C clang, the default); option 3 research next**
 
