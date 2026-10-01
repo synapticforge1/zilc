@@ -59,6 +59,11 @@ citation to the incident.
 - **When something reports total failure, suspect the instrument.** "0 matches" for all four patch
   edits, including a one-line anchor, was line endings, not upstream changes. Run a control (the
   known-good v0.685 file) before believing it. (2026-10-01.)
+- **When a git (or any) task fails only on Windows, trace down to the CHILD command that fails
+  and run it alone.** KI-23's "Permission denied" was not a lock held by another program. A
+  plain `git multi-pack-index write` worked; it failed only as a child of `repack`, which held the
+  file memory-mapped. `GIT_TRACE=1` showed the child in one run. Then read the next error too:
+  "File exists" was a second, separate Windows/exFAT rename rule. (2026-10-01.)
 - **When a fix lands, update EVERY issue it closes, in the same commit, and re-check before calling
   anything open.** KI-17's unoptimized route fixed KI-10's thread joins on 2026-09-30, but KI-10's
   heading stayed 🟡 and it was listed as open the next day. Before listing open items, check each
