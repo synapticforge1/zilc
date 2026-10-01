@@ -13,6 +13,21 @@ for structure and policy.
 
 ---
 
+## ⏸️ PAUSED 2026-09-30 (end of day). START HERE NEXT SESSION
+
+- **Next task: KI-18** (`known-issues.md`), the Fil-C pass assertion `!(CSize % WordSize)` on
+  `22_strings-and-runes` and `69_http-client`, in every mode. The function reducer left one innocent
+  function plus the globals. **Extend `tools/p2/llreduce.ts` to reduce GLOBALS**, then test the `i2`
+  tag-field suspicion. The reduced module is at `~/zilc-work/csize/csize-reduced.ll` (WSL).
+- **Then** work down the **PRE-PUBLISH CHECKLIST** below: KI-19, the output comparison, library
+  mode, KI-5, `--version` and release notes, and the platforms scope pass. Then publish
+  `v0.15.2-3`.
+- **State:** everything committed (`0185e3e` on `main`), **nothing pushed**. Tests 22/22, gate 4/4.
+  Corpus as designed: C 78/78; Zig ReleaseSafe/Fast/Small 76/78 each, Debug 63/78.
+- **How to run things:** `tools/run-gate-wsl.sh` (gate); `tools/basics/zilc-check.sh` (`MODE=…`) and
+  `all-modes.sh` (corpus); Windows-side builds need `C:\zig\0.15.2\zig.exe` and
+  `ZIG_LOCAL_CACHE_DIR=C:\zig-cache\zilc`. Pass shell text to WSL as a **file** (KI-1).
+
 ## 🆕 2026-09-30 — the Zig runtime and other platforms now have a plan (no version bump)
 
 - **Decided (owner):** the Zig-native runtime (P3) is built **on Linux first, checked against
