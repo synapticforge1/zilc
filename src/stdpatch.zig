@@ -23,7 +23,7 @@ pub const Error = error{
 };
 
 /// Bump when any patch changes, so stale overlays are rebuilt.
-pub const overlay_version = 2;
+pub const overlay_version = 3;
 
 pub const Patch = struct {
     /// Path relative to the Zig lib directory.
@@ -92,6 +92,23 @@ const zig_0_15_2 = [_]Patch{
         // alloc: `page` is already a pointer.
         .old = "const bucket: *BucketHeader = .fromPage(@intFromPtr(page), slot_count);",
         .new = "const bucket: *BucketHeader = .fromPage(@alignCast(page), slot_count); // zilc: Z-5",
+        .count = 1,
+    } } },
+    // Native stack walking (KI-15, zig-upstream-notes.md Z-8; owner chose this option).
+    // In Debug, DebugAllocator captures a stack trace on every alloc/free by walking raw
+    // frame pointers and probing them with process_vm_readv, which Fil-C stops ("unsupported
+    // syscall: 310"). Turning saved frame-pointer integers into pointers can never be safe
+    // under Fil-C. So std is told the truth: native stack walking is unavailable. Its users
+    // (DebugAllocator's default frames, the testing allocators, the build system) then take
+    // their existing 0-frame branch. Fil-C prints its own trace, with file:line, for every
+    // safety stop, and panics go through zerror. The original switch is kept, renamed.
+    .{ .file = "std/debug.zig", .edit = .{ .replace = .{
+        .old = "pub const sys_can_stack_trace = switch (builtin.cpu.arch) {",
+        .new =
+        \\// zilc: native stack walking is unavailable under Fil-C (KI-15); the original follows, renamed.
+        \\pub const sys_can_stack_trace = false;
+        \\pub const zilc_native_sys_can_stack_trace = switch (builtin.cpu.arch) {
+        ,
         .count = 1,
     } } },
     .{ .file = "std/heap/debug_allocator.zig", .edit = .{ .replace = .{
@@ -238,9 +255,27 @@ test "a different original is refused, not mis-patched" {
 }
 
 test "only 0.15.2 has patches so far" {
-    try testing.expectEqual(@as(usize, 4), patchesFor("0.15.2").len);
+    try testing.expectEqual(@as(usize, 5), patchesFor("0.15.2").len);
     // ⚠️ 0.16.0 fixed Z-1 upstream but NOT Z-5: a 0.16 line needs the DebugAllocator patch.
     try testing.expectEqual(@as(usize, 0), patchesFor("0.16.0").len);
+}
+
+test "the stack-trace patch keeps the original switch, renamed" {
+    const src =
+        \\pub const sys_can_stack_trace = switch (builtin.cpu.arch) {
+        \\    .wasm32 => false,
+        \\    else => true,
+        \\};
+        \\
+    ;
+    for (zig_0_15_2) |p| {
+        if (!std.mem.eql(u8, p.file, "std/debug.zig")) continue;
+        const got = try apply(testing.allocator, src, p);
+        defer testing.allocator.free(got);
+        try testing.expect(std.mem.indexOf(u8, got, "pub const sys_can_stack_trace = false;\n") != null);
+        try testing.expect(std.mem.indexOf(u8, got, "pub const zilc_native_sys_can_stack_trace = switch (builtin.cpu.arch) {") != null);
+        try testing.expect(std.mem.indexOf(u8, got, "    else => true,") != null);
+    }
 }
 
 test "an exact replacement checks its occurrence count" {
@@ -262,7 +297,8 @@ test "the DebugAllocator patches match the real call-site shapes" {
         \\
     ;
     var cur = try testing.allocator.dupe(u8, src);
-    for (zig_0_15_2[1..]) |p| {
+    for (zig_0_15_2) |p| {
+        if (!std.mem.eql(u8, p.file, "std/heap/debug_allocator.zig")) continue;
         const next = try apply(testing.allocator, cur, p);
         testing.allocator.free(cur);
         cur = next;

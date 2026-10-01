@@ -170,7 +170,10 @@ pub fn rewriteSyscalls(gpa: std.mem.Allocator, ir: []const u8) !SyscallRewrite {
         const nl = std.mem.indexOfScalarPos(u8, ir, pos, '\n');
         const line = if (nl) |n| ir[pos..n] else ir[pos..];
 
-        if (std.mem.indexOf(u8, line, syscall_marker) != null) {
+        // Skip the wrappers' own `define` lines; only calls are rewritten.
+        const is_call = std.mem.indexOf(u8, line, syscall_marker) != null or
+            (std.mem.indexOf(u8, line, wrapper_marker) != null and !std.mem.startsWith(u8, line, "define "));
+        if (is_call) {
             if (try rewriteSyscallLine(gpa, &out, line, count)) {
                 count += 1;
             } else {
@@ -194,8 +197,33 @@ pub fn rewriteSyscalls(gpa: std.mem.Allocator, ir: []const u8) !SyscallRewrite {
 
 /// Rewrites one asm-call line into zero or more `inttoptr` lines plus the
 /// helper call. Returns false, writing nothing, if the line has an unexpected shape.
+/// Zig's syscall wrappers: `os.linux.x86_64.syscall0` … `syscall6(n, args…) usize`.
+const wrapper_marker = "@os.linux.x86_64.syscall";
+
+/// Where a syscall's operand list opens: after the asm constraint string, or after
+/// a call to one of Zig's `syscallN` wrappers. In unoptimized IR the wrappers are
+/// real functions, so an asm rewrite inside them would receive the arguments as
+/// integer PARAMETERS, which have no capability whatever the caller held. Rewriting
+/// the CALL instead keeps the `inttoptr` in the function that did the `ptrtoint`,
+/// independent of inlining (KI-7, KI-17).
+fn syscallOperands(line: []const u8) ?struct { marker_at: usize, open: usize } {
+    if (std.mem.indexOf(u8, line, syscall_marker)) |m| {
+        const cons_start = m + syscall_marker.len;
+        const cons_end = std.mem.indexOfScalarPos(u8, line, cons_start, '"') orelse return null;
+        if (cons_end + 1 >= line.len or line[cons_end + 1] != '(') return null;
+        return .{ .marker_at = m, .open = cons_end + 1 };
+    }
+    if (std.mem.indexOf(u8, line, wrapper_marker)) |m| {
+        const d = m + wrapper_marker.len;
+        if (d + 1 >= line.len or line[d] < '0' or line[d] > '6' or line[d + 1] != '(') return null;
+        return .{ .marker_at = m, .open = d + 1 };
+    }
+    return null;
+}
+
 fn rewriteSyscallLine(gpa: std.mem.Allocator, out: *std.ArrayListUnmanaged(u8), line: []const u8, id: usize) !bool {
-    const marker_at = std.mem.indexOf(u8, line, syscall_marker) orelse return false;
+    const where = syscallOperands(line) orelse return false;
+    const marker_at = where.marker_at;
 
     // Everything before "call": indentation and an optional "%result = ".
     const call_at = std.mem.lastIndexOf(u8, line[0..marker_at], "call ") orelse return false;
@@ -203,14 +231,12 @@ fn rewriteSyscallLine(gpa: std.mem.Allocator, out: *std.ArrayListUnmanaged(u8), 
     for ([_][]const u8{ "musttail ", "notail ", "tail " }) |t| {
         if (std.mem.endsWith(u8, head, t)) head = head[0 .. head.len - t.len];
     }
-    if (!std.mem.startsWith(u8, std.mem.trimLeft(u8, line[call_at..marker_at], " "), "call i64 ")) return false;
+    // `call i64 asm …` or `call fastcc i64 @os.linux.x86_64.syscallN(…)`.
+    const call_text = std.mem.trimLeft(u8, line[call_at..marker_at], " ");
+    if (!std.mem.startsWith(u8, call_text, "call ") or !std.mem.endsWith(u8, call_text, "i64 ")) return false;
 
-    // The constraint string, then the parenthesised operand list.
-    const cons_start = marker_at + syscall_marker.len;
-    const cons_end = std.mem.indexOfScalarPos(u8, line, cons_start, '"') orelse return false;
-    if (cons_end + 1 >= line.len or line[cons_end + 1] != '(') return false;
-    const args_start = cons_end + 2;
-    const args_end = matchingParen(line, cons_end + 1) orelse return false;
+    const args_start = where.open + 1;
+    const args_end = matchingParen(line, where.open) orelse return false;
     const args = line[args_start..args_end];
     const rest = line[args_end + 1 ..];
 
@@ -606,6 +632,31 @@ test "raw syscall asm becomes a zilc_syscall call (shapes taken from real Zig IR
         \\  %29 = call i64 @zilc_syscall(i64 186, ptr null, ptr null, ptr null, ptr null, ptr null, ptr null), !dbg !3899
     ) != null);
     try testing.expect(std.mem.indexOf(u8, got.ir, syscall_decl) != null);
+}
+
+test "calls to Zig's syscallN wrappers are rewritten at the call site (real unoptimized IR)" {
+    const ir =
+        \\define internal fastcc i64 @os.linux.x86_64.syscall4(i64 %0, i64 %1, i64 %2, i64 %3, i64 %4) unnamed_addr #0 {
+        \\  %6 = call i64 asm sideeffect "syscall", "={rax},{rax},{rdi},{rsi},{rdx},{r10},~{memory},~{rcx},~{r11},~{dirflag},~{fpsr},~{flags}"(i64 %0, i64 %1, i64 %2, i64 %3, i64 %4)
+        \\  ret i64 %6
+        \\}
+        \\define void @sleep(ptr %req) {
+        \\  %7 = ptrtoint ptr %req to i64
+        \\  %9 = call fastcc i64 @os.linux.x86_64.syscall4(i64 230, i64 %5, i64 %6, i64 %7, i64 %8)
+        \\  ret void
+        \\}
+        \\
+    ;
+    const got = try rewriteSyscalls(testing.allocator, ir);
+    defer testing.allocator.free(got.ir);
+    // The wrapper's own `define` line is untouched; its inner asm and the call are rewritten.
+    try testing.expectEqual(@as(usize, 2), got.count);
+    try testing.expect(std.mem.indexOf(u8, got.ir, "define internal fastcc i64 @os.linux.x86_64.syscall4(i64 %0") != null);
+    // At the call site the timespec's ptrtoint is in the SAME function as the new inttoptr.
+    try testing.expect(std.mem.indexOf(u8, got.ir,
+        \\  %zilc.sys.1.3 = inttoptr i64 %7 to ptr
+    ) != null);
+    try testing.expect(std.mem.indexOf(u8, got.ir, "  %9 = call i64 @zilc_syscall(i64 230, ptr %zilc.sys.1.1, ptr %zilc.sys.1.2, ptr %zilc.sys.1.3, ptr %zilc.sys.1.4, ptr null, ptr null)") != null);
 }
 
 test "syscall rewrite: other asm untouched, no-op without syscalls, idempotent" {

@@ -80,6 +80,11 @@ for structure and policy.
   (`design-decisions.md` invariant 5). Then the **panic handler** (Fil-C `zerror`, no `getcontext`) and
   **KI-9** (f128 helpers through the pass): Zig as designed **50/78**. **Next for the corpus:** 26 × "pointer with null
   object", the new top failure.
+- 🔑 **Pipeline change (2026-09-30): zilc now takes Zig's UNOPTIMIZED IR (KI-17).** Zig's `-femit-llvm-ir` is
+  post-optimisation under an integral layout, which turned pointer loads into integers. With it:
+  **ReleaseSafe, ReleaseFast and ReleaseSmall each 76/78 as designed** (identical); Debug 63/78.
+  Open: **KI-18** (a Fil-C assertion, 2 programs, every mode) and **KI-19** (Debug-only syscall
+  pointer arguments, 13). KI-15 is fixed by owner-chosen option 1 (`sys_can_stack_trace = false`).
 - 🧭 **The 2 bounds violations (2026-09-30):** **69** (the `mmap` hint) is **fixed** through std's
   `root.os.heap.page_allocator` hook (KI-12). **67** (`indexOfSentinel` over-read) is std's own
   SIMD scan, **already fixed upstream in 0.16.0**, and documented for a possible Zig report

@@ -42,5 +42,5 @@ done | xargs -P "${JOBS:-12}" -L 1 sh -c "OUT='$OUT' ZILC='$ZILC' MODE='$MODE'; 
 
 for L in $LANGS; do
   echo "== $L [$MODE]: $(grep -c "^$L .* OK$" "$OUT/results.txt") OK / $(grep -c "^$L " "$OUT/results.txt")"
-  grep "^$L " "$OUT/results.txt" | grep -v ' OK$' | awk '{ $1=""; $2=""; print }' | sed 's/^ *//' | sed -E 's/ [0-9a-fx]{8,}//g' | sort | uniq -c | sort -rn
+  grep "^$L " "$OUT/results.txt" | grep -v ' OK$' | awk '{ $1=""; $2=""; print }' | sed 's/^ *//' | sed -E 's/ [0-9a-fx]{8,}//g; s/[[0-9]+] //' | sort | uniq -c | sort -rn
 done

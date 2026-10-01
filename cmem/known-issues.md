@@ -383,7 +383,7 @@ asm (`literal register %rdi not covered…`). **Fix:** the driver always passes 
 Natively the sequence is a no-op unless running under Valgrind, which a zilc program never does,
 so no behaviour changes.
 
-## 🔴 KI-15 — Debug: `DebugAllocator` captures a stack trace for EVERY allocation, by walking raw frame pointers (2026-09-30)
+## ✅ KI-15 — Debug: `DebugAllocator` captures a stack trace for EVERY allocation, by walking raw frame pointers. **FIXED 2026-09-30: option 1, owner-approved** (`std.debug.sys_can_stack_trace = false` in the std overlay; the original switch kept, renamed). Debug `09_slices`, `10_maps` and `34_atomic-counters` (50 threads) now run on both routes
 
 **Owner: "make sure to make a note on this item for sure."**
 
@@ -402,7 +402,7 @@ so no behaviour changes.
   unaffected (0 frames). Found 2026-09-30 by `09_slices` built with `-O Debug`.
 - **std offers no switch:** `std.Options` has no stack-trace knob; `sys_can_stack_trace` is a fixed
   per-architecture constant (`debug.zig:171`).
-- **Safe equivalents, to decide (owner):**
+- **Safe equivalents (owner chose 1, 2026-09-30, "I agree with your recommendation"; 3 stays possible later, on top of 1):**
   1. **std overlay patch: `std.debug.sys_can_stack_trace = false` under zilc** *(recommended)*.
      It tells std the truth, that native stack walking is unavailable, so every std path that would
      walk the stack (allocator traces, panic traces, `dumpCurrentStackTrace`) takes its existing
@@ -415,6 +415,79 @@ so no behaviour changes.
      file and line) to keep allocation-site traces. More work, but no loss.
 - Also check: whether other std paths reach syscall 310 or raw frame-pointer walks in Release
   modes (part of the all-modes check below).
+
+## 🔑 KI-17 — Zig's emitted IR is ALREADY OPTIMIZED, under an integral data layout (2026-09-30). ✅ **The unoptimized route is now the DEFAULT** (`--verbose-llvm-ir` + `-fllvm`; `ZILC_OPTIMIZED_IR=1` restores the old one). Release modes all 76/78 as designed; gate 4/4
+
+**The most important pipeline finding since KI-4.** `-femit-llvm-ir` emits the module **after**
+Zig's LLVM optimization passes (Zig's help: "Produce a .ll file with optimized LLVM IR"). Those
+passes ran under Zig's ordinary data layout, where pointers are plain integers, so LLVM is free to
+canonicalise a pointer load into **`load i64` + `inttoptr`**. Under Fil-C a loaded integer has **no
+capability**, so the pointer dies. Fil-C's `ni:0` layout exists to forbid exactly that transform,
+but zilc applied it *after* Zig had already optimized.
+
+- **Found by** the 5 thread-join failures (KI-10): Zig's source keeps `pthread_t` as a pointer
+  throughout, but in the emitted IR `Thread.join` did `%v = load i64, ptr %slot; %p = inttoptr i64
+  %v to ptr; call @pthread_join(%p)`.
+- **Zig's unoptimized module** is available through the debug flag **`--verbose-llvm-ir=PATH`**.
+  In it, `join` does `load ptr` as written. On `34_atomic-counters`, `inttoptr`s drop from **386
+  (optimized) to 117** (the rest are real `@ptrFromInt` in source).
+- **This is how Fil-C's own C pipeline works:** the front end hands over unoptimized IR, and all
+  optimisation happens inside Fil-C's clang, under `ni:0`. zilc should do the same.
+- **Experiment, 2026-09-30 (`ZILC_UNOPT_IR=1`, env-gated in `driver.compileZig`):** 34
+  (`ops: 50000` from 50 threads) and 27 now pass, the controls still pass, and the KI-4 pass crash
+  did **not** reappear on them. **The full corpus in all 4 modes is running** to decide whether
+  this becomes the default.
+- **Explains the per-mode differences** (KI-16): how often LLVM rewrites pointers as integers
+  depends on the optimisation level (optimized route: ReleaseSafe 71, ReleaseFast 75, ReleaseSmall
+  69 as designed).
+- ⚠️ **Open costs, to measure:** speed (Fil-C's clang at `-O1` instead of Zig's full pipeline;
+  Fil-C's `-O2` is worth trying, since the pass placement is upstream's); compile time; and the
+  risk of the KI-4 crash on larger unoptimized modules.
+- KI-13's fixes still apply: overflow intrinsics come from Zig's front end and are in the
+  unoptimized IR too, and `fromPage`'s integer parameter is source-level.
+
+## 🔴 KI-18 — Fil-C pass assertion `!(CSize % WordSize)` on unoptimized Zig IR (2026-09-30)
+
+On the unoptimized route (KI-17), **2 of 78 programs crash Fil-C's clang in every mode**:
+`22_strings-and-runes` and `69_http-client`. The crash is `FilPizlonator.cpp:16714: void
+{anonymous}::Pizlonator::run(): Assertion '!(CSize % WordSize)' failed`, an abort (exit 134) inside
+`FilPizlonatorPass::run`. Both build fine on the optimized route.
+
+- **Reduced** with `tools/p2/llreduce.ts` (`--opt -O1`): 21,523 → 7,710 lines, **one function body
+  left** (`os.linux.x86_64.syscall4`, which is innocent: four `inttoptr` and a call). The reducer only
+  removes function bodies, and **the remaining module is mostly GLOBALS**, kept alive through the
+  debug metadata's global list. The assertion is about a **constant's size**, so a global is the
+  likely trigger.
+- **Prime suspect (unverified):** Zig's unoptimized constants are full of **`i2` fields**
+  (error-union and optional tags), e.g. `{ { ptr, i64 }, { [16 x i8], i2, [7 x i8] }, …, i8, i2,
+  [6 x i8] }`. A 2-bit integer has no whole-byte size, which fits an assertion about word-multiple
+  sizes. LLVM's optimizer likely rewrote these away on the optimized route.
+- **Next:** extend the reducer to drop globals (replace initializers with `zeroinitializer`, or
+  remove unreferenced ones) until one global remains. Then decide: an IR workaround (widen `iN`
+  fields in pointer-bearing constants to bytes), and/or **an upstream Fil-C report** (an assertion
+  on valid IR, like KI-4's crash).
+- Reduced module: `~/zilc-work/csize/csize-reduced.ll` (WSL); input `…/runes.zilc-tmp/
+  strings-and-runes.filc.ll`.
+
+## 🔴 KI-19 — Debug only: syscall POINTER arguments arrive without a capability (2026-09-30)
+
+On the default (unoptimized) route, Debug is 63/78 as designed against 76 in every Release mode.
+**All 13 Debug-only traps are the same thing:** a system call's pointer argument has no
+capability when Fil-C's runtime uses it: `clock_nanosleep`'s timespec (7: 29, 30, 31, 32, 35, 37,
+76), the futex timed-wait timeout (3: 28, 33, 36), `getdents`' buffer (2: 62, 63), and `statx`'s
+buffer (1: 58).
+
+- 🔸 **Hypothesis, not yet verified:** Debug compiles the instrumented IR at **`filc -O0`** (the
+  KI-4 workaround), so no pass promotes stack slots to registers. Zig's Debug IR keeps each
+  `@intFromPtr` result in a stack slot (`store i64` then `load i64`) before calling the `syscallN`
+  wrapper. A **loaded** integer is BOTTOM to Fil-C's `inttoptr` analysis, so the `inttoptr` that
+  `rewriteSyscalls` inserts at the call site recovers nothing. KI-17's problem again, in Debug's form.
+- **To check first:** the IR of `31_timers` in Debug around the `syscall4` call.
+- **Candidate fixes:** (a) in the rewrite, follow the operand back through a same-function
+  `store`/`load` of a stack slot to its `ptrtoint`, and pass the original pointer directly;
+  (b) re-test whether KI-4's `-O1` crash still occurs on the unoptimized route, since `-O1` would
+  promote the slots; (c) run only `mem2reg`/SROA before the pass at `-O0`, if Fil-C's pipeline
+  allows it.
 
 ## 🧪 KI-16 — Every optimisation mode must be checked separately (owner, 2026-09-30)
 
@@ -432,6 +505,20 @@ these found conditions."** The conditions found so far **depend on the mode**:
 
 So **the corpus runs in every mode** (`tools/basics/zilc-check.sh`, `MODE=…`), and results are
 recorded per mode in `testing.md`.
+
+**Measured 2026-09-30 (Zig corpus, as designed out of 78):**
+
+| route | ReleaseSafe | ReleaseFast | ReleaseSmall | Debug |
+| --- | --- | --- | --- | --- |
+| optimized IR (old) | 71 | 75 | 69 | stopped by KI-15 |
+| **unoptimized IR (default now)**, plus the wrapper-call rewrite | **76** | **76** | **76** | **63** (57 clean exits); see KI-19 |
+
+**The modes differed because of LLVM's pre-optimisation (KI-17). Once it was removed, the three Release
+modes give identical results.** The 2 left in each are the KI-18 Fil-C assertion. Two
+mode-specific fixes were needed along the way: **`-fllvm`** (Debug otherwise uses Zig's own x86_64
+backend, so there was no LLVM module and every Debug build failed), and **rewriting calls to Zig's
+`syscallN` wrappers at the call site** (in unoptimized ReleaseSmall the wrapper is not inlined, so
+an asm-only rewrite received pointers as integer parameters, with no capability).
 
 ## 🟡 KI-10 — `pthread_join` traps on a pointer with no capability (2026-09-30)
 

@@ -311,7 +311,23 @@ fn compileZig(
     errdefer gpa.free(obj_path);
 
     // 1. Stock Zig emits plain LLVM IR. `-fno-emit-bin`: we only want the IR.
-    const emit_arg = try std.fmt.allocPrint(gpa, "-femit-llvm-ir={s}", .{ll_path});
+    //
+    // Zig's UNOPTIMIZED module (KI-17), the default since 2026-09-30. `-femit-llvm-ir`
+    // is post-optimization, and LLVM's optimizer runs there under Zig's integral data
+    // layout, so it may rewrite pointer loads as `load i64` + `inttoptr`, which loses
+    // capabilities under Fil-C. Fil-C's own pipeline optimizes only under `ni:0`,
+    // which forbids exactly that. With this route the three Release modes give
+    // identical corpus results. ZILC_OPTIMIZED_IR=1 restores the old route, for
+    // comparison only.
+    const unopt = blk: {
+        const v = std.process.getEnvVarOwned(gpa, "ZILC_OPTIMIZED_IR") catch break :blk true;
+        defer gpa.free(v);
+        break :blk !std.mem.eql(u8, v, "1");
+    };
+    const emit_arg = if (unopt)
+        try std.fmt.allocPrint(gpa, "--verbose-llvm-ir={s}", .{ll_path})
+    else
+        try std.fmt.allocPrint(gpa, "-femit-llvm-ir={s}", .{ll_path});
     defer gpa.free(emit_arg);
 
     var zig_args: std.ArrayListUnmanaged([]const u8) = .{};
@@ -328,6 +344,10 @@ fn compileZig(
         // no-op unless running under Valgrind. Fil-C refuses all inline asm, and a
         // zilc program never runs under Valgrind, so leave them out (KI-14).
         "-fno-valgrind",
+        // Always the LLVM backend. Debug otherwise defaults to Zig's own x86_64
+        // backend, which emits no LLVM module at all (`-femit-llvm-ir` used to
+        // force LLVM implicitly; the unoptimized route does not, KI-17).
+        "-fllvm",
     });
     if (zig_lib_dir) |d| try zig_args.appendSlice(gpa, &.{ "--zig-lib-dir", d });
     // Every mode, not only Debug: ReleaseSafe emits the probe too for large frames
