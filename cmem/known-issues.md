@@ -505,7 +505,12 @@ On the unoptimized route (KI-17), **2 of 78 programs crash Fil-C's clang in ever
 - Reduced module: `~/zilc-work/csize/csize-reduced.ll` (WSL); input `…/runes.zilc-tmp/
   strings-and-runes.filc.ll`.
 
-## ◐ KI-23 — Git's automatic maintenance fails on the exFAT drive (2026-10-01). **Mitigated**
+## ✅ KI-23 — Git's automatic maintenance fails on the exFAT drive (2026-10-01). **Mitigated; mitigation is FINAL (owner: projects stay on D: for portability)**
+
+> **Owner decision 2026-10-01:** "The reason it is on the D: drive is for portability. We won't be
+> placing project on the NTFS drive." The repo and its `.git` stay on the exFAT D: drive. The
+> NTFS-gitdir idea below is **rejected**. The mitigation (repo-local `maintenance.*` config) is
+> permanent, and it travels with the project, because `.git/config` is on D: too.
 
 **Symptom:** after commits, `fatal: could not write multi-pack-index: Permission denied` /
 `error: task 'geometric-repack' failed`. A forced `gc` fails with `renaming pack to '…pack' failed:

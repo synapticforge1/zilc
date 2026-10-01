@@ -58,9 +58,9 @@ for structure and policy.
 - 📏 **LF everywhere (owner):** `.gitattributes` is `* text=auto eol=lf`; reference clones use
   `core.autocrlf=false`; and since 2026-10-01 (owner) **global** `core.autocrlf=input`,
   `core.eol=lf` (overriding Git for Windows' system default `true`) across all projects.
-- 🧹 **KI-23 (git maintenance errors after commits) mitigated:** repo-local config uses `gc` instead of
-  the geometric task, which Windows and exFAT file semantics break. Full fix: repos on NTFS (owner's
-  call).
+- 🧹 **KI-23 (git maintenance errors after commits) closed:** repo-local config uses `gc` instead of
+  the geometric task, which Windows and exFAT file semantics break. **Projects stay on D: for
+  portability (owner)**, so this mitigation is final, and it travels with the repo.
 - 🏷️ **Stale labels corrected:** KI-10 (fixed 2026-09-30 by KI-17), KI-6 (handled), the KI-11
   line, and the upstream-report loose end. README synced: Debug needs the patched clang; build
   times; layout.
@@ -347,7 +347,7 @@ the runtime-linking rule checked.
 | [roadmap.md](roadmap.md) | P0 ✅ → P1 ✅ → P2 ✅ (`0.3.0`) → **P3 Zig runtime (plan 2026-09-30: Linux first, checked against Fil-C, `zsys_*` first; next step the `zsys_write` spike)** → P4 Zig-language fidelity → P5 C++ → **P6 other platforms (proposed 2026-09-30)**. |
 | [security-model.md](security-model.md) | The safety guarantees being targeted (spatial, temporal, thread-safe capability updates), and what is explicitly out of scope. |
 | [testing.md](testing.md) | Current gates (gate 4/4, tests 24/24 on 2026-10-01, with the exact commands), corpus results per mode and (2026-10-01) build times, the recorded expected panics, and the planned gates: `-Druntime=both`, the between-versions comparison, and the benchmark suite. |
-| [known-issues.md](known-issues.md) | 🆕 2026-10-01: **KI-4, KI-10, KI-18, KI-19, KI-20, KI-21 fixed; KI-22 (build time) mostly done** (patched Fil-C clang; option 3 rejected; speed-up options (a)–(c) approved, not started). Partly open: KI-7 (`getcontext`), KI-5, **KI-23** (git maintenance on exFAT, mitigated). 🔑 **KI-4 (2026-09-23): Fil-C's IR is a PATCHED-LLVM DIALECT** (`ni:0` + `datalayout_after_filc`), so stock IR cannot enter the pass — this decided the integration route. KI-1 ✅ resolved (WSL2 installed; `sudo` needs a password); KI-2 exFAT zig-cache; KI-3 LLVM 20 vs 21 skew. |
+| [known-issues.md](known-issues.md) | 🆕 2026-10-01: **KI-4, KI-10, KI-18, KI-19, KI-20, KI-21 fixed; KI-22 (build time) mostly done** (patched Fil-C clang; option 3 rejected; speed-up options (a)–(c) approved, not started). Partly open: KI-7 (`getcontext`), KI-5. KI-23 (git maintenance on exFAT) closed with a final mitigation. 🔑 **KI-4 (2026-09-23): Fil-C's IR is a PATCHED-LLVM DIALECT** (`ni:0` + `datalayout_after_filc`), so stock IR cannot enter the pass — this decided the integration route. KI-1 ✅ resolved (WSL2 installed; `sudo` needs a password); KI-2 exFAT zig-cache; KI-3 LLVM 20 vs 21 skew. |
 | [workarounds.md](workarounds.md) | 🆕 2026-10-01. **The WHY of every workaround** (owner rule): symptom index, five failure families (F1 pass rejects valid IR, F2 capability lost through an integer, F3 inline asm, F4 code outside the pass, F5 std out of bounds), the entry template, KI-18 in full, and short forms of KI-4…KI-17. **Look up new failures here first.** |
 | [releasing.md](releasing.md) | 🔖 **Version `0.15.2-3`** (applied 2026-09-30): `<Zig line>-<release>`, the **basis** each latest-line release names, how to bump it, why `.` and `_` were rejected, no 1.0, `-N` restarts at 1 per Zig version, the four places the number lives. The old minor-per-phase cadence is retired. |
 | [filc-abi.md](filc-abi.md) | 🆕 2026-09-30. **Fil-C 0.685's runtime ABI as OBSERVED** (post-pass IR, headers, binaries; no runtime source): flight pointers, the object-header word, function objects and getters, the fast and generic calling convention, the thread layout, linking and overriding. What P3 must match, and its scoping consequences. |
