@@ -45,6 +45,11 @@ for structure and policy.
   **Debug median 19 s → 4 s, same as ReleaseSafe; 78/78 in all modes.** Remaining: `69`-class
   programs (55.9 s vs native 16.9 s), inherent to instrumented code; the three levers were
   **approved by the owner at end of day** (next task, above).
+- 📦 **The patched clang is also archived IN THE PROJECT** (owner, end of day): `toolchain/` (gitignored,
+  never push) holds the tree (83 MB) and its debug info (966 MB), verified by a restore into a
+  scratch directory: same objects, gate 4/4. A fresh machine restores it with
+  `tools/filc/restore-patched-clang.sh` in a minute instead of a ~1 h rebuild. After any change to
+  the patch, re-run `tools/filc/archive-patched-clang.sh`.
 - **State:** everything committed on `main`, **nothing pushed**. WSL has
   `build-essential` + `cmake` (owner installed; `ninja` 1.12.1 and gdb in `~/zilc-work/tools/`, no
   sudo needed). ⚠️ Build LLVM with `JOBS` ≤ 12 (32 crashed the WSL VM).
