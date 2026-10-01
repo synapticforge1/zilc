@@ -13,17 +13,24 @@ for structure and policy.
 
 ---
 
-## ⏸️ PAUSED 2026-09-30 (end of day). START HERE NEXT SESSION
+## ▶️ 2026-10-01 — IN PROGRESS. START HERE
 
-- **Next task: KI-18** (`known-issues.md`), the Fil-C pass assertion `!(CSize % WordSize)` on
-  `22_strings-and-runes` and `69_http-client`, in every mode. The function reducer left one innocent
-  function plus the globals. **Extend `tools/p2/llreduce.ts` to reduce GLOBALS**, then test the `i2`
-  tag-field suspicion. The reduced module is at `~/zilc-work/csize/csize-reduced.ll` (WSL).
-- **Then** work down the **PRE-PUBLISH CHECKLIST** below: KI-19, the output comparison, library
-  mode, KI-5, `--version` and release notes, and the platforms scope pass. Then publish
-  `v0.15.2-3`.
-- **State:** everything committed (`0185e3e` on `main`), **nothing pushed**. Tests 22/22, gate 4/4.
-  Corpus as designed: C 78/78; Zig ReleaseSafe/Fast/Small 76/78 each, Debug 63/78.
+- **Done today:** **KI-18** fixed (3-byte globals wrapped in a struct; `i21` and `<3 x i8>`),
+  **KI-20** fixed (`crypto_always_getrandom`), **KI-21** fixed (std's stack-trace code no longer
+  compiled: `62` 40 s → 8 s). Release modes **78/78 as designed** each, Debug 65/78. Tests 24/24,
+  gate 4/4. New: `workarounds.md` (the why of every workaround, owner rule) and
+  `UPSTREAM-ISSUES.md` (documentation only; reporting not planned).
+- **Owner decisions today** (`design-decisions.md`): "clean-room" meant **licence compliance**, not
+  a ban on reading Fil-C's source; compliance is **documentation only**; **KI-22: option 2, then
+  research option 3.**
+- **In progress: KI-22 option 2.** A patched Fil-C clang is being built in WSL from the prebuilt's
+  commit `bb0d0a64` with an output-identical colouring fix (`tools/filc/build-patched-clang.sh`,
+  log `~/zilc-work/filc-build.log`, install `~/zilc-work/tools/filc-0.685-zilc/`). **Next:** prove
+  byte-identical objects against the prebuilt, time `69` in every mode, then research option 3
+  (lifetime markers) against those numbers. Then the rest of the **PRE-PUBLISH CHECKLIST**.
+- **State:** today's work is **uncommitted**; last commit `0185e3e` on `main`, nothing pushed.
+  WSL now has `build-essential` + `cmake` (owner installed; `ninja` 1.12.1 and gdb in
+  `~/zilc-work/tools/`, no sudo needed).
 - **How to run things:** `tools/run-gate-wsl.sh` (gate); `tools/basics/zilc-check.sh` (`MODE=…`) and
   `all-modes.sh` (corpus); Windows-side builds need `C:\zig\0.15.2\zig.exe` and
   `ZIG_LOCAL_CACHE_DIR=C:\zig-cache\zilc`. Pass shell text to WSL as a **file** (KI-1).
@@ -95,18 +102,24 @@ for structure and policy.
   (`design-decisions.md` invariant 5). Then the **panic handler** (Fil-C `zerror`, no `getcontext`) and
   **KI-9** (f128 helpers through the pass): Zig as designed **50/78**. **Next for the corpus:** 26 × "pointer with null
   object", the new top failure.
-- ✅ **OWNER DECISIONS, 2026-09-30** (`design-decisions.md`): **(1) clean-room runtime**: never read
-  Fil-C's runtime source. **(2) upstream defects are noted for the record, not filed.**
+- ✅ **OWNER DECISIONS, 2026-09-30** (`design-decisions.md`): **(1) ~~clean-room runtime: never read
+  Fil-C's runtime source~~ → CORRECTED 2026-10-01 (owner): the intent is LICENCE COMPLIANCE.**
+  Fil-C's source (pass and runtime) may be read; the Zig runtime is new Zig code; every adaptation
+  is ledgered and its notice carried (`licensing.md`). **(2) upstream defects are noted for the
+  record, not filed** (refined 2026-10-01: a short email pointing to `UPSTREAM-ISSUES.md`).
   **(3) publish as `v0.15.2-3`** after the open items and the platforms scope, before the port
   (move the local tag and branch, `releasing.md`). **(4) platforms: Linux, macOS, Windows on every
   prevalent processor, then iOS, Android later** (`roadmap.md` P6; ✅ x86_64 + aarch64 confirmed;
   riscv64 out of scope for now, low interest).
 - 📋 **PRE-PUBLISH CHECKLIST (all must close before `v0.15.2-3` is pushed):**
-  - [ ] **KI-18**: Fil-C assertion on 2 programs (every mode). Reduce to the global, then work
-    around it or document
-  - [ ] **KI-19**: Debug syscall pointer arguments (13 programs)
+  - [x] **KI-18**: Fil-C assertion on 2 programs (every mode). ✅ 2026-10-01, `ir.wrapThreeByteGlobals`
+  - [x] **KI-20**: `madvise` probe in `std.crypto.random`. ✅ 2026-10-01, `crypto_always_getrandom`
+  - [x] **KI-21**: dead stack-trace code compiled into every program. ✅ 2026-10-01, std-overlay guards
+  - [ ] **KI-22**: build time on big functions and Debug (option 2 in progress, then research option 3)
+  - [ ] **KI-19**: Debug syscall pointer arguments (12 programs)
   - [ ] **Output comparison**: corpus output vs native, not just exit codes
-  - [ ] **Library mode** (C owns `main`): panic handler and page-allocator hook not applied
+  - [ ] **Library mode** (C owns `main`): panic handler, page-allocator hook and (KI-20)
+    `crypto_always_getrandom` not applied
   - [ ] **KI-5**: `std.os.environ` unset by the entry shim
   - [ ] `zilc --version` shows the user-code Zig and Fil-C release; create a **release-notes file**
   - [ ] **Platforms scope pass** (P6): per platform, the processors, the std OS-function count, the
@@ -243,6 +256,16 @@ this for the project"), do all of the following:
 3. **If the work produced a transferable METHOD lesson, add it to
    [`best-practices.md`](best-practices.md)** as one bold rule plus a citation to the incident.
 
+### The "workaround" rule (binding on every agent; owner, 2026-10-01)
+
+**Every workaround gets copious WHY notes in [`workarounds.md`](workarounds.md) when it is made**,
+whether the cause is an upstream defect or a system limitation: the exact symptom, the class, the
+root cause (measured vs. surmised, kept apart), why the fix is correct, what was ruled out, how it
+was found, how to recognise a relative, and the cost and exit condition. Owner: *"so that when we
+run into similar issues we can quickly identify those past problems and their resolutions, and
+investigate and surmise potential similar resolutions."* **A new failure is looked up in
+`workarounds.md`'s symptom index and families first.**
+
 ### The "adopt upstream code" trigger (binding on every agent)
 
 Before incorporating or adapting code from Fil-C, LLVM or Zig (see `reference-projects.md`,
@@ -266,8 +289,9 @@ the runtime-linking rule checked.
 | [reference-projects.md](reference-projects.md) | Fil-C, LLVM, Zig: verified licenses, what to mine each for, adoption status. |
 | [roadmap.md](roadmap.md) | P0 ✅ → P1 ✅ → P2 ✅ (`0.3.0`) → **P3 Zig runtime (plan 2026-09-30: Linux first, checked against Fil-C, `zsys_*` first; next step the `zsys_write` spike)** → P4 Zig-language fidelity → P5 C++ → **P6 other platforms (proposed 2026-09-30)**. |
 | [security-model.md](security-model.md) | The safety guarantees being targeted (spatial, temporal, thread-safe capability updates), and what is explicitly out of scope. |
-| [testing.md](testing.md) | Current gates (gate 4/4, tests 10/10 on 2026-09-30, with the exact commands), the recorded expected panics, and the planned gates: `-Druntime=both`, the between-versions comparison, and the benchmark suite. |
-| [known-issues.md](known-issues.md) | 🔑 **KI-4 (2026-09-23): Fil-C's IR is a PATCHED-LLVM DIALECT** (`ni:0` + `datalayout_after_filc`), so stock IR cannot enter the pass — this decided the integration route. KI-1 ✅ resolved (WSL2 installed; `sudo` needs a password); KI-2 exFAT zig-cache; KI-3 LLVM 20 vs 21 skew. |
+| [testing.md](testing.md) | Current gates (gate 4/4, tests 24/24 on 2026-10-01, with the exact commands), corpus results per mode and (2026-10-01) build times, the recorded expected panics, and the planned gates: `-Druntime=both`, the between-versions comparison, and the benchmark suite. |
+| [known-issues.md](known-issues.md) | 🆕 2026-10-01: **KI-18, KI-20, KI-21 fixed; KI-22 (build time, cubic colouring in Fil-C's pass) in progress**; KI-19 open. 🔑 **KI-4 (2026-09-23): Fil-C's IR is a PATCHED-LLVM DIALECT** (`ni:0` + `datalayout_after_filc`), so stock IR cannot enter the pass — this decided the integration route. KI-1 ✅ resolved (WSL2 installed; `sudo` needs a password); KI-2 exFAT zig-cache; KI-3 LLVM 20 vs 21 skew. |
+| [workarounds.md](workarounds.md) | 🆕 2026-10-01. **The WHY of every workaround** (owner rule): symptom index, five failure families (F1 pass rejects valid IR, F2 capability lost through an integer, F3 inline asm, F4 code outside the pass, F5 std out of bounds), the entry template, KI-18 in full, and short forms of KI-4…KI-17. **Look up new failures here first.** |
 | [releasing.md](releasing.md) | 🔖 **Version `0.15.2-3`** (applied 2026-09-30): `<Zig line>-<release>`, the **basis** each latest-line release names, how to bump it, why `.` and `_` were rejected, no 1.0, `-N` restarts at 1 per Zig version, the four places the number lives. The old minor-per-phase cadence is retired. |
 | [filc-abi.md](filc-abi.md) | 🆕 2026-09-30. **Fil-C 0.685's runtime ABI as OBSERVED** (post-pass IR, headers, binaries; no runtime source): flight pointers, the object-header word, function objects and getters, the fast and generic calling convention, the thread layout, linking and overriding. What P3 must match, and its scoping consequences. |
 | [zig-upstream-notes.md](zig-upstream-notes.md) | 🆕 2026-09-30. **Zig behaviours we may need to report** (owner asked): Z-1 `indexOfSentinel` over-read (fixed in 0.16.0; report draft and repro in `tools/zig-reports/`), Z-2 the `mmap` hint, Z-3 raw syscalls, Z-4 `getcontext`, Z-5 `DebugAllocator` integer arithmetic. Each with whether it is really a Zig bug. |

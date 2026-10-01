@@ -48,8 +48,10 @@ LLVM-derived code is fine in the runtime (the LLVM exception waives attribution 
 **BSD-2-Clause (libpas) and MIT (Zig, musl) are not** — each requires its notice to accompany binary
 distributions. So: **porting libpas/filc-runtime code into `zilc_runtime` imposes an attribution
 obligation on every downstream program.** That is an acceptable trade (Fil-C itself works this way),
-but it must be a *decision*, recorded in the ledger entry — not an accident. A clean-room Zig runtime
-avoids it entirely. See `cmem/licensing.md`.
+but it must be a *decision*, recorded in the ledger entry — not an accident. **Owner decision
+2026-10-01: comply rather than avoid.** Fil-C's source may be read, and each adaptation into the
+runtime is ledgered here, with the BSD-2-Clause notice carried with user binaries. See
+`cmem/licensing.md`.
 
 ### Copyleft exclusion
 
@@ -80,10 +82,39 @@ Run this **before** incorporating code from any project.
 
 ## Component Ledger
 
-~~EMPTY as of 2026-09-18.~~ **First entries 2026-09-30:** test programs, and a 4-line Zig std backport (MIT). **Still no third-party
-runtime code in zilc.**
+~~EMPTY as of 2026-09-18.~~ **First entries 2026-09-30:** test programs, and a 4-line Zig std backport (MIT).
+**2026-10-01:** a local patch to Fil-C's compiler pass (toolchain-only, not distributed). **Still no
+third-party runtime code in zilc.**
 
 Newest first. Copy the template for each adopted component.
+
+### filc-pass-colouring-fix (a local patch to Fil-C's compiler pass; LOCAL USE ONLY)
+- **Source:** https://github.com/pizlonator/llvm-project-deluge (Fil-C's LLVM fork)
+- **Version / commit:** `bb0d0a64eed297ab8e171002033208fb08ad9941`, the commit the Fil-C **0.685**
+  prebuilt names in `clang --version`
+- **Upstream path(s):** `llvm/lib/Transforms/Instrumentation/FilPizlonator.cpp`, the two frame-slot
+  colouring loops (about lines 3054–3076 and 3146–3160 at that commit)
+- **License (SPDX):** `Apache-2.0 WITH LLVM-exception` (the file's own header)
+- **License file:** upstream `LLVM-LICENSE.txt` / `llvm/LICENSE.TXT`; nothing copied into zilc's
+  source beyond the diff context
+- **What we changed:** the greedy colouring picks the lowest frame index no neighbour holds by marking
+  the neighbours' indices once, instead of rescanning every neighbour per candidate index. Same
+  visiting order, same choice, so **the same colouring and the same output**, at O(degree) instead
+  of O(degree × colours) per value (KI-22, `cmem/workarounds.md`)
+- **Where it lives in zilc:** `tools/filc/patch-pass.ts` (exact-match edit script, the diff
+  context), `third_party/filc-patches/0001-ki22-frame-slot-colouring.patch` (the resulting diff),
+  `tools/filc/build-patched-clang.sh` (build recipe mirroring Fil-C's `configure_llvm.sh`)
+- **Artifact destination:** **toolchain-only, and local only.** The patched clang lives in
+  `~/zilc-work/tools/filc-0.685-zilc/` and is **not distributed**. It emits the same code as the
+  prebuilt, so user binaries carry nothing new
+- **Modifications:** each changed block is marked `// zilc (KI-22): …` in the patched source
+- **Obligations satisfied:** [n/a] while local: Apache-2.0 §4 applies only on redistribution.
+  **If the patched clang is ever distributed:** [ ] include the Apache-2.0 + LLVM-exception licence
+  [ ] carry Fil-C's NOTICE/attribution files [ ] keep the `zilc (KI-22)` change marks (§4(b)
+  prominent notice of modification) [ ] state the base commit
+- **Benefit / drawback note:** removes the cubic cost that made big Zig functions (TLS, crypto) and
+  Debug builds impractically slow; drawback: zilc must rebuild the patched clang at every Fil-C
+  upgrade until upstream changes the loop (`cmem/upstream.md` stage A)
 
 ### zig-std-backports (Zig standard-library backports applied by `src/stdpatch.zig`)
 - **Source:** https://codeberg.org/ziglang/zig (the Zig 0.16.0 release, as installed: `lib/std/mem.zig`)

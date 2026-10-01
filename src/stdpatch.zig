@@ -23,7 +23,7 @@ pub const Error = error{
 };
 
 /// Bump when any patch changes, so stale overlays are rebuilt.
-pub const overlay_version = 3;
+pub const overlay_version = 4;
 
 pub const Patch = struct {
     /// Path relative to the Zig lib directory.
@@ -108,6 +108,40 @@ const zig_0_15_2 = [_]Patch{
         \\// zilc: native stack walking is unavailable under Fil-C (KI-15); the original follows, renamed.
         \\pub const sys_can_stack_trace = false;
         \\pub const zilc_native_sys_can_stack_trace = switch (builtin.cpu.arch) {
+        ,
+        .count = 1,
+    } } },
+    // Make "no native stack walking" true at COMPILE time, not just at run time (KI-21,
+    // cmem/workarounds.md). zilc compiles Zig's UNOPTIMIZED IR (KI-17), so code that
+    // std skips only by a run-time test still reaches Fil-C, which instruments it and
+    // compiles it. Two entry points kept the whole DWARF unwinder in every program
+    // (`debug.Dwarf`, `debug.SelfInfo`, `compress.flate`, `sort.block`: about half of
+    // `62_directories`' IR): DebugAllocator's calls to captureStackTrace (with 0
+    // frames) and StackTrace.format (for logged traces). A comptime-known early return,
+    // the pattern std itself uses for freestanding just below, keeps the rest of each
+    // function from being analysed, so none of it is emitted. Behaviour is unchanged:
+    // the trace was already empty, and a walk would stop under Fil-C anyway (KI-15).
+    .{ .file = "std/debug.zig", .edit = .{ .replace = .{
+        .old = "pub fn captureStackTrace(first_address: ?usize, stack_trace: *std.builtin.StackTrace) void {\n",
+        .new =
+        \\pub fn captureStackTrace(first_address: ?usize, stack_trace: *std.builtin.StackTrace) void {
+        \\    // zilc: no native stack walking (KI-15), decided at compile time (KI-21).
+        \\    if (!sys_can_stack_trace) {
+        \\        stack_trace.index = 0;
+        \\        return;
+        \\    }
+        \\
+        ,
+        .count = 1,
+    } } },
+    .{ .file = "std/builtin.zig", .edit = .{ .replace = .{
+        .old = "        if (builtin.os.tag == .freestanding) return;\n",
+        .new =
+        \\        if (builtin.os.tag == .freestanding) return;
+        \\        // zilc: no native stack walking (KI-15), so no DWARF symbolizer either (KI-21).
+        \\        // Fil-C prints its own trace, with file:line, at every safety stop.
+        \\        if (!std.debug.sys_can_stack_trace) return writer.writeAll("\n(no Zig stack trace under zilc; see Fil-C's trace)\n");
+        \\
         ,
         .count = 1,
     } } },
@@ -255,7 +289,7 @@ test "a different original is refused, not mis-patched" {
 }
 
 test "only 0.15.2 has patches so far" {
-    try testing.expectEqual(@as(usize, 5), patchesFor("0.15.2").len);
+    try testing.expectEqual(@as(usize, 7), patchesFor("0.15.2").len);
     // ⚠️ 0.16.0 fixed Z-1 upstream but NOT Z-5: a 0.16 line needs the DebugAllocator patch.
     try testing.expectEqual(@as(usize, 0), patchesFor("0.16.0").len);
 }
@@ -270,12 +304,46 @@ test "the stack-trace patch keeps the original switch, renamed" {
     ;
     for (zig_0_15_2) |p| {
         if (!std.mem.eql(u8, p.file, "std/debug.zig")) continue;
+        if (std.mem.indexOf(u8, p.edit.replace.old, "sys_can_stack_trace") == null) continue;
         const got = try apply(testing.allocator, src, p);
         defer testing.allocator.free(got);
         try testing.expect(std.mem.indexOf(u8, got, "pub const sys_can_stack_trace = false;\n") != null);
         try testing.expect(std.mem.indexOf(u8, got, "pub const zilc_native_sys_can_stack_trace = switch (builtin.cpu.arch) {") != null);
         try testing.expect(std.mem.indexOf(u8, got, "    else => true,") != null);
     }
+}
+
+test "stack-trace entry points return before the unwinder at compile time (KI-21)" {
+    const debug_src =
+        \\pub fn captureStackTrace(first_address: ?usize, stack_trace: *std.builtin.StackTrace) void {
+        \\    if (native_os == .windows) {
+        \\
+    ;
+    const builtin_src =
+        \\    pub fn format(self: StackTrace, writer: *std.io.Writer) std.io.Writer.Error!void {
+        \\        if (builtin.os.tag == .freestanding) return;
+        \\
+        \\        const debug_info = std.debug.getSelfDebugInfo() catch |err| {
+        \\
+    ;
+    var seen: usize = 0;
+    for (zig_0_15_2) |p| {
+        const src = if (std.mem.eql(u8, p.file, "std/builtin.zig"))
+            builtin_src
+        else if (std.mem.eql(u8, p.file, "std/debug.zig") and std.mem.indexOf(u8, p.edit.replace.old, "captureStackTrace") != null)
+            debug_src
+        else
+            continue;
+        const got = try apply(testing.allocator, src, p);
+        defer testing.allocator.free(got);
+        // The guard sits before the first native-only statement.
+        const guard = std.mem.indexOf(u8, got, "sys_can_stack_trace) ") orelse return error.TestUnexpectedResult;
+        const native = std.mem.indexOf(u8, got, "native_os == .windows") orelse
+            std.mem.indexOf(u8, got, "getSelfDebugInfo").?;
+        try testing.expect(guard < native);
+        seen += 1;
+    }
+    try testing.expectEqual(@as(usize, 2), seen);
 }
 
 test "an exact replacement checks its occurrence count" {

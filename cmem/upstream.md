@@ -81,6 +81,47 @@ Compare **previous reference → new reference (A) → latest-Zig port (B)**, on
 ⚠️ Performance claims need **repeats and a stated noise floor** (`best-practices.md` §1). A benchmark
 suite does not exist yet (`testing.md`, planned gates).
 
+## ✉️ Reporting upstream (owner, 2026-10-01)
+
+> **Status (owner, later 2026-10-01): NOT PLANNED.** Licence compliance needs only our own
+> documentation (`design-decisions.md`); reporting is optional goodwill. `UPSTREAM-ISSUES.md` is
+> kept as documentation, and the email template below is kept in case that changes.
+
+**One public file, one short email.** Every upstream defect worth telling a project about goes into
+[`UPSTREAM-ISSUES.md`](../UPSTREAM-ISSUES.md) at the repo root, under that project's heading. The
+owner then sends a brief email that just says an issue was found and links the file. No GitHub
+issue, no long report (some upstreams are anti-AI; the owner does not want to deal with that).
+
+**Rules for `UPSTREAM-ISSUES.md`:** plain facts only: version string, a self-contained repro file
+in the repo, the one-line command, what happens, what was tried, and the workaround. No KI numbers,
+no `cmem/` links, no internal vocabulary, no mention of how it was produced. Only **real defects**
+go in, not std design choices (`zig-upstream-notes.md` "Zig bug?" column) or things already fixed
+upstream. Keep `cmem/workarounds.md` as the full internal why.
+
+**Link** (works only after `main` is pushed):
+`https://github.com/jrmarcum/zilc/blob/main/UPSTREAM-ISSUES.md`
+
+**Email template** (fill in the project and the count):
+
+> Subject: Fil-C 0.685: two compiler issues found (reproductions attached in a repo)
+>
+> Hello,
+>
+> While compiling Zig-generated LLVM IR with Fil-C 0.685, I found two issues in the
+> FilPizlonator pass: an assertion failure on globals with a 3-byte value type, and a segfault at
+> -O1. Each has a small reproduction file, and the details are here:
+>
+> https://github.com/jrmarcum/zilc/blob/main/UPSTREAM-ISSUES.md
+>
+> Neither is blocking me; I'm passing them on in case they're useful.
+>
+> Thanks for Fil-C,
+> Jon Marcum
+
+**Who:** Fil-C (`pizlonator/fil-c`): the owner picks the address. Zig: nothing open (Z-1 is fixed
+in 0.16.0). The old GitHub-issue draft `tools/p2/repro/UPSTREAM-REPORT.md` is kept as a record
+but superseded.
+
 ## Git remote
 
 Not added yet. How Fil-C enters the repo (subtree, submodule, sparse checkout of the paths above, or

@@ -450,7 +450,32 @@ but zilc applied it *after* Zig had already optimized.
 - KI-13's fixes still apply: overflow intrinsics come from Zig's front end and are in the
   unoptimized IR too, and `fromPage`'s integer parameter is source-level.
 
-## 🔴 KI-18 — Fil-C pass assertion `!(CSize % WordSize)` on unoptimized Zig IR (2026-09-30)
+## ✅ KI-18 — Fil-C pass assertion `!(CSize % WordSize)` on unoptimized Zig IR (2026-09-30, fixed 2026-10-01)
+
+**Root cause (2026-10-01): any GLOBAL whose value type is `i17`…`i24`** (a 3-byte store size),
+constant or mutable, at every `-O`. Here it was Zig's `std.unicode.replacement_character: u21`
+→ `@unicode.replacement_character = internal unnamed_addr constant i21 65533`. Found by extending
+`tools/p2/llreduce.ts` to reduce globals as well as functions (globals become `external`
+declarations): 320 units → 1 in 11 runs.
+
+- **Probed widths:** `i17`, `i21`, `i24` assert. `i2`, `i8`, `i9`, `i12`, `i16`, `i25`, `i31`,
+  `i32`, `i33`…`i64`, `i65`, `i100`, `i120` pass, and so do `{ i21 }`, `{ i21, i8 }`, `[2 x i21]`,
+  `[3 x i8]`, and `i21` in allocas, loads and stores. The `i2` suspicion below was **wrong**: `i2`
+  fields are harmless.
+- **Fix:** `ir.wrapThreeByteGlobals` (driver step 2d) rewrites such a global's value to
+  `{ iN } { iN V }`: the same size, alignment and bytes, with field 0 at the global's address, and
+  with opaque pointers no use names the type. Declarations are left alone. Unit-tested.
+- **Recorded, not filed:** 16-line repro `tools/p2/repro/filc-0.685-i21-global.ll`, notes in
+  `tools/p2/repro/README.md`.
+- **Also hit by vectors** (found in `69_http-client`): `@__anon_9482 = … constant <3 x i8>`. The
+  rule is the 3-byte store size, so the rewrite (renamed `ir.wrapThreeByteGlobals`) covers integer
+  vectors of 17–24 bits too. Mechanism, from the pass source: `workarounds.md` KI-18.
+- **Results (2026-10-01, corpus in all 4 modes):** `22` runs in every mode; `69` builds in every
+  Release mode (Debug: KI-22 build time) and then hit KI-20, now fixed too. ReleaseSafe,
+  ReleaseFast and ReleaseSmall are each **78/78 as designed**; Debug 65/78 (12 × KI-19, 69's
+  build time). Tests 24/24, gate 4/4.
+
+**Original notes (2026-09-30), kept for the record:**
 
 On the unoptimized route (KI-17), **2 of 78 programs crash Fil-C's clang in every mode**:
 `22_strings-and-runes` and `69_http-client`. The crash is `FilPizlonator.cpp:16714: void
@@ -472,6 +497,35 @@ On the unoptimized route (KI-17), **2 of 78 programs crash Fil-C's clang in ever
   on valid IR, like KI-4's crash).
 - Reduced module: `~/zilc-work/csize/csize-reduced.ll` (WSL); input `…/runes.zilc-tmp/
   strings-and-runes.filc.ll`.
+
+## 🔴 KI-22 — Build time: Fil-C's frame-slot colouring is cubic on big Zig functions (2026-10-01). **Option 2 in progress: a locally patched Fil-C clang**
+
+`69_http-client`: ReleaseSafe 132 s alone (native Zig 20 s), ReleaseFast 754 s under corpus load;
+Debug times out (30 min). 75% of it is in `FilPizlonatorPass`, almost all in one greedy colouring
+loop that rescans every neighbour per candidate frame index, which is cubic when Zig's unoptimized
+IR keeps hundreds of escaping allocas live together (no lifetime markers). Found by synthetic
+scaling, gdb sampling and the pass source (allowed, owner 2026-10-01). **Owner chose option 2**:
+build Fil-C's clang locally from the prebuilt's own commit with an output-identical fix
+(`tools/filc/`, `third_party/filc-patches/`, ledger `filc-pass-colouring-fix`), **then research
+option 3** (zilc-inserted lifetime markers). The full why, what was ruled out, and the options:
+`workarounds.md` KI-22. Open data: why ReleaseFast compiles 69 3.5× slower than ReleaseSafe, and
+why trivial Debug programs take ~36 s under load.
+
+## ✅ KI-21 — Build time: std's stack-trace code was compiled into every program (2026-10-01, FIXED)
+
+KI-15 disabled native stack walking at run time only; on the unoptimized route (KI-17) Fil-C still
+instrumented and compiled the whole DWARF unwinder (about half of `62_directories`' IR). **Fix:** two
+std-overlay guards with a comptime-known early return (`captureStackTrace`,
+`StackTrace.format`), overlay v4. **62 ReleaseSafe 40 s → 8.0 s** (native 6.7 s); IR 228k → 87k
+lines. Details: `workarounds.md` KI-21.
+
+## ✅ KI-20 — `std.crypto.random` probes `madvise` with an invalid advice (2026-10-01, FIXED)
+
+`69_http-client`: `filc safety error: attempting to use unrecognized madvise advice -1`. std's
+CSPRNG deliberately passes `0xffffffff` to detect QEMU and expects `EINVAL`; Fil-C stops instead.
+**Fix:** the entry shim sets std's official `std_options.crypto_always_getrandom = true` (kernel
+CSPRNG on every fill, fork-safe). 69 now completes a real HTTPS request in every Release mode.
+Library mode is not covered (pre-publish checklist). Details: `workarounds.md` KI-20.
 
 ## 🔴 KI-19 — Debug only: syscall POINTER arguments arrive without a capability (2026-09-30)
 

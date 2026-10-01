@@ -238,7 +238,7 @@ handshakes, a store barrier, and **exit/enter around anything that blocks**. So 
 the **thread state machine and pollcheck callbacks**; even a blocking `write()` touches the GC.
 
 ✅ **Probed 2026-09-30:** the pollcheck flag is a byte at **thread + 8**, masked `0x0E` → `filc_pollcheck_slow`, and blocking calls do **`filc_exit` → syscall → `filc_enter`** (`filc-abi.md` §3, §5b). ▶️ **Next:** the spike below, **re-aimed at step 0**. The ABI is now observed enough to start, once
-open question #3 (port or clean-room rewrite) is settled.
+open question #3 is settled (2026-10-01: new Zig code, licence-compliant, Fil-C source may be read).
 
 ▶️ **The spike, waiting for the owner's go-ahead:** the **`zsys_write` spike**. Override
 `pizlonated_zsys_write` from a Zig static library in one gate case, confirm our version is the one
@@ -248,7 +248,7 @@ normal C calls; `filc_cc_args_check_failure` is part of it), and **(b) linking**
 libc as a shared library, so a replacement in a static archive may not get pulled in without
 `--whole-archive` or passing object files directly.
 
-⚠️ **Prerequisites:** open question #3 (port vs. clean-room rewrite) must be settled before runtime
+⚠️ **Prerequisites:** open question #3 (✅ settled 2026-10-01: comply, do not avoid) had to be settled before runtime
 code, and the Zig runtime must match Fil-C 0.685's object layout exactly (`design-decisions.md`).
 
 ## P4 — Zig language fidelity
@@ -266,19 +266,19 @@ performance measurement against Fil-C.
 ## P6 — Platforms. ✅ **ADOPTED 2026-09-30 (owner)**
 
 **Goal: Linux, macOS and Windows, on every currently prevalent processor; then iOS; Android
-later.** ✅ Processors: **x86_64 + aarch64** per OS (owner). riscv64 is out of scope for now: a low-interest later candidate for the Linux row only, once the clean-room runtime exists. Reasoning and limits
+later.** ✅ Processors: **x86_64 + aarch64** per OS (owner). riscv64 is out of scope for now: a low-interest later candidate for the Linux row only, once the Zig runtime exists. Reasoning and limits
 are in `design-decisions.md` open question #4.
 
 | tier | platform | processors | what it depends on |
 | --- | --- | --- | --- |
 | 1 | **Linux** | x86_64 ✅ working · aarch64 | Fil-C ships both (`filc-<ver>-linux-aarch64`), so aarch64 needs only zilc's target handling; checkable against Fil-C |
-| 1 | **macOS** | aarch64 (Apple silicon) · x86_64 (Intel) | **Fil-C has no macOS.** Needs the clean-room Zig runtime, plus a checked OS layer over libSystem (macOS has no stable syscall ABI), Mach-O linking, and a Fil-C clang built for macOS hosts or cross-compiling |
-| 1 | **Windows** | x86_64 · aarch64 | **Fil-C has no Windows.** Clean-room runtime, plus a checked layer over ntdll/kernel32, PE/COFF, SEH unwinding, LLP64, and std's TEB access via asm (a KI-5-style problem) |
+| 1 | **macOS** | aarch64 (Apple silicon) · x86_64 (Intel) | **Fil-C has no macOS.** Needs the Zig runtime (P3), plus a checked OS layer over libSystem (macOS has no stable syscall ABI), Mach-O linking, and a Fil-C clang built for macOS hosts or cross-compiling |
+| 1 | **Windows** | x86_64 · aarch64 | **Fil-C has no Windows.** The Zig runtime (P3), plus a checked layer over ntdll/kernel32, PE/COFF, SEH unwinding, LLP64, and std's TEB access via asm (a KI-5-style problem) |
 | 2 | **iOS** | aarch64 | macOS's work plus code signing, no JIT/`mmap` exec, sandboxing |
 | 3 | **Android** | aarch64 · x86_64 | Linux kernel, but **Bionic** instead of musl, so a checked libc layer over Bionic |
 
 **Sequencing:** the scope pass below happens **before publishing `v0.15.2-3`**. The port efforts
-come after publishing (`design-decisions.md`). Every non-Linux row depends on **P3**, the clean-room
+come after publishing (`design-decisions.md`). Every non-Linux row depends on **P3**, the
 runtime, because Fil-C's own runtime and libc exist only for Linux.
 
 **Scope pass (pre-publish), per platform:** confirm the processor list; count the OS functions Zig's

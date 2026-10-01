@@ -100,6 +100,15 @@ const entry_shim =
     \\    };
     \\};
     \\
+    \\// std.crypto.random's thread-local CSPRNG first probes for QEMU by calling
+    \\// madvise with a deliberately invalid advice (0xffffffff), expecting EINVAL.
+    \\// Fil-C's madvise stops the program on an unrecognized advice instead of
+    \\// returning EINVAL (cmem/workarounds.md KI-20). std's official option makes
+    \\// every fill a getrandom call, through Fil-C's checked libc (directly, or via
+    \\// zilc_syscall when std picks the raw syscall): the kernel's
+    \\// CSPRNG, fork-safe by construction, and the madvise path is never reached.
+    \\pub const std_options: std.Options = .{ .crypto_always_getrandom = true };
+    \\
     \\extern fn zerror(str: [*:0]const u8) void;
     \\
     \\fn zilcPanic(msg: []const u8, first_trace_addr: ?usize) noreturn {
@@ -397,10 +406,15 @@ fn compileZig(
     defer gpa.free(folded.ir);
     if (opts.verbose and folded.count > 0) std.debug.print("zilc: {s}: {d} overflow-checked result(s) exposed as plain arithmetic\n", .{ src, folded.count });
 
-    if (std.mem.indexOf(u8, folded.ir, "fp128") != null) uses_f128.* = true;
-    const final_ir = if (keep_exports) |keep| try ir.internalizeExcept(gpa, folded.ir, keep) else null;
+    // 2d. Fil-C's pass asserts on a global of a 3-byte type (i17..i24, <3 x i8>); wrap its value (KI-18).
+    const wrapped = try ir.wrapThreeByteGlobals(gpa, folded.ir);
+    defer gpa.free(wrapped.ir);
+    if (opts.verbose and wrapped.count > 0) std.debug.print("zilc: {s}: {d} 3-byte global(s) wrapped in a struct\n", .{ src, wrapped.count });
+
+    if (std.mem.indexOf(u8, wrapped.ir, "fp128") != null) uses_f128.* = true;
+    const final_ir = if (keep_exports) |keep| try ir.internalizeExcept(gpa, wrapped.ir, keep) else null;
     defer if (final_ir) |f| gpa.free(f);
-    try std.fs.cwd().writeFile(.{ .sub_path = filc_ll_path, .data = final_ir orelse folded.ir });
+    try std.fs.cwd().writeFile(.{ .sub_path = filc_ll_path, .data = final_ir orelse wrapped.ir });
 
     // 3. Fil-C's clang runs the pass and emits the object.
     //

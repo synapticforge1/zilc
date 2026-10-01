@@ -1,0 +1,367 @@
+# Workarounds — what we work around, and WHY
+
+**Owner rule (2026-10-01):** *"When we create a work around for something, take copious notes for
+the why part so we can refer back to it in the future. Whether it is an upstream defect or a system
+limitation we need to know the why of these issues so that when we run into similar issues we can
+quickly identify those past problems and their resolutions, and investigate and surmise potential
+similar resolutions."*
+
+So this file is the **lookup table for new failures**. A new symptom goes here first: find its row
+in the symptom index, read the family, and try that family's resolution before starting from zero.
+`known-issues.md` keeps the full investigation history of each KI. This file keeps the
+**reasoning**: why it fails, why the fix is correct, and how to recognise a relative.
+
+---
+
+## How to write an entry (binding on every agent)
+
+Every workaround gets an entry **when it is made**, not later. Use these headings:
+
+| heading | what goes in it |
+| --- | --- |
+| **Symptom** | The exact text a user or the corpus sees (assertion, trap message, linker error), so a text search finds it |
+| **Class** | Upstream defect (Fil-C / Zig / LLVM) · system limitation (by design, will not change) · std behaviour (legal natively, unsafe under Fil-C) · zilc's own gap |
+| **Root cause (the why)** | The mechanism, as far as it is **known**. Mark what is **measured** and what is **surmised**, separately |
+| **Why the workaround is correct** | Which invariant it preserves (same bytes, same value, same checks), and why it cannot hide a real safety error |
+| **Ruled out** | Hypotheses that were tested and failed, with the test. These save the most time later |
+| **How it was found** | The method and tools (reducer, probes), so the next one is quicker |
+| **Recognising a relative** | What a similar problem would look like, and the first thing to try |
+| **Cost and exit** | What it costs (speed, size, lost diagnostics), and the condition for removing it (e.g. "Fil-C fixes X") |
+| **Where** | Code (function, driver step), tests, repro files, KI number |
+
+---
+
+## Families: the patterns seen so far
+
+| family | the shape | members | first thing to try |
+| --- | --- | --- | --- |
+| **F1. Fil-C's pass rejects a valid IR shape** | An assertion or crash inside `FilPizlonatorPass` on IR that stock LLVM accepts | KI-4 (Debug `-O1` segfault), **KI-18** (3-byte globals) | Reduce with `tools/p2/llreduce.ts` (functions **and** globals), then probe the minimal shape's neighbours (sizes, wrappers, positions) by hand. Rewrite the IR into an equivalent shape the pass accepts |
+| **F2. A capability lost through an integer** | `cannot read/write pointer with null object` | KI-5, KI-13, KI-17, KI-19, KI-10 | Find where the pointer became an integer (`ptrtoint`, a call result, `extractvalue`, a parameter, a stack slot). Fil-C recovers a capability only through plain same-function integer arithmetic |
+| **F3. Inline asm** | `cannot handle inline asm …` | KI-7 (syscall), KI-14 (Valgrind), KI-15/Z-4 (frame walks) | Route through checked libc (`zilc_syscall`), or turn the feature off with a Zig flag (`-fno-valgrind`) |
+| **F4. Code that never goes through the pass** | `undefined reference to pizlonated_…` | KI-6 (glibc names), KI-8 (stack probe), KI-9 (f128 helpers) | Either stop emitting the call (a flag) or compile the provider through the pass |
+| **F6. Build time far above native Zig** | a zilc build several times slower than `zig build-exe` | KI-21 (dead std code compiled), KI-22 (cubic frame-slot colouring in the pass) | Time each stage (Zig IR, Fil-C `-ftime-report`, link) against native and stock-clang baselines; list IR lines by namespace; for time inside the pass, scale a synthetic test and sample with gdb, then read the pass |
+| **F5. std code that is legal natively but stopped by Fil-C** | `cannot read N bytes when upper - ptr = M`, `ptr >= upper`, `unrecognized … advice` | KI-11 (sentinel over-read), KI-12 (`mmap` hint), KI-20 (`madvise` probe) | std hook if one exists (`root.os.heap.page_allocator`); otherwise the std overlay (`src/stdpatch.zig`), backporting upstream first |
+
+---
+
+## Symptom index
+
+| symptom text (search for it) | entry |
+| --- | --- |
+| `Assertion '!(CSize % WordSize)' failed` (`FilPizlonator.cpp:16714`) | [KI-18](#ki-18--globals-with-a-3-byte-value-type) |
+| segfault in `FilPizlonatorPass` on Debug IR at `-O1` | KI-4 (`known-issues.md`, `tools/p2/repro/`) |
+| `cannot handle inline asm (unsupported mnemonic for safe inline asm: syscall)` | KI-7 |
+| `literal register %rdi not covered` (Valgrind sequence) | KI-14 |
+| `undefined reference to pizlonated___zig_probe_stack` | KI-8 |
+| `undefined reference to pizlonated___multf3` / `roundq` | KI-9 |
+| `undefined reference to pizlonated_getrlimit64` / `mmap64` | KI-6 |
+| `cannot write pointer with null object` in `DebugAllocator` | KI-13 |
+| `cannot read pointer with null object` after a syscall, Debug only | KI-19 (open) |
+| `unsupported syscall: 310` | KI-15 |
+| `cannot read 16 bytes when upper - ptr = 12` at `mem.zig` | KI-11 |
+| `cannot write pointer with ptr >= upper` inside `zsys_mmap` | KI-12 |
+| Zig `start.zig` trap reading the aux vector | KI-5 |
+| a zilc build many times slower than native Zig; IR full of `debug.Dwarf` / `compress.flate` | [KI-21](#ki-21--stds-stack-trace-code-compiled-into-every-program-build-time) |
+| build time dominated by `FilPizlonatorPass` on one huge function; Debug builds that never finish | [KI-22](#ki-22--fil-cs-frame-slot-colouring-is-cubic-on-big-zig-functions-build-time-open) |
+| `attempting to use unrecognized madvise advice -1` (from `tlcsprng.zig`) | [KI-20](#ki-20--stdcryptorandom-probes-madvise-with-an-invalid-advice) |
+
+---
+
+## KI-18 — globals with a 3-byte value type
+
+**Symptom.** Fil-C's clang aborts (exit 134, the driver reports `clang frontend command failed with
+exit code 134`):
+`FilPizlonator.cpp:16714: void {anonymous}::Pizlonator::run(): Assertion '!(CSize % WordSize)' failed.`
+Seen on `22_strings-and-runes` and `69_http-client`, in **every** mode, only on the unoptimized IR
+route (KI-17).
+
+**Class.** Upstream defect in Fil-C 0.685's pass: an assertion on valid IR. Noted for the record,
+not filed (owner decision 2026-09-30).
+
+**Root cause, measured** (black-box probes, 2026-10-01; the pass source was not read):
+
+- The trigger is a **global variable definition whose value type has a store size of exactly 3
+  bytes**. Constant or mutable, internal or not, at `-O0`, `-O1` and `-O2`.
+- ❌ asserts: `i17`, `i21`, `i24`; `<3 x i8>`, `<24 x i1>`, `<17 x i1>`, `<2 x i12>`.
+- ✅ passes: `i2`, `i8`, `i9`, `i12`, `i16`, `i25`, `i31`, `i32`, `i33`, `i39`, `i40`, `i41`,
+  `i48`, `i49`, `i56`, `i57`, `i63`, `i64`, `i65`, `i100`, `i120`; `<3 x i1>`, `<5 x i8>`,
+  `<6 x i8>`, `<7 x i8>`, `<9 x i8>`, `<11 x i8>`, `<12 x i8>`, `<3 x i16>`, `<3 x i32>`,
+  `<3 x float>`; `[3 x i8]`, `{ i21 }`, `{ i21, i8 }`, `{ <3 x i8> }`, `[2 x i21]`.
+- ✅ passes: the same types **inside functions** (an `alloca i21`, a `load`/`store i21`, a
+  `load i21` from an `i32` global).
+- Where the two came from: Zig's `std.unicode.replacement_character: u21 = 0xFFFD`
+  (`@unicode.replacement_character = internal unnamed_addr constant i21 65533`) in 22 and 69, and a
+  `<3 x i8>` constant (`@__anon_9482 = … <3 x i8> <i8 48, i8 48, i8 48>`, three ASCII `'0'`s,
+  likely a `@Vector(3, u8)` or a SIMD-ized std literal) in 69.
+- Why only the unoptimized route: on the optimized route LLVM had already constant-folded these
+  globals into their uses and deleted them, so the pass never saw them.
+
+**Root cause, from the pass source** (read 2026-10-01 at the binary's commit `bb0d0a64`, once the
+owner allowed reading the pass): for each global, `FilPizlonator.cpp:16710` builds
+`paddedConstant(constantToRestConstantWithPtrPlaceholders(init))`, then asserts its store size is a
+multiple of `WordSize = 8`. `paddedConstant` (line 6584) computes the padding from the **store**
+size (3 for `i21`, so 5 bytes of padding) and appends it as a struct field. But a struct lays its
+next field out after the **allocation** size (4 for `i21`), so `{ i21, [5 x i8] }` is 9 bytes, not
+8, and the assertion fires. A wrapped `{ i21 }` is padded as an aggregate whose store size is 4, so
+`{ { i21 }, [4 x i8] }` is 8. ❓ Not traced: why 5-to-7-byte scalars (`i40`, `<5 x i8>`) pass,
+which by the same arithmetic would not. `constantToRestConstantWithPtrPlaceholders` probably
+reshapes them first. The measured table above is authoritative.
+
+**Why the workaround is correct.** `ir.wrapThreeByteGlobals` (driver step 2d, after the overflow
+fold) rewrites `@g = … constant T V` to `@g = … constant { T } { T V }`:
+
+- A one-field struct has **the same size, alignment and bytes** as its field (DataLayout), and the
+  field is at offset 0, so **the global's address is the field's address**.
+- With **opaque pointers**, no use of `@g` names its value type: `load i21, ptr @g` reads the same
+  bytes as before. Nothing else in the module changes.
+- So the program is identical in memory. Fil-C still checks every access to `@g` with the same
+  bounds (one 4-byte object), so **no safety check is removed or weakened**.
+- Declarations (`external global i24`, no initializer) are left alone; the assertion needs an
+  initializer to lay out, and a declaration's type must match its definer's.
+- Idempotent: a wrapped global's type starts with `{`, which the matcher ignores.
+
+**Ruled out.**
+
+- ❌ **"`i2` tag fields in Zig's error unions and optionals"** (the first suspicion, 2026-09-30). A
+  hand-written global `{ { ptr, i64 }, { [16 x i8], i2, [7 x i8] }, i8, i2, [6 x i8] }` compiles.
+  Odd widths **inside** aggregates are fine.
+- ❌ The remaining function body after the first reduction (`os.linux.x86_64.syscall4`). It was kept
+  only because the reducer could not remove globals yet.
+- ❌ Debug metadata: the reduction kept all of it, and the minimal repro has none.
+
+**How it was found.** `tools/p2/llreduce.ts` (ddmin) first reduced functions only: 21,523 → 7,710
+lines with one innocent function left. Extended 2026-10-01 to reduce **globals** too (an excluded
+global becomes `@g = external global T`, so references stay valid): 320 units → 1 in 11 runs
+for 22. The same run on 69 found the `<3 x i8>` (→ 1 unit in 23 runs). Then hand-written
+16-line probes swept widths, kinds and positions until the rule was exact. **Lesson:** when a
+reducer leaves something "innocent", the reducer is missing a unit type, not the bug.
+
+**Recognising a relative.**
+
+- Any **other** `FilPizlonator.cpp` assertion about a size (`Size`, `WordSize`, alignment) on a
+  module that stock clang compiles: suspect a **global's value type** first. Grep the module's
+  `^@` lines for scalar or vector types and test each odd size with a 16-line probe.
+- If a future type triggers it (e.g. some 3-byte `half`-based shape, or a 3-byte scalar inside a
+  context other than a global), extend `threeByteGlobal`'s type test. The wrap applies to any type.
+- If a 5-, 6- or 7-byte scalar ever triggers it, the surmise above is wrong and the rule is about
+  something else. Re-probe.
+
+**Cost and exit.** No run-time cost (same bytes); a linear text scan at build time. Remove it when a
+Fil-C release compiles `tools/p2/repro/filc-0.685-i21-global.ll`. Re-test that file at every Fil-C
+upgrade (`upstream.md` upgrade procedure, stage A).
+
+**Where.** `src/ir.zig` `wrapThreeByteGlobals` / `threeByteGlobal` / `intTypeBits` and the test
+"3-byte globals are wrapped in a one-field struct"; `src/driver.zig` step 2d (`--verbose` prints
+the count); repro `tools/p2/repro/filc-0.685-i21-global.ll` with notes in
+`tools/p2/repro/README.md`; `known-issues.md` KI-18.
+
+---
+
+## KI-20 — `std.crypto.random` probes `madvise` with an invalid advice
+
+**Symptom.** At run time, the first use of `std.crypto.random` (here a TLS client handshake):
+`filc safety error: attempting to use unrecognized madvise advice -1.` then
+`filc panic: thwarted a futile attempt to violate memory safety.` (exit 133). Trace:
+`zsys_madvise` ← musl `__madvise` ← `posix.zig:7052 posix.madvise` ←
+`tlcsprng.zig:100 crypto.tlcsprng.tlsCsprngFill` ← `Random.bytes` ← `crypto.tls.Client.init`.
+Seen on `69_http-client` once KI-18 no longer stopped its build (ReleaseSafe and ReleaseSmall,
+2026-10-01).
+
+**Class.** Std behaviour that is legal natively, meeting a deliberate Fil-C policy. **Not a bug on
+either side**, so not for `UPSTREAM-ISSUES.md`.
+
+**Root cause, measured** (read in Zig 0.15.2's `lib/std/crypto/tlcsprng.zig`):
+
+- When the OS has `fork` and no `arc4random`, and `std.options.crypto_fork_safety` is on (the
+  default), std keeps its CSPRNG state in a page it wants wiped on `fork`
+  (`MADV_WIPEONFORK = 18`, Linux 4.14+).
+- Before using it, std checks for **QEMU user-mode emulation**, which accepts any `madvise` hint:
+  it calls `posix.madvise(ptr, 0, 0xffffffff)` **on purpose** and expects `EINVAL` (`:97`–`:102`).
+  The Zig comment says so: *"Check if this is the case by passing bogus parameters, we expect
+  EINVAL as result."*
+- Fil-C's `zsys_madvise` does not pass an unknown advice through to the kernel to get `EINVAL`. It
+  **stops the program**, which is its general rule for arguments it cannot vet.
+- musl has no `arc4random`, so `os_has_arc4random` is false and this path is the default under zilc.
+
+**Why the workaround is correct.** The entry shim declares std's official option
+`pub const std_options: std.Options = .{ .crypto_always_getrandom = true };`. Then
+`tlsCsprngFill` returns at its second line, through `std.options.cryptoRandomSeed`
+(`tlcsprng.defaultRandomSeed` → `posix.getrandom`, which calls either `std.c.getrandom` or the raw
+`linux.getrandom` syscall depending on `std.c.versionCheck`; the raw one is routed through
+`zilc_syscall` by KI-7's rewrite, so **both reach the kernel through Fil-C's checked libc**):
+
+- The bytes still come from the **kernel CSPRNG**; nothing becomes weaker. If anything stronger:
+  there is no user-space state to leak.
+- **Fork safety is kept by construction**: no state exists to duplicate into a child. That is
+  better than the rejected alternative, `crypto_fork_safety = false`, which would let a forked
+  child repeat its parent's random stream.
+- The `madvise` probe and the WIPEONFORK page (an `mmap` of its own) are never reached.
+- **Cost:** one `getrandom` call per fill instead of a ChaCha step. Random fills are rare (key
+  generation, TLS nonces), so it is negligible.
+- ⚠️ A user program that declares its own `std_options` is not affected either way: under zilc
+  the entry shim is the root module, so only the shim's declarations count (the same as `panic`
+  and `page_allocator`).
+
+**Ruled out.** Patching `maybe_have_wipe_on_fork` to false in the std overlay: that falls back to
+`pthread_atfork` plus user-space state, which is more moving parts, and an overlay patch where an
+official option exists. Not tried, because the option is strictly simpler.
+
+**Recognising a relative.** Any `filc safety error: … unrecognized … <arg>` from a `zsys_*`
+function means **std passed a value Fil-C will not vet**, usually a probe or a feature test that
+expects an error code natively. Read the std caller around the trace line. Look first for a
+`std.Options` field or a root-module hook that skips the path (`std_options`, `os.heap`,
+`panic`), then the std overlay.
+
+**Cost and exit.** Negligible run-time cost. No exit needed. If Fil-C ever returns `EINVAL` for
+unknown advice, the option can stay anyway.
+
+**Where.** `src/driver.zig`, entry shim (`std_options`), commented. Library mode (C owns `main`) is
+**not** covered, like the other shim hooks (pre-publish checklist).
+
+---
+
+## KI-21 — std's stack-trace code compiled into every program (build time)
+
+**Symptom.** Builds many times slower than native Zig: `62_directories` ReleaseSafe 40 s under
+zilc vs 6.7 s natively, its IR 228k lines and 1,265 functions. Half of it is `debug.Dwarf`,
+`debug.SelfInfo`, `compress.flate`, `sort.block` (sorting DWARF tables) and
+`debug.FixedBufferReader`: std's DWARF unwinder and symbolizer.
+
+**Class.** zilc's own gap, created by KI-17 (the unoptimized-IR route) together with KI-15.
+
+**Root cause, measured** (IR caller analysis, 2026-10-01). KI-15 set `sys_can_stack_trace = false`,
+but std tests it at RUN time. Two entry points keep the whole unwinder referenced:
+`DebugAllocator` calls `debug.captureStackTrace` from `free`, `resize*` and `reportDoubleFree`
+(with 0 frames), and `builtin.StackTrace.format` calls `getSelfDebugInfo` and `writeStackTrace`.
+On the optimized route LLVM proved them dead and deleted them before Fil-C. On the unoptimized
+route Fil-C instruments and compiles all of it, and Fil-C's code generation costs about 6× stock
+LLVM's on the same IR (38.4 s vs 5.7 s for 62).
+
+**Why the workaround is correct.** Two std-overlay patches (`src/stdpatch.zig`, overlay v4) put a
+**comptime-known early return** at the top of both entry points:
+`if (!sys_can_stack_trace) { stack_trace.index = 0; return; }` and
+`if (!std.debug.sys_can_stack_trace) return writer.writeAll(…)`. Zig's semantic analysis stops at a
+comptime-known `return`, so nothing after it is referenced or emitted. std uses this exact pattern
+itself, in the same function (`if (builtin.os.tag == .freestanding) return;`, commented "avoid an
+error … where it tries to call detectTTYConfig"). Behaviour is unchanged: the trace was already
+empty, and a real walk would stop under Fil-C (KI-15).
+
+**Result.** 62 ReleaseSafe 40 s → **8.0 s** (native 6.7 s); its IR 228k → 87k lines, 1,265 → 436
+functions. It runs identically.
+
+**Recognising a relative.** A zilc build much slower than native Zig: list the IR's lines by
+namespace (`irstat.sh`-style awk over `^define`) and look for code that cannot run under zilc. Then
+find who references it (callers of the namespace, from non-namespace functions). **Any std
+behaviour we disable at run time must also be disabled at compile time**, or the unoptimized route
+pays for it.
+
+**Where.** `src/stdpatch.zig` (two patches, test "stack-trace entry points return before the
+unwinder at compile time (KI-21)").
+
+---
+
+## KI-22 — Fil-C's frame-slot colouring is cubic on big Zig functions (build time, OPEN)
+
+**Symptom.** `69_http-client` ReleaseSafe 132 s (native 20 s), 76% of it inside
+`FilPizlonatorPass`. Debug (`filc -O0`) far worse: `crypto.tls.Client.init` alone ran 24 min
+using 5.8 GB before it was stopped; the whole Debug build of 69 times out at 30 min.
+
+**Class.** Upstream performance defect in Fil-C 0.685's pass, triggered by the shape of Zig's
+unoptimized IR. Not fixed yet; options below.
+
+**Root cause, measured** (time reports, synthetic scaling, gdb stack sampling and the pass source
+at the binary's own commit `bb0d0a64`, 2026-10-01):
+
+- Per function, the pass gives every pointer value the GC must see (escaping allocas and pointer
+  SSA values) a frame slot (`FilPizlonator.cpp` ~2880–3076). It computes liveness (an iterative
+  data flow copying an `unordered_set` per block), builds an **interference graph** (each
+  definition × everything live), then **colours it greedily**: for each value, it tries
+  `FrameIndex = 0, 1, 2, …` and **scans the whole adjacency set at each index**
+  (lines 3054–3076).
+- Zig's unoptimized IR puts **every local in an entry-block alloca, with no
+  `llvm.lifetime.start/end`**. So every escaping alloca is live from function entry to its last
+  use, they all interfere, and a function with N of them is a near-complete graph: the colouring
+  costs about N³ hash lookups. `Client.init`: 100k lines, 912 allocas.
+- gdb: **27 of 30 samples** at `-O1` were in that colouring loop (16 walking `Adjacency`, 11 in
+  `FrameIndexMap` lookups). The same loop dominates at `-O0`.
+- `-O0` is worse because Fil-C's own pre-pass clean-up (`filc-optimize`) only runs at `-O1`+ and
+  cannot be forced on at `-O0`; without it there are more pointer values. For 62, the pass takes
+  0.5 s at `-O1` and 3.6 s at `-O0`.
+- Synthetic scaling at `-O1` (`scale2.ts`): N escaping allocas in one function: pass 0.08, 0.30,
+  1.11, 4.67 s for N = 250…2000 (×4 per doubling). Calls alone: linear.
+
+**Ruled out (each measured, so nobody re-tries them):** debug metadata (stripped: 116 s vs 117 s);
+`llvm.assume` (120 s); Fil-C's DSE (`-filc-dse=false`: 108 s); check scheduling
+(`-filc-optimize-checks`, `-filc-propagate-checks-backward`: 119–124 s, and slower builds overall);
+the `-filc-inline-*` sub-passes (no effect at all: byte-identical objects); turning
+`-filc-optimize` off (69: 172 s → **1,960 s**). **Splitting large basic blocks** (implemented and
+measured, then removed): a synthetic single block of N stores IS quadratic at `-O0` (40k stores:
+80 s vs 0.4 s in blocks of 16), but on 69 it changed nothing (131 s), because the real cost is the
+colouring, and more blocks only make the liveness pass dearer.
+
+**Specific to Fil-C, not to an LLVM version** (owner asked, 2026-10-01): the loop is in Fil-C's
+own pass, which stock LLVM (and so Zig's bundled LLVM, any version) does not have. Plain Zig is
+fast on the same code. **The trigger is Zig's IR shape, which does vary by Zig version:** measured
+on one test module, Zig 0.16.0 still emits **no lifetime markers** and about **2× the allocas** of
+0.15.2 (Debug 18,241 vs 9,202; ReleaseSafe 10,559 vs 4,755). So a 0.16 line would hit KI-22
+harder. Re-check list: `ports/README.md`.
+
+**Options (owner chose 2, then research 3; 2026-10-01):**
+
+1. **Report upstream with a fix that changes no output.** Gather the neighbours' assigned indices
+   once into a set or bitset, then take the lowest free index ≥ `NumSpecialFrameObjects`. The
+   result is the same colouring (same order, same choice), so binaries stay byte-identical, at
+   O(degree) per value instead of O(degree × colours). The same applies to the stack-aux colouring
+   at lines 3146–3160.
+2. **Build a patched Fil-C clang** with that fix. It works now and keeps output identical, but zilc
+   has avoided building LLVM so far (hours; the owner's call).
+3. **zilc inserts `llvm.lifetime.start` before each alloca's first use**, where that point
+   dominates every use and lies in no loop. This shrinks the live ranges, so the graph is no longer
+   a clique. It needs CFG, dominator and loop analysis in `src/ir.zig`, and a wrong marker
+   miscompiles, so it carries the most risk.
+4. **Accept it for now.** Typical programs are near native after KI-21; only functions with
+   hundreds of escaping locals (TLS, big crypto) are slow, and Debug builds of them are impractical.
+
+**Where.** Measurement scripts: this session's scratchpad (`scale.ts`, `scale2.ts`, `split.ts`,
+`sample.sh` + `sampler.py`, gdb from `apt-get download` into `~/zilc-work/tools/gdb`, needs
+`LD_LIBRARY_PATH`). Pass source: `~/zilc-work/filc-src/FilPizlonator.cpp` (reading the pass is
+allowed, owner 2026-10-01).
+
+---
+
+## Earlier workarounds (short form; expand to the full template when next touched)
+
+- **KI-4, Debug compiled at `filc -O0`.** *Why:* Fil-C's pass segfaults on Zig's Debug IR at
+  `-O1`/`-O2` (reduced to 8 `std.compress.flate` functions, `tools/p2/repro/`). Upstream defect, F1.
+  *Cost:* no inlining in Debug, which also exposes KI-13 #2 and KI-19. *Exit:* the repro compiles at
+  `-O1`.
+- **KI-4, the two-line data-layout rewrite** (`ir.toFilCDialect`). *Why:* Fil-C's LLVM is a dialect:
+  `ni:0` on address space 0 plus `datalayout_after_filc`. Stock IR lacks both. System limitation.
+- **KI-5, generated C-ABI entry shim.** *Why:* `start.zig` forges pointers from integers
+  (`@ptrFromInt(getauxval(AT_PHDR))`), which InvisiCap forbids by design. F2. Also hosts the panic
+  handler and the `page_allocator` hook. ⚠️ Not applied in library mode.
+- **KI-6, target `x86_64-linux-musl`.** *Why:* Fil-C's libc is musl; gnu-target Zig emits `*64`
+  glibc names. F4.
+- **KI-7, raw `syscall` asm → `zilc_syscall`** (`ir.rewriteSyscalls`). *Why:* std makes raw syscalls
+  even with `-lc`; Fil-C refuses inline asm, and a raw blocking syscall would also stall the GC
+  (FUGC needs an exit before blocking). The helper goes through Fil-C's checked `syscall()`. F3.
+- **KI-8, `-fno-stack-check` in every mode.** *Why:* `__zig_probe_stack` lives in compiler-rt, which
+  never goes through the pass. Safe because Fil-C checks the stack at every function entry. F4.
+- **KI-9, f128 compiler-rt through the pass.** *Why:* the helpers are not in Fil-C's libc; they are
+  compiled as checked code, with every other export internalized so they cannot replace Fil-C's
+  libm. F4.
+- **KI-11, std overlay backport of 0.16.0 `findSentinel`.** *Why:* 0.15.2's SIMD scan reads past the
+  object (legal natively within a page). std has no hook for it. F5.
+- **KI-12, `root.os.heap.page_allocator = c_allocator`.** *Why:* `PageAllocator`'s `mmap` hint is a
+  pointer at an object's upper bound. F5.
+- **KI-13, overflow fold + `fromPage` patch.** *Why:* Fil-C recovers capabilities only through plain
+  integer instructions; `extractvalue` of `*.with.overflow` and integer parameters start at BOTTOM.
+  Field 0 is the identical value, and the overflow branch is untouched. F2.
+- **KI-14, `-fno-valgrind`.** *Why:* Valgrind client requests are inline asm; they are no-ops unless
+  run under Valgrind. F3.
+- **KI-15, `sys_can_stack_trace = false` in the overlay.** *Why:* native stack walking reads raw
+  frame pointers and probes with `process_vm_readv`; it can never carry capabilities. Fil-C gives
+  its own traces. F3/F2.
+- **KI-17, Zig's unoptimized IR** (`--verbose-llvm-ir -fllvm`). *Why:* `-femit-llvm-ir` is
+  post-optimisation under an integral layout, so LLVM had already turned pointer loads into
+  integers. F2. Side effect: exposed KI-18 (globals no longer folded away).

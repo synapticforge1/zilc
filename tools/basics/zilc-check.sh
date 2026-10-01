@@ -1,7 +1,7 @@
 #!/bin/sh
 # Build every tests/basics example with zilc (MODE=ReleaseSafe by default; Debug, ReleaseFast,
 # ReleaseSmall: KI-16), run it, and classify the result:
-# OK, BUILD-FAIL (with the first undefined symbol or error), TRAP (with Fil-C's fault), TIMEOUT,
+# OK, BUILD-FAIL (with the first undefined symbol or error), TRAP (with Fil-C's fault), TIMEOUT, BUILD-TIMEOUT (zilc build over $TBUILD s, default 1800),
 # or a plain exit code. The quick loop for fixing std-under-zilc problems (KI-7…KI-10).
 #
 #   wsl.exe -e sh /mnt/d/…/zilc/tools/basics/zilc-check.sh [c|zig]
@@ -22,7 +22,11 @@ cp -r "$REPO/tests/basics" "$OUT/src"
 one() {
   L=$1; f=$2; n=$(basename "$(dirname "$f")"); B=$OUT/bin/$L/$n
   mkdir -p "$B/cwd/tmp"; printf 'hello\nzig\n' > "$B/cwd/tmp/dat.txt"
-  if ! "$ZILC" build -O "$MODE" -o "$B/prog" "$f" > "$B/build.log" 2>&1; then
+  s=$(date +%s)
+  timeout "${TBUILD:-1800}" "$ZILC" build -O "$MODE" -o "$B/prog" "$f" > "$B/build.log" 2>&1; brc=$?
+  echo "build seconds: $(( $(date +%s) - s ))" >> "$B/build.log"
+  if [ $brc -eq 124 ]; then echo "$L $n BUILD-TIMEOUT"; return; fi
+  if [ $brc -ne 0 ]; then
     why=$(grep -o "undefined reference to \`[^']*'" "$B/build.log" | head -1)
     [ -z "$why" ] && why=$(grep -m1 -i 'error' "$B/build.log" | cut -c1-100)
     echo "$L $n BUILD-FAIL $why"; return

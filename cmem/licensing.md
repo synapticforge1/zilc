@@ -57,7 +57,12 @@ those notices in its distribution documentation. Neither license has an object-c
   Zig code in the user binary. This is universal to every Zig program and is not zilc-specific, but
   it is worth knowing.
 
-This is open question 3 in `design-decisions.md` (port vs clean-room runtime).
+✅ **Settled 2026-10-01 (owner, open question 3 in `design-decisions.md`): comply, don't avoid.**
+The Zig runtime is new Zig code; Fil-C's source may be read; wherever Fil-C code or design is
+adapted into the runtime, this rule applies and the BSD-2-Clause notice ships with user binaries.
+Each adoption gets its ledger entry in `third_party/LICENSES.md` at the time it is made. The record
+of workarounds and upstream issues (`workarounds.md`, `UPSTREAM-ISSUES.md`) is part of that
+compliance trail.
 
 ## Copyleft exclusion
 

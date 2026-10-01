@@ -5,8 +5,10 @@
 // compiler. Written for cmem/known-issues.md KI-4: Zig's Debug IR segfaults
 // Fil-C's pass at -O1, and "189,740 lines" is not a bug report.
 //
-// Reduction unit: one function definition. Excluded definitions become
-// `declare`s, so call sites stay valid and the module keeps parsing.
+// Reduction units: function definitions and global variable definitions.
+// Excluded functions become `declare`s and excluded globals become
+// `external` declarations, so every reference stays valid and the module keeps
+// parsing. Globals were added for KI-18, whose trigger is a constant.
 //
 //   deno run --allow-read --allow-write --allow-run llreduce.ts \
 //     --input dbg-ni.ll --out reduced.ll --filc /path/to/filc/bin/clang
@@ -38,19 +40,31 @@ function parseArgs(argv: string[]): Args {
   return a;
 }
 
-interface Func {
+export interface Func {
   start: number; // index of the `define` line
   end: number; // index of the closing `}` line
   decl: string; // the `declare` that replaces it when excluded
 }
 
 /** Turn a `define` line into a `declare`: drop the body, the linkage and any metadata. */
-function defineToDeclare(defineLine: string): string {
-  const open = defineLine.indexOf("(");
-  const close = defineLine.lastIndexOf(")");
-  if (open < 0 || close < 0 || close < open) return "";
+export function defineToDeclare(defineLine: string): string {
+  // Find the name first: Zig's quoted names contain parentheses and spaces,
+  // e.g. @"crypto.aegis.Aegis128XGeneric(1,128).decrypt"(…).
+  const at = defineLine.indexOf("@");
+  if (at < 0) return "";
+  const open = defineLine[at + 1] === '"'
+    ? defineLine.indexOf('"', at + 2) + 1
+    : defineLine.indexOf("(", at);
+  if (open <= 0 || defineLine[open] !== "(") return "";
+  let depth = 0, close = -1;
+  for (let i = open; i < defineLine.length; i++) {
+    if (defineLine[i] === "(") depth++;
+    else if (defineLine[i] === ")" && --depth === 0) { close = i; break; }
+  }
+  if (close < 0) return "";
 
-  const head = defineLine.slice(0, open); // "define internal fastcc void @foo"
+  const head = defineLine.slice(0, at); // "define internal fastcc void "
+  const name = defineLine.slice(at, open);
   const params = defineLine.slice(open + 1, close);
 
   // Keep the return type, calling convention and name; drop linkage keywords,
@@ -71,7 +85,7 @@ function defineToDeclare(defineLine: string): string {
     return pct > 0 ? t.slice(0, pct).trim() : t;
   }).filter((t) => t !== "");
 
-  return `declare ${headParts.join(" ")}(${types.join(", ")})`;
+  return `declare ${headParts.join(" ")} ${name}(${types.join(", ")})`;
 }
 
 /** Split a parameter list on commas that are not nested inside <>, [], {} or (). */
@@ -91,9 +105,41 @@ function splitTopLevel(s: string): string[] {
   return out;
 }
 
-function findFunctions(lines: string[]): Func[] {
+/**
+ * Turn a global definition (always one line in LLVM text) into an `external`
+ * declaration of the same type. Returns "" for anything that must stay as is:
+ * aliases, `llvm.*` globals, and lines it cannot parse.
+ */
+export function globalToDeclare(line: string): string {
+  const m = /^(@[^\s=]+) = (.*)$/.exec(line);
+  if (!m || m[1].startsWith("@llvm.")) return "";
+  const rest = m[2];
+  const kw = /\b(global|constant) /.exec(rest);
+  if (!kw) return "";
+
+  // The type follows the keyword: a nested aggregate or a single token.
+  let i = kw.index + kw[0].length;
+  let depth = 0;
+  const start = i;
+  for (; i < rest.length; i++) {
+    const c = rest[i];
+    if ("<[{(".includes(c)) depth++;
+    else if (">]})".includes(c)) depth--;
+    else if (c === " " && depth === 0) break;
+  }
+  const type = rest.slice(start, i);
+  if (!type) return "";
+  return `${m[1]} = external ${kw[1]} ${type}`;
+}
+
+export function findFunctions(lines: string[]): Func[] {
   const funcs: Func[] = [];
   for (let i = 0; i < lines.length; i++) {
+    if (lines[i].startsWith("@")) {
+      const decl = globalToDeclare(lines[i]);
+      if (decl && !lines[i].includes(" external ")) funcs.push({ start: i, end: i, decl });
+      continue;
+    }
     if (!lines[i].startsWith("define ")) continue;
     let j = i;
     while (j < lines.length && lines[j] !== "}") j++;
@@ -105,7 +151,7 @@ function findFunctions(lines: string[]): Func[] {
 }
 
 /** Render the module with only `keep` function bodies present. */
-function render(lines: string[], funcs: Func[], keep: Set<number>): string {
+export function render(lines: string[], funcs: Func[], keep: Set<number>): string {
   const skip = new Map<number, Func>();
   for (const [idx, f] of funcs.entries()) if (!keep.has(idx)) skip.set(f.start, f);
 
@@ -155,7 +201,7 @@ async function main() {
   const args = parseArgs(Deno.args.slice());
   const lines = (await Deno.readTextFile(args.input)).split("\n");
   const funcs = findFunctions(lines);
-  console.log(`input: ${lines.length} lines, ${funcs.length} function definitions`);
+  console.log(`input: ${lines.length} lines, ${funcs.length} units (function and global definitions)`);
 
   const tmp = await Deno.makeTempFile({ suffix: ".ll" });
 
@@ -189,7 +235,7 @@ async function main() {
         keep = candidate;
         granularity = Math.max(granularity - 1, 2);
         reduced = true;
-        console.log(`  ${keep.size} functions still crash (run ${runs})`);
+        console.log(`  ${keep.size} units still crash (run ${runs})`);
         break;
       }
     }
@@ -202,7 +248,7 @@ async function main() {
 
   const finalText = render(lines, funcs, keep);
   await Deno.writeTextFile(args.out, finalText);
-  console.log(`\nreduced to ${finalText.split("\n").length} lines, ${keep.size} function bodies, in ${runs} runs`);
+  console.log(`\nreduced to ${finalText.split("\n").length} lines, ${keep.size} units, in ${runs} runs`);
   console.log(`wrote ${args.out}`);
   for (const idx of keep) {
     console.log(`  kept: ${lines[funcs[idx].start].slice(0, 120)}`);

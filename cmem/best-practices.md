@@ -24,6 +24,12 @@ citation to the incident.
 
 - **Finding a real defect at a layer is not evidence that it causes your symptom.** Vary one thing
   at a time. (wazmrt KI: exFAT zig-cache, four misdiagnoses; zilc KI-2.)
+- **When a reducer leaves something "innocent" behind, the reducer is missing a unit type, not the
+  bug.** Teach it the missing unit (functions, then globals), then sweep the minimal shape's
+  neighbours by hand with tiny probes until the rule is exact. (KI-18, 2026-10-01: a function-only
+  reduction kept an innocent `syscall4`; adding globals found `i21` in 11 runs.)
+- **Write the WHY of a workaround when you make it** (`workarounds.md`), keeping measured facts and
+  surmises apart, and listing what was ruled out. (Owner rule, 2026-10-01.)
 - **A reopen condition is not self-checking.** Re-test it when you *price* the entry, not just when
   it was written.
 

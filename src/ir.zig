@@ -545,6 +545,97 @@ fn internalizedDefine(line: []const u8, keep: []const []const u8) ?[]const u8 {
 }
 
 // ---------------------------------------------------------------------------
+// Globals of a 3-byte type (KI-18).
+//
+// Fil-C 0.685's pass asserts `!(CSize % WordSize)` on any global whose value
+// type has a 3-byte store size, constant or not: i17 through i24, e.g. Zig's
+// `@unicode.replacement_character = internal unnamed_addr constant i21 65533`,
+// and integer vectors of 17 to 24 bits, e.g. `<3 x i8>`, `<24 x i1>`,
+// `<2 x i12>`. Every other size tested passes, and so do the same values inside
+// a struct or array, in locals, and in loads and stores. So such a global's
+// value is wrapped in a one-field struct: `{ T } { T V }` has the same size,
+// alignment and bytes, field 0 sits at the global's own address, and with
+// opaque pointers no use of the global mentions its type. Nothing else changes.
+
+pub const ThreeByteWrap = struct {
+    ir: []u8,
+    /// How many global definitions were wrapped.
+    count: usize,
+};
+
+pub fn wrapThreeByteGlobals(gpa: std.mem.Allocator, ir: []const u8) !ThreeByteWrap {
+    var out: std.ArrayListUnmanaged(u8) = .{};
+    errdefer out.deinit(gpa);
+
+    var count: usize = 0;
+    var pos: usize = 0;
+    while (true) {
+        const nl = std.mem.indexOfScalarPos(u8, ir, pos, '\n');
+        const line = if (nl) |n| ir[pos..n] else ir[pos..];
+
+        if (threeByteGlobal(line)) |g| {
+            try out.print(gpa, "{s}{{ {s} }} {{ {s} {s} }}{s}", .{ line[0..g.type_at], g.ty, g.ty, g.init, line[g.init_end..] });
+            count += 1;
+        } else try out.appendSlice(gpa, line);
+
+        if (nl) |n| {
+            try out.append(gpa, '\n');
+            pos = n + 1;
+        } else break;
+    }
+    return .{ .ir = try out.toOwnedSlice(gpa), .count = count };
+}
+
+/// For `@x = … global|constant T INIT[, …]` where T is `iN` or `<K x iM>` of 17
+/// to 24 bits in all, where the type starts, the type, the initializer, and
+/// where the initializer ends. Null for any other line, including declarations
+/// (no initializer).
+fn threeByteGlobal(line: []const u8) ?struct { type_at: usize, ty: []const u8, init: []const u8, init_end: usize } {
+    if (line.len == 0 or line[0] != '@') return null;
+    const eq = std.mem.indexOf(u8, line, " = ") orelse return null;
+    // The first keyword is the real one; a later match could be inside a string.
+    var type_at: usize = line.len;
+    for ([_][]const u8{ " global ", " constant " }) |kw| {
+        if (std.mem.indexOfPos(u8, line, eq, kw)) |k| type_at = @min(type_at, k + kw.len);
+    }
+    if (type_at == line.len) return null;
+
+    const ty_end = std.mem.indexOfScalarPos(u8, line, type_at, if (line[type_at] == '<') '>' else ' ') orelse return null;
+    const ty = line[type_at .. ty_end + @intFromBool(line[type_at] == '<')];
+    if (intTypeBits(ty)) |bits| {
+        if (bits < 17 or bits > 24) return null;
+    } else return null;
+
+    // The initializer runs to the first comma outside any brackets (a vector
+    // constant has commas of its own).
+    const init_at = type_at + ty.len + 1;
+    if (init_at >= line.len) return null;
+    var depth: usize = 0;
+    var i = init_at;
+    while (i < line.len) : (i += 1) switch (line[i]) {
+        '(', '[', '{', '<' => depth += 1,
+        ')', ']', '}', '>' => depth -|= 1,
+        ',' => if (depth == 0) break,
+        else => {},
+    };
+    const init = std.mem.trimRight(u8, line[init_at..i], " ");
+    if (init.len == 0) return null;
+    return .{ .type_at = type_at, .ty = ty, .init = init, .init_end = init_at + init.len };
+}
+
+/// Total bits of `iN` or `<K x iM>`; null for any other type.
+fn intTypeBits(ty: []const u8) ?u32 {
+    if (std.mem.startsWith(u8, ty, "<") and std.mem.endsWith(u8, ty, ">")) {
+        const x = std.mem.indexOf(u8, ty, " x ") orelse return null;
+        const lanes = std.fmt.parseInt(u32, ty[1..x], 10) catch return null;
+        const elem = intTypeBits(ty[x + " x ".len .. ty.len - 1]) orelse return null;
+        return std.math.mul(u32, lanes, elem) catch null;
+    }
+    if (ty.len < 2 or ty[0] != 'i') return null;
+    return std.fmt.parseInt(u32, ty[1..], 10) catch null;
+}
+
+// ---------------------------------------------------------------------------
 
 const testing = std.testing;
 
@@ -740,6 +831,52 @@ test "internalizeExcept keeps only the asked-for exports" {
         \\declare double @floor(double)
         \\
     , got);
+}
+
+test "3-byte globals are wrapped in a one-field struct (real Zig IR, KI-18)" {
+    const ir =
+        \\@unicode.replacement_character = internal unnamed_addr constant i21 65533, align 4, !dbg !33
+        \\@__anon_9482 = internal unnamed_addr constant <3 x i8> <i8 48, i8 48, i8 48>, align 4
+        \\@a = internal global i17 -1
+        \\@v = internal global <24 x i1> zeroinitializer
+        \\@b = internal unnamed_addr constant i32 65533, align 4
+        \\@c = internal unnamed_addr constant i25 1
+        \\@d = internal unnamed_addr constant i2 1
+        \\@w = internal unnamed_addr constant <4 x i8> <i8 1, i8 2, i8 3, i8 4>, align 4
+        \\@e = external global i24, align 4
+        \\@f = internal constant { i21, i8 } { i21 1, i8 2 }
+        \\@g = internal constant [5 x i8] c" i21 "
+        \\define i21 @use() {
+        \\  %v = load i21, ptr @unicode.replacement_character, align 4
+        \\  ret i21 %v
+        \\}
+        \\
+    ;
+    const got = try wrapThreeByteGlobals(testing.allocator, ir);
+    defer testing.allocator.free(got.ir);
+    try testing.expectEqual(@as(usize, 4), got.count);
+    try testing.expectEqualStrings(
+        \\@unicode.replacement_character = internal unnamed_addr constant { i21 } { i21 65533 }, align 4, !dbg !33
+        \\@__anon_9482 = internal unnamed_addr constant { <3 x i8> } { <3 x i8> <i8 48, i8 48, i8 48> }, align 4
+        \\@a = internal global { i17 } { i17 -1 }
+        \\@v = internal global { <24 x i1> } { <24 x i1> zeroinitializer }
+        \\@b = internal unnamed_addr constant i32 65533, align 4
+        \\@c = internal unnamed_addr constant i25 1
+        \\@d = internal unnamed_addr constant i2 1
+        \\@w = internal unnamed_addr constant <4 x i8> <i8 1, i8 2, i8 3, i8 4>, align 4
+        \\@e = external global i24, align 4
+        \\@f = internal constant { i21, i8 } { i21 1, i8 2 }
+        \\@g = internal constant [5 x i8] c" i21 "
+        \\define i21 @use() {
+        \\  %v = load i21, ptr @unicode.replacement_character, align 4
+        \\  ret i21 %v
+        \\}
+        \\
+    , got.ir);
+
+    const again = try wrapThreeByteGlobals(testing.allocator, got.ir);
+    defer testing.allocator.free(again.ir);
+    try testing.expectEqual(@as(usize, 0), again.count);
 }
 
 test "a module with no datalayout is an error, not a silent pass-through" {

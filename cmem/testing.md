@@ -44,7 +44,8 @@ programs don't**, and gives size numbers against plain Zig. Tools in `tools/basi
 | runs as designed, plain ReleaseSafe | **78/78** | **78/78** exit codes. ⚠️ Outputs were wrong when redirected until the stdio streaming fix (2026-09-30, `tests/basics/README.md`) |
 | **builds with zilc** | **78/78** | ReleaseSafe ~~50/78~~ → **77/78** after the KI-8 fix (only KI-9 left) · ReleaseSmall **77/78** (KI-9) |
 | **runs as designed under zilc** (ReleaseSafe) | **78/78** (`42_panic` traps via Fil-C, as designed) | ~~24~~ → 26 (KI-8) → 45 (KI-7) → 50 (panic handler + KI-9) → **71/78** (KI-13 overflow fold + `fromPage` patch, KI-14 `-fno-valgrind`). 65 clean exits plus 6 intentional (`42` panic, `66` exit 1 without a subcommand, `77` exit 3, three servers). Then the **unoptimized-IR route** (KI-17, the default since 2026-09-30) → **76/78**: the 5 thread joins pass, and `76_signals` now runs (it waits, as designed). **Left, 2:** the KI-18 Fil-C assertion (`22_strings-and-runes`, `69_http-client`) |
-| **every mode** (KI-16, default route) | same in every mode (C ignores `-O`) | **ReleaseSafe 76 · ReleaseFast 76 · ReleaseSmall 76 · Debug 63** as designed. Release modes now identical. Debug's extra 13 are KI-19 (syscall pointer arguments at `-O0`); all modes share KI-18's 2. Tool: `tools/basics/all-modes.sh` |
+| **every mode** (KI-16, default route) | same in every mode (C ignores `-O`) | ~~ReleaseSafe 76 · ReleaseFast 76 · ReleaseSmall 76 · Debug 63~~ → **2026-10-01: ReleaseSafe 78 · ReleaseFast 78 · ReleaseSmall 78 · Debug 65** as designed (KI-18 three-byte globals, KI-20 `madvise` probe). Debug's other 13: 12 × KI-19 and `69`'s build time (KI-22). Tool: `tools/basics/all-modes.sh` |
+| **build time** (2026-10-01, all 4 modes × 8 jobs at once, so inflated) | — | After KI-21: ReleaseSafe median **4 s**, `62` 19 s (was 92), `48_json` 30 s (was 86); `69` 214 s (ReleaseSafe), 754 s (ReleaseFast), timeout (Debug), all KI-22. Alone: `62` ReleaseSafe 8.0 s vs native 6.7 s; `69` 132 s vs native 20 s. `zilc-check.sh` now reports `BUILD-TIMEOUT` (`TBUILD`, default 1800 s) and writes `build seconds:` into each `build.log` |
 
 **C already works under zilc across the whole corpus. Zig's gaps are all in std**, not the pipeline:
 raw system calls, stack probes, f128 helpers, thread handles. That is P4, now with a
@@ -68,12 +69,12 @@ inside). Zig zilc ReleaseSafe/ReleaseSafe **1.26** stripped; zilc ReleaseSmall/R
 stripped (instrumentation plus Fil-C's calling-convention thunks). Tools:
 `tools/basics/size-compare.sh`, `size-report.sh`.
 
-## Current gates (re-run 2026-09-30)
+## Current gates (re-run 2026-10-01)
 
 | Step | Checks | State |
 | --- | --- | --- |
-| `zig build gate` | Every example traps at the right line (needs Fil-C) | **4/4** (2026-09-30, after `--runtime` was added) |
-| `zig build test` | Runtime module + CLI module + the IR rewrite + the `--runtime zig` refusal + the version round-trip | **11/11** pass |
+| `zig build gate` | Every example traps at the right line (needs Fil-C) | **4/4** (2026-10-01, with KI-18, KI-20 and KI-21) |
+| `zig build test` | Runtime module + CLI module + the IR rewrites (incl. the KI-18 three-byte-global wrap) + the std-overlay patches (incl. the KI-21 guards) + the `--runtime zig` refusal + the version round-trip | **24/24** pass (2026-10-01) |
 | `zig build capi-smoke` | `tests/capi_smoke.c` links `zilc_runtime` via `zilc.h` and calls it | pass |
 | `zig build baseline` | Builds `examples/*.c` with plain `zig cc` | builds. `baseline_oob_write` prints `a[3] = 3`, exit 0: **the undetected bug** |
 
