@@ -84,8 +84,8 @@ for structure and policy.
   Fil-C's runtime source. **(2) upstream defects are noted for the record, not filed.**
   **(3) publish as `v0.15.2-3`** after the open items and the platforms scope, before the port
   (move the local tag and branch, `releasing.md`). **(4) platforms: Linux, macOS, Windows on every
-  prevalent processor, then iOS, Android later** (`roadmap.md` P6; 🔸 x86_64 + aarch64 assumed,
-  riscv64 to confirm).
+  prevalent processor, then iOS, Android later** (`roadmap.md` P6; ✅ x86_64 + aarch64 confirmed;
+  riscv64 out of scope for now, low interest).
 - 📋 **PRE-PUBLISH CHECKLIST (all must close before `v0.15.2-3` is pushed):**
   - [ ] **KI-18**: Fil-C assertion on 2 programs (every mode). Reduce to the global, then work
     around it or document

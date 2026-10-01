@@ -109,9 +109,9 @@ These shape everything else. Listed roughly in order of how much they constrain 
    ABI, to re-check at every upstream sync.
 4. ✅ **SETTLED 2026-09-30 (owner): Linux, macOS and Windows, on every currently prevalent
    processor; then iOS; Android later.** The scope work comes before publishing (`roadmap.md` P6).
-   🔸 "Prevalent processors" is read as **x86_64 and aarch64 (arm64)** on each OS, which covers
+   ✅ **Processors confirmed (owner, 2026-09-30): x86_64 and aarch64 (arm64)** on each OS, which covers
    Linux servers and desktops, Intel and Apple-silicon Macs, and Windows on x64 and ARM.
-   **riscv64** is the emerging candidate. Confirm with the owner whether it is in.
+   **riscv64: out of scope for now** ("a low interest item"). It runs mainly on Linux (Android is in progress; no macOS, iOS or Windows), and Fil-C has no riscv64 build. Candidate for later, on the Linux row only, once the clean-room runtime exists.
    **Platform analysis** (Linux x86_64 is still the only working target, developed in WSL2, KI-1).
    How far other platforms can go, as analysed with the owner 2026-09-30:
    - **What Zig's portability covers:** the runtime (garbage collector, capabilities, safepoints). It

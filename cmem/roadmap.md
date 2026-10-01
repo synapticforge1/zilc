@@ -266,7 +266,7 @@ performance measurement against Fil-C.
 ## P6 — Platforms. ✅ **ADOPTED 2026-09-30 (owner)**
 
 **Goal: Linux, macOS and Windows, on every currently prevalent processor; then iOS; Android
-later.** 🔸 Processors read as **x86_64 + aarch64** per OS (riscv64 to confirm). Reasoning and limits
+later.** ✅ Processors: **x86_64 + aarch64** per OS (owner). riscv64 is out of scope for now: a low-interest later candidate for the Linux row only, once the clean-room runtime exists. Reasoning and limits
 are in `design-decisions.md` open question #4.
 
 | tier | platform | processors | what it depends on |
