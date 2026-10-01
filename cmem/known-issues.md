@@ -505,6 +505,24 @@ On the unoptimized route (KI-17), **2 of 78 programs crash Fil-C's clang in ever
 - Reduced module: `~/zilc-work/csize/csize-reduced.ll` (WSL); input `…/runes.zilc-tmp/
   strings-and-runes.filc.ll`.
 
+## ◐ KI-23 — Git's automatic maintenance fails on the exFAT drive (2026-10-01). **Mitigated**
+
+**Symptom:** after commits, `fatal: could not write multi-pack-index: Permission denied` /
+`error: task 'geometric-repack' failed`. A forced `gc` fails with `renaming pack to '…pack' failed:
+File exists`. **Commits and objects are unaffected** (fsck clean, 1,080 objects, before and after).
+
+**Cause (measured):** two Windows/exFAT file semantics that Linux doesn't have. (1) The geometric
+task's child `multi-pack-index write` replaces the MIDX file while its parent `repack` still has it
+memory-mapped: Windows refuses ("Permission denied"); a plain `git multi-pack-index write` works.
+(2) A repack sometimes writes a pack whose content-derived name already exists. Git for Windows on
+exFAT cannot rename over the existing read-only pack ("File exists"); on Linux the rename replaces
+it. A full `git repack -a -d` consolidated six packs to one, but the next repack hit (2) again.
+
+**Mitigation (repo-local config, not committed):** `maintenance.geometric-repack.enabled=false`,
+`maintenance.gc.enabled=true`. The automatic run after commits is now clean. `gc` only runs when
+loose objects pass `gc.auto` (~6,700), so the error is rare, and harmless when it occurs. **Full fix:**
+keep repos on NTFS, the same remedy as KI-2 (zig-cache on exFAT). Owner's call.
+
 ## ◐ KI-22 — Build time: Fil-C's frame-slot colouring is cubic on big Zig functions (2026-10-01). **Option 2 DONE (patched Fil-C clang, the default); option 3 research next**
 
 **Status 2026-10-01 (evening):** the patched clang is built and is the default in zilc's scripts

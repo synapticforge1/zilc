@@ -56,7 +56,11 @@ for structure and policy.
   `FilPizlonator.cpp`, all zilc edits still apply. ⚠️ **Not yet reviewed**: read those 9 commits
   (above all `097f7b7`, stack auxes, next to our colouring fix) and then run `--mark-reviewed`.
 - 📏 **LF everywhere (owner):** `.gitattributes` is `* text=auto eol=lf`; reference clones use
-  `core.autocrlf=false`. The global `core.autocrlf=true` is left alone (owner's call).
+  `core.autocrlf=false`; and since 2026-10-01 (owner) **global** `core.autocrlf=input`,
+  `core.eol=lf` (overriding Git for Windows' system default `true`) across all projects.
+- 🧹 **KI-23 (git maintenance errors after commits) mitigated:** repo-local config uses `gc` instead of
+  the geometric task, which Windows and exFAT file semantics break. Full fix: repos on NTFS (owner's
+  call).
 - 🏷️ **Stale labels corrected:** KI-10 (fixed 2026-09-30 by KI-17), KI-6 (handled), the KI-11
   line, and the upstream-report loose end. README synced: Debug needs the patched clang; build
   times; layout.
