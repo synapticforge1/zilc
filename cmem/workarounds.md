@@ -313,6 +313,14 @@ empty, and a real walk would stop under Fil-C (KI-15).
 **Result.** 62 ReleaseSafe 40 s → **8.0 s** (native 6.7 s); its IR 228k → 87k lines, 1,265 → 436
 functions. It runs identically.
 
+**Third route, Debug only (found 2026-10-01 evening).** `posix.unexpectedErrno` calls
+`debug.dumpCurrentStackTrace` when std's "unexpected error tracing" is on, which is Debug. That
+kept the whole unwinder, symbolizer and `compress.flate` in **every Debug program**: a trivial
+program's Debug IR was 190,873 lines and 1,095 functions, 56k lines of them this code, plus 6
+`indirectbr` (KI-4's trigger). Two more guards of the same kind (`dumpCurrentStackTraceToWriter`,
+`dumpStackTrace`), overlay v5. **`04_constants` Debug: 9.9 s → 2.1 s** (IR 190k → 28k lines;
+native Zig Debug with LLVM 1.1 s). Debug's "~5× Release" build time was this, not KI-22.
+
 **Recognising a relative.** A zilc build much slower than native Zig: list the IR's lines by
 namespace (`irstat.sh`-style awk over `^define`) and look for code that cannot run under zilc. Then
 find who references it (callers of the namespace, from non-namespace functions). **Any std
@@ -379,8 +387,9 @@ harder. Re-check list: `ports/README.md`.
    at lines 3146–3160.
 2. **Build a patched Fil-C clang** with that fix. It works now and keeps output identical, but zilc
    has avoided building LLVM so far (hours; the owner's call).
-3. **zilc inserts `llvm.lifetime.start` before each alloca's first use**, where that point
-   dominates every use and lies in no loop. This shrinks the live ranges, so the graph is no longer
+3. ❌ **(Researched and rejected 2026-10-01: Fil-C erases escaping allocas' lifetime markers before
+   liveness; see "Option 3 researched" below.)** **zilc inserts `llvm.lifetime.start` before each
+   alloca's first use**, where that point dominates every use and lies in no loop. This shrinks the live ranges, so the graph is no longer
    a clique. It needs CFG, dominator and loop analysis in `src/ir.zig`, and a wrong marker
    miscompiles, so it carries the most risk.
 4. **Accept it for now.** Typical programs are near native after KI-21; only functions with
@@ -391,6 +400,29 @@ the patch (`tools/filc/build-patched-clang.sh`; ~1 h; GCC 15.2 and CMake 4.2.3 f
 1.12.1 release binary). The version string matches the prebuilt exactly (the source remote must be
 `git@github.com:…`, and the generated `VCSVersion.inc`/`VCSRevision.h` deleted to regenerate).
 `69` at `-O1`: **112 s → 54 s** for Fil-C's clang alone.
+
+**Option 3 researched and REJECTED (2026-10-01, owner asked to check its necessity after
+option 2).**
+
+- **Where the time is now** (`69` ReleaseSafe, patched clang, alone): zilc 55.9 s vs native Zig
+  16.9 s. Fil-C's clang 55.4 s = pass **11.4 s** + LLVM's `-O1` optimizer ~18 s + code generation
+  ~25 s. Stock clang on the same uninstrumented IR took ~15 s, so ~3× of the downstream work is
+  the instrumentation's own size, inherent to Fil-C. Debug `69` is the same (54.5 s).
+- **Inside the pass** (gdb with symbols, patched build): about 7 of 12 pass samples are in
+  liveness and interference building (`FilPizlonator.cpp` 2970–2998), which is quadratic in
+  simultaneously live pointers. That ~6–7 s (~12% of the build) is all that lifetime markers
+  could ever have saved.
+- **Why markers would not save even that:** `removeLifetimeIntrinsics()` **erases the lifetime
+  markers of every ESCAPING alloca** before liveness runs, and keeps them only for non-escaping
+  ones. The liveness and interference work tracks only escaping values (`LiveCast` returns null
+  for anything else). So markers zilc inserted would be deleted before they could shorten any
+  costly live range. **Option 3 cannot help build time.** It would also need CFG, dominator and
+  loop analysis in `src/ir.zig`, with miscompile risk.
+- **What did help instead:** the Debug-only std route above (KI-21, third route).
+- **Levers that remain, if `69`-class builds must get faster** (owner's call, not started):
+  (a) split the module and run Fil-C's clang on the parts in parallel. Fil-C already compiles C
+  one translation unit at a time, and 32 cores sit idle. (b) A faster interference build in the
+  patched pass that produces the same graph. (c) Cache objects by IR hash for unchanged rebuilds.
 
 **How the patch was proved output-identical, and why byte comparison could not do it:**
 

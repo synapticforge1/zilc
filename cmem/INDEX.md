@@ -31,9 +31,13 @@ for structure and policy.
   which **fixed KI-19**. **The corpus is 78/78 as designed in ALL FOUR MODES**, gate 4/4, tests 24/24.
 - 🔑 **Found:** Fil-C's output is **not reproducible under ASLR** (bears on the fidelity goal;
   `roadmap.md` P3, `workarounds.md` KI-22).
-- **Next:** **research option 3** (zilc-inserted lifetime markers) against the new numbers: `69` is
-  ~54 s in Fil-C vs native Zig's 20 s, and Debug's median build is ~5× Release's. Then the rest of
-  the **PRE-PUBLISH CHECKLIST**.
+- ✅ **Option 3 researched and REJECTED:** Fil-C erases escaping allocas' lifetime markers before
+  its liveness runs, so zilc-inserted markers could not help (`workarounds.md` KI-22). Debug's slow
+  builds were a third KI-21 route (`unexpectedErrno` → stack-trace dump), now guarded (overlay v5):
+  **Debug median 19 s → 4 s, same as ReleaseSafe; 78/78 in all modes.** Remaining: `69`-class
+  programs (55.9 s vs native 16.9 s), inherent to instrumented code; further levers (parallel
+  per-part compile, faster interference build, object cache) await the owner.
+- **Next:** the rest of the **PRE-PUBLISH CHECKLIST**.
 - **State:** committed through today's work (see `git log`), nothing pushed. WSL has
   `build-essential` + `cmake` (owner installed; `ninja` 1.12.1 and gdb in `~/zilc-work/tools/`, no
   sudo needed). ⚠️ Build LLVM with `JOBS` ≤ 12 (32 crashed the WSL VM).
@@ -121,8 +125,9 @@ for structure and policy.
   - [x] **KI-18**: Fil-C assertion on 2 programs (every mode). ✅ 2026-10-01, `ir.wrapThreeByteGlobals`
   - [x] **KI-20**: `madvise` probe in `std.crypto.random`. ✅ 2026-10-01, `crypto_always_getrandom`
   - [x] **KI-21**: dead stack-trace code compiled into every program. ✅ 2026-10-01, std-overlay guards
-  - [ ] **KI-22**: build time on big functions and Debug. ✅ Option 2 done (patched clang, default);
-    research option 3 next
+  - [x] **KI-22**: build time on big functions and Debug. ✅ Option 2 done (patched clang, default);
+    option 3 researched and rejected; Debug builds now as fast as Release. `69`-class speed-ups
+    beyond this are optional (owner)
   - [x] **KI-19**: Debug syscall pointer arguments (12 programs). ✅ 2026-10-01, Debug at `-O1` via the
     KI-4 patch
   - [x] **KI-4** (Debug `-O1` crash), the root of KI-19. ✅ 2026-10-01, patched `indirectbr` lowering

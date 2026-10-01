@@ -23,7 +23,7 @@ pub const Error = error{
 };
 
 /// Bump when any patch changes, so stale overlays are rebuilt.
-pub const overlay_version = 4;
+pub const overlay_version = 5;
 
 pub const Patch = struct {
     /// Path relative to the Zig lib directory.
@@ -130,6 +130,30 @@ const zig_0_15_2 = [_]Patch{
         \\        stack_trace.index = 0;
         \\        return;
         \\    }
+        \\
+        ,
+        .count = 1,
+    } } },
+    // Debug-only route to the same unwinder (found 2026-10-01): `posix.unexpectedErrno` calls
+    // `dumpCurrentStackTrace` when std's "unexpected error tracing" is on (Debug), which pulled the
+    // whole DWARF symbolizer and `compress.flate` back into EVERY Debug program (a trivial program's
+    // IR: 190k lines, 56k of them this code). Same guard, at the two dump entry points.
+    .{ .file = "std/debug.zig", .edit = .{ .replace = .{
+        .old = "pub fn dumpCurrentStackTraceToWriter(start_addr: ?usize, writer: *Writer) !void {\n",
+        .new =
+        \\pub fn dumpCurrentStackTraceToWriter(start_addr: ?usize, writer: *Writer) !void {
+        \\    // zilc: no native stack walking (KI-15), decided at compile time (KI-21).
+        \\    if (!sys_can_stack_trace) return writer.writeAll("(no Zig stack trace under zilc; see Fil-C's trace)\n");
+        \\
+        ,
+        .count = 1,
+    } } },
+    .{ .file = "std/debug.zig", .edit = .{ .replace = .{
+        .old = "pub fn dumpStackTrace(stack_trace: std.builtin.StackTrace) void {\n",
+        .new =
+        \\pub fn dumpStackTrace(stack_trace: std.builtin.StackTrace) void {
+        \\    // zilc: no native stack walking (KI-15), decided at compile time (KI-21).
+        \\    if (!sys_can_stack_trace) return;
         \\
         ,
         .count = 1,
@@ -289,7 +313,7 @@ test "a different original is refused, not mis-patched" {
 }
 
 test "only 0.15.2 has patches so far" {
-    try testing.expectEqual(@as(usize, 7), patchesFor("0.15.2").len);
+    try testing.expectEqual(@as(usize, 9), patchesFor("0.15.2").len);
     // ⚠️ 0.16.0 fixed Z-1 upstream but NOT Z-5: a 0.16 line needs the DebugAllocator patch.
     try testing.expectEqual(@as(usize, 0), patchesFor("0.16.0").len);
 }

@@ -39,6 +39,14 @@ citation to the incident.
 - **KI-1 again: never pass shell text containing `|` inline through PowerShell to WSL**, even in
   a "simple" wait loop. A `grep -E "a|b"` became shell pipes, and the watcher looped on errors
   for an hour. Put it in a script file. (2026-10-01.)
+- **Before building a workaround for an upstream cost, read whether upstream already discards
+  your input.** Option 3 (inserting lifetime markers for Fil-C) would have been real compiler work
+  with miscompile risk, but the pass erases escaping allocas' markers before the analysis they
+  were meant to speed up. One `grep` for how the pass treats the construct settled it. (KI-22,
+  2026-10-01.)
+- **Measure Debug separately; its std is different code.** Debug-only std behaviour
+  (`unexpectedErrno` dumping stack traces) kept 56k lines of dead code in every Debug build after
+  the Release builds were already clean. (KI-21, 2026-10-01.)
 - **Write the WHY of a workaround when you make it** (`workarounds.md`), keeping measured facts and
   surmises apart, and listing what was ruled out. (Owner rule, 2026-10-01.)
 - **A reopen condition is not self-checking.** Re-test it when you *price* the entry, not just when

@@ -512,8 +512,16 @@ On the unoptimized route (KI-17), **2 of 78 programs crash Fil-C's clang in ever
 of the corpus in all 4 modes (`ZILC_VERIFY_COLOURING=1`). Together with the KI-4 fix (Debug at
 `-O1`), `69`'s builds under full corpus load: ReleaseSafe 214 → **112 s**, ReleaseFast 742 →
 **154 s**, ReleaseSmall 178 → **87 s**, Debug timeout → **83 s**. Corpus medians: Debug 19 s,
-ReleaseSafe 4 s, ReleaseFast 3 s, ReleaseSmall 2 s. **Still open for option 3:** `69` alone is
-~54 s in Fil-C's clang vs native Zig's 20 s total, and Debug's median is ~5× Release's.
+ReleaseSafe 4 s, ReleaseFast 3 s, ReleaseSmall 2 s.
+
+**Option 3 researched and rejected (same day):** Fil-C's pass erases the lifetime markers of
+escaping allocas before its liveness runs, and those are the only values whose interference costs
+time, so zilc-inserted markers could not help. Debug's "~5× Release" was a third KI-21 route
+(`unexpectedErrno` → `dumpCurrentStackTrace`), now guarded: trivial Debug builds 9.9 s → 2.1 s.
+Remaining gap, inherent to instrumentation: `69` alone 55.9 s vs native 16.9 s (pass 11 s; the rest
+is LLVM optimizing and generating the instrumented code). Further levers (parallel per-part
+compile, faster interference build, object cache) are listed in `workarounds.md` KI-22, not
+started.
 
 Original entry:
 
@@ -534,7 +542,9 @@ KI-15 disabled native stack walking at run time only; on the unoptimized route (
 instrumented and compiled the whole DWARF unwinder (about half of `62_directories`' IR). **Fix:** two
 std-overlay guards with a comptime-known early return (`captureStackTrace`,
 `StackTrace.format`), overlay v4. **62 ReleaseSafe 40 s → 8.0 s** (native 6.7 s); IR 228k → 87k
-lines. Details: `workarounds.md` KI-21.
+lines. **Third route, Debug only (2026-10-01 evening):** `posix.unexpectedErrno` →
+`dumpCurrentStackTrace` (std's Debug "unexpected error tracing"); two more guards, overlay v5.
+Trivial Debug programs 9.9 s → 2.1 s. Details: `workarounds.md` KI-21.
 
 ## ✅ KI-20 — `std.crypto.random` probes `madvise` with an invalid advice (2026-10-01, FIXED)
 
