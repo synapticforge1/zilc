@@ -265,7 +265,7 @@ fails with `undefined reference to pizlonated_getrlimit64 / setrlimit64 / mmap64
 **Use `-target x86_64-linux-musl`** and they resolve. (The `pizlonated_` prefix in the error is just
 the pass's renaming — a plain "missing libc symbol", not a Fil-C-specific failure.)
 
-## 🔴 KI-7 — Zig's std makes RAW `syscall` asm even with `-lc`; Fil-C refuses it (2026-09-30)
+## ◐ KI-7 — Zig's std makes RAW `syscall` asm even with `-lc`; Fil-C refuses it (2026-09-30). **MOSTLY FIXED the same day**: rewritten to the checked `zilc_syscall` helper; Zig OK 26 → 45/78, no syscall-asm traps left. Remaining: `getcontext` (std level)
 
 Found by the `tests/basics` corpus: **~23 of 78 Zig programs trap at run time**, even
 `01_hello-world`. Fil-C: `cannot handle inline asm (unsupported mnemonic for safe inline asm: syscall)`.
@@ -282,6 +282,15 @@ Hello-world's backtrace: `std.debug.print` → `debug.lockStderrWriter` → `Pro
 - ⚠️ **It is also a GC hazard (from the design docs, `filc-abi.md` §5b):** a raw `futex` or
   `clock_nanosleep` blocks **without exiting**, so FUGC's soft handshakes would wait on that thread
   forever. Routing through the runtime is **required**.
+- 🔸 **The one asm block the rewrite cannot touch: `std.debug`'s `getcontext`**, a long asm sequence
+  that stores every register into a context struct, with a `syscall` (`rt_sigprocmask`) inside, for
+  stack traces. Its problem is not the syscall but **copying raw registers**, which can never carry
+  capabilities, so no rewrite of it can be safe. **The safe equivalent exists at a higher level:**
+  Fil-C's `stdfil.h` has **`zdump_stack()`**, **`zstack_scan()`** (frames with function, file and
+  line) and **`zfiber_context_getcontext()`**. The fix belongs in **std, not the IR**: zilc's entry
+  shim is the root module, so it can define Zig's root `panic` override (and stack-trace hooks) to
+  report through `zdump_stack`/`zstack_scan`, and `getcontext` is never reached. It is reached only
+  on panic and stack-trace paths. (Owner asked, 2026-09-30.)
 - **Most zilc-shaped fix (to verify):** extend the IR rewrite (`src/ir.zig`) to replace
   `asm sideeffect "syscall"` with a call to libc's `syscall(n, …)`, which in Fil-C goes through the
   checked `zsys_*` layer (`filc-abi.md`). It needs checking that Fil-C's `syscall()` accepts these

@@ -38,6 +38,17 @@
    must be a deterministic trap under the safe build. A new unsafe pattern gets an example first.
 3. **Our own files carry `SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception OR MIT`.**
    Adapted files carry the upstream's SPDX (`third_party/LICENSES.md`).
+5. 🔒 **NOTHING UNSAFE IS LEFT TO CHANCE (owner, 2026-09-30): "We definitely don't want to leave
+   anything unsafe to chance. That would be totally the opposite of what our end goal with this
+   port is."** Binding on every fix:
+   - An unsafe construct (raw `syscall` asm, register-copying `getcontext`, `@ptrFromInt` of a
+     forged address) is **replaced by a safe equivalent**, never bypassed, whitelisted, or left
+     "rarely reached". If no safe equivalent exists yet, the program must **stop with an explicit
+     Fil-C error**. It must never run unchecked.
+   - Glue zilc adds (the entry shim, `zilc_syscall`) is **compiled by Fil-C**, so it is checked code
+     itself, and reaches the kernel only through Fil-C's libc and runtime.
+   - "Only on the panic path" is not an exemption: `getcontext` gets a safe replacement
+     (`zdump_stack`/`zstack_scan`, KI-7), not a pass.
 4. **Written to be upgraded (owner goal, 2026-09-30).** Moving to the latest Zig must mean editing a
    few known places, not reorganising files. The rules:
    - **The file layout stays stable** (`src/`, `include/`, `tools/`, `examples/`). Zig API churn is
