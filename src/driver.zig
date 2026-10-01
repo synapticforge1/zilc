@@ -88,6 +88,17 @@ const entry_shim =
     \\// invariant 5).
     \\pub const panic = std.debug.FullPanic(zilcPanic);
     \\
+    \\// std's page_allocator maps memory with mmap and passes the end of its previous
+    \\// mapping as an address hint. Under Fil-C that hint is a pointer one past an
+    \\// object's end, which Fil-C's mmap rightly rejects (cmem/zig-upstream-notes.md
+    \\// Z-2). std lets the root module supply the page allocator, so pages come from
+    \\// Fil-C's malloc instead: real GC objects with exact capabilities.
+    \\pub const os = struct {
+    \\    pub const heap = struct {
+    \\        pub const page_allocator = std.heap.c_allocator;
+    \\    };
+    \\};
+    \\
     \\extern fn zerror(str: [*:0]const u8) void;
     \\
     \\fn zilcPanic(msg: []const u8, first_trace_addr: ?usize) noreturn {

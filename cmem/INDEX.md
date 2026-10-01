@@ -80,6 +80,12 @@ for structure and policy.
   (`design-decisions.md` invariant 5). Then the **panic handler** (Fil-C `zerror`, no `getcontext`) and
   **KI-9** (f128 helpers through the pass): Zig as designed **50/78**. **Next for the corpus:** 26 × "pointer with null
   object", the new top failure.
+- 🧭 **The 2 bounds violations (2026-09-30):** **69** (the `mmap` hint) is **fixed** through std's
+  `root.os.heap.page_allocator` hook (KI-12). **67** (`indexOfSentinel` over-read) is std's own
+  SIMD scan, **already fixed upstream in 0.16.0**, and documented for a possible Zig report
+  (`zig-upstream-notes.md` Z-1). ❓ **Owner decision pending (KI-11):** backport upstream's fix
+  through a small **zilc std overlay** (`--zig-lib-dir`, recommended, likely needed for Z-5
+  `DebugAllocator` too), or leave it as a safe Fil-C stop until 0.16.
 - 🔒 **STAY ON ZIG 0.15.2 UNTIL THERE IS A STABLE BASE (owner).** A 0.16.0 trial port was
   stopped. Its facts are in `ports/README.md` "Scouting": Fil-C head is still LLVM 20.1.8, latest
   Zig is 0.16.0 (clang 21), and Fil-C ships ARM64 builds.
@@ -223,6 +229,7 @@ the runtime-linking rule checked.
 | [known-issues.md](known-issues.md) | 🔑 **KI-4 (2026-09-23): Fil-C's IR is a PATCHED-LLVM DIALECT** (`ni:0` + `datalayout_after_filc`), so stock IR cannot enter the pass — this decided the integration route. KI-1 ✅ resolved (WSL2 installed; `sudo` needs a password); KI-2 exFAT zig-cache; KI-3 LLVM 20 vs 21 skew. |
 | [releasing.md](releasing.md) | 🔖 **Version `0.15.2-3`** (applied 2026-09-30): `<Zig line>-<release>`, the **basis** each latest-line release names, how to bump it, why `.` and `_` were rejected, no 1.0, `-N` restarts at 1 per Zig version, the four places the number lives. The old minor-per-phase cadence is retired. |
 | [filc-abi.md](filc-abi.md) | 🆕 2026-09-30. **Fil-C 0.685's runtime ABI as OBSERVED** (post-pass IR, headers, binaries; no runtime source): flight pointers, the object-header word, function objects and getters, the fast and generic calling convention, the thread layout, linking and overriding. What P3 must match, and its scoping consequences. |
+| [zig-upstream-notes.md](zig-upstream-notes.md) | 🆕 2026-09-30. **Zig behaviours we may need to report** (owner asked): Z-1 `indexOfSentinel` over-read (fixed in 0.16.0; report draft and repro in `tools/zig-reports/`), Z-2 the `mmap` hint, Z-3 raw syscalls, Z-4 `getcontext`, Z-5 `DebugAllocator` integer arithmetic. Each with whether it is really a Zig bug. |
 | [ports/](ports/README.md) | 🆕 2026-09-30. **Port notes: one file per new Zig line, named by its first release** (`ports/0.16.2-1.md`): its basis, each API change and fix, the sites touched. `ports/README.md` holds the guide, the template, and, seeded with the 2026-09-18 0.16 → 0.15.2 move, whose API list is the 0.15.2 → 0.16 port in reverse. |
 | [best-practices.md](best-practices.md) | Method rules. Seeded from wazmrt, plus zilc's own: verify toolchain versions in the build files **and** the binary; a minimum-version field is not a pin; no heredocs; Deno/Bun for scripts; (2026-09-30) measure the contract before planning a port; reserve a switch by refusing, never by falling back. |
 

@@ -316,6 +316,32 @@ every function entry (`cmp rsp, [thread]`, `filc-abi.md` §3).
 through the pass, and Fil-C's libc does not provide them. The fix needs compiler-rt (or those
 functions) built through the pass. P3/P4.
 
+## 🟡 KI-11 — Zig 0.15.2's `indexOfSentinel` over-reads; under Fil-C it is an OOB read (2026-09-30)
+
+`67_environment-variables`: `cannot read 16 bytes when upper - ptr = 12` at `mem.zig:1118:48`. std's
+SIMD sentinel scan reads past the end of the string's object, up to the page boundary. Full analysis,
+minimal reproduction and report draft: `zig-upstream-notes.md` **Z-1**,
+`tools/zig-reports/sentinel-overread/`. **Fixed upstream in 0.16.0** (a scalar `findSentinel`).
+
+std has no hook to swap this function out (unlike `panic` and `page_allocator`). ❓ **Owner decision
+pending:**
+1. **(recommended)** a small **zilc std overlay**: build with `--zig-lib-dir` pointing at a cached
+   copy of Zig's lib with a few patched files. The first patch is **upstream's own 0.16.0 loop**, a
+   backport rather than an invention. It is likely also needed for Z-5 (`DebugAllocator`).
+   Re-checked at every Zig move (`ports/`).
+2. Leave it as an explicit Fil-C stop until zilc is on 0.16. Safe, but C-string handling is
+   everywhere.
+3. An IR-level rewrite: rejected, nothing reliable to anchor to.
+
+## ✅ KI-12 — `PageAllocator`'s `mmap` hint rejected by Fil-C. **FIXED 2026-09-30**
+
+`69_http-client`: `cannot write pointer with ptr >= upper` inside `zsys_mmap`. The hint is the end of
+the previous mapping, a pointer at an object's upper bound (`zig-upstream-notes.md` **Z-2**; not a
+Zig bug). **Fix:** the entry shim declares std's official hook `root.os.heap.page_allocator =
+std.heap.c_allocator`, so pages are Fil-C malloc objects. 69 now gets past it and stops on Z-5
+(`DebugAllocator`) instead. ⚠️ Library mode (C owns `main`) is not covered, as with the panic
+handler.
+
 ## 🟡 KI-10 — `pthread_join` traps on a pointer with no capability (2026-09-30)
 
 `33_mutexes` and one more threading example: `cannot read pointer with null object` in musl's
