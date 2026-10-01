@@ -93,11 +93,11 @@ Newest first. Copy the template for each adopted component.
   lesson `.md` files or build outputs
 - **License (SPDX):** `CC-BY-3.0` for the lesson code, which derives (via "Basics of Coding Go") from
   **"Go by Example" by Mark McGranaghan**; `CC0-1.0` for the owner's original contributions
-- **License file:** `tests/basics/c/LICENSE` + `NOTICE`, `tests/basics/zig/LICENSE` + `NOTICE`
+- **License file:** `tests/basics/c/LICENSE` + `NOTICE`, `tests/basics/zig-0.15.2/` and `zig-0.16.0/` `LICENSE` + `NOTICE`
   (copied verbatim; each NOTICE carries the CC BY 3.0 attribution)
 - **What we reused:** the example programs, as a corpus of *correct* programs that zilc must build
   and run without false traps
-- **Where it lives in zilc:** `tests/basics/c/`, `tests/basics/zig/` (converted to Zig 0.15.2),
+- **Where it lives in zilc:** `tests/basics/c/`, `tests/basics/zig-0.15.2/` (converted to Zig 0.15.2),
   `tests/basics/zig-0.16.0/` (converted to Zig 0.16.0)
 - **Artifact destination:** **test-only.** Never linked into zilc, its runtime or user programs
 - **Modifications:** yes. Each non-obvious change is marked with a `// zilc:` or `/* zilc: */`

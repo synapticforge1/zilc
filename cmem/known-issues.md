@@ -287,7 +287,7 @@ Hello-world's backtrace: `std.debug.print` → `debug.lockStderrWriter` → `Pro
   checked `zsys_*` layer (`filc-abi.md`). It needs checking that Fil-C's `syscall()` accepts these
   numbers, and that pointer arguments (futex addresses) keep their capabilities.
 
-## 🟡 KI-8 — `__zig_probe_stack` undefined in ReleaseSafe too, not only Debug (2026-09-30)
+## ✅ KI-8 — `__zig_probe_stack` undefined in ReleaseSafe too. **FIXED 2026-09-30**: `-fno-stack-check` in every mode. Zig builds under zilc went from 50/78 to 77/78
 
 **27 of 28 ReleaseSafe build failures** in `tests/basics` (38 references): functions with large
 frames (`std/debug/SelfInfo.zig` stack traces, `std/fs/Dir.zig` path buffers) get Zig's stack probe,

@@ -26,7 +26,7 @@ cp -r "$REPO/tests/basics" "$OUT/src"
 
 echo "lang,example,zig_small,zig_safe,zilc_safe,zilc_small,zig_small_stripped,zig_safe_stripped,zilc_safe_stripped,zilc_small_stripped,run_zig_safe,run_zilc" > "$OUT/sizes.csv"
 { for f in "$OUT"/src/c/*/*.c; do echo "c $f"; done
-  for f in "$OUT"/src/zig/*/*.zig; do echo "zig $f"; done; } |
+  for f in "$OUT"/src/${ZIGDIR:-zig-0.15.2}/*/*.zig; do echo "zig $f"; done; } |
   xargs -P "${JOBS:-12}" -L 1 sh -c 'sh "$0" "$1" "$2" "'"$OUT"'"' "$REPO/tools/basics/size-one.sh" >> "$OUT/sizes.csv"
 
 L=$WORK/tools/filc-0.685-linux-x86_64/pizfix/lib

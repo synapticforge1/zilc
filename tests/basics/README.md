@@ -8,7 +8,7 @@ it gives size and speed numbers against plain Zig.
 | folder | contents | builds with |
 | --- | --- | --- |
 | `c/` | the C lessons | `zig cc -lc` (Zig 0.15.2), and zilc |
-| `zig/` | the Zig lessons, **converted to Zig 0.15.2** | Zig 0.15.2 with `-lc`, and zilc |
+| `zig-0.15.2/` | the Zig lessons, **converted to Zig 0.15.2** | Zig 0.15.2 with `-lc`, and zilc |
 | `zig-0.16.0/` | the Zig lessons, **converted to Zig 0.16.0**, for the future 0.16 line | Zig 0.16.0 with `-lc` |
 
 ## Where they come from, and the licence
@@ -21,7 +21,7 @@ Copied 2026-09-30 from the owner's repositories, source files only:
 | Zig | https://github.com/jrmarcum/BasicsOfCodingZig | `d85cc5f7ac19232b240bf890dcd1b915449de789` |
 
 The lesson code derives, via "Basics of Coding Go", from **"Go by Example" by Mark McGranaghan**,
-licensed **CC BY 3.0**. See `c/NOTICE` and `zig/NOTICE`, copied verbatim, which carry the
+licensed **CC BY 3.0**. See `c/NOTICE`, `zig-0.15.2/NOTICE` and `zig-0.16.0/NOTICE`, copied verbatim, which carry the
 attribution. The owner's own contributions are CC0 (`LICENSE`). Ledger entry:
 `third_party/LICENSES.md`. These files are **tests only**; nothing here is linked into zilc or into
 programs it builds.

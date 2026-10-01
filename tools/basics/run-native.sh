@@ -17,7 +17,8 @@ for L in $LANGS; do
   # 58_reading-files reads ./tmp/dat.txt
   printf 'hello\nzig\n' > "$OUT/cwd/tmp/dat.txt"
   : > "$OUT/summary.txt"
-  for f in "$T"/$L/*/*.$L; do
+  D=$L; [ "$L" = zig ] && D=${ZIGDIR:-zig-0.15.2}
+  for f in "$T"/$D/*/*.$L; do
     n=$(basename "$(dirname "$f")")
     if [ "$L" = zig ]; then
       "$ZIG" build-exe -lc -target x86_64-linux-musl -femit-bin="$OUT/bin/$n" "$f" > "$OUT/$n.build" 2>&1

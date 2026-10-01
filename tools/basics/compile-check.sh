@@ -13,7 +13,7 @@ mkdir -p "$ROOT/zig-out"
 OUT=$ROOT/zig-out/basics-compile.txt
 BIN=$ROOT/zig-out/basics-check
 : > "$OUT"
-for f in "$T"/zig/*/*.zig; do
+for f in "$T"/${ZIGDIR:-zig-0.15.2}/*/*.zig; do
   if err=$("$Z" build-exe -fno-emit-bin -lc -target x86_64-linux-musl "$f" 2>&1); then r=ok; else r="FAIL $(echo "$err" | grep -m1 'error:' | sed 's/.*error: //')"; fi
   echo "zig $(basename "$(dirname "$f")") $r" >> "$OUT"
 done

@@ -59,7 +59,8 @@ pub const Error = error{ ToolFailed, NoInputs, UnsupportedInput, RuntimeNotReady
 ///  * **`-fno-stack-check`.** Zig's stack probe (`__zig_probe_stack`) lives in
 ///    Zig's compiler-rt, which never goes through the pass, so the link fails
 ///    on it. Turning probing off is honest here: Fil-C's own checks are what
-///    make the program safe, and they do not rely on guard pages.
+///    make the program safe, and they do not rely on guard pages. Since
+///    2026-09-30 this applies in every mode, not only Debug (KI-8).
 ///
 /// The cost is size — a Debug object runs to tens of megabytes.
 pub fn isDebug(optimize: []const u8) bool {
@@ -177,7 +178,10 @@ fn compileZig(
         "-O",      opts.optimize,
         "-fno-emit-bin", emit_arg,
     });
-    if (isDebug(opts.optimize)) try zig_args.append(gpa, "-fno-stack-check");
+    // Every mode, not only Debug: ReleaseSafe emits the probe too for large frames
+    // (std.debug's stack-trace code, std.fs path buffers), and it fails the link the
+    // same way. Fil-C checks the stack at every function entry anyway (KI-8).
+    try zig_args.append(gpa, "-fno-stack-check");
 
     var shim_path: ?[]u8 = null;
     defer if (shim_path) |p| gpa.free(p);
