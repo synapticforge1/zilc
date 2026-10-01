@@ -237,9 +237,8 @@ boxes; the exact checks; `inttoptr`'s capability rule; and the **FUGC protocol**
 handshakes, a store barrier, and **exit/enter around anything that blocks**. So step 0 also needs
 the **thread state machine and pollcheck callbacks**; even a blocking `write()` touches the GC.
 
-▶️ **Next:** one more observation probe, a loop plus a blocking call, to read the **pollcheck
-word's location** and the **enter/exit entry points** from the pass's output. Then the spike below,
-**re-aimed at step 0**.
+✅ **Probed 2026-09-30:** the pollcheck flag is a byte at **thread + 8**, masked `0x0E` → `filc_pollcheck_slow`, and blocking calls do **`filc_exit` → syscall → `filc_enter`** (`filc-abi.md` §3, §5b). ▶️ **Next:** the spike below, **re-aimed at step 0**. The ABI is now observed enough to start, once
+open question #3 (port or clean-room rewrite) is settled.
 
 ▶️ **The spike, waiting for the owner's go-ahead:** the **`zsys_write` spike**. Override
 `pizlonated_zsys_write` from a Zig static library in one gate case, confirm our version is the one

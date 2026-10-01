@@ -93,6 +93,7 @@ hash is accepted.
 | offset | field |
 | --- | --- |
 | `+0` | ✅ **stack limit**. Every function entry does `cmp rsp, [thread]; jae filc_stack_overflow_failure` |
+| `+8` | ✅ **state byte**. Every loop's **pollcheck** loads it and tests the mask **`0x0E`** (bits 1–3: GC work pending), calling **`filc_pollcheck_slow(thread, origin)`** if set. The runtime's own `filc_pollcheck_outline` is literally `testb $0xe, 8(%rdi); jne → filc_pollcheck_slow` (probed 2026-09-30, `tools/p3/gc-probe.sh`) |
 | `+16` | ✅ **top frame**. Each function pushes a frame `{ parent, origin, [0 x ptr] }` and pops it on return: a **shadow stack, which is how FUGC finds roots precisely**. `origin` is the source location used in panic traces |
 | `+128` | ✅ **cc payload buffer**: arguments/results, 8 bytes per word |
 | `+384` | ✅ **cc aux buffer**: one capability (`lower`) per payload word, 0 for a non-pointer; 64-byte aligned |
@@ -137,6 +138,18 @@ demands from a runtime and from compiled code:
 | **safe signal delivery** | signals are delivered at safepoints (see `zincrement_signal_deferral_depth` in `pizlonated_runtime.h`) |
 | **safepoint guarantee** | a pointer loaded from the heap is safe to use until the next pollcheck or exit, so it only has to be visible to stack scanning by then |
 
+**Observed entry points (2026-09-30, `tools/p3/gc-probe.sh`, `nm`/`objdump` of `libpizlo.so`):**
+
+| export | role |
+| --- | --- |
+| `filc_pollcheck_slow(thread, origin)` | the pollcheck slow path, called from compiled loops. It finds the current thread through a pthread key (`filc_thread_key`) |
+| `filc_pollcheck_outline` | out-of-line pollcheck: `testb $0xe, 8(%rdi)`, then the slow path |
+| **`filc_exit` / `filc_enter`** (+ `_with_allocation_root`, `filc_exit_on_panic`) | **leave and re-enter managed code.** ✅ `filc_native_zsys_read` calls **`filc_exit` → libc `read` → `filc_enter`**, then sets errno through `filc_set_errno`. **Every blocking `zsys_*` follows this shape** |
+| `filc_memcpy_with_exit`, `filc_memmove_with_exit`, `filc_memset_with_exit`, `filc_low_level_ptr_safe_bzero_with_exit` | long copies that exit, so a big `memcpy` doesn't stall a handshake |
+| `filc_soft_handshake`, `filc_handshake_lock*`, `filc_runtime_threads_handshake`, `fugc_handshake` | soft handshakes |
+| `filc_stop_the_world`, `fugc_should_stop_the_world` | stop-the-world (`fork`, `FUGC_STW=1`) |
+| `filc_thread_participates_in_pollchecks` / `…_in_handshakes` | per-thread participation |
+
 ⚠️ **KI-7 is a GC problem, not only a policy one:** a raw `futex` or `clock_nanosleep` blocks without
 exiting, so every soft handshake would wait on that thread forever. Routing those calls through
 libc's `syscall()` (which exits) is **required**, not a workaround.
@@ -154,7 +167,7 @@ libc's `syscall()` (which exits) is **required**, not a workaround.
   a "just write()" replacement needs part of the GC.
 - ✅ **This spec was built entirely from observation plus the published design docs**: the pass's
   output, public headers, binaries, `invisicap.txt`, `gimso_semantics.md` and `Manifesto.md`. It is
-  evidence that a **clean-room runtime is feasible** (open question #3). Still unspecified: the
-  exact **flag-bit** values besides *function*, the **pollcheck word's location** in the thread
-  (not in the IR we probed, which had no loops), and the **enter/exit entry points**. The next probe
-  is a loop plus a blocking call, reading the pass's output as before.
+  evidence that a **clean-room runtime is feasible** (open question #3). ✅ **The pollcheck word
+  (thread + 8, mask `0x0E`) and the exit/enter entry points were observed 2026-09-30** (§3, §5b).
+  **Still unspecified:** the exact **flag-bit** values besides *function* and READONLY, the meaning
+  of each state bit, and the rest of the thread layout beyond +0/+8/+16/+128/+384.

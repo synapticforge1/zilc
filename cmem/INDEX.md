@@ -70,8 +70,15 @@ for structure and policy.
   ✅ **Design docs read** (`invisicap.txt`, `gimso_semantics.md`, `Manifesto.md`), closing most
   gaps: the header is `{size, aux}`, aux holds lowers or atomic boxes, `inttoptr` loses capabilities
   across loads and calls, and the **FUGC protocol requires exiting before any blocking call**. So
-  KI-7's raw syscalls would also stall the GC. **Next:** one probe for the pollcheck word and the
-  enter/exit entry points. Probes: `tools/p3/`.
+  KI-7's raw syscalls would also stall the GC. ✅ **Probed:** the pollcheck flag is a byte at
+  thread + 8 (mask `0x0E`) → `filc_pollcheck_slow`, and blocking calls are `filc_exit` → syscall →
+  `filc_enter`. **The ABI is observed enough to start step 0**, once open question #3 is settled.
+  Probes: `tools/p3/`.
+- 🛠️ **Fixed 2026-09-30:** **KI-8** (`-fno-stack-check` in every mode: Zig builds under zilc
+  50 → 77/78) and most of **KI-7** (raw `syscall` asm → the checked `zilc_syscall` helper: Zig runs
+  correctly 26 → **45/78**). Rule recorded: **nothing unsafe is left to chance**
+  (`design-decisions.md` invariant 5). **Next for the corpus:** 19 × "cannot write pointer with null
+  object", the new top failure.
 - 🔒 **STAY ON ZIG 0.15.2 UNTIL THERE IS A STABLE BASE (owner).** A 0.16.0 trial port was
   stopped. Its facts are in `ports/README.md` "Scouting": Fil-C head is still LLVM 20.1.8, latest
   Zig is 0.16.0 (clang 21), and Fil-C ships ARM64 builds.
