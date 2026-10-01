@@ -343,6 +343,96 @@ std.heap.c_allocator`, so pages are Fil-C malloc objects. 69 now gets past it an
 (`DebugAllocator`) instead. ⚠️ Library mode (C owns `main`) is not covered, as with the panic
 handler.
 
+## ✅ KI-13 — Pointers rebuilt from integers lose their capability (the "null object" class). **MOSTLY FIXED 2026-09-30**
+
+The `DebugAllocator` traps (`cannot write pointer with null object` at `debug_allocator.zig:782`/`798`)
+had **two independent causes**, each confirmed by experiment, not reasoning alone:
+
+1. **Overflow-checked arithmetic hides provenance (all safe-mode Zig code).** In ReleaseSafe and
+   Debug, Zig compiles `+ - *` to `llvm.*.with.overflow` and reads the result with
+   `extractvalue …, 0`. Fil-C's `inttoptr` recovery starts at BOTTOM for any call or `extractvalue`
+   result (`gimso_semantics.md`), so `@ptrFromInt(@intFromPtr(p) + off)` comes out with **no
+   capability**, even within one function. Seen in the IR of `fromPage`: `ptrtoint` →
+   `uadd.with.overflow` → `extractvalue` → `usub.with.overflow` → `extractvalue` → `inttoptr`.
+   **Fix (`ir.foldOverflowValues`):** each `extractvalue …, 0` of such a call becomes the plain
+   `add`/`sub`/`mul`, which is the identical value. The overflow flag (field 1) and its panic branch
+   are untouched. This is general: it fixes the pattern in **all** Zig code, std and user alike.
+   Zig 0.16 itself rewrote `fromPage` with wrapping `+% -%`, which emits plain arithmetic, so the
+   direction matches upstream.
+2. **An address passed as an integer parameter.** `BucketHeader.fromPage(page_addr: usize, …)`:
+   an integer *parameter* is BOTTOM, whatever the caller held. **Fix: std overlay patch**
+   (`src/stdpatch.zig`, zilc's own, **not a backport**, since 0.16.0 has the same signature):
+   `fromPage` takes the page **pointer**; the three call sites pass `page`, or
+   `@ptrFromInt(page_addr)` computed in the same function as `@intFromPtr(memory.ptr)`.
+   Addresses are computed identically.
+
+⚠️ **Proof that both are needed, and a method lesson:** with only the fold, ReleaseSafe passed,
+**but only because Fil-C's clang inlined `fromPage` at `-O1` before the pass**. A Debug build
+(`-O0`, no inlining) still trapped at the same site. Relying on an optimiser decision would be
+"leaving it to chance" (invariant 5). The patch stays.
+
+**Result (ReleaseSafe):** Zig as designed **50 → 71/78** (65 clean exits plus 6 intentional).
+**Left: 7** (6 × `cannot read pointer with null object`, 1 × `cannot access pointer with null
+object`), to be analysed individually.
+
+## ✅ KI-14 — Valgrind client requests are inline asm (Debug). **FIXED 2026-09-30**
+
+Debug defaults to `-fvalgrind`: Zig emits Valgrind's magic no-op sequence (`rolq $3,%rdi; … xchgq
+%rbx,%rbx`) in allocation paths (seen in `heap.CAllocator.alignedAlloc`). Fil-C refuses all inline
+asm (`literal register %rdi not covered…`). **Fix:** the driver always passes `-fno-valgrind`.
+Natively the sequence is a no-op unless running under Valgrind, which a zilc program never does,
+so no behaviour changes.
+
+## 🔴 KI-15 — Debug: `DebugAllocator` captures a stack trace for EVERY allocation, by walking raw frame pointers (2026-09-30)
+
+**Owner: "make sure to make a note on this item for sure."**
+
+- **What happens:** in Debug, `DebugAllocator`'s `stack_trace_frames` defaults to **6**
+  (`debug_allocator.zig:106`: `default_sys_stack_trace_frames = if (std.debug.sys_can_stack_trace)
+  6 else 0`; ReleaseSafe/Fast/Small default to 0). Every `alloc` and `free` calls
+  `std.debug.captureStackTrace`, which walks the stack **by reading raw frame pointers** and probes
+  whether each address is readable with **`process_vm_readv` (syscall 310)**.
+- **Under Fil-C:** the probe goes through `zilc_syscall` → Fil-C's `syscall()` → **`filc user error:
+  unsupported syscall: 310`**, an explicit, safe stop. Without the probe, the walk itself would turn
+  saved frame-pointer integers into pointers (`@ptrFromInt`), which have no capability. **Native
+  stack walking cannot be made safe under Fil-C in any form**, the same family as `getcontext`
+  (KI-7, Z-4).
+- **Effect:** **every Debug-mode Zig program that allocates through `DebugAllocator`** (i.e.
+  `GeneralPurposeAllocator`) **stops on its first allocation.** ReleaseSafe/Fast/Small are
+  unaffected (0 frames). Found 2026-09-30 by `09_slices` built with `-O Debug`.
+- **std offers no switch:** `std.Options` has no stack-trace knob; `sys_can_stack_trace` is a fixed
+  per-architecture constant (`debug.zig:171`).
+- **Safe equivalents, to decide (owner):**
+  1. **std overlay patch: `std.debug.sys_can_stack_trace = false` under zilc** *(recommended)*.
+     It tells std the truth, that native stack walking is unavailable, so every std path that would
+     walk the stack (allocator traces, panic traces, `dumpCurrentStackTrace`) takes its existing
+     "no stack traces" branch. Fil-C already supplies traces for every safety stop, with
+     file:line, and the panic handler uses `zerror` (KI-7). Loses only `DebugAllocator`'s leak and
+     double-free *allocation-site* traces; Fil-C itself catches double free and use-after-free.
+  2. Patch only `default_sys_stack_trace_frames` to 0: narrower, but leaves other stack-walking
+     paths reachable.
+  3. Later: implement `captureStackTrace` over **Fil-C's `zstack_scan`** (frames with function,
+     file and line) to keep allocation-site traces. More work, but no loss.
+- Also check: whether other std paths reach syscall 310 or raw frame-pointer walks in Release
+  modes (part of the all-modes check below).
+
+## 🧪 KI-16 — Every optimisation mode must be checked separately (owner, 2026-09-30)
+
+**Owner: "We may also need to check that all release modes do not have differing issues with
+these found conditions."** The conditions found so far **depend on the mode**:
+
+| condition | Debug | ReleaseSafe | ReleaseFast | ReleaseSmall |
+| --- | --- | --- | --- | --- |
+| overflow-checked arithmetic (KI-13 #1) | yes | yes | no (plain wrap) | no |
+| inlining hides or exposes KI-13 #2 | **no inlining** (`filc -O0`) | `-O1` inlines | `-O1` | `-O1` |
+| Valgrind client requests (KI-14) | **yes** (default) | no | no | no |
+| `DebugAllocator` stack traces (KI-15) | **6 frames** | 0 | 0 | 0 |
+| stack-probe symbol (KI-8) | yes | yes (large frames) | ? | ? |
+| stack-trace / panic code in the binary | full | full | full | **mostly stripped** |
+
+So **the corpus runs in every mode** (`tools/basics/zilc-check.sh`, `MODE=…`), and results are
+recorded per mode in `testing.md`.
+
 ## 🟡 KI-10 — `pthread_join` traps on a pointer with no capability (2026-09-30)
 
 `33_mutexes` and one more threading example: `cannot read pointer with null object` in musl's

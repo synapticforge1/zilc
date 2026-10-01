@@ -18,20 +18,32 @@ pub const Error = error{
     PatchUnexpectedOriginal,
     /// No closing `}` at column 0 after the start.
     PatchEndNotFound,
+    /// An exact replacement's original text occurs a different number of times than expected.
+    PatchUnexpectedCount,
 };
 
 /// Bump when any patch changes, so stale overlays are rebuilt.
-pub const overlay_version = 1;
+pub const overlay_version = 2;
 
 pub const Patch = struct {
     /// Path relative to the Zig lib directory.
     file: []const u8,
-    /// The exact first line of the region; the region runs to the next `}` line at column 0.
-    start: []const u8,
-    /// Text that must appear in the region, proving it is the original we expect.
-    must_contain: []const u8,
-    /// What the whole region becomes.
-    replacement: []const u8,
+    edit: union(enum) {
+        /// From an exact first line to the next `}` at column 0: a whole top-level function.
+        region: struct {
+            start: []const u8,
+            /// Text that must appear in the region, proving it is the original we expect.
+            must_contain: []const u8,
+            /// What the whole region becomes.
+            replacement: []const u8,
+        },
+        /// Exact text, which must occur exactly `count` times; every occurrence is replaced.
+        replace: struct {
+            old: []const u8,
+            new: []const u8,
+            count: usize,
+        },
+    },
 };
 
 /// Zig 0.15.2: `indexOfSentinel` scans with 16-byte SIMD loads that read past the
@@ -40,8 +52,7 @@ pub const Patch = struct {
 /// loop; this replacement is that 0.16.0 function body, under the 0.15.2 name.
 /// Zig std is MIT-licensed; ledger entry in third_party/LICENSES.md.
 const zig_0_15_2 = [_]Patch{
-    .{
-        .file = "std/mem.zig",
+    .{ .file = "std/mem.zig", .edit = .{ .region = .{
         .start = "pub fn indexOfSentinel(comptime T: type, comptime sentinel: T, p: [*:sentinel]const T) usize {",
         .must_contain = "reading past the end of the buffer is valid, as long",
         .replacement =
@@ -55,7 +66,41 @@ const zig_0_15_2 = [_]Patch{
         \\    return i;
         \\}
         ,
-    },
+    } } },
+
+    // DebugAllocator (KI-13, zig-upstream-notes.md Z-5). NOT a backport: 0.16.0 has the
+    // same code. `BucketHeader.fromPage` receives the page ADDRESS as an integer and
+    // turns it into a pointer. Under Fil-C an integer that arrives as a parameter has
+    // no capability, so the bucket header pointer is dead and the first write traps.
+    // Passing the page POINTER instead keeps every int->ptr round trip inside one
+    // function, where Fil-C recovers the capability. Addresses are computed exactly
+    // as before.
+    .{ .file = "std/heap/debug_allocator.zig", .edit = .{ .replace = .{
+        .old =
+        \\            fn fromPage(page_addr: usize, slot_count: usize) *BucketHeader {
+        \\                const unaligned = page_addr + page_size - bucketSize(slot_count);
+        ,
+        .new =
+        \\            // zilc: takes the page POINTER, not its address, so the int->ptr round trip
+        \\            // stays inside one function and Fil-C keeps the page's capability (Z-5).
+        \\            fn fromPage(page: [*]align(page_size) u8, slot_count: usize) *BucketHeader {
+        \\                const unaligned = @intFromPtr(page) + page_size - bucketSize(slot_count);
+        ,
+        .count = 1,
+    } } },
+    .{ .file = "std/heap/debug_allocator.zig", .edit = .{ .replace = .{
+        // alloc: `page` is already a pointer.
+        .old = "const bucket: *BucketHeader = .fromPage(@intFromPtr(page), slot_count);",
+        .new = "const bucket: *BucketHeader = .fromPage(@alignCast(page), slot_count); // zilc: Z-5",
+        .count = 1,
+    } } },
+    .{ .file = "std/heap/debug_allocator.zig", .edit = .{ .replace = .{
+        // free and resizeSmall: page_addr comes from @intFromPtr(memory.ptr) in the SAME
+        // function, so @ptrFromInt here recovers that pointer's capability.
+        .old = "const bucket: *BucketHeader = .fromPage(page_addr, slot_count);",
+        .new = "const bucket: *BucketHeader = .fromPage(@ptrFromInt(page_addr), slot_count); // zilc: Z-5",
+        .count = 2,
+    } } },
 };
 
 /// The patches for one Zig version (from `zig env`'s `.version`); empty if none.
@@ -66,13 +111,21 @@ pub fn patchesFor(zig_version: []const u8) []const Patch {
 
 /// Returns `original` with the patch applied. The caller owns the result.
 pub fn apply(gpa: std.mem.Allocator, original: []const u8, patch: Patch) ![]u8 {
-    const start = std.mem.indexOf(u8, original, patch.start) orelse return Error.PatchStartNotFound;
-    if (start != 0 and original[start - 1] != '\n') return Error.PatchStartNotFound;
-    const close = "\n}\n";
-    const close_at = std.mem.indexOfPos(u8, original, start, close) orelse return Error.PatchEndNotFound;
-    const end = close_at + close.len - 1; // keep the newline after `}`
-    if (std.mem.indexOf(u8, original[start..end], patch.must_contain) == null) return Error.PatchUnexpectedOriginal;
-    return std.mem.concat(gpa, u8, &.{ original[0..start], patch.replacement, original[end..] });
+    switch (patch.edit) {
+        .region => |r| {
+            const start = std.mem.indexOf(u8, original, r.start) orelse return Error.PatchStartNotFound;
+            if (start != 0 and original[start - 1] != '\n') return Error.PatchStartNotFound;
+            const close = "\n}\n";
+            const close_at = std.mem.indexOfPos(u8, original, start, close) orelse return Error.PatchEndNotFound;
+            const end = close_at + close.len - 1; // keep the newline after `}`
+            if (std.mem.indexOf(u8, original[start..end], r.must_contain) == null) return Error.PatchUnexpectedOriginal;
+            return std.mem.concat(gpa, u8, &.{ original[0..start], r.replacement, original[end..] });
+        },
+        .replace => |r| {
+            if (std.mem.count(u8, original, r.old) != r.count) return Error.PatchUnexpectedCount;
+            return std.mem.replaceOwned(u8, gpa, original, r.old, r.new);
+        },
+    }
 }
 
 /// Builds (once) and returns the overlay directory for this Zig version, or null
@@ -184,7 +237,40 @@ test "a different original is refused, not mis-patched" {
     try testing.expectError(Error.PatchStartNotFound, apply(testing.allocator, "pub fn other() void {}\n", zig_0_15_2[0]));
 }
 
-test "only 0.15.2 has patches; 0.16.0 is fixed upstream" {
-    try testing.expectEqual(@as(usize, 1), patchesFor("0.15.2").len);
+test "only 0.15.2 has patches so far" {
+    try testing.expectEqual(@as(usize, 4), patchesFor("0.15.2").len);
+    // ⚠️ 0.16.0 fixed Z-1 upstream but NOT Z-5: a 0.16 line needs the DebugAllocator patch.
     try testing.expectEqual(@as(usize, 0), patchesFor("0.16.0").len);
+}
+
+test "an exact replacement checks its occurrence count" {
+    const p: Patch = .{ .file = "x", .edit = .{ .replace = .{ .old = "a", .new = "b", .count = 2 } } };
+    const got = try apply(testing.allocator, "a-a", p);
+    defer testing.allocator.free(got);
+    try testing.expectEqualStrings("b-b", got);
+    try testing.expectError(Error.PatchUnexpectedCount, apply(testing.allocator, "a", p));
+    try testing.expectError(Error.PatchUnexpectedCount, apply(testing.allocator, "a-a-a", p));
+}
+
+test "the DebugAllocator patches match the real call-site shapes" {
+    const src =
+        \\            fn fromPage(page_addr: usize, slot_count: usize) *BucketHeader {
+        \\                const unaligned = page_addr + page_size - bucketSize(slot_count);
+        \\            const bucket: *BucketHeader = .fromPage(@intFromPtr(page), slot_count);
+        \\            const bucket: *BucketHeader = .fromPage(page_addr, slot_count);
+        \\            const bucket: *BucketHeader = .fromPage(page_addr, slot_count);
+        \\
+    ;
+    var cur = try testing.allocator.dupe(u8, src);
+    for (zig_0_15_2[1..]) |p| {
+        const next = try apply(testing.allocator, cur, p);
+        testing.allocator.free(cur);
+        cur = next;
+    }
+    defer testing.allocator.free(cur);
+    try testing.expect(std.mem.indexOf(u8, cur, "fn fromPage(page: [*]align(page_size) u8, slot_count: usize)") != null);
+    try testing.expect(std.mem.indexOf(u8, cur, "@intFromPtr(page) + page_size") != null);
+    try testing.expect(std.mem.indexOf(u8, cur, ".fromPage(@alignCast(page), slot_count)") != null);
+    try testing.expectEqual(@as(usize, 2), std.mem.count(u8, cur, ".fromPage(@ptrFromInt(page_addr), slot_count)"));
+    try testing.expect(std.mem.indexOf(u8, cur, "fromPage(page_addr, ") == null);
 }

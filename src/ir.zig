@@ -330,6 +330,134 @@ fn isIntLiteral(v: []const u8) bool {
 }
 
 // ---------------------------------------------------------------------------
+// Overflow-checked arithmetic and pointer provenance (KI-13).
+//
+// In safe modes Zig compiles `+`, `-` and `*` to LLVM's `*.with.overflow`
+// intrinsics and reads the result with `extractvalue … , 0`. Fil-C recovers a
+// pointer's capability across `ptrtoint`/arithmetic/`inttoptr` only through
+// plain integer instructions; a call's result, and an `extractvalue`, start that
+// analysis at BOTTOM (gimso_semantics.md "Inttoptr"). So
+// `@ptrFromInt(@intFromPtr(p) + off)` in ReleaseSafe produces a pointer with NO
+// capability, where the same code in C (a plain `add`) keeps it.
+//
+// Field 0 of `uadd.with.overflow(a, b)` IS `add a, b`, the same bits whether or
+// not it overflowed. So each such extractvalue is rewritten to the plain
+// instruction. The overflow flag (field 1) and its panic branch are untouched;
+// no value and no check changes. Fil-C's own analysis simply sees the arithmetic.
+
+const overflow_ops = [_]struct { intrinsic: []const u8, op: []const u8 }{
+    .{ .intrinsic = "uadd", .op = "add" }, .{ .intrinsic = "sadd", .op = "add" },
+    .{ .intrinsic = "usub", .op = "sub" }, .{ .intrinsic = "ssub", .op = "sub" },
+    .{ .intrinsic = "umul", .op = "mul" }, .{ .intrinsic = "smul", .op = "mul" },
+};
+
+pub const OverflowFold = struct {
+    ir: []u8,
+    /// How many `extractvalue …, 0` were turned into plain arithmetic.
+    count: usize,
+};
+
+const OverflowCall = struct { op: []const u8, ty: []const u8, a: []const u8, b: []const u8 };
+
+/// Rewrites `%v = extractvalue {iN, i1} %c, 0` into `%v = OP iN A, B` wherever
+/// `%c = call {iN, i1} @llvm.X.with.overflow.iN(iN A, iN B)` in the same function.
+pub fn foldOverflowValues(gpa: std.mem.Allocator, ir: []const u8) !OverflowFold {
+    var out: std.ArrayListUnmanaged(u8) = .{};
+    errdefer out.deinit(gpa);
+    var calls: std.StringHashMapUnmanaged(OverflowCall) = .{};
+    defer calls.deinit(gpa);
+
+    var count: usize = 0;
+    var pos: usize = 0;
+    var in_fn = false;
+    while (true) {
+        const nl = std.mem.indexOfScalarPos(u8, ir, pos, '\n');
+        const line_end = nl orelse ir.len;
+        const line = ir[pos..line_end];
+
+        if (std.mem.startsWith(u8, line, "define ")) {
+            in_fn = true;
+            calls.clearRetainingCapacity();
+            // First pass over this function: collect every overflow intrinsic call,
+            // so a use that appears textually before its block is still found.
+            const fn_end = std.mem.indexOfPos(u8, ir, pos, "\n}\n") orelse ir.len;
+            var it = std.mem.splitScalar(u8, ir[pos..fn_end], '\n');
+            while (it.next()) |l| if (parseOverflowCall(l)) |c| try calls.put(gpa, c.name, c.call);
+        } else if (in_fn and std.mem.eql(u8, line, "}")) {
+            in_fn = false;
+        }
+
+        if (in_fn) {
+            if (try foldExtract(gpa, &out, line, &calls)) {
+                count += 1;
+            } else try out.appendSlice(gpa, line);
+        } else try out.appendSlice(gpa, line);
+
+        if (nl) |n| {
+            try out.append(gpa, '\n');
+            pos = n + 1;
+        } else break;
+    }
+    return .{ .ir = try out.toOwnedSlice(gpa), .count = count };
+}
+
+/// `%c = [tail ]call { iN, i1 } @llvm.X.with.overflow.iN(iN A, iN B)…` → name and parts.
+fn parseOverflowCall(line: []const u8) ?struct { name: []const u8, call: OverflowCall } {
+    const t = std.mem.trimLeft(u8, line, " ");
+    if (t.len == 0 or t[0] != '%') return null;
+    const eq = std.mem.indexOf(u8, t, " = ") orelse return null;
+    const name = t[0..eq];
+    const at = std.mem.indexOf(u8, t, "@llvm.") orelse return null;
+    if (std.mem.indexOf(u8, t[eq..at], "call ") == null) return null;
+    const rest = t[at + "@llvm.".len ..];
+    inline for (overflow_ops) |o| {
+        const pre = o.intrinsic ++ ".with.overflow.";
+        if (std.mem.startsWith(u8, rest, pre)) {
+            const paren = std.mem.indexOfScalar(u8, rest, '(') orelse return null;
+            const ty = rest[pre.len..paren]; // e.g. "i64"
+            const close = matchingParen(rest, paren) orelse return null;
+            var args = TopLevelSplit{ .s = rest[paren + 1 .. close] };
+            const a = intOperand(args.next() orelse return null, ty) orelse return null;
+            const b = intOperand(args.next() orelse return null, ty) orelse return null;
+            if (args.next() != null) return null;
+            return .{ .name = name, .call = .{ .op = o.op, .ty = ty, .a = a, .b = b } };
+        }
+    }
+    return null;
+}
+
+/// `TY [attrs] VALUE` → `VALUE`, for an integer operand of type `ty`.
+fn intOperand(arg: []const u8, ty: []const u8) ?[]const u8 {
+    var v = std.mem.trim(u8, arg, " ");
+    if (!std.mem.startsWith(u8, v, ty) or v.len <= ty.len or v[ty.len] != ' ') return null;
+    v = std.mem.trimLeft(u8, v[ty.len + 1 ..], " ");
+    for ([_][]const u8{ "noundef ", "signext ", "zeroext " }) |a| {
+        if (std.mem.startsWith(u8, v, a)) v = std.mem.trimLeft(u8, v[a.len..], " ");
+    }
+    if (std.mem.startsWith(u8, v, "range(")) {
+        const close = matchingParen(v, "range".len) orelse return null;
+        v = std.mem.trimLeft(u8, v[close + 1 ..], " ");
+    }
+    return if (v.len == 0) null else v;
+}
+
+/// Rewrites one `%v = extractvalue { iN, i1 } %c, 0` line if `%c` is a known
+/// overflow call. Returns false, writing nothing, otherwise.
+fn foldExtract(gpa: std.mem.Allocator, out: *std.ArrayListUnmanaged(u8), line: []const u8, calls: *const std.StringHashMapUnmanaged(OverflowCall)) !bool {
+    const ev = std.mem.indexOf(u8, line, " = extractvalue { ") orelse return false;
+    const after_ty = std.mem.indexOfPos(u8, line, ev, ", i1 } ") orelse return false;
+    const operand_start = after_ty + ", i1 } ".len;
+    const comma = std.mem.indexOfScalarPos(u8, line, operand_start, ',') orelse return false;
+    const agg = line[operand_start..comma];
+    const rest = line[comma + 1 ..];
+    const idx_end = std.mem.indexOfScalar(u8, rest, ',') orelse rest.len;
+    if (!std.mem.eql(u8, std.mem.trim(u8, rest[0..idx_end], " "), "0")) return false; // only the value field
+    const c = calls.get(agg) orelse return false;
+    try out.print(gpa, "{s} = {s} {s} {s}, {s}{s}", .{ line[0..ev], c.op, c.ty, c.a, c.b, rest[idx_end..] });
+    return true;
+}
+
+// ---------------------------------------------------------------------------
 // Keeping only the exports we asked for (KI-9).
 //
 // Some compiler-rt files export more than zilc needs: round.zig defines roundq,
@@ -507,6 +635,39 @@ test "syscall rewrite: other asm untouched, no-op without syscalls, idempotent" 
     try testing.expectEqual(@as(usize, 1), once.count);
     try testing.expectEqual(@as(usize, 0), twice.count);
     try testing.expectEqualStrings(once.ir, twice.ir);
+}
+
+test "overflow-checked arithmetic is exposed to Fil-C as plain instructions (real fromPage IR)" {
+    const ir =
+        \\define internal fastcc ptr @fromPage(ptr %0, i64 %1) {
+        \\Entry:
+        \\  %2 = ptrtoint ptr %0 to i64, !dbg !8704
+        \\  %3 = tail call { i64, i1 } @llvm.uadd.with.overflow.i64(i64 %2, i64 131072), !dbg !8705
+        \\  %4 = extractvalue { i64, i1 } %3, 1, !dbg !8705
+        \\  br i1 %4, label %OverflowFail, label %OverflowOk, !dbg !8705
+        \\OverflowOk:
+        \\  %5 = extractvalue { i64, i1 } %3, 0, !dbg !8707
+        \\  %16 = tail call { i64, i1 } @llvm.usub.with.overflow.i64(i64 %5, i64 %15), !dbg !8737
+        \\  %18 = extractvalue { i64, i1 } %16, 0, !dbg !8740
+        \\  %19 = inttoptr i64 %18 to ptr, !dbg !8744
+        \\  ret ptr %19
+        \\}
+        \\define void @other() {
+        \\  %5 = extractvalue { i64, i1 } %3, 0
+        \\  ret void
+        \\}
+        \\
+    ;
+    const got = try foldOverflowValues(testing.allocator, ir);
+    defer testing.allocator.free(got.ir);
+    try testing.expectEqual(@as(usize, 2), got.count);
+    try testing.expect(std.mem.indexOf(u8, got.ir, "  %5 = add i64 %2, 131072, !dbg !8707\n") != null);
+    try testing.expect(std.mem.indexOf(u8, got.ir, "  %18 = sub i64 %5, %15, !dbg !8740\n") != null);
+    // The overflow flag and its branch are untouched.
+    try testing.expect(std.mem.indexOf(u8, got.ir, "%4 = extractvalue { i64, i1 } %3, 1, !dbg !8705") != null);
+    try testing.expect(std.mem.indexOf(u8, got.ir, "@llvm.uadd.with.overflow.i64(i64 %2, i64 131072)") != null);
+    // Names are per function: @other's %3 is not fromPage's %3.
+    try testing.expect(std.mem.indexOf(u8, got.ir, "define void @other() {\n  %5 = extractvalue { i64, i1 } %3, 0\n") != null);
 }
 
 test "internalizeExcept keeps only the asked-for exports" {

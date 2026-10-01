@@ -12,7 +12,10 @@ Fil-C is `tools/p2/repro/UPSTREAM-REPORT.md` (KI-4).
 | Z-2 | `PageAllocator` passes the previous mapping's end as an `mmap` hint | **No**: a hint is advisory, and this is valid OS usage. Fil-C's `mmap` treats the hint pointer's capability strictly | still in 0.16.0 (`addr_hint`) | none; zilc overrides the page allocator |
 | Z-3 | std on Linux uses raw `syscall` asm even with libc linked (gettid, futex, clock_nanosleep, statx, …) | **No**: a design choice. It conflicts with any libc-only environment (Fil-C) | see KI-7 | none; zilc reroutes them (`ir.rewriteSyscalls`) |
 | Z-4 | std's panic handler captures registers with inline asm (`getcontext`) | **No**: a native-only technique | see KI-7 | none; zilc overrides `panic` |
-| Z-5 | `DebugAllocator` does integer address arithmetic across functions (`BucketHeader.fromPage(@intFromPtr(page))`) | **No**: valid Zig. It is incompatible with capability models | next to fix (the 26 null-object traps) | none |
+| Z-5 | `DebugAllocator` passes a page address across a function boundary as an integer (`BucketHeader.fromPage(page_addr: usize, …)`) | **No**: valid Zig, but it discards provenance. **Worth suggesting upstream** as a provenance-friendly change: pass the pointer | same code in 0.16.0 | none; zilc std-overlay patch (KI-13 #2) |
+| Z-6 | Safe-mode `+ - *` compile to `llvm.*.with.overflow` + `extractvalue`, which hides integer-pointer provenance from analyses that track plain arithmetic | **No**: correct LLVM. A Fil-C interaction. 0.16 moved `fromPage` to wrapping `+% -%` | — | none; zilc folds the value field (`ir.foldOverflowValues`, KI-13 #1) |
+| Z-7 | Debug defaults to Valgrind client requests (inline asm) | **No** | — | none; zilc passes `-fno-valgrind` (KI-14) |
+| Z-8 | Debug `DebugAllocator` captures a stack trace per allocation by walking raw frame pointers, probing with `process_vm_readv`; `std.Options` has no switch, and `sys_can_stack_trace` is a fixed per-arch constant | **No** (native technique). **Possible upstream suggestion:** a `std.Options` knob to disable stack capture, for capability or sandboxed targets | — | none; ❓ zilc fix pending owner decision (KI-15) |
 
 ## Z-1 in detail: `indexOfSentinel` over-read (found 2026-09-30)
 

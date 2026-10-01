@@ -43,7 +43,8 @@ programs don't**, and gives size numbers against plain Zig. Tools in `tools/basi
 | compiles + links, plain Zig 0.15.2, `-lc`, musl | **78/78** (after 5 portability fixes) | **78/78** (after converting 60 files from 0.13/0.14) |
 | runs as designed, plain ReleaseSafe | **78/78** | **78/78** exit codes. ⚠️ Outputs were wrong when redirected until the stdio streaming fix (2026-09-30, `tests/basics/README.md`) |
 | **builds with zilc** | **78/78** | ReleaseSafe ~~50/78~~ → **77/78** after the KI-8 fix (only KI-9 left) · ReleaseSmall **77/78** (KI-9) |
-| **runs as designed under zilc** | **78/78** (`42_panic` traps via Fil-C, as designed) | ~~24~~ → 26 (KI-8) → 45 (KI-7) → **50/78** (panic handler + KI-9; the servers now build too). **Left, 28, all "pointer with null object"** (Z-5, `DebugAllocator`). ✅ The 2 bounds violations are fixed: 67 by the 0.16.0 std backport (KI-11), 69 by the page-allocator hook (KI-12). Both now stop on Z-5 |
+| **runs as designed under zilc** (ReleaseSafe) | **78/78** (`42_panic` traps via Fil-C, as designed) | ~~24~~ → 26 (KI-8) → 45 (KI-7) → 50 (panic handler + KI-9) → **71/78** (KI-13 overflow fold + `fromPage` patch, KI-14 `-fno-valgrind`). 65 clean exits plus 6 intentional (`42` panic, `66` exit 1 without a subcommand, `77` exit 3, three servers). **Left, 7:** 6 × `cannot read pointer with null object`, 1 × `cannot access pointer with null object`. The 2 bounds violations are fixed (KI-11, KI-12) |
+| **other modes** (KI-16) | same as ReleaseSafe (C ignores `-O`) | Debug / ReleaseFast / ReleaseSmall: **being measured** (`tools/basics/all-modes.sh`). Debug is known to stop at the first allocation (KI-15) |
 
 **C already works under zilc across the whole corpus. Zig's gaps are all in std**, not the pipeline:
 raw system calls, stack probes, f128 helpers, thread handles. That is P4, now with a

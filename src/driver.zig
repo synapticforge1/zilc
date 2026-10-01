@@ -324,6 +324,10 @@ fn compileZig(
         // Always: Fil-C always links its libc, and without -lc Zig's std reaches
         // the kernel through raw `syscall` asm in many more places (KI-7).
         "-lc",
+        // Debug defaults to Valgrind client requests: a magic asm sequence that is a
+        // no-op unless running under Valgrind. Fil-C refuses all inline asm, and a
+        // zilc program never runs under Valgrind, so leave them out (KI-14).
+        "-fno-valgrind",
     });
     if (zig_lib_dir) |d| try zig_args.appendSlice(gpa, &.{ "--zig-lib-dir", d });
     // Every mode, not only Debug: ReleaseSafe emits the probe too for large frames
@@ -367,10 +371,16 @@ fn compileZig(
         needs_syscall_helper.* = true;
         if (opts.verbose) std.debug.print("zilc: {s}: {d} raw syscall(s) routed through {s}\n", .{ src, routed.count, ir.syscall_helper });
     }
-    if (std.mem.indexOf(u8, routed.ir, "fp128") != null) uses_f128.* = true;
-    const final_ir = if (keep_exports) |keep| try ir.internalizeExcept(gpa, routed.ir, keep) else null;
+    // 2c. Overflow-checked `+ - *` hide pointer arithmetic from Fil-C's capability
+    // recovery; expose the (identical) plain result (KI-13).
+    const folded = try ir.foldOverflowValues(gpa, routed.ir);
+    defer gpa.free(folded.ir);
+    if (opts.verbose and folded.count > 0) std.debug.print("zilc: {s}: {d} overflow-checked result(s) exposed as plain arithmetic\n", .{ src, folded.count });
+
+    if (std.mem.indexOf(u8, folded.ir, "fp128") != null) uses_f128.* = true;
+    const final_ir = if (keep_exports) |keep| try ir.internalizeExcept(gpa, folded.ir, keep) else null;
     defer if (final_ir) |f| gpa.free(f);
-    try std.fs.cwd().writeFile(.{ .sub_path = filc_ll_path, .data = final_ir orelse routed.ir });
+    try std.fs.cwd().writeFile(.{ .sub_path = filc_ll_path, .data = final_ir orelse folded.ir });
 
     // 3. Fil-C's clang runs the pass and emits the object.
     //

@@ -85,6 +85,14 @@ citation to the incident.
   `std.SemanticVersion.parse("0.15.2_3")` succeeds, because `_` is a digit separator, and yields
   patch **23**, silently equal to `0.15.23`. Only printing the parsed fields exposed it. (zilc
   versioning, 2026-09-30.)
+- **A fix that passes may be passing because of the optimiser. Re-test with the optimiser off.**
+  zilc's overflow fold alone made `09_slices` pass in ReleaseSafe, only because clang inlined
+  `fromPage` before Fil-C's pass. In Debug (`-O0`) it trapped again, which proved the std patch was
+  still needed. For any fix that depends on code shape, run it in Debug **and** a Release mode.
+  (zilc KI-13, 2026-09-30.)
+- **Read the IR before believing a mechanism.** "An integer parameter loses its capability" was
+  true but not sufficient; the IR showed overflow intrinsics breaking the chain inside the
+  function too. One look at the actual `define` beat two rounds of reasoning. (zilc KI-13.)
 - **Reserve a switch by refusing it, never by falling back.** `--runtime zig` exists but refuses
   to run, so no build can claim the new path while quietly using the old one. The same rule applied
   to Debug before it was supported. (zilc, 2026-09-30.)
