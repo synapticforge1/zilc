@@ -79,6 +79,25 @@ const entry_shim =
     \\const std = @import("std");
     \\const user = @import("user");
     \\
+    \\// Zig's default panic handler prints a stack trace by capturing the CPU
+    \\// registers with inline asm (std.debug's getcontext), which can never carry
+    \\// capabilities, so Fil-C rightly refuses it. The root module may replace the
+    \\// handler, and this shim is the root, so panics report through Fil-C instead:
+    \\// zerror prints the message and stops the program the same way a memory-safety
+    \\// violation does, with Fil-C's own stack trace (KI-7, design-decisions.md
+    \\// invariant 5).
+    \\pub const panic = std.debug.FullPanic(zilcPanic);
+    \\
+    \\extern fn zerror(str: [*:0]const u8) void;
+    \\
+    \\fn zilcPanic(msg: []const u8, first_trace_addr: ?usize) noreturn {
+    \\    _ = first_trace_addr;
+    \\    var buf: [1024]u8 = undefined;
+    \\    const text = std.fmt.bufPrintZ(&buf, "zig panic: {s}", .{msg}) catch "zig panic (message too long)";
+    \\    zerror(text);
+    \\    std.process.abort(); // zerror does not return; this only satisfies `noreturn`
+    \\}
+    \\
     \\export fn main(argc: c_int, argv: [*][*:0]u8) c_int {
     \\    std.os.argv = argv[0..@intCast(argc)];
     \\
@@ -144,6 +163,43 @@ const syscall_helper_c =
     \\
 ;
 
+/// Zig's compiler-rt files implementing 128-bit float (`f128`) arithmetic (KI-9).
+/// LLVM lowers f128 operations to calls into these, but compiler-rt is never
+/// compiled through the pass, so under Fil-C nothing checked provides them. When
+/// a program uses f128, zilc compiles these files through the same pipeline as
+/// the program, so they are checked code too.
+const f128_rt_files = [_][]const u8{
+    "addtf3",     "subtf3",      "multf3",      "divtf3",      "cmptf2",      "getf2",
+    "unordtf2",   "extendsftf2", "extenddftf2", "trunctfsf2",  "trunctfdf2",  "fixtfsi",
+    "fixtfdi",    "fixtfti",     "fixunstfsi",  "fixunstfdi",  "fixunstfti",  "floatsitf",
+    "floatditf",  "floattitf",   "floatunsitf", "floatunditf", "floatuntitf", "extendxftf2",
+    "trunctfxf2", "round",
+};
+
+/// The only symbols those files may export. Everything else is made internal,
+/// so that, for example, round.zig's `round` and `roundf` cannot displace Fil-C's
+/// own libm functions for C code linked into the same program.
+const f128_rt_exports = [_][]const u8{
+    "__addtf3",    "__subtf3",     "__multf3",     "__divtf3",     "__cmptf2",     "__eqtf2",
+    "__netf2",     "__lttf2",      "__letf2",      "__getf2",      "__gttf2",      "__unordtf2",
+    "__extendsftf2", "__extenddftf2", "__trunctfsf2", "__trunctfdf2", "__fixtfsi",  "__fixtfdi",
+    "__fixtfti",   "__fixunstfsi", "__fixunstfdi", "__fixunstfti", "__floatsitf",  "__floatditf",
+    "__floattitf", "__floatunsitf", "__floatunditf", "__floatuntitf", "__extendxftf2",
+    "__trunctfxf2", "roundq",
+};
+
+/// Zig's lib directory, from `zig env` (ZON: `.lib_dir = "…"`).
+fn zigLibDir(gpa: std.mem.Allocator, zig: []const u8) ![]u8 {
+    const res = try std.process.Child.run(.{ .allocator = gpa, .argv = &.{ zig, "env" } });
+    defer gpa.free(res.stdout);
+    defer gpa.free(res.stderr);
+    const key = ".lib_dir = \"";
+    const start = (std.mem.indexOf(u8, res.stdout, key) orelse return Error.ToolFailed) + key.len;
+    const end = std.mem.indexOfScalarPos(u8, res.stdout, start, '"') orelse return Error.ToolFailed;
+    // ZON escapes backslashes (Windows paths); Linux paths come through unchanged.
+    return std.mem.replaceOwned(u8, gpa, res.stdout[start..end], "\\\\", "\\");
+}
+
 /// Does this Zig file look like a program (rather than a library of exports)?
 ///
 /// Textual, deliberately: parsing Zig to answer it would be a compiler, and a
@@ -200,6 +256,11 @@ fn compileZig(
     /// Set if this module's raw `syscall` asm was redirected to `zilc_syscall`,
     /// so the link needs the helper (KI-7).
     needs_syscall_helper: *bool,
+    /// Set if this module uses 128-bit floats, so the link needs the f128
+    /// compiler-rt helpers (KI-9).
+    uses_f128: *bool,
+    /// If set, every function definition not named here is made internal.
+    keep_exports: ?[]const []const u8,
 ) ![]u8 {
     const stem = std.fs.path.stem(src);
     const ll_path = try std.fmt.allocPrint(gpa, "{s}/{s}.ll", .{ tmp_path, stem });
@@ -265,7 +326,10 @@ fn compileZig(
         needs_syscall_helper.* = true;
         if (opts.verbose) std.debug.print("zilc: {s}: {d} raw syscall(s) routed through {s}\n", .{ src, routed.count, ir.syscall_helper });
     }
-    try std.fs.cwd().writeFile(.{ .sub_path = filc_ll_path, .data = routed.ir });
+    if (std.mem.indexOf(u8, routed.ir, "fp128") != null) uses_f128.* = true;
+    const final_ir = if (keep_exports) |keep| try ir.internalizeExcept(gpa, routed.ir, keep) else null;
+    defer if (final_ir) |f| gpa.free(f);
+    try std.fs.cwd().writeFile(.{ .sub_path = filc_ll_path, .data = final_ir orelse routed.ir });
 
     // 3. Fil-C's clang runs the pass and emits the object.
     //
@@ -338,15 +402,35 @@ pub fn build(gpa: std.mem.Allocator, opts: Options) !void {
     }
 
     var needs_syscall_helper = false;
+    var uses_f128 = false;
     for (opts.inputs, 0..) |input, i| {
         switch (try classify(input)) {
             .zig => {
-                const obj = try compileZig(gpa, opts, tmp_path, input, entry_index == i, &needs_syscall_helper);
+                const obj = try compileZig(gpa, opts, tmp_path, input, entry_index == i, &needs_syscall_helper, &uses_f128, null);
                 try owned.append(gpa, obj);
                 try link_args.append(gpa, obj);
             },
             // C/C++/objects go to Fil-C untouched: it is already their compiler.
             .native => try link_args.append(gpa, input),
+        }
+    }
+
+    // 128-bit floats: the compiler-rt helpers, compiled through the pass (KI-9).
+    if (uses_f128) {
+        const lib_dir = try zigLibDir(gpa, opts.zig);
+        defer gpa.free(lib_dir);
+        // Their own subdirectory, so a user file named like one (round.zig) cannot collide.
+        const rt_tmp = try std.fmt.allocPrint(gpa, "{s}/compiler_rt", .{tmp_path});
+        defer gpa.free(rt_tmp);
+        try std.fs.cwd().makePath(rt_tmp);
+        if (opts.verbose) std.debug.print("zilc: f128 in use: compiling {d} compiler-rt files through Fil-C\n", .{f128_rt_files.len});
+        var unused = false;
+        for (f128_rt_files) |name| {
+            const src = try std.fmt.allocPrint(gpa, "{s}/compiler_rt/{s}.zig", .{ lib_dir, name });
+            defer gpa.free(src);
+            const obj = try compileZig(gpa, opts, rt_tmp, src, false, &needs_syscall_helper, &unused, &f128_rt_exports);
+            try owned.append(gpa, obj);
+            try link_args.append(gpa, obj);
         }
     }
 

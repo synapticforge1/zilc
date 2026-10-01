@@ -290,7 +290,11 @@ Hello-world's backtrace: `std.debug.print` → `debug.lockStderrWriter` → `Pro
   line) and **`zfiber_context_getcontext()`**. The fix belongs in **std, not the IR**: zilc's entry
   shim is the root module, so it can define Zig's root `panic` override (and stack-trace hooks) to
   report through `zdump_stack`/`zstack_scan`, and `getcontext` is never reached. It is reached only
-  on panic and stack-trace paths. (Owner asked, 2026-09-30.)
+  on panic and stack-trace paths. (Owner asked, 2026-09-30.) ✅ **Done the same day for whole
+  programs:** the entry shim defines `pub const panic = std.debug.FullPanic(zilcPanic)`, which calls
+  Fil-C's **`zerror`**. `42_panic` now prints `zig panic: a problem` with Fil-C's trace naming
+  `panic.zig:6:5`, instead of a stack overflow in the trace code. ⚠️ **Not yet covered: library mode**
+  (C owns `main`), where the user's file is the root, so the default handler still applies.
 - **Most zilc-shaped fix (to verify):** extend the IR rewrite (`src/ir.zig`) to replace
   `asm sideeffect "syscall"` with a call to libc's `syscall(n, …)`, which in Fil-C goes through the
   checked `zsys_*` layer (`filc-abi.md`). It needs checking that Fil-C's `syscall()` accepts these
@@ -305,7 +309,7 @@ which lives in compiler-rt and never goes through the pass. The driver passes `-
 built). **Fix: pass `-fno-stack-check` in every mode.** It's safe, because Fil-C checks the stack at
 every function entry (`cmp rsp, [thread]`, `filc-abi.md` §3).
 
-## 🟡 KI-9 — 128-bit float helpers missing (`__multf3`, `roundq`, …) (2026-09-30)
+## ✅ KI-9 — 128-bit float helpers missing (`__multf3`, `roundq`, …). **FIXED 2026-09-30**: when a module uses `fp128`, the driver compiles the 26 f128 compiler-rt files through the pass (checked code), internalizing every export but the f128 symbols. `48_json` now links
 
 `48_json` (float parsing uses `f128`) fails to link: `pizlonated___multf3`, `__divtf3`, `__fixtfti`,
 `__floatuntitf`, comparison helpers and `roundq`. These live in compiler-rt, which is not compiled

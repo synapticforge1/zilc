@@ -77,7 +77,8 @@ for structure and policy.
 - 🛠️ **Fixed 2026-09-30:** **KI-8** (`-fno-stack-check` in every mode: Zig builds under zilc
   50 → 77/78) and most of **KI-7** (raw `syscall` asm → the checked `zilc_syscall` helper: Zig runs
   correctly 26 → **45/78**). Rule recorded: **nothing unsafe is left to chance**
-  (`design-decisions.md` invariant 5). **Next for the corpus:** 19 × "cannot write pointer with null
+  (`design-decisions.md` invariant 5). Then the **panic handler** (Fil-C `zerror`, no `getcontext`) and
+  **KI-9** (f128 helpers through the pass): Zig as designed **50/78**. **Next for the corpus:** 26 × "pointer with null
   object", the new top failure.
 - 🔒 **STAY ON ZIG 0.15.2 UNTIL THERE IS A STABLE BASE (owner).** A 0.16.0 trial port was
   stopped. Its facts are in `ports/README.md` "Scouting": Fil-C head is still LLVM 20.1.8, latest

@@ -43,7 +43,7 @@ programs don't**, and gives size numbers against plain Zig. Tools in `tools/basi
 | compiles + links, plain Zig 0.15.2, `-lc`, musl | **78/78** (after 5 portability fixes) | **78/78** (after converting 60 files from 0.13/0.14) |
 | runs as designed, plain ReleaseSafe | **78/78** | **78/78** exit codes. ⚠️ Outputs were wrong when redirected until the stdio streaming fix (2026-09-30, `tests/basics/README.md`) |
 | **builds with zilc** | **78/78** | ReleaseSafe ~~50/78~~ → **77/78** after the KI-8 fix (only KI-9 left) · ReleaseSmall **77/78** (KI-9) |
-| **runs the same under zilc** | **77/78**: only `42_panic` differs, `abort()` exits 133 not 134 | ~~24/78~~ → 26 (KI-8 fix) → **45/78** (KI-7 syscall routing). Left: 19 × "cannot write pointer with null object", 5 × read, KI-9, `getcontext` |
+| **runs as designed under zilc** | **78/78** (`42_panic` traps via Fil-C, as designed) | ~~24~~ → 26 (KI-8) → 45 (KI-7) → **50/78** (panic handler + KI-9; the servers now build too). **Left, 28: 26 × "pointer with null object"** (incl. `DebugAllocator.alloc`), **2 bounds violations to investigate** (`67_environment-variables` reads 16 bytes of a 12-byte object; `69_http-client` writes past upper) |
 
 **C already works under zilc across the whole corpus. Zig's gaps are all in std**, not the pipeline:
 raw system calls, stack probes, f128 helpers, thread handles. That is P4, now with a

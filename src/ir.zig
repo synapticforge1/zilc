@@ -330,6 +330,67 @@ fn isIntLiteral(v: []const u8) bool {
 }
 
 // ---------------------------------------------------------------------------
+// Keeping only the exports we asked for (KI-9).
+//
+// Some compiler-rt files export more than zilc needs: round.zig defines roundq,
+// which f128 code needs, but also round, roundf and roundl. Linked into a program,
+// those would quietly replace Fil-C's own libm functions for any C code in it.
+// So every function definition not in `keep` becomes `internal`.
+
+/// Linkage and visibility words that may precede a definition's return type.
+const linkage_words = [_][]const u8{
+    "external", "weak",            "weak_odr",  "linkonce", "linkonce_odr", "available_externally",
+    "hidden",   "protected",       "default",   "dso_local", "dso_preemptable",
+};
+
+/// Makes every `define` whose name is not in `keep` internal. Declarations,
+/// aliases and globals are left alone.
+pub fn internalizeExcept(gpa: std.mem.Allocator, ir: []const u8, keep: []const []const u8) ![]u8 {
+    var out: std.ArrayListUnmanaged(u8) = .{};
+    errdefer out.deinit(gpa);
+
+    var pos: usize = 0;
+    while (true) {
+        const nl = std.mem.indexOfScalarPos(u8, ir, pos, '\n');
+        const line = if (nl) |n| ir[pos..n] else ir[pos..];
+
+        if (internalizedDefine(line, keep)) |tail| {
+            try out.print(gpa, "define internal {s}", .{tail});
+        } else {
+            try out.appendSlice(gpa, line);
+        }
+        if (nl) |n| {
+            try out.append(gpa, '\n');
+            pos = n + 1;
+        } else break;
+    }
+    return out.toOwnedSlice(gpa);
+}
+
+/// For a `define` line that must become internal, the text after its linkage
+/// and visibility words; otherwise null.
+fn internalizedDefine(line: []const u8, keep: []const []const u8) ?[]const u8 {
+    if (!std.mem.startsWith(u8, line, "define ")) return null;
+    const at = std.mem.indexOfScalar(u8, line, '@') orelse return null;
+    const name_end = std.mem.indexOfScalarPos(u8, line, at, '(') orelse return null;
+    const name = line[at + 1 .. name_end];
+    for (keep) |k| if (std.mem.eql(u8, name, k)) return null;
+
+    var rest = line["define ".len..];
+    if (std.mem.startsWith(u8, rest, "internal ") or std.mem.startsWith(u8, rest, "private ")) return null;
+    outer: while (true) {
+        for (linkage_words) |w| {
+            if (std.mem.startsWith(u8, rest, w) and rest.len > w.len and rest[w.len] == ' ') {
+                rest = rest[w.len + 1 ..];
+                continue :outer;
+            }
+        }
+        break;
+    }
+    return rest;
+}
+
+// ---------------------------------------------------------------------------
 
 const testing = std.testing;
 
@@ -446,6 +507,27 @@ test "syscall rewrite: other asm untouched, no-op without syscalls, idempotent" 
     try testing.expectEqual(@as(usize, 1), once.count);
     try testing.expectEqual(@as(usize, 0), twice.count);
     try testing.expectEqualStrings(once.ir, twice.ir);
+}
+
+test "internalizeExcept keeps only the asked-for exports" {
+    const ir =
+        \\define weak hidden float @roundf(float %0) #0 {
+        \\define weak hidden fp128 @roundq(fp128 %0) #0 {
+        \\define internal fp128 @helper(fp128 %0) {
+        \\define weak hidden double @round(double %0) #0 {
+        \\declare double @floor(double)
+        \\
+    ;
+    const got = try internalizeExcept(testing.allocator, ir, &.{"roundq"});
+    defer testing.allocator.free(got);
+    try testing.expectEqualStrings(
+        \\define internal float @roundf(float %0) #0 {
+        \\define weak hidden fp128 @roundq(fp128 %0) #0 {
+        \\define internal fp128 @helper(fp128 %0) {
+        \\define internal double @round(double %0) #0 {
+        \\declare double @floor(double)
+        \\
+    , got);
 }
 
 test "a module with no datalayout is an error, not a silent pass-through" {
