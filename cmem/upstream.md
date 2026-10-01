@@ -122,13 +122,48 @@ upstream. Keep `cmem/workarounds.md` as the full internal why.
 in 0.16.0). The old GitHub-issue draft `tools/p2/repro/UPSTREAM-REPORT.md` is kept as a record
 but superseded.
 
-## Git remote
+## 📚 The `upstream/` reference folder (owner, 2026-10-01; settles open question 6)
 
-Not added yet. How Fil-C enters the repo (subtree, submodule, sparse checkout of the paths above, or
-reference-only) is open question 6 in `design-decisions.md`. A sparse, blob-filtered clone keeps
-the llvm-project history out:
+**Pattern taken from binaryen-ts** (`wasmExamples/binaryen-ts/upstream/`): a **plain git clone,
+gitignored, never built, a read-only reference**, kept up to date with upstream's branch and
+**monitored for changes**. It is used for comparisons with what zilc changed. Not a submodule:
+binaryen-ts learned that a submodule leaves a wedged nested repo in the IDE ("submodule remnant",
+its `publishing.md`).
 
-```sh
-git clone --filter=blob:none --sparse https://github.com/pizlonator/fil-c.git
-git -C fil-c sparse-checkout set llvm/lib/Transforms/Instrumentation libpas filc projects/usermusl projects/yolomusl
-```
+- **Where:** `upstream/fil-c/` (gitignored as `/upstream/`), branch **`deluge`**. Note that
+  `pizlonator/llvm-project-deluge`, the name in `clang --version`, redirects to `pizlonator/fil-c`.
+- **Shape:** partial (`--filter=blob:none`), shallow (history from v0.684 on, so v0.685 and
+  everything after), and sparse. The sparse set is Fil-C's pass and its headers
+  (`llvm/lib/Transforms/Instrumentation`, `llvm/include/llvm/Transforms/Instrumentation`), LLVM's
+  `CodeGen` (`IndirectBrExpandPass.cpp`, which KI-4's broken lowering was copied from), the runtime
+  (`libpas`, and `filc` without its 15,603-file `tests/`), plus the top-level docs and build
+  scripts. About 450 MB.
+- **Create:** `sh tools/upstream/clone-upstream.sh` (Git Bash). It sets, **in the clone only**:
+  - `core.autocrlf=false`: upstream's exact LF bytes; the global `true` broke exact-text matching;
+  - `core.protectNTFS=false`: Fil-C bundles files whose names Windows forbids (`aux.h`, `:`, `\`),
+    all outside the sparse set, which Git for Windows otherwise refuses even to index;
+  - `core.longpaths=true`.
+
+  Once per machine, because D: is exFAT (no file ownership):
+  `git config --global --add safe.directory …/zilc/upstream/fil-c`. That's the same as every other
+  project's `upstream/` in your global config.
+- **Monitor:** `sh tools/upstream/check-upstream.sh`. It fetches, then reports, relative to the last
+  reviewed commit in `tools/upstream/REVIEWED` (committed):
+  - new commits and new release tags;
+  - commits touching **watched files** (the pass zilc patches, `IndirectBrExpandPass.cpp`,
+    `configure_llvm.sh`, `libpas/common.sh`, the runtime headers, the design docs, the versioning
+    checklist);
+  - **whether zilc's pass patch still applies** to upstream's newest `FilPizlonator.cpp`
+    (`patch-pass.ts --check`; exit 1 if an edit's original text is gone).
+
+  After reviewing, `--mark-reviewed` records the new head; commit `REVIEWED`.
+- **First run (2026-10-01):** reviewed = v0.685 (`bb0d0a64`, our build). Upstream `deluge` is at
+  `69522cf` (2026-09-30), **104 commits ahead, no new release tag**. Watched-file hits: **9 commits to
+  `FilPizlonator.cpp`** (e.g. `097f7b7` "Give always-live explicit stack auxes their own frame
+  slots", which is in the stack-aux colouring code we patch; `26a97be` C++20 coroutines and
+  musttail; `635e0b7` setjmp by name), 1 to `configure_llvm.sh` (cosmo aarch64), 1 to `filc/include`
+  ("Versioning"). **All four zilc edits still apply** textually. ⚠️ The stack-aux commit must be
+  re-verified semantically (rebuild with `ZILC_VERIFY_COLOURING=1`) at the next Fil-C upgrade.
+  **Not yet marked reviewed.**
+- **When to run it:** at every "update the project memory" (`INDEX.md` policy, step 5), and before
+  any Fil-C upgrade (stage A above).

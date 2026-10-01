@@ -294,6 +294,10 @@ this for the project"), do all of the following:
 
    `toolchain/` is gitignored, so the archive itself is never committed, but the patch, the
    scripts and the checksum line in the ledger are.
+5. **Check Fil-C upstream for changes (owner, 2026-10-01):** `sh tools/upstream/check-upstream.sh`
+   (Git Bash). Record in `upstream.md` anything that touches a watched file, above all whether
+   zilc's pass patch still applies. After reviewing, `--mark-reviewed`, and commit
+   `tools/upstream/REVIEWED`. The reference clone is `upstream/fil-c/` (gitignored, never built).
 
 ### The "workaround" rule (binding on every agent; owner, 2026-10-01)
 

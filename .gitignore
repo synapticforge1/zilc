@@ -5,3 +5,6 @@ zig-out/
 # Local archive of the patched Fil-C clang (never push: it would distribute Fil-C).
 toolchain/*
 !toolchain/README.md
+
+# Read-only reference clone of Fil-C upstream (tools/upstream/clone-upstream.sh; cmem/upstream.md).
+/upstream/

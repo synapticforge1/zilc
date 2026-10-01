@@ -145,8 +145,12 @@ These shape everything else. Listed roughly in order of how much they constrain 
    source language** from the start, via the existing Fil-C pass (see the milestone decision
    above). It is not C-only. Since GIMSO accepts any LLVM IR, putting Zig first is how the premise
    gets tested.
-6. **Relationship to upstream in git.** Options: vendor Fil-C as a subtree, keep a separate fork and
-   reference it, or copy only the pass + runtime files. See `upstream.md`.
+6. ✅ **SETTLED 2026-10-01 (owner): a reference clone, as in binaryen-ts.** `upstream/fil-c/` is a
+   plain, gitignored, read-only clone of the `deluge` branch, never built, kept up to date and
+   monitored for changes (`tools/upstream/check-upstream.sh`). It's the reference for comparisons
+   with zilc's modifications. Not a subtree, submodule, fork or vendored copy. zilc's own changes
+   to Fil-C stay as the patch in `third_party/filc-patches/` and the edit script in `tools/filc/`.
+   Details: `upstream.md` "The `upstream/` reference folder".
 
 ## Zig 0.15.2 API notes (this project targets 0.15.2)
 

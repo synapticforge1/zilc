@@ -47,6 +47,18 @@ citation to the incident.
 - **Measure Debug separately; its std is different code.** Debug-only std behaviour
   (`unexpectedErrno` dumping stack traces) kept 56k lines of dead code in every Debug build after
   the Release builds were already clean. (KI-21, 2026-10-01.)
+- **Name the repo in every git command (`git -C <absolute path>`), and never chain commands with
+  `;` after one that can fail.** A `cd` into a new clone failed, the next commands ran in zilc
+  itself, and a `fetch --filter=blob:none` silently turned zilc into a partial clone
+  (`promisor`, `partialclonefilter`, format version 1). It was caught by reading `.git/config`.
+  (2026-10-01.)
+- **LF everywhere (owner): `* text=auto eol=lf` in `.gitattributes`, and `core.autocrlf=false` in
+  any reference clone.** The global Windows `core.autocrlf=true` checked Fil-C out as CRLF, so every
+  exact-text patch check failed, and per-extension rules let `.ts`, `.patch` and `.gitignore` slip
+  through. (2026-10-01.)
+- **When something reports total failure, suspect the instrument.** "0 matches" for all four patch
+  edits, including a one-line anchor, was line endings, not upstream changes. Run a control (the
+  known-good v0.685 file) before believing it. (2026-10-01.)
 - **Write the WHY of a workaround when you make it** (`workarounds.md`), keeping measured facts and
   surmises apart, and listing what was ruled out. (Owner rule, 2026-10-01.)
 - **A reopen condition is not self-checking.** Re-test it when you *price* the entry, not just when

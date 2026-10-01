@@ -224,9 +224,23 @@ static bool zilcVerifyColouring() {
   },
 ];
 
-const path = Deno.args[0];
-if (!path) throw new Error("usage: patch-pass.ts path/to/FilPizlonator.cpp");
+// `--check`: report, edit by edit, whether the patch would apply, WITHOUT writing. Used by
+// tools/upstream/check-upstream.sh against upstream's newest FilPizlonator.cpp. Exit 1 if any
+// edit's original text is gone (upstream changed the code we patch: re-derive that edit).
+const check = Deno.args[0] === "--check";
+const path = check ? Deno.args[1] : Deno.args[0];
+if (!path) throw new Error("usage: patch-pass.ts [--check] path/to/FilPizlonator.cpp");
 let text = await Deno.readTextFile(path);
+if (check) {
+  let broken = 0;
+  for (const e of edits) {
+    const n = text.split(e.old).length - 1;
+    const state = text.includes(e.new) ? "already applied" : n === 1 ? "applies" : `ORIGINAL FOUND ${n} TIMES (expected 1)`;
+    if (!text.includes(e.new) && n !== 1) broken++;
+    console.log(`  ${state.padEnd(36)} ${e.name}`);
+  }
+  Deno.exit(broken ? 1 : 0);
+}
 // Each edit is applied on its own: skipped if its result is already there, applied if the exact
 // original is there once, and an error otherwise.
 for (const e of edits) {
