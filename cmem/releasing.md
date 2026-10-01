@@ -1,5 +1,20 @@
 # Releasing & Versioning
 
+## 📦 PUBLISH PLAN (owner, 2026-09-30)
+
+**Publish as `v0.15.2-3`** once (1) the remaining open-items list is done and (2) the platforms
+scope pass is done (`roadmap.md` P6), and **before** the port efforts begin. Nothing is pushed until
+then.
+
+At publish time:
+- **Move the local tag `v0.15.2-3` and branch `v0.15.2`** from `5464a17` (where they were made
+  this morning) to the final commit. Both are **local only** and were never pushed, so moving them
+  rewrites nobody's history: `git tag -f -a v0.15.2-3 <final>`, `git branch -f v0.15.2 <final>`.
+- Push `main`, `v0.15.2` and `v0.15.2-3`.
+- The version stays `0.15.2-3` everywhere; it was never published, so there is nothing to bump.
+- Release notes (the file still to be created) state the user-code Zig (0.15.2) and the Fil-C
+  release (0.685).
+
 ## 🔖 THE VERSION IS **`0.15.2-3`** — APPLIED 2026-09-30 (was `0.3.0`; same release, new scheme)
 
 In code, `src/root.zig` builds it from two named constants, `zig_line` (0.15.2) and `release`

@@ -63,6 +63,10 @@ The installed binary reports **clang 20.1.2**. When the switch condition fires, 
 the reverse of that change.** `main.zig` goes back to `std.process.Init`/`std.Io`,
 `minimum_zig_version` becomes `0.16.0`, and the Zig API notes in `design-decisions.md` get updated.
 
+> 📝 **Upstream policy (owner, 2026-09-30):** upstream defects are **noted for the record, not
+> filed**. The KI-4 crash report in `tools/p2/repro/` stays as a record. Applies by default to
+> KI-18 and the Zig notes too.
+
 ## 🔑 KI-4 — Fil-C's IR is a PATCHED-LLVM DIALECT. ⚠️ **PARTLY REVERSED SAME DAY — stock IR CAN enter it**
 
 > ⚠️ **READ THE REVERSAL AT THE END OF THIS ENTRY BEFORE ACTING ON ANYTHING ABOVE IT.** The dialect

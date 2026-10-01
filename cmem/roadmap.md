@@ -263,10 +263,30 @@ Zig ⇄ C program where C overflows a Zig-owned slice and panics, across the ful
 libc++/libc++abi under the target, exceptions/unwinding, threads with atomic capability updates,
 performance measurement against Fil-C.
 
-## P6 — Other platforms. **Proposed 2026-09-30, not yet adopted as a goal**
+## P6 — Platforms. ✅ **ADOPTED 2026-09-30 (owner)**
 
-Target: **safe Zig on the major 64-bit OSes, safe C on Linux first.** Reasoning and limits are in
-`design-decisions.md` open question #4. Order:
+**Goal: Linux, macOS and Windows, on every currently prevalent processor; then iOS; Android
+later.** 🔸 Processors read as **x86_64 + aarch64** per OS (riscv64 to confirm). Reasoning and limits
+are in `design-decisions.md` open question #4.
+
+| tier | platform | processors | what it depends on |
+| --- | --- | --- | --- |
+| 1 | **Linux** | x86_64 ✅ working · aarch64 | Fil-C ships both (`filc-<ver>-linux-aarch64`), so aarch64 needs only zilc's target handling; checkable against Fil-C |
+| 1 | **macOS** | aarch64 (Apple silicon) · x86_64 (Intel) | **Fil-C has no macOS.** Needs the clean-room Zig runtime, plus a checked OS layer over libSystem (macOS has no stable syscall ABI), Mach-O linking, and a Fil-C clang built for macOS hosts or cross-compiling |
+| 1 | **Windows** | x86_64 · aarch64 | **Fil-C has no Windows.** Clean-room runtime, plus a checked layer over ntdll/kernel32, PE/COFF, SEH unwinding, LLP64, and std's TEB access via asm (a KI-5-style problem) |
+| 2 | **iOS** | aarch64 | macOS's work plus code signing, no JIT/`mmap` exec, sandboxing |
+| 3 | **Android** | aarch64 · x86_64 | Linux kernel, but **Bionic** instead of musl, so a checked libc layer over Bionic |
+
+**Sequencing:** the scope pass below happens **before publishing `v0.15.2-3`**. The port efforts
+come after publishing (`design-decisions.md`). Every non-Linux row depends on **P3**, the clean-room
+runtime, because Fil-C's own runtime and libc exist only for Linux.
+
+**Scope pass (pre-publish), per platform:** confirm the processor list; count the OS functions Zig's
+std references (the size of the checked-wrapper layer); identify the libc story (C on that OS needs
+a checked libc); find the std code that builds pointers from integers (KI-5 family); and work out the
+host-toolchain question (which hosts can run the Fil-C pass).
+
+The original order (still valid inside tier 1):
 
 1. **Linux ARM64.** Fil-C supports it upstream. zilc hard-codes x86_64 as the default target
    (`driver.zig` `Options.target`, `main.zig`), and the IR tests only use an x86 triple. The `ni:0`

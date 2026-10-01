@@ -80,6 +80,25 @@ for structure and policy.
   (`design-decisions.md` invariant 5). Then the **panic handler** (Fil-C `zerror`, no `getcontext`) and
   **KI-9** (f128 helpers through the pass): Zig as designed **50/78**. **Next for the corpus:** 26 × "pointer with null
   object", the new top failure.
+- ✅ **OWNER DECISIONS, 2026-09-30** (`design-decisions.md`): **(1) clean-room runtime**: never read
+  Fil-C's runtime source. **(2) upstream defects are noted for the record, not filed.**
+  **(3) publish as `v0.15.2-3`** after the open items and the platforms scope, before the port
+  (move the local tag and branch, `releasing.md`). **(4) platforms: Linux, macOS, Windows on every
+  prevalent processor, then iOS, Android later** (`roadmap.md` P6; 🔸 x86_64 + aarch64 assumed,
+  riscv64 to confirm).
+- 📋 **PRE-PUBLISH CHECKLIST (all must close before `v0.15.2-3` is pushed):**
+  - [ ] **KI-18**: Fil-C assertion on 2 programs (every mode). Reduce to the global, then work
+    around it or document
+  - [ ] **KI-19**: Debug syscall pointer arguments (13 programs)
+  - [ ] **Output comparison**: corpus output vs native, not just exit codes
+  - [ ] **Library mode** (C owns `main`): panic handler and page-allocator hook not applied
+  - [ ] **KI-5**: `std.os.environ` unset by the entry shim
+  - [ ] `zilc --version` shows the user-code Zig and Fil-C release; create a **release-notes file**
+  - [ ] **Platforms scope pass** (P6): per platform, the processors, the std OS-function count, the
+    libc story, KI-5-family code, and the host toolchain
+  - [ ] Then: move tag `v0.15.2-3` + branch `v0.15.2` to the final commit, and push
+  - Deferred past publish (with the port): `-Druntime=both`, the byte-identity check, the
+    benchmark suite (stage C), and the 0.16.0 examples under zilc
 - 🔑 **Pipeline change (2026-09-30): zilc now takes Zig's UNOPTIMIZED IR (KI-17).** Zig's `-femit-llvm-ir` is
   post-optimisation under an integral layout, which turned pointer loads into integers. With it:
   **ReleaseSafe, ReleaseFast and ReleaseSmall each 76/78 as designed** (identical); Debug 63/78.
