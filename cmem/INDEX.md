@@ -50,6 +50,16 @@ for structure and policy.
   scratch directory: same objects, gate 4/4. A fresh machine restores it with
   `tools/filc/restore-patched-clang.sh` in a minute instead of a ~1 h rebuild. After any change to
   the patch, re-run `tools/filc/archive-patched-clang.sh`.
+- 📚 **Upstream reference (owner, end of day; settles open question 6):** `upstream/fil-c/`
+  (gitignored, read-only, never built) as in binaryen-ts. `tools/upstream/check-upstream.sh`
+  monitors it (memory-update step 5). As of 2026-10-01: 104 commits past v0.685, 9 to
+  `FilPizlonator.cpp`, all zilc edits still apply. ⚠️ **Not yet reviewed**: read those 9 commits
+  (above all `097f7b7`, stack auxes, next to our colouring fix) and then run `--mark-reviewed`.
+- 📏 **LF everywhere (owner):** `.gitattributes` is `* text=auto eol=lf`; reference clones use
+  `core.autocrlf=false`. The global `core.autocrlf=true` is left alone (owner's call).
+- 🏷️ **Stale labels corrected:** KI-10 (fixed 2026-09-30 by KI-17), KI-6 (handled), the KI-11
+  line, and the upstream-report loose end. README synced: Debug needs the patched clang; build
+  times; layout.
 - **State:** everything committed on `main`, **nothing pushed**. WSL has
   `build-essential` + `cmake` (owner installed; `ninja` 1.12.1 and gdb in `~/zilc-work/tools/`, no
   sudo needed). ⚠️ Build LLVM with `JOBS` ≤ 12 (32 crashed the WSL VM).
@@ -327,7 +337,7 @@ the runtime-linking rule checked.
 | [vision.md](vision.md) | The goal: one `zig` binary that compiles Zig, C and C++ to a single memory-safe target. Owner's framing (via a Gemini discussion, 2026-09-18), with the claims that still need verifying marked. |
 | [architecture.md](architecture.md) | Target pipeline (frontend → LLVM IR → zilc pass → `zilc_runtime`), the InvisiCap and FUGC components, what exists today, and 🔑 **the runtime contract measured 2026-09-30** (`libpizlo`'s four layers, by symbol count). |
 | [design-decisions.md](design-decisions.md) | Invariants, decisions made so far, and the **open questions** that must be settled with the owner. **2026-09-30: Linux-first Zig runtime checked against Fil-C, `--runtime filc\|zig`, the pass not ported; #4 platform analysis; #3 now blocks runtime code.** Zig 0.15.2 API + Windows build notes (0.15.2 is at `C:\zig\0.15.2`, not on PATH). |
-| [upstream.md](upstream.md) | How zilc relates to Fil-C upstream: what to track, which files matter, pinned commit, and 🔄 **the three-stage upgrade procedure (2026-09-30)**: Fil-C + compatible Zig → latest Zig → benchmarks. |
+| [upstream.md](upstream.md) | 🆕 2026-10-01: **the `upstream/fil-c/` reference clone and its monitor** (`tools/upstream/`, first-run results), and reporting marked not planned. How zilc relates to Fil-C upstream: what to track, which files matter, pinned commit, and 🔄 **the three-stage upgrade procedure (2026-09-30)**: Fil-C + compatible Zig → latest Zig → benchmarks. |
 | [licensing.md](licensing.md) | **License = `Apache-2.0 WITH LLVM-exception OR MIT`** (2026-09-18). Why, the runtime-linking rule, the copyleft exclusion. |
 | [reference-projects.md](reference-projects.md) | Fil-C, LLVM, Zig: verified licenses, what to mine each for, adoption status. |
 | [roadmap.md](roadmap.md) | P0 ✅ → P1 ✅ → P2 ✅ (`0.3.0`) → **P3 Zig runtime (plan 2026-09-30: Linux first, checked against Fil-C, `zsys_*` first; next step the `zsys_write` spike)** → P4 Zig-language fidelity → P5 C++ → **P6 other platforms (proposed 2026-09-30)**. |

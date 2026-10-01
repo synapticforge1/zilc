@@ -61,9 +61,21 @@ semantic origin:
 
 ```sh
 export ZILC_ZIG=/path/to/zig-0.15.2/zig          # stock Zig
-export ZILC_FILC=/path/to/filc/build/bin/clang   # Fil-C's clang
+export ZILC_FILC=/path/to/filc/build/bin/clang   # Fil-C's clang (see below)
 zilc build [-O ReleaseSafe] [--target x86_64-linux-musl] [--entry auto|zig|c] [--runtime filc] [-o out] <inputs...>
 ```
+
+**Which Fil-C clang.** zilc works best with **Fil-C 0.685's clang rebuilt with two fixes** to its
+compiler pass (`tools/filc/build-patched-clang.sh`, about an hour; the diff is in
+`third_party/filc-patches/`). The fixes don't change what the compiler emits for code it already
+handled:
+
+- a crash on code with several computed jumps in one function, which Zig's Debug builds contain.
+  **Debug builds need the patched clang.**
+- a slow step that grew with the cube of a function's size. Large programs build several times
+  faster.
+
+The stock Fil-C 0.685 prebuilt still works for the Release modes.
 
 `.zig` inputs go through Zig and the Fil-C pass; `.c`, `.cpp`, `.o` and `.a` go straight to Fil-C.
 `-v` prints every command it runs. `--runtime zig` is reserved for zilc's own runtime and is refused
@@ -74,9 +86,12 @@ until that runtime is ready for testing; `filc` (the default) links Fil-C's.
 Each has a reason recorded in [cmem/known-issues.md](cmem/known-issues.md):
 
 - **Linux x86_64 only** — that is what Fil-C supports.
-- **`-O Debug` costs ~100× in size** — Debug IR crashes the Fil-C pass at clang `-O1`, so zilc
-  compiles it at `-O0` (and passes `-fno-stack-check`). It works and traps correctly; the binary is
-  13.8 MB instead of 127 KB. ReleaseSafe keeps Zig's own safety checks on and is the better default.
+- **`-O Debug` needs the patched Fil-C clang** (above). With the stock prebuilt, Fil-C's pass
+  crashes on Zig's Debug code. ReleaseSafe keeps Zig's own safety checks on and is the better
+  default anyway.
+- **Large programs build slower than with plain Zig.** Fil-C's checks make the code it compiles
+  several times larger. Typical programs build in seconds; a TLS client (`std.http.Client`) takes
+  about a minute against Zig's 17 seconds.
 - **Target musl** — Fil-C's libc is musl; a gnu target fails to link.
 - **Zig's own start code cannot run** — it builds a pointer out of an integer address
   (`@ptrFromInt(getauxval(AT_PHDR))`), which is precisely what the capability model forbids. zilc
@@ -117,13 +132,15 @@ $env:ZIG_LOCAL_CACHE_DIR = 'C:\zig-cache\zilc'
 ## Layout
 
 ```text
-src/          Zig sources: runtime library (root.zig), C ABI (capi.zig), CLI (main.zig)
+src/          Zig sources: driver, IR rewrites, std patches, runtime library, CLI
 include/      zilc.h, the runtime's C ABI
-tests/        C smoke test
+tests/        C smoke test, and tests/basics: 156 C and Zig programs that must run correctly
 examples/     canonical memory-safety bugs (OOB write, use-after-free)
-tools/        developer tooling (future)
-third_party/  upstream license texts + the compliance ledger (LICENSES.md)
-cmem/         project memory: design, decisions, roadmap
+tools/        developer tooling: corpus runs, the patched Fil-C build (filc/), upstream monitoring
+third_party/  upstream license texts, Fil-C patches, and the compliance ledger (LICENSES.md)
+cmem/         project memory: design, decisions, roadmap, workarounds
+toolchain/    local archive of the patched Fil-C clang (not in git)
+upstream/     read-only reference clone of Fil-C (not in git)
 ```
 
 ## License

@@ -59,6 +59,10 @@ citation to the incident.
 - **When something reports total failure, suspect the instrument.** "0 matches" for all four patch
   edits, including a one-line anchor, was line endings, not upstream changes. Run a control (the
   known-good v0.685 file) before believing it. (2026-10-01.)
+- **When a fix lands, update EVERY issue it closes, in the same commit, and re-check before calling
+  anything open.** KI-17's unoptimized route fixed KI-10's thread joins on 2026-09-30, but KI-10's
+  heading stayed 🟡 and it was listed as open the next day. Before listing open items, check each
+  label against the latest corpus results. (2026-10-01.)
 - **Write the WHY of a workaround when you make it** (`workarounds.md`), keeping measured facts and
   surmises apart, and listing what was ruled out. (Owner rule, 2026-10-01.)
 - **A reopen condition is not self-checking.** Re-test it when you *price* the entry, not just when
