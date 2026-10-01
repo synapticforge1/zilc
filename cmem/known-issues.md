@@ -269,7 +269,7 @@ semantic origin:  hello.zig:25:6: hello.main (inlined)  ←  zilc_entry.zig:16:2
 no Zig segfault handler. Nothing that has been tested needs them, and Fil-C's own checks replace the
 last one — but a program that reads `std.os.environ` will find it empty until the shim sets it.
 
-## 🟡 KI-6 — Zig must target **musl**, not gnu, or the link fails on `*64` symbols (2026-09-23)
+## ✅ KI-6 — Zig must target **musl**, not gnu, or the link fails on `*64` symbols (2026-09-23). **Handled: zilc's default target is `x86_64-linux-musl`** (`src/driver.zig`, `src/main.zig`); a non-musl `--target` gets a warning
 
 Fil-C's libc is **musl**. With `-target x86_64-linux-gnu`, Zig emits glibc-style names and the link
 fails with `undefined reference to pizlonated_getrlimit64 / setrlimit64 / mmap64 / getcontext`.
@@ -614,7 +614,14 @@ backend, so there was no LLVM module and every Debug build failed), and **rewrit
 `syscallN` wrappers at the call site** (in unoptimized ReleaseSmall the wrapper is not inlined, so
 an asm-only rewrite received pointers as integer parameters, with no capability).
 
-## 🟡 KI-10 — `pthread_join` traps on a pointer with no capability (2026-09-30)
+## ✅ KI-10 — `pthread_join` traps on a pointer with no capability (2026-09-30). **FIXED 2026-09-30 by the unoptimized-IR route (KI-17); label corrected 2026-10-01**
+
+**Status:** fixed the same day as found, but the label was never updated. KI-17 records "the 5
+thread joins pass" once zilc took Zig's unoptimized IR: the `pthread_t` round trip had been LLVM's
+pre-optimisation turning a pointer load into an integer one. Verified 2026-10-01: the threading
+programs `28`–`37` (incl. `33_mutexes`) pass in Debug, ReleaseSafe, ReleaseFast and ReleaseSmall.
+
+Original entry:
 
 `33_mutexes` and one more threading example: `cannot read pointer with null object` in musl's
 `__pthread_timedjoin_np`. Most likely Zig's std keeps the `pthread_t` it got from `pthread_create`
