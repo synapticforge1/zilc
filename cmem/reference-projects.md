@@ -11,7 +11,7 @@ the upstream license files **and** source headers on 2026-09-18.
 | Fil-C — musl (`usermusl`/`yolomusl`) | `MIT` | C | The two-level libc approach | ✅ in use — it is why `-target …-musl` is required (KI-6) |
 | Fil-C — docs | n/a | — | `invisicap.txt`, `invisicaps_by_example.md`, `gimso_semantics.md`, `Manifesto.md` | **Read first** — `gimso_semantics.md` explained the `ni:0` requirement |
 | [LLVM](https://github.com/llvm/llvm-project) | `Apache-2.0 WITH LLVM-exception` | C++ | Pass infrastructure, plugin API, clang 20→21 deltas | Evaluating |
-| [Zig](https://codeberg.org/ziglang/zig) | `MIT` | Zig | LLVM backend, `zig cc` driver, bundled libcs, `std.heap` | Evaluating |
+| [Zig](https://codeberg.org/ziglang/zig) | `MIT` | Zig | LLVM backend, `zig cc` driver, bundled libcs, `std.heap` | ✅ **First adoption 2026-09-30:** the 0.16.0 `findSentinel` body, backported to 0.15.2 by `src/stdpatch.zig` (ledger: zig-std-backports). zilc otherwise *invokes* Zig |
 
 All permissive; all compatible with our dual `Apache-2.0 WITH LLVM-exception OR MIT`. See
 `licensing.md` for the runtime-linking caveat.

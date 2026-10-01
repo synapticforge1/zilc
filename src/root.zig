@@ -11,6 +11,9 @@ const std = @import("std");
 /// Rewriting stock LLVM IR into Fil-C's dialect — the core of the zilc driver.
 pub const ir = @import("ir.zig");
 
+/// Backports to Zig's std, applied to a cached overlay of the user's Zig lib (KI-11).
+pub const stdpatch = @import("stdpatch.zig");
+
 /// The Zig release this line of zilc is built with. Every Zig release gets its
 /// own line. The Zig that compiles *user code* is a separate number: it must
 /// match Fil-C's LLVM, and can lag behind this one (cmem/upstream.md, stage B).
@@ -46,4 +49,5 @@ test "version string parses back to the same version" {
 
 test {
     _ = ir;
+    _ = stdpatch;
 }

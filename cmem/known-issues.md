@@ -316,15 +316,16 @@ every function entry (`cmp rsp, [thread]`, `filc-abi.md` §3).
 through the pass, and Fil-C's libc does not provide them. The fix needs compiler-rt (or those
 functions) built through the pass. P3/P4.
 
-## 🟡 KI-11 — Zig 0.15.2's `indexOfSentinel` over-reads; under Fil-C it is an OOB read (2026-09-30)
+## ✅ KI-11 — Zig 0.15.2's `indexOfSentinel` over-reads; under Fil-C it is an OOB read. **FIXED 2026-09-30 by backporting upstream's 0.16.0 fix** (owner chose option 1)
 
 `67_environment-variables`: `cannot read 16 bytes when upper - ptr = 12` at `mem.zig:1118:48`. std's
 SIMD sentinel scan reads past the end of the string's object, up to the page boundary. Full analysis,
 minimal reproduction and report draft: `zig-upstream-notes.md` **Z-1**,
 `tools/zig-reports/sentinel-overread/`. **Fixed upstream in 0.16.0** (a scalar `findSentinel`).
 
-std has no hook to swap this function out (unlike `panic` and `page_allocator`). ❓ **Owner decision
-pending:**
+✅ **Done:** `src/stdpatch.zig` builds a cached **std overlay** (`~/.cache/zilc/std-overlay/0.15.2-v1`: a real copy of `std/`, everything else symlinked) and applies the **0.16.0 `findSentinel` body**; the driver passes `--zig-lib-dir`. Each patch **verifies the exact original** and fails the build otherwise; Zig 0.16.0 has no patch set and gets no overlay. Result: the repro prints `len = 11` under zilc, `67` gets past `getenv`, gate 4/4, no corpus regressions. Ledger: `zig-std-backports`. History of the decision follows.
+std has no hook to swap this function out (unlike `panic` and `page_allocator`). ❓ ~~**Owner decision
+pending:**~~ decided 2026-09-30, option 1.
 1. **(recommended)** a small **zilc std overlay**: build with `--zig-lib-dir` pointing at a cached
    copy of Zig's lib with a few patched files. The first patch is **upstream's own 0.16.0 loop**, a
    backport rather than an invention. It is likely also needed for Z-5 (`DebugAllocator`).

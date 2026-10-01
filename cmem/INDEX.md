@@ -85,7 +85,9 @@ for structure and policy.
   SIMD scan, **already fixed upstream in 0.16.0**, and documented for a possible Zig report
   (`zig-upstream-notes.md` Z-1). ❓ **Owner decision pending (KI-11):** backport upstream's fix
   through a small **zilc std overlay** (`--zig-lib-dir`, recommended, likely needed for Z-5
-  `DebugAllocator` too), or leave it as a safe Fil-C stop until 0.16.
+  `DebugAllocator` too), or leave it as a safe Fil-C stop until 0.16. ✅ **Decided and done 2026-09-30:
+  the 0.16.0 backport**, through a version-keyed **std overlay** (`src/stdpatch.zig`, each patch
+  verifying its original). Both bounds violations are cleared, so every remaining Zig failure is Z-5.
 - 🔒 **STAY ON ZIG 0.15.2 UNTIL THERE IS A STABLE BASE (owner).** A 0.16.0 trial port was
   stopped. Its facts are in `ports/README.md` "Scouting": Fil-C head is still LLVM 20.1.8, latest
   Zig is 0.16.0 (clang 21), and Fil-C ships ARM64 builds.

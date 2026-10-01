@@ -8,7 +8,7 @@ Fil-C is `tools/p2/repro/UPSTREAM-REPORT.md` (KI-4).
 
 | # | behaviour | Zig bug? | status | report |
 | --- | --- | --- | --- | --- |
-| Z-1 | `std.mem.indexOfSentinel` over-reads past the string's object (SIMD, up to the page end) | **Yes, arguably**: reads outside the object; upstream already special-cases Valgrind for it | ✅ **fixed in 0.16.0** (scalar `findSentinel`) | `tools/zig-reports/sentinel-overread/` (draft, not filed) |
+| Z-1 | `std.mem.indexOfSentinel` over-reads past the string's object (SIMD, up to the page end) | **Yes, arguably**: reads outside the object; upstream already special-cases Valgrind for it | ✅ **fixed in 0.16.0** (scalar `findSentinel`); ✅ **backported into zilc's 0.15.2 std overlay** (`src/stdpatch.zig`) | `tools/zig-reports/sentinel-overread/` (draft, not filed) |
 | Z-2 | `PageAllocator` passes the previous mapping's end as an `mmap` hint | **No**: a hint is advisory, and this is valid OS usage. Fil-C's `mmap` treats the hint pointer's capability strictly | still in 0.16.0 (`addr_hint`) | none; zilc overrides the page allocator |
 | Z-3 | std on Linux uses raw `syscall` asm even with libc linked (gettid, futex, clock_nanosleep, statx, …) | **No**: a design choice. It conflicts with any libc-only environment (Fil-C) | see KI-7 | none; zilc reroutes them (`ir.rewriteSyscalls`) |
 | Z-4 | std's panic handler captures registers with inline asm (`getcontext`) | **No**: a native-only technique | see KI-7 | none; zilc overrides `panic` |
@@ -31,7 +31,7 @@ Fil-C is `tools/p2/repro/UPSTREAM-REPORT.md` (KI-4).
 - **Upstream:** Valgrind special case via `std.debug.inValgrind()` (issue #17717), which needs
   `-fvalgrind` *and* a real Valgrind run. **0.16.0 replaced the function with a scalar loop**
   (`findSentinel`), so no report is needed unless 0.15.x gets a maintenance release.
-- **zilc's options while on 0.15.2:** see `known-issues.md` KI-11.
+- **zilc on 0.15.2:** ✅ backported upstream's 0.16.0 body through the std overlay (`src/stdpatch.zig`, KI-11, ledger `zig-std-backports`). Remove the patch when the reference line moves to 0.16.
 
 ## Z-2 in detail: `mmap` address hint (found 2026-09-30)
 

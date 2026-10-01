@@ -80,10 +80,33 @@ Run this **before** incorporating code from any project.
 
 ## Component Ledger
 
-~~EMPTY as of 2026-09-18.~~ **First entry 2026-09-30:** test programs only. **Still no third-party
-code in zilc's toolchain or runtime.**
+~~EMPTY as of 2026-09-18.~~ **First entries 2026-09-30:** test programs, and a 4-line Zig std backport (MIT). **Still no third-party
+runtime code in zilc.**
 
 Newest first. Copy the template for each adopted component.
+
+### zig-std-backports (Zig standard-library backports applied by `src/stdpatch.zig`)
+- **Source:** https://codeberg.org/ziglang/zig (the Zig 0.16.0 release, as installed: `lib/std/mem.zig`)
+- **Version / commit:** Zig **0.16.0** release tarball (the backport source), applied to Zig **0.15.2**
+- **Upstream path(s):** `lib/std/mem.zig`, `findSentinel` (0.16.0), the body of the scalar loop
+- **License (SPDX):** `MIT` (Zig; verified against the installed `lib/std` and `LICENSE`)
+- **License file:** `third_party/zig/LICENSE` (staged since 2026-09-18)
+- **What we reused:** the 0.16.0 `findSentinel` body, 4 lines (`var i = 0; while (p[i] != sentinel) i += 1;
+  return i;`), as the replacement for 0.15.2's vectorised `indexOfSentinel` (KI-11,
+  `cmem/zig-upstream-notes.md` Z-1)
+- **Where it lives in zilc:** `src/stdpatch.zig` (`zig_0_15_2` patch set). Applied at build time to a
+  cached copy of the **user's own** Zig `std/` (`~/.cache/zilc/std-overlay/<version>-v<n>`). zilc
+  ships no Zig files
+- **Artifact destination:** compiled into **user programs** as part of std, like all Zig std code,
+  which is already MIT. Zig's notice obligations for binaries are unchanged by the backport
+- **Modifications:** a `zilc:` comment naming the backport and its reason; otherwise verbatim. Each
+  patch verifies the exact original before replacing it, and fails the build if it differs
+- **Obligations satisfied:** [x] license present  [x] change-notes (comment in the patched function)
+  [x] SPDX on `stdpatch.zig`  [n/a] NOTICE (no new licence; Zig's MIT already applies to every Zig
+  program)
+- **Benefit / drawback note:** removes an out-of-bounds read in 0.15.2's std that Fil-C rightly
+  rejects (`getenv`, every C-string span), by adopting **upstream's own fix**, not an invention.
+  Drawback: each Zig version needs its patch set re-checked (`cmem/ports/`).
 
 ### basics-of-coding (C and Zig example programs, used as TESTS)
 - **Source:** https://github.com/jrmarcum/BasicsOfCodingC and https://github.com/jrmarcum/BasicsOfCodingZig

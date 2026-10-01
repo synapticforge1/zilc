@@ -13,6 +13,7 @@ const std = @import("std");
 // Through the module, not the file: importing "ir.zig" directly would put the
 // same file in two modules, which Zig rejects.
 const ir = @import("zilc").ir;
+const ir_std = @import("zilc").stdpatch;
 
 /// Who provides `main`.
 ///
@@ -199,16 +200,42 @@ const f128_rt_exports = [_][]const u8{
     "__trunctfxf2", "roundq",
 };
 
-/// Zig's lib directory, from `zig env` (ZON: `.lib_dir = "…"`).
-fn zigLibDir(gpa: std.mem.Allocator, zig: []const u8) ![]u8 {
+/// What zilc needs from `zig env` (ZON: `.lib_dir = "…"`, `.version = "…"`).
+const ZigEnv = struct {
+    lib_dir: []u8,
+    version: []u8,
+    fn deinit(self: ZigEnv, gpa: std.mem.Allocator) void {
+        gpa.free(self.lib_dir);
+        gpa.free(self.version);
+    }
+};
+
+fn zigEnv(gpa: std.mem.Allocator, zig: []const u8) !ZigEnv {
     const res = try std.process.Child.run(.{ .allocator = gpa, .argv = &.{ zig, "env" } });
     defer gpa.free(res.stdout);
     defer gpa.free(res.stderr);
-    const key = ".lib_dir = \"";
-    const start = (std.mem.indexOf(u8, res.stdout, key) orelse return Error.ToolFailed) + key.len;
-    const end = std.mem.indexOfScalarPos(u8, res.stdout, start, '"') orelse return Error.ToolFailed;
+    const lib_dir = try zonString(gpa, res.stdout, ".lib_dir = \"");
+    errdefer gpa.free(lib_dir);
+    return .{ .lib_dir = lib_dir, .version = try zonString(gpa, res.stdout, ".version = \"") };
+}
+
+fn zonString(gpa: std.mem.Allocator, zon: []const u8, key: []const u8) ![]u8 {
+    const start = (std.mem.indexOf(u8, zon, key) orelse return Error.ToolFailed) + key.len;
+    const end = std.mem.indexOfScalarPos(u8, zon, start, '"') orelse return Error.ToolFailed;
     // ZON escapes backslashes (Windows paths); Linux paths come through unchanged.
-    return std.mem.replaceOwned(u8, gpa, res.stdout[start..end], "\\\\", "\\");
+    return std.mem.replaceOwned(u8, gpa, zon[start..end], "\\\\", "\\");
+}
+
+/// zilc's cache: $ZILC_CACHE_DIR, else $XDG_CACHE_HOME/zilc, else $HOME/.cache/zilc.
+fn cacheRoot(gpa: std.mem.Allocator) ![]u8 {
+    if (std.process.getEnvVarOwned(gpa, "ZILC_CACHE_DIR")) |d| return d else |_| {}
+    if (std.process.getEnvVarOwned(gpa, "XDG_CACHE_HOME")) |d| {
+        defer gpa.free(d);
+        return std.fmt.allocPrint(gpa, "{s}/zilc", .{d});
+    } else |_| {}
+    const home = std.process.getEnvVarOwned(gpa, "HOME") catch return Error.ToolFailed;
+    defer gpa.free(home);
+    return std.fmt.allocPrint(gpa, "{s}/.cache/zilc", .{home});
 }
 
 /// Does this Zig file look like a program (rather than a library of exports)?
@@ -272,6 +299,8 @@ fn compileZig(
     uses_f128: *bool,
     /// If set, every function definition not named here is made internal.
     keep_exports: ?[]const []const u8,
+    /// The std overlay with zilc's backports, if this Zig version has any (KI-11).
+    zig_lib_dir: ?[]const u8,
 ) ![]u8 {
     const stem = std.fs.path.stem(src);
     const ll_path = try std.fmt.allocPrint(gpa, "{s}/{s}.ll", .{ tmp_path, stem });
@@ -296,6 +325,7 @@ fn compileZig(
         // the kernel through raw `syscall` asm in many more places (KI-7).
         "-lc",
     });
+    if (zig_lib_dir) |d| try zig_args.appendSlice(gpa, &.{ "--zig-lib-dir", d });
     // Every mode, not only Debug: ReleaseSafe emits the probe too for large frames
     // (std.debug's stack-trace code, std.fs path buffers), and it fails the link the
     // same way. Fil-C checks the stack at every function entry anyway (KI-8).
@@ -412,12 +442,31 @@ pub fn build(gpa: std.mem.Allocator, opts: Options) !void {
         }
     }
 
+    // Zig's own std, with zilc's backports for this exact version, if it has any (KI-11).
+    var env: ?ZigEnv = null;
+    defer if (env) |e| e.deinit(gpa);
+    var overlay: ?[]u8 = null;
+    defer if (overlay) |o| gpa.free(o);
+    for (opts.inputs) |input| {
+        if ((try classify(input)) != .zig) continue;
+        env = try zigEnv(gpa, opts.zig);
+        const cache = try cacheRoot(gpa);
+        defer gpa.free(cache);
+        overlay = ir_std.ensureOverlay(gpa, env.?.lib_dir, env.?.version, cache) catch |e| {
+            std.debug.print("zilc: cannot prepare the std backports for Zig {s}: {s}\n" ++
+                "  (each patch checks the exact original it replaces; see cmem/known-issues.md KI-11)\n", .{ env.?.version, @errorName(e) });
+            return Error.ToolFailed;
+        };
+        if (opts.verbose) if (overlay) |o| std.debug.print("zilc: std backports for Zig {s}: {s}\n", .{ env.?.version, o });
+        break;
+    }
+
     var needs_syscall_helper = false;
     var uses_f128 = false;
     for (opts.inputs, 0..) |input, i| {
         switch (try classify(input)) {
             .zig => {
-                const obj = try compileZig(gpa, opts, tmp_path, input, entry_index == i, &needs_syscall_helper, &uses_f128, null);
+                const obj = try compileZig(gpa, opts, tmp_path, input, entry_index == i, &needs_syscall_helper, &uses_f128, null, overlay);
                 try owned.append(gpa, obj);
                 try link_args.append(gpa, obj);
             },
@@ -428,8 +477,7 @@ pub fn build(gpa: std.mem.Allocator, opts: Options) !void {
 
     // 128-bit floats: the compiler-rt helpers, compiled through the pass (KI-9).
     if (uses_f128) {
-        const lib_dir = try zigLibDir(gpa, opts.zig);
-        defer gpa.free(lib_dir);
+        const lib_dir = env.?.lib_dir; // set: uses_f128 implies a Zig input
         // Their own subdirectory, so a user file named like one (round.zig) cannot collide.
         const rt_tmp = try std.fmt.allocPrint(gpa, "{s}/compiler_rt", .{tmp_path});
         defer gpa.free(rt_tmp);
@@ -439,7 +487,7 @@ pub fn build(gpa: std.mem.Allocator, opts: Options) !void {
         for (f128_rt_files) |name| {
             const src = try std.fmt.allocPrint(gpa, "{s}/compiler_rt/{s}.zig", .{ lib_dir, name });
             defer gpa.free(src);
-            const obj = try compileZig(gpa, opts, rt_tmp, src, false, &needs_syscall_helper, &unused, &f128_rt_exports);
+            const obj = try compileZig(gpa, opts, rt_tmp, src, false, &needs_syscall_helper, &unused, &f128_rt_exports, overlay);
             try owned.append(gpa, obj);
             try link_args.append(gpa, obj);
         }

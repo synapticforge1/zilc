@@ -9,6 +9,12 @@ from the `0.16.1-1` port, `0.16.2-1` should go faster. How lines, bases and vers
 line, **named by the line's first release**: `ports/0.16.2-1.md`. Later changes carried to that
 line are appended to the same file, each with the release it produced and its new basis.
 
+⚠️ **Every Zig move must re-check zilc's std patch sets** (`src/stdpatch.zig`, KI-11). A patch set is
+keyed by exact Zig version and verifies the original text, so a new Zig without a patch set simply
+gets **no overlay**. That is correct only if upstream fixed the issue in that version (0.16.0 did for
+Z-1). For each new version: check that every patched behaviour is fixed upstream, and if not, write
+a patch set for it.
+
 **Per file:** the new line and its **basis**, the Zig versions from → to, each API change with its
 fix and the sites it touched, anything that surprised us, and how long it took. Copy the template
 below.
