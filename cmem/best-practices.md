@@ -157,6 +157,10 @@ citation to the incident.
   program with `env -i` and a fixed list), same inputs, same working-directory layout; and run
   the reference twice to separate "differs" from "varies by itself". (Output comparison,
   2026-10-02: the harnesses' own variables were the only real difference.)
+- **A resource probe must defeat the optimizer AND Fil-C's escape analysis.** Check that the
+  native number is physically possible (a "195 MiB" recursion on an 8 MiB stack was a loop), and
+  keep the measured locals from escaping, or Fil-C moves them off the machine stack. Use
+  `noinline`, `@call(.never_tail, …)`, `std.mem.doNotOptimizeAway`. (KI-5 stack probe, 2026-10-02.)
 - **Prove "same code" like for like, and prove the comparison can tell.** Compare against a
   reference built from the SAME input in the same form, not against a run whose own output
   varies; show the variation with a harmless perturbation (a timing-only flag) and a

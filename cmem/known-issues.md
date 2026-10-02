@@ -266,9 +266,28 @@ semantic origin:  hello.zig:25:6: hello.main (inlined)  ←  zilc_entry.zig:16:2
 `--entry auto|zig|c` overrides the choice; `auto` picks the shim when a lone `.zig` input declares
 `pub fn main` and no C/C++ input is present. `tools/p2/whole-program.sh` runs it.
 
-⚠️ **What this does NOT do:** the program gets no `std.os.environ`, no Zig stack-size expansion, and
-no Zig segfault handler. Nothing that has been tested needs them, and Fil-C's own checks replace the
-last one — but a program that reads `std.os.environ` will find it empty until the shim sets it.
+~~⚠️ **What this does NOT do:** the program gets no `std.os.environ`, no Zig stack-size expansion,
+and no Zig segfault handler.~~ **Settled 2026-10-02 (pre-publish item), each measured:**
+
+- ✅ **`std.os.environ`: now SET.** Before, it read as EMPTY (0 entries where native saw 3; the
+  `undefined` global happens to be zero), silently. std itself never needed it with libc linked
+  (`getenv`, `getEnvMap`, `execv`, `Child` all read libc's `environ` when `link_libc`), so only
+  user code reading `std.os.environ` directly was affected. The entry shim now fills it from
+  `std.c.environ`, the same array `start.zig` snapshots, and a real Fil-C object (exact
+  capability; not main's third argument, whose path through Fil-C's own start code was not
+  verified). Native and zilc now print the same, Debug and Release; gate case 5
+  (`examples/whole_program/environ.zig`).
+- ✅ **Stack-size expansion: NOT NEEDED.** Native Zig records a 16 MiB stack in `PT_GNU_STACK`
+  and `start.zig` raises the soft limit to it (from the shell's 8 MiB). zilc's binaries record 0.
+  Measured with a 1 KiB-per-level recursion that cannot be optimized away
+  (`noinline`, `.never_tail`, `doNotOptimizeAway`): native stops at ~15,400 levels (~15 MiB) with
+  a SEGFAULT (rc 139); zilc goes to ~65,300 levels (~4× deeper) and then stops with a clean
+  `filc safety error: stack overflow`. ⚠️ A first probe was wrong both ways: native turned the
+  recursion into a loop, and the buffers escaped, so Fil-C kept them off the machine stack.
+- ✅ **Segfault handler: not applicable.** Fil-C stops memory errors before any segfault, with
+  its own report.
+- **Library mode** (C owns `main`): `std.os.environ` and `std.os.argv` stay unset, exactly as
+  natively, where Zig's start code does not run either. Not a zilc gap.
 
 ## ✅ KI-6 — Zig must target **musl**, not gnu, or the link fails on `*64` symbols (2026-09-23). **Handled: zilc's default target is `x86_64-linux-musl`** (`src/driver.zig`, `src/main.zig`); a non-musl `--target` gets a warning
 
@@ -306,7 +325,7 @@ Hello-world's backtrace: `std.debug.print` → `debug.lockStderrWriter` → `Pro
   programs:** the entry shim defines `pub const panic = std.debug.FullPanic(zilcPanic)`, which calls
   Fil-C's **`zerror`**. `42_panic` now prints `zig panic: a problem` with Fil-C's trace naming
   `panic.zig:6:5`, instead of a stack overflow in the trace code. ✅ **Library mode covered 2026-10-02**
-  (C owns `main`): a generated library root (`library_shim`) carries the same handler (gate case 7).
+  (C owns `main`): a generated library root (`library_shim`) carries the same handler (gate case 8).
 - **Most zilc-shaped fix (to verify):** extend the IR rewrite (`src/ir.zig`) to replace
   `asm sideeffect "syscall"` with a call to libc's `syscall(n, …)`, which in Fil-C goes through the
   checked `zsys_*` layer (`filc-abi.md`). It needs checking that Fil-C's `syscall()` accepts these
@@ -601,7 +620,7 @@ Trivial Debug programs 9.9 s → 2.1 s. Details: `workarounds.md` KI-21.
 CSPRNG deliberately passes `0xffffffff` to detect QEMU and expects `EINVAL`; Fil-C stops instead.
 **Fix:** the entry shim sets std's official `std_options.crypto_always_getrandom = true` (kernel
 CSPRNG on every fill, fork-safe). 69 now completes a real HTTPS request in every Release mode.
-Library mode covered 2026-10-02 (library root; gate case 6). Details: `workarounds.md` KI-20.
+Library mode covered 2026-10-02 (library root; gate case 7). Details: `workarounds.md` KI-20.
 
 ## ✅ KI-19 — Debug only: syscall POINTER arguments arrive without a capability (2026-09-30). **FIXED 2026-10-01 by moving Debug to `filc -O1`**
 

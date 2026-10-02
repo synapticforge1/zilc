@@ -67,7 +67,7 @@ Every workaround gets an entry **when it is made**, not later. Use these heading
 | `Can't create a MachineFunction using a Module with a Target-incompatible DataLayout` (a module split before Fil-C's pass) | KI-22, lever (a): `datalayout_after_filc` lost |
 | `TLS reference in … mismatches non-TLS reference in …` (joining split parts) | KI-22, lever (a): unused hidden declarations |
 | `multiple definition of 'main'` … `filc_crt.o` / `filc_mincrt.o` after `clang -r` | KI-22, lever (a): Fil-C's driver adds its crt even to `-r -nostdlib` |
-| `filc safety error: stack overflow` on a Zig `@panic`, or the KI-12 / KI-20 traps, in a program whose `main` is C | the Zig file was compiled without zilc's generated root, so std's hooks were missing: fixed 2026-10-02 by the library root (`library_shim`, KI-5 short form below; gate cases 5–7) |
+| `filc safety error: stack overflow` on a Zig `@panic`, or the KI-12 / KI-20 traps, in a program whose `main` is C | the Zig file was compiled without zilc's generated root, so std's hooks were missing: fixed 2026-10-02 by the library root (`library_shim`, KI-5 short form below; gate cases 6–8) |
 | `patch-pass.ts` / `patch-split.ts`: `original found 0 times, expected 1` | an edit's original text no longer matches: upstream changed it (`check-upstream.sh`), or an editor trimmed a whitespace-only line in it (KI-22, lever (b)) |
 | `zilc (KI-22): interference graph differs from the original` / `frame-slot colouring differs` | only with `ZILC_VERIFY_INTERFERENCE=1` / `ZILC_VERIFY_COLOURING=1`: the patched pass disagrees with the original; KI-22 levers (b) and the colouring fix |
 
@@ -204,9 +204,11 @@ either side**, so not for `UPSTREAM-ISSUES.md`.
 - The `madvise` probe and the WIPEONFORK page (an `mmap` of its own) are never reached.
 - **Cost:** one `getrandom` call per fill instead of a ChaCha step. Random fills are rare (key
   generation, TLS nonces), so it is negligible.
-- ⚠️ A user program that declares its own `std_options` is not affected either way: under zilc
-  the entry shim is the root module, so only the shim's declarations count (the same as `panic`
-  and `page_allocator`).
+- ~~A user program that declares its own `std_options` is not affected either way~~ (true until
+  2026-10-02). Since then both generated roots FORWARD a user file's own `std_options`, and force
+  only this one field to `true`. So a user who explicitly writes
+  `crypto_always_getrandom = false` gets `true` anyway: with `false`, the program would stop at
+  its first random number. 🔸 Owner to confirm (`design-decisions.md` 2026-10-02, library mode).
 
 **Ruled out.** Patching `maybe_have_wipe_on_fork` to false in the std overlay: that falls back to
 `pthread_atfork` plus user-space state, which is more moving parts, and an overlay patch where an

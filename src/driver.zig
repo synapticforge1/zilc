@@ -145,6 +145,14 @@ const entry_shim = shim_hooks ++
     \\// Fil-C's musl a plain C `main` to call instead.
     \\export fn main(argc: c_int, argv: [*][*:0]u8) c_int {
     \\    std.os.argv = argv[0..@intCast(argc)];
+    \\    // What start.zig would do (KI-5): std.os.environ is otherwise left `undefined`,
+    \\    // which reads as empty. std itself reads libc's environ when libc is linked, so
+    \\    // only code that reads std.os.environ directly needs this. Taken from libc's
+    \\    // `environ`, the same array start.zig snapshots, and a real Fil-C object, so
+    \\    // its capability is exact.
+    \\    var env_len: usize = 0;
+    \\    while (std.c.environ[env_len] != null) env_len += 1;
+    \\    std.os.environ = @ptrCast(std.c.environ[0..env_len]);
     \\
     \\    const Ret = @typeInfo(@TypeOf(user.main)).@"fn".return_type.?;
     \\    switch (@typeInfo(Ret)) {

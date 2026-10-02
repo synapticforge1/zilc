@@ -1,6 +1,6 @@
 # Testing
 
-## 🎯 `zig build gate` — THE SAFETY GATE (new 2026-09-23). **7/7 green** (2026-10-02: + 3 library-mode cases that must RUN)
+## 🎯 `zig build gate` — THE SAFETY GATE (new 2026-09-23). **8/8 green** (2026-10-02: + the KI-5 environ case and 3 library-mode cases, which must RUN)
 
 Builds every example with the zilc driver and asserts each one **traps at the right source line**.
 This is the gate the whole project exists to keep green.
@@ -114,7 +114,7 @@ and so do `argv`, files, stdin, child processes and threads.
 
 | Step | Checks | State |
 | --- | --- | --- |
-| `zig build gate` | Every bug example traps at the right line; the library-mode example runs (needs Fil-C) | **7/7** (2026-10-02, library mode added; earlier 4/4 with the parallel code generation of KI-22 lever (a)) |
+| `zig build gate` | Every bug example traps at the right line; the library-mode example runs (needs Fil-C) | **8/8** (2026-10-02, KI-5 environ and library mode added; earlier 4/4 with the parallel code generation of KI-22 lever (a)) |
 | `zig build test` | Runtime module + CLI module + the IR rewrites (incl. the KI-18 three-byte-global wrap) + the std-overlay patches (incl. the KI-21 guards) + the `--runtime zig` refusal + the version round-trip + the object cache key and `--clean-cache` (KI-22 lever c) | **26/26** pass (2026-10-02, incl. `--clean-cache`) |
 | `zig build capi-smoke` | `tests/capi_smoke.c` links `zilc_runtime` via `zilc.h` and calls it | pass |
 | `zig build baseline` | Builds `examples/*.c` with plain `zig cc` | builds. `baseline_oob_write` prints `a[3] = 3`, exit 0: **the undetected bug** |

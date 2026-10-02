@@ -106,7 +106,10 @@ Each has a reason recorded in [cmem/known-issues.md](cmem/known-issues.md):
 - **Zig's own start code cannot run** — it builds a pointer out of an integer address
   (`@ptrFromInt(getauxval(AT_PHDR))`), which is precisely what the capability model forbids. zilc
   works around it by generating a C-ABI entry that calls your `main` directly, so whole Zig programs
-  work; your program just gets no `std.os.environ` and no Zig stack-size expansion.
+  work, with `std.os.argv` and `std.os.environ` set as usual. A C `main` calling Zig exports works
+  too, and gets the same std hooks. Zig's start code also raises the stack limit to 16 MiB; under
+  Fil-C that is not needed (a recursion test went about 4× deeper than native, and stopped with a
+  clean Fil-C error instead of a segfault).
 
 ### Where it is going
 

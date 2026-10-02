@@ -164,7 +164,7 @@ semantic origin:  bounds.zig:13:6: zig_add   ←  c_caller.c:26:5: main      exi
 
 - **Upstream report** for the Debug/-O1 crash — drafted at `tools/p2/repro/UPSTREAM-REPORT.md`,
   **owner will file it** (owner, 2026-09-23).
-- `std.os.environ` is unset by the entry shim (KI-5); nothing tested needs it yet.
+- ~~`std.os.environ` is unset by the entry shim (KI-5)~~ ✅ set since 2026-10-02 (gate case 5).
 - Then **P4**: Zig language fidelity, where `@ptrFromInt` across `std` is the interesting problem.
 
 ## P3 — `zilc_runtime` in Zig. **Plan set 2026-09-30: Linux first, checked against Fil-C**

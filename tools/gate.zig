@@ -65,6 +65,12 @@ const cases = [_]Case{
         .origin = "use_after_free.c:13",
         .fault = "free object",
     },
+    .{
+        .name = "whole Zig program: std.os.environ filled (KI-5)",
+        .inputs = &.{"examples/whole_program/environ.zig"},
+        .expect = .runs,
+        .fault = "std.os.environ has PATH",
+    },
     // Library mode (C owns main): the hooks the generated library root supplies.
     .{
         .name = "library mode: std.heap.page_allocator (KI-12 hook)",
