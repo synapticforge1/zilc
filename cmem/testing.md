@@ -73,6 +73,43 @@ inside). Zig zilc ReleaseSafe/ReleaseSafe **1.26** stripped; zilc ReleaseSmall/R
 stripped (instrumentation plus Fil-C's calling-convention thunks). Tools:
 `tools/basics/size-compare.sh`, `size-report.sh`.
 
+## 🔍 Output comparison: zilc vs native, not just exit codes (pre-publish item, ✅ 2026-10-02)
+
+**Result: 0 unexplained differences.** Every tests/basics program, C and Zig, in all four modes
+(624 comparisons): **496 byte-identical** to plain Zig 0.15.2; **68** whose NATIVE output already
+varies between two runs (times, random numbers, thread order), all with the same shape (line
+count, and the same lines once digits are masked); **60** in the short EXPECTED table, 8
+programs, each with its reason:
+
+| program | why it cannot match |
+| --- | --- |
+| `17_pointers`, `46_string-formatting` | print an address (native's is fixed: non-PIE) |
+| `27_goroutines`, `36_worker-pools` | thread scheduling decides the order (27 matched natively twice by chance, in C) |
+| `42_panic` | designed: under zilc the panic is reported by Fil-C (`zerror`) |
+| `64_command-line-arguments` | prints its own path, which differs between the harnesses |
+| `74_execing-processes`, `75_spawning-processes` | `ls -la` of the working directory, `date` |
+
+Also learned: the program's **environment** works under zilc (67 lists it and reads `FOO`),
+and so do `argv`, files, stdin, child processes and threads.
+
+**How to run it** (WSL; ~40 s per native pass, the corpus as usual):
+1. `OUTROOT=~/zilc-work/outcmp/native1 sh tools/basics/run-native.sh`, then the same with
+   `native2` (two runs, to tell programs whose own output varies).
+2. `LANGS="c zig" sh tools/basics/all-modes.sh`.
+3. `deno run --allow-read tools/basics/compare-output.ts ~/zilc-work/outcmp/native1
+   ~/zilc-work/outcmp/native2 ~/zilc-work` (exit 0 = no unexplained difference).
+
+**Harness fixes it needed (2026-10-02):**
+- Both runners now start programs with the SAME fixed environment (`env -i HOME PATH USER
+  LANG=C.UTF-8 TERM=dumb`): each script's own variables (`ZILC_*`, `OUTROOT`, `JOBS`) were
+  showing up in 67's listing.
+- `run-native.sh` runs in parallel (`JOBS`, default 8) and writes where `OUTROOT` says: one at a
+  time into the repo on exFAT, its Zig half alone took over 30 minutes; now ~40 s per pass.
+- `zilc-check.sh` works under `sh` (dash) again: `export -f` is bash-only and made dash exit 2,
+  silently, before any program ran (`all-modes.sh` used bash, which hid it).
+- `zilc-check.sh` clears its WHOLE mode folder, so a C-only run deletes that mode's Zig results:
+  run both languages together (`LANGS="c zig"` in `all-modes.sh`).
+
 ## Current gates (re-run 2026-10-02)
 
 | Step | Checks | State |

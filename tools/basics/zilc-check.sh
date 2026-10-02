@@ -41,14 +41,18 @@ one() {
     [ -z "$why" ] && why=$(grep -m1 -i 'error' "$B/build.log" | cut -c1-100)
     echo "$L $n BUILD-FAIL $why"; return
   fi
-  (cd "$B/cwd" && printf 'hello\nfilter\n' | timeout 15 "$B/prog" > "$B/run.out" 2>&1); rc=$?
+  # A fixed environment, the same as run-native.sh's, so outputs compare with native
+  # (compare-output.ts): this script's own ZILC_* variables used to show up in 67's listing.
+  (cd "$B/cwd" && printf 'hello\nfilter\n' | timeout 15 env -i HOME="$HOME" PATH="$PATH" USER="$USER" \
+    LANG=C.UTF-8 TERM=dumb "$B/prog" > "$B/run.out" 2>&1); rc=$?
   if grep -q 'filc safety error\|filc panic' "$B/run.out"; then
     echo "$L $n TRAP $(grep -m1 'filc safety error\|filc panic' "$B/run.out" | sed 's/.*filc safety error: //' | cut -c1-110)"
   elif [ $rc -eq 124 ]; then echo "$L $n TIMEOUT"
   elif [ $rc -eq 0 ]; then echo "$L $n OK"
   else echo "$L $n exit=$rc"; fi
 }
-export -f one 2>/dev/null
+# No `export -f one`: it is bash-only, and dash (`sh`) exits with status 2 on it, silently,
+# before any program runs (2026-10-02). The workers get `one` below, from `typeset -f` or `sed`.
 for L in $LANGS; do
   D=$L; [ "$L" = zig ] && D=${ZIGDIR:-zig-0.15.2}
   for f in "$OUT"/src/$D/*/*.$L; do echo "$L $f"; done

@@ -4,11 +4,13 @@
 #   wsl.exe -e sh /mnt/d/…/zilc/tools/basics/all-modes.sh [modes…]
 D=$(dirname "$0")
 MODES=${*:-"Debug ReleaseSafe ReleaseFast ReleaseSmall"}
+# LANGS="c zig" adds the C half (the output comparison, compare-output.ts, wants both); C ignores
+# -O, so it only repeats the same build per mode.
 for m in $MODES; do
-  MODE=$m JOBS=${JOBS:-8} bash "$D/zilc-check.sh" zig > "$HOME/zilc-work/all-modes-$m.txt" 2>&1 &
+  MODE=$m JOBS=${JOBS:-8} bash "$D/zilc-check.sh" "${LANGS:-zig}" > "$HOME/zilc-work/all-modes-$m.txt" 2>&1 &
 done
 wait
 for m in $MODES; do
   echo "################ $m"
-  grep -v 'Trace/breakpoint\|^Aborted' "$HOME/zilc-work/all-modes-$m.txt" | tail -15
+  grep -v 'Trace/breakpoint\|^Aborted' "$HOME/zilc-work/all-modes-$m.txt" | tail -30
 done

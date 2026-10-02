@@ -153,6 +153,10 @@ citation to the incident.
   producing results.
 - **Every declared symbol needs a link-time gate.** Tests that call only what exists never notice
   what is promised but missing. (wazmrt audit #20: 180 such symbols.)
+- **A comparison harness must give both sides the same world.** Same environment (start the
+  program with `env -i` and a fixed list), same inputs, same working-directory layout; and run
+  the reference twice to separate "differs" from "varies by itself". (Output comparison,
+  2026-10-02: the harnesses' own variables were the only real difference.)
 - **Prove "same code" like for like, and prove the comparison can tell.** Compare against a
   reference built from the SAME input in the same form, not against a run whose own output
   varies; show the variation with a harmless perturbation (a timing-only flag) and a
@@ -168,6 +172,11 @@ citation to the incident.
 - **Script in Deno or Bun, never Python** (owner, 2026-09-18). Tooling in `tools/` is `.ts`/`.mjs`,
   run with `deno run` or `bun`. This follows the project's memory-safety stance and matches
   wazmrt's Deno tooling.
+- **A shell script whose usage line says `sh` must run under dash.** `export -f` (bash-only)
+  makes dash exit 2 with no message. Test with `sh -x`. (zilc-check.sh, 2026-10-02.)
+- **Stopping a WSL command from the Windows side does not stop its Linux processes.** A
+  "killed" background job kept running and polled on; check `ps` in WSL after a timeout, and
+  give long jobs a long timeout up front. (2026-10-02.)
 - **Exact-match patch text must keep upstream's trailing whitespace.** The file editor trims a
   whitespace-only line, and an edit's "original" then matches 0 times. Check suspicious lines
   with `cat -A`; fix them with `sed`, and mark them in the edit script. (KI-22 lever (b),
