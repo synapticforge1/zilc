@@ -31,6 +31,9 @@ const usage =
     \\  --filc <path>    Fil-C's clang (env ZILC_FILC)
     \\  -j <n>           parallel code generation parts for big modules
     \\                   (default: cores, at most 16; 1 = off; env ZILC_JOBS)
+    \\  --no-cache       always run Fil-C's clang, even for an unchanged module
+    \\                   (env ZILC_CACHE=0; the cache is in $ZILC_CACHE_DIR,
+    \\                   else $XDG_CACHE_HOME/zilc, else ~/.cache/zilc)
     \\  --keep-temps     keep the intermediate .ll/.o files
     \\  -v, --verbose    print every command
     \\  -h, --help       this text
@@ -94,6 +97,7 @@ fn run(arena: std.mem.Allocator, args: []const []const u8) !u8 {
     var zig_path = std.process.getEnvVarOwned(arena, "ZILC_ZIG") catch @as([]u8, @constCast("zig"));
     var filc_path = std.process.getEnvVarOwned(arena, "ZILC_FILC") catch @as([]u8, @constCast("clang"));
     var jobs_text: ?[]const u8 = std.process.getEnvVarOwned(arena, "ZILC_JOBS") catch null;
+    var cache = if (std.process.getEnvVarOwned(arena, "ZILC_CACHE")) |v| !std.mem.eql(u8, v, "0") else |_| true;
 
     var i: usize = 2;
     while (i < args.len) : (i += 1) {
@@ -138,6 +142,8 @@ fn run(arena: std.mem.Allocator, args: []const []const u8) !u8 {
             jobs_text = args[i];
         } else if (std.mem.eql(u8, a, "-c")) {
             emit = .obj;
+        } else if (std.mem.eql(u8, a, "--no-cache")) {
+            cache = false;
         } else if (std.mem.eql(u8, a, "--keep-temps")) {
             keep_temps = true;
         } else if (isFlag(a, "-v", "--verbose")) {
@@ -181,6 +187,7 @@ fn run(arena: std.mem.Allocator, args: []const []const u8) !u8 {
         .keep_temps = keep_temps,
         .verbose = verbose,
         .jobs = jobs,
+        .cache = cache,
     });
     return 0;
 }

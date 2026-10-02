@@ -18,6 +18,9 @@ export ZIG_LOCAL_CACHE_DIR=${ZIG_LOCAL_CACHE_DIR:-$HOME/.cache/zilc-basics}
 # Up to $JOBS builds run at once, and each big module splits its code generation into parallel
 # parts (KI-22 lever a): cap the parts so 12 builds cannot start 12 x 16 clang processes.
 export ZILC_JOBS=${ZILC_JOBS:-4}
+# The corpus measures real compiles (its build times are recorded in cmem/testing.md), so zilc's
+# object cache (KI-22 lever c) is off unless asked for: a second run would otherwise be all hits.
+export ZILC_CACHE=${ZILC_CACHE:-0}
 MODE=${MODE:-ReleaseSafe}
 OUT=$WORK/basics-zilc${MODE:+-$MODE}
 LANGS=${1:-"c zig"}

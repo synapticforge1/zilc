@@ -168,3 +168,7 @@ citation to the incident.
 - **Script in Deno or Bun, never Python** (owner, 2026-09-18). Tooling in `tools/` is `.ts`/`.mjs`,
   run with `deno run` or `bun`. This follows the project's memory-safety stance and matches
   wazmrt's Deno tooling.
+- **Exact-match patch text must keep upstream's trailing whitespace.** The file editor trims a
+  whitespace-only line, and an edit's "original" then matches 0 times. Check suspicious lines
+  with `cat -A`; fix them with `sed`, and mark them in the edit script. (KI-22 lever (b),
+  2026-10-02: a six-space line in `FilPizlonator.cpp`.)

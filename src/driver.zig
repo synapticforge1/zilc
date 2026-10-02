@@ -51,6 +51,8 @@ pub const Options = struct {
     /// Parallel parts for a big module's code generation: 0 = automatic (cores, at most
     /// `max_auto_jobs`), 1 = never split. See `filcCompile`.
     jobs: u32 = 0,
+    /// Reuse Fil-C objects for unchanged modules (`cacheLookup`).
+    cache: bool = true,
 };
 
 pub const Error = error{ ToolFailed, NoInputs, UnsupportedInput, RuntimeNotReady };
@@ -411,11 +413,132 @@ fn compileZig(
     if (std.mem.indexOf(u8, wrapped.ir, "fp128") != null) uses_f128.* = true;
     const final_ir = if (keep_exports) |keep| try ir.internalizeExcept(gpa, wrapped.ir, keep) else null;
     defer if (final_ir) |f| gpa.free(f);
-    try std.fs.cwd().writeFile(.{ .sub_path = filc_ll_path, .data = final_ir orelse wrapped.ir });
+    const filc_ir = final_ir orelse wrapped.ir;
+    try std.fs.cwd().writeFile(.{ .sub_path = filc_ll_path, .data = filc_ir });
 
-    // 3. Fil-C's clang runs the pass and emits the object.
-    try filcCompile(gpa, opts, tmp_path, stem, filc_ll_path, obj_path);
+    // 3. Fil-C's clang runs the pass and emits the object, unless the cache has it.
+    const plan = try planFilc(gpa, opts, stem, filc_ir.len);
+    defer plan.deinit(gpa);
+    switch (cacheLookup(gpa, opts, filc_ir, plan, obj_path)) {
+        .hit => {},
+        .off => try filcCompile(gpa, opts, tmp_path, stem, filc_ll_path, obj_path, plan),
+        .miss => |key| {
+            defer gpa.free(key);
+            try filcCompile(gpa, opts, tmp_path, stem, filc_ll_path, obj_path, plan);
+            cacheStore(opts, key, obj_path);
+        },
+    }
     return obj_path;
+}
+
+/// How Fil-C's clang will compile one module: in one run, or with its code generation split
+/// into `jobs` parts by `splitter` (see `filcCompile`).
+const FilcPlan = struct {
+    jobs: u32,
+    splitter: ?[]u8,
+    fn deinit(self: FilcPlan, gpa: std.mem.Allocator) void {
+        if (self.splitter) |s| gpa.free(s);
+    }
+};
+
+fn planFilc(gpa: std.mem.Allocator, opts: Options, stem: []const u8, ir_len: usize) !FilcPlan {
+    const jobs: u32 = if (opts.jobs != 0) opts.jobs else @intCast(@min(std.Thread.getCpuCount() catch 1, max_auto_jobs));
+    if (jobs < 2 or ir_len < split_min_bytes) return .{ .jobs = 1, .splitter = null };
+    if (try toolPath(gpa, opts.filc, "llvm-split")) |s| return .{ .jobs = jobs, .splitter = s };
+    if (opts.verbose) std.debug.print("zilc: {s}: no llvm-split next to Fil-C's clang; one code generation job\n", .{stem});
+    return .{ .jobs = 1, .splitter = null };
+}
+
+/// The object cache (build-speed lever (c), cmem/workarounds.md KI-22): an unchanged module
+/// skips Fil-C's clang entirely. The key covers everything that decides the object: the final
+/// Fil-C-dialect IR, zilc's version and clang flags, the plan, and the IDENTITY of the clang and
+/// llvm-split binaries that would run (path, size, mtime, inode). Not their `--version`: the
+/// patched clang keeps the prebuilt's exact version string. Fil-C's output is not reproducible
+/// run to run anyway (its pass orders by heap addresses), so an earlier object for the same
+/// input is as faithful as a fresh one.
+///
+/// `.hit`: the object is now at `obj_path`. `.miss`: compile, then store under the key (owned by
+/// the caller). `.off`: the cache is disabled, or no key could be made (e.g. clang not found on
+/// PATH); compile and store nothing.
+const CacheLookup = union(enum) { hit, miss: []u8, off };
+
+fn cacheLookup(gpa: std.mem.Allocator, opts: Options, filc_ir: []const u8, plan: FilcPlan, obj_path: []const u8) CacheLookup {
+    if (!opts.cache) return .off;
+    const key = objectKey(gpa, opts.filc, filc_ir, plan) catch |e| {
+        if (opts.verbose) std.debug.print("zilc: object cache off for this module: {s}\n", .{@errorName(e)});
+        return .off;
+    };
+    var dir = openCacheObjects() catch return .{ .miss = key };
+    defer dir.close();
+    dir.copyFile(key, std.fs.cwd(), obj_path, .{}) catch return .{ .miss = key };
+    if (opts.verbose) std.debug.print("zilc: object cache hit: {s}\n", .{key});
+    gpa.free(key);
+    return .hit;
+}
+
+/// Best effort: a cache that cannot be written must not fail the build.
+fn cacheStore(opts: Options, key: []const u8, obj_path: []const u8) void {
+    var dir = openCacheObjects() catch return;
+    defer dir.close();
+    // copyFile writes through a temporary and renames, so a reader never sees half an object.
+    std.fs.cwd().copyFile(obj_path, dir, key, .{}) catch |e| {
+        if (opts.verbose) std.debug.print("zilc: object cache store failed: {s}\n", .{@errorName(e)});
+    };
+}
+
+fn openCacheObjects() !std.fs.Dir {
+    var buf: [std.fs.max_path_bytes]u8 = undefined;
+    var fba = std.heap.FixedBufferAllocator.init(&buf);
+    const root = try cacheRoot(fba.allocator());
+    var root_dir = try std.fs.cwd().makeOpenPath(root, .{});
+    defer root_dir.close();
+    return root_dir.makeOpenPath("objects", .{});
+}
+
+/// Bump when zilc's clang command lines in `filcCompile` change: they decide the object too.
+const filc_commands_tag = "v1: -O1 -g -Wno-override-module | split: -emit-llvm-uselists, --zilc-part, -disable-llvm-passes, ld -r, objcopy --keep-global-symbols";
+
+/// The cache key: Blake3 over everything that decides the object, as a file name (`<hex>.o`).
+fn objectKey(gpa: std.mem.Allocator, filc: []const u8, filc_ir: []const u8, plan: FilcPlan) ![]u8 {
+    var h = std.crypto.hash.Blake3.init(.{});
+    h.update("zilc object cache\x00");
+    h.update(@import("zilc").version_string);
+    h.update("\x00");
+    h.update(filc_commands_tag);
+    h.update("\x00");
+    try hashTool(gpa, &h, filc);
+    h.update(std.mem.asBytes(&plan.jobs));
+    if (plan.splitter) |s| try hashTool(gpa, &h, s);
+    h.update(filc_ir);
+    var digest: [32]u8 = undefined;
+    h.final(&digest);
+    const hex = std.fmt.bytesToHex(digest, .lower);
+    return std.fmt.allocPrint(gpa, "{s}.o", .{&hex});
+}
+
+/// A tool binary's identity: where it resolves (PATH included) and what file is there.
+fn hashTool(gpa: std.mem.Allocator, h: *std.crypto.hash.Blake3, name: []const u8) !void {
+    const path = try resolveExe(gpa, name);
+    defer gpa.free(path);
+    const st = try std.fs.cwd().statFile(path); // follows symlinks: clang -> clang-20
+    h.update(path);
+    h.update("\x00");
+    h.update(std.mem.asBytes(&st.size));
+    h.update(std.mem.asBytes(&st.mtime));
+    h.update(std.mem.asBytes(&st.inode));
+}
+
+/// `name` as the OS would run it: as given if it has a slash, else the first match on PATH.
+fn resolveExe(gpa: std.mem.Allocator, name: []const u8) ![]u8 {
+    if (std.mem.indexOfScalar(u8, name, '/') != null) return gpa.dupe(u8, name);
+    const path_env = std.process.getEnvVarOwned(gpa, "PATH") catch return error.FileNotFound;
+    defer gpa.free(path_env);
+    var it = std.mem.tokenizeScalar(u8, path_env, ':');
+    while (it.next()) |dir| {
+        const candidate = try std.fs.path.join(gpa, &.{ dir, name });
+        if (std.fs.cwd().access(candidate, .{})) |_| return candidate else |_| gpa.free(candidate);
+    }
+    return error.FileNotFound;
 }
 
 /// Modules whose Fil-C-dialect IR is at least this big get their code generation split into
@@ -446,14 +569,10 @@ fn filcCompile(
     stem: []const u8,
     filc_ll_path: []const u8,
     obj_path: []const u8,
+    plan: FilcPlan,
 ) !void {
-    const jobs: u32 = if (opts.jobs != 0) opts.jobs else @intCast(@min(std.Thread.getCpuCount() catch 1, max_auto_jobs));
-    const size = (try std.fs.cwd().statFile(filc_ll_path)).size;
-    const splitter = if (jobs >= 2 and size >= split_min_bytes) try toolPath(gpa, opts.filc, "llvm-split") else null;
-    defer if (splitter) |s| gpa.free(s);
-    if (splitter == null) {
-        if (jobs >= 2 and size >= split_min_bytes and opts.verbose)
-            std.debug.print("zilc: {s}: no llvm-split next to Fil-C's clang; one code generation job\n", .{stem});
+    const jobs = plan.jobs;
+    const splitter = plan.splitter orelse {
         // `-Wno-override-module`: Zig names the triple `…-linux-musl` while Fil-C's
         // driver is `…-linux-gnu`, so clang warns that it is overriding ours. It is
         // expected, not a mismatch to fix — Fil-C's libc *is* musl whatever its
@@ -461,7 +580,7 @@ fn filcCompile(
         return runFilc(gpa, opts, &.{
             opts.filc, "-O1", "-g", "-Wno-override-module", "-c", "-o", obj_path, filc_ll_path,
         });
-    }
+    };
 
     // 1. The pass and the optimizer, whole.
     const bc_path = try std.fmt.allocPrint(gpa, "{s}/{s}.opt.bc", .{ tmp_path, stem });
@@ -490,7 +609,7 @@ fn filcCompile(
         const bc = try std.fmt.allocPrint(arena, "{s}/part{d}.bc", .{ parts_dir, i });
         objs[i] = try std.fmt.allocPrint(arena, "{s}/part{d}.o", .{ parts_dir, i });
         const part_arg = try std.fmt.allocPrint(arena, "--zilc-part={d}", .{i});
-        cuts[i] = try arena.dupe([]const u8, &.{ splitter.?, n_arg, part_arg, keep_arg, "-o", bc, bc_path });
+        cuts[i] = try arena.dupe([]const u8, &.{ splitter, n_arg, part_arg, keep_arg, "-o", bc, bc_path });
         gens[i] = try arena.dupe([]const u8, &.{
             opts.filc, "-O1", "-g", "-Xclang", "-disable-llvm-passes", "-c", "-x", "ir", "-o", objs[i], bc,
         });
@@ -741,6 +860,38 @@ pub fn build(gpa: std.mem.Allocator, opts: Options) !void {
 
     try link_args.appendSlice(gpa, &.{ "-o", opts.output });
     try run(gpa, link_args.items, opts.verbose);
+}
+
+test "object cache key: stable for the same inputs, different when anything that decides the object differs" {
+    const gpa = std.testing.allocator;
+    var tmp = std.testing.tmpDir(.{});
+    defer tmp.cleanup();
+    // A stand-in for the clang binary: the key hashes its path and file identity, never runs it.
+    try tmp.dir.writeFile(.{ .sub_path = "clang", .data = "one" });
+    const tool = try tmp.dir.realpathAlloc(gpa, "clang");
+    defer gpa.free(tool);
+    const one: FilcPlan = .{ .jobs = 1, .splitter = null };
+
+    const a = try objectKey(gpa, tool, "define void @f() { ret void }", one);
+    defer gpa.free(a);
+    const again = try objectKey(gpa, tool, "define void @f() { ret void }", one);
+    defer gpa.free(again);
+    try std.testing.expectEqualStrings(a, again);
+    try std.testing.expect(std.mem.endsWith(u8, a, ".o") and a.len == 64 + 2);
+
+    const other_ir = try objectKey(gpa, tool, "define void @g() { ret void }", one);
+    defer gpa.free(other_ir);
+    try std.testing.expect(!std.mem.eql(u8, a, other_ir));
+
+    const other_jobs = try objectKey(gpa, tool, "define void @f() { ret void }", .{ .jobs = 4, .splitter = null });
+    defer gpa.free(other_jobs);
+    try std.testing.expect(!std.mem.eql(u8, a, other_jobs));
+
+    // A rebuilt compiler at the same path (same version string, new file) is a different key.
+    try tmp.dir.writeFile(.{ .sub_path = "clang", .data = "two, longer" });
+    const rebuilt = try objectKey(gpa, tool, "define void @f() { ret void }", one);
+    defer gpa.free(rebuilt);
+    try std.testing.expect(!std.mem.eql(u8, a, rebuilt));
 }
 
 test "--runtime zig is refused before anything runs" {

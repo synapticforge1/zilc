@@ -26,12 +26,20 @@ export PATH=$W/tools/ninja:$PATH
 for t in cc c++ cmake ninja; do command -v $t >/dev/null || { echo "missing: $t"; exit 1; }; done
 test "$(git -C "$SRC" rev-parse HEAD)" = "$SHA" || { echo "source is not at $SHA"; exit 1; }
 
-# The patches (idempotent; fail loudly if the original text differs). The pass fixes (KI-4,
-# KI-22), and zilc's splitting mode of llvm-split for parallel code generation (KI-22 lever a).
-~/.deno/bin/deno run --allow-read --allow-write "$REPO/tools/filc/patch-pass.ts" \
-  "$SRC/llvm/lib/Transforms/Instrumentation/FilPizlonator.cpp"
-~/.deno/bin/deno run --allow-read --allow-write "$REPO/tools/filc/patch-split.ts" \
-  "$SRC/llvm/tools/llvm-split/llvm-split.cpp"
+# The patches (fail loudly if the original text differs): the pass fixes (KI-4, KI-22 colouring
+# and lever b), and zilc's splitting mode of llvm-split (KI-22 lever a). Each is applied to a
+# fresh copy of the PRISTINE file at $SHA, so changing an edit's replacement text just works,
+# and the tree's file is replaced only if the result differs (else ninja would rebuild clang
+# for nothing).
+patch_file() { # edit-script path-in-source
+  t=$(mktemp)
+  git -C "$SRC" show "$SHA:$2" > "$t"
+  ~/.deno/bin/deno run --allow-read --allow-write "$REPO/tools/filc/$1" "$t"
+  cmp -s "$t" "$SRC/$2" || cp "$t" "$SRC/$2"
+  rm -f "$t"
+}
+patch_file patch-pass.ts llvm/lib/Transforms/Instrumentation/FilPizlonator.cpp
+patch_file patch-split.ts llvm/tools/llvm-split/llvm-split.cpp
 
 mkdir -p "$SRC/build" && cd "$SRC/build"
 if [ ! -f build.ninja ]; then

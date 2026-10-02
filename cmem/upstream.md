@@ -171,7 +171,8 @@ its `publishing.md`).
 - **Run of 2026-10-02:** upstream `deluge` at `9e72307` (2026-10-01), **105 commits ahead**, no
   new release tag. Watched-file hits unchanged (the same 9 to `FilPizlonator.cpp`, 1 to
   `configure_llvm.sh`, 1 to `filc/include`); **none to `llvm-split.cpp` or `SplitModule.cpp`**.
-  **All four pass edits and all three `llvm-split` edits still apply.** Still not marked reviewed:
+  **All pass edits (five, with KI-22 lever (b)'s, re-checked later the same day) and all three
+  `llvm-split` edits still apply.** Still not marked reviewed:
   the 9 pass commits (above all `097f7b7`) have not been read yet.
 - **When to run it:** at every "update the project memory" (`INDEX.md` policy, step 5), and before
   any Fil-C upgrade (stage A above).

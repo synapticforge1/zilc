@@ -67,6 +67,8 @@ Every workaround gets an entry **when it is made**, not later. Use these heading
 | `Can't create a MachineFunction using a Module with a Target-incompatible DataLayout` (a module split before Fil-C's pass) | KI-22, lever (a): `datalayout_after_filc` lost |
 | `TLS reference in … mismatches non-TLS reference in …` (joining split parts) | KI-22, lever (a): unused hidden declarations |
 | `multiple definition of 'main'` … `filc_crt.o` / `filc_mincrt.o` after `clang -r` | KI-22, lever (a): Fil-C's driver adds its crt even to `-r -nostdlib` |
+| `patch-pass.ts` / `patch-split.ts`: `original found 0 times, expected 1` | an edit's original text no longer matches: upstream changed it (`check-upstream.sh`), or an editor trimmed a whitespace-only line in it (KI-22, lever (b)) |
+| `zilc (KI-22): interference graph differs from the original` / `frame-slot colouring differs` | only with `ZILC_VERIFY_INTERFERENCE=1` / `ZILC_VERIFY_COLOURING=1`: the patched pass disagrees with the original; KI-22 levers (b) and the colouring fix |
 
 ---
 
@@ -427,7 +429,8 @@ option 2).**
   (a) split the module and run Fil-C's clang on the parts in parallel. Fil-C already compiles C
   one translation unit at a time, and 32 cores sit idle. (b) A faster interference build in the
   patched pass that produces the same graph. (c) Cache objects by IR hash for unchanged rebuilds.
-  ✅ **(a) done 2026-10-02**, as the code-generation-only split below. (b) and (c) are next.
+  ✅ **(a) done 2026-10-02**, as the code-generation-only split below. ✅ **(b) and (c) done the
+  same day** (sections after (a)).
 
 **Lever (a) carried out (2026-10-02): split CODE GENERATION only, after the whole-module pass.**
 
@@ -516,6 +519,71 @@ one-step and two-step objects could be compared byte for byte on every input.
 **Recognising a relative.** Any future "same IR, different machine code" puzzle: check use-list
 order first (text vs bitcode, cloned vs original module). Any "TLS mismatches non-TLS": look for
 an unused hidden declaration of a thread-local.
+
+**Lever (b) carried out (2026-10-02): the pass's interference graph over dense ids.**
+
+- **Where the pass's time was** (gdb samples of the whole-module step on `69`, after lever (a);
+  the pass was 11.2 s of a 31 s step, the rest LLVM's own `-O1` passes): 17 of 44 pass samples
+  in the interference build's hash-set inserts (`FilPizlonator.cpp` 2997–2998 at `bb0d0a64`),
+  6 in the colouring's `FrameIndexMap` lookups per neighbour (3072–3073), 4 in `EraseIf`
+  (1033–1035), 3 in liveness (2970).
+- **The change** (`patch-pass.ts`, edit "interference graph over dense ids", plus the colouring
+  edit): every value gets a number and one id per pointer slot; the live set during the
+  interference walk is a dense set of value numbers (O(1) insert and erase); a neighbour list is
+  a plain `std::vector<uint32_t>`; the colouring reads a dense "index held" array that mirrors
+  `FrameIndexMap`. Duplicate neighbours are allowed: the colouring only asks which indices the
+  neighbours hold, and its `Taken` vector, sized by the list length, still has a free slot in
+  range. Liveness itself (the fixpoint) is unchanged.
+- **Why it is the same graph, and the details that keep it so:**
+  - The def × live loop counts a live value's slots with `countPtrsForValue(LV)`, but the
+    argument loops count an argument's with `countPtrs(type)`. The two can differ for a byval
+    argument, so each value's id range covers the larger, and each loop uses the count the
+    original used.
+  - `FrameIndexMap` already holds `Ignored` entries (index 0) when the colouring starts, and the
+    original sees them as taken indices, so the dense array is filled from `FrameIndexMap`, not
+    started empty.
+  - `ZILC_VERIFY_INTERFERENCE=1` also runs the original construction, verbatim, and aborts unless
+    every value's neighbour SET is equal (both directions: no value missing from either graph).
+    With `ZILC_VERIFY_COLOURING=1` the original colouring search runs too, reading
+    `FrameIndexMap` itself, which also checks the mirror array. **Both on, the whole corpus in
+    all four modes: no difference** (the verified `69` builds took 154–431 s, proof the original
+    code ran).
+- **Result:** the pass on `69` **11.2 s → 4.3 s**; the whole-module step 31.2 → 24.7 s, peak
+  ~1.0 GB. Through the driver: `69` ReleaseSafe **43.9 → 35.9 s** (split), `-j 1` 60.6 → 49.9 s.
+  The 2,000-alloca stress test: unchanged (13.2 vs 13.1 s; its pass time is elsewhere). What is
+  left in the pass has no hotspot (a re-profile spreads 18 samples over 14 places); the rest of
+  the step is LLVM's own optimizer (SROA 4.2 s, InstCombine 3.0 s, …), which would change the
+  output if touched.
+- ⚠️ **Whitespace trap in the edit's original text:** `FilPizlonator.cpp` has a line of six spaces
+  after `Live = LiveAtTail[BB];`. The file editor trimmed it from the edit, and the patch failed
+  with "original found 0 times". Restored with `sed`, and marked in `patch-pass.ts`.
+- `build-patched-clang.sh` now applies each edit script to a fresh copy of the PRISTINE file
+  (`git show $SHA:path`) and replaces the tree's file only if the result differs: changing an
+  edit's replacement text used to require resetting the file by hand, and rewriting an unchanged
+  file made ninja rebuild clang.
+
+**Lever (c) carried out (2026-10-02): the object cache.**
+
+- **What:** before running Fil-C's clang on a module, zilc looks for
+  `<cache>/objects/<key>.o` (cache = `$ZILC_CACHE_DIR`, else `$XDG_CACHE_HOME/zilc`, else
+  `~/.cache/zilc`, the same root as the std overlay) and copies it on a hit; on a miss it compiles
+  and stores the object (written through a temporary and renamed, so never half an object).
+  `--no-cache` / `ZILC_CACHE=0` turn it off. `cacheLookup`, `objectKey` in `src/driver.zig`.
+- **The key** (Blake3): the final Fil-C-dialect IR, zilc's version, a tag for zilc's clang
+  command lines (`filc_commands_tag`: bump it when they change), the plan (parts count), and the
+  IDENTITY of the clang and `llvm-split` binaries that would run: resolved path (PATH searched
+  like the OS), size, mtime, inode. **Not `clang --version`:** the patched clang deliberately
+  keeps the prebuilt's exact version string, so a rebuilt compiler would be invisible to it.
+- **Why reuse is faithful:** Fil-C's own output is not reproducible run to run (pass ordered by
+  heap addresses, above), so an earlier object for byte-identical input is as faithful as a
+  fresh compile; the program it produces passed the same checks.
+- **Result** (same source, same output path, built twice): `69` **36.0 → 2.3 s**, `62` 5.4 →
+  0.5 s. Zig's IR is identical run to run (checked).
+- **Limits:** (1) The key includes the OUTPUT path in effect: the entry shim lives in
+  `<output>.zilc-tmp/`, and its path is in the IR's debug info, so the same program built to a
+  different output path misses (seen in the first test, which used a new directory per run).
+  (2) No eviction: each entry is a full object (`69` ~11 MB); delete the folder to reclaim.
+  (3) The corpus script sets `ZILC_CACHE=0` so its recorded build times stay real compiles.
 
 **How the patch was proved output-identical, and why byte comparison could not do it:**
 

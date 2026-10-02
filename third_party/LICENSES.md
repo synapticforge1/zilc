@@ -106,6 +106,11 @@ Newest first. Copy the template for each adopted component.
   with several `indirectbr`s in one function, each is lowered in place into its own `switch` over
   its own destinations, instead of all being merged into one `switch_bb` (which broke the
   destinations' phis and dominance, and crashed). The single-`indirectbr` path is unchanged.
+  **Added 2026-10-02 (KI-22 lever b):** the frame-slot interference graph is built over dense
+  value ids with vector neighbour lists instead of hash sets of `ValuePtr`, and the colouring
+  reads a dense array mirroring `FrameIndexMap`: the same graph and the same colouring, verified
+  on the whole corpus with `ZILC_VERIFY_INTERFERENCE=1` (the original construction runs too and
+  the compile aborts on any difference).
   **Added 2026-10-02 (KI-22 lever a):** `llvm-split` gains `--zilc-part=I` /
   `--zilc-keep-global=FILE`: it writes one part of an already-compiled module by deleting the
   other parts' function bodies (keeping use-list order), for parallel code generation. A separate
@@ -125,7 +130,8 @@ Newest first. Copy the template for each adopted component.
 - **Modifications:** each changed block is marked `// zilc (KI-22): …` or `// zilc (KI-4): …` in the
   patched source. Also
   adds `zilcVerifyColouring()`: with `ZILC_VERIFY_COLOURING=1` the original search runs too and the
-  compile aborts on any difference (off by default)
+  compile aborts on any difference (off by default); and `zilcVerifyInterference()`, the same for
+  the interference graph with `ZILC_VERIFY_INTERFERENCE=1` (2026-10-02)
 - **Obligations satisfied:** [n/a] while local: Apache-2.0 §4 applies only on redistribution.
   **If the patched clang is ever distributed:** [ ] include the Apache-2.0 + LLVM-exception licence
   [ ] carry Fil-C's NOTICE/attribution files [ ] keep the `zilc (KI-…)` change marks (§4(b)

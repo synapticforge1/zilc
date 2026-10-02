@@ -537,9 +537,17 @@ move git's object store. Moving `.git` to NTFS behind a `gitdir:` pointer file w
 **rejected** (portability). Other projects on D: are outside zilc's scope and are not tracked here.
 **Nothing about KI-23 is open.**
 
-## ◐ KI-22 — Build time: Fil-C's frame-slot colouring is cubic on big Zig functions (2026-10-01). **Option 2 DONE (patched Fil-C clang, the default); option 3 rejected; lever (a) DONE 2026-10-02; (b), (c) next**
+## ✅ KI-22 — Build time: Fil-C's frame-slot colouring is cubic on big Zig functions (2026-10-01). **Option 2 DONE (patched Fil-C clang, the default); option 3 rejected; levers (a), (b), (c) DONE 2026-10-02**
 
-**Status 2026-10-02:** lever (a) is in: big modules (≥ 4 MB of Fil-C-dialect IR) run Fil-C's pass
+**Status 2026-10-02 (later): all three approved levers are in.** (b) builds the pass's
+interference graph over dense ids: the pass on `69` 11.2 → 4.3 s, verified equal to the original
+on the whole corpus in all four modes (`ZILC_VERIFY_INTERFERENCE=1`). (c) caches Fil-C objects by
+a key over the IR and the tools' identity: an unchanged `69` rebuilds in 2.3 s. `69` ReleaseSafe
+alone: **55.9 s (2026-10-01) → 35.9 s** cold, against native Zig's 16.9 s. What remains is mostly
+LLVM's own `-O1` optimizer on the instrumented code (~20 s of the whole-module step), which zilc
+cannot change without changing the output. Detail: `workarounds.md` KI-22.
+
+**Status 2026-10-02 (lever a):** lever (a) is in: big modules (≥ 4 MB of Fil-C-dialect IR) run Fil-C's pass
 and the optimizer whole, then generate their code in parallel parts with zilc's mode of
 `llvm-split` (`-j`/`ZILC_JOBS`). Same code: 2,840/2,840 of `69`'s functions identical to the
 unsplit compile of the same bitcode. `69` ReleaseSafe alone 60.6 → **43.9 s**; under corpus load

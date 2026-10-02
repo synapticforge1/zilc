@@ -82,6 +82,11 @@ the number of cores, at most 16, and `-j 1` turns it off.
 
 The stock Fil-C 0.685 prebuilt still works for the Release modes, without the parallel step.
 
+zilc also keeps the objects Fil-C's clang produces, so rebuilding an unchanged program skips that
+step: a TLS client rebuilds in about 2 seconds instead of 36. The cache lives in
+`$ZILC_CACHE_DIR`, else `$XDG_CACHE_HOME/zilc`, else `~/.cache/zilc`; `--no-cache` (or
+`ZILC_CACHE=0`) turns it off, and deleting the folder clears it.
+
 `.zig` inputs go through Zig and the Fil-C pass; `.c`, `.cpp`, `.o` and `.a` go straight to Fil-C.
 `-v` prints every command it runs. `--runtime zig` is reserved for zilc's own runtime and is refused
 until that runtime is ready for testing; `filc` (the default) links Fil-C's.
@@ -96,7 +101,7 @@ Each has a reason recorded in [cmem/known-issues.md](cmem/known-issues.md):
   default anyway.
 - **Large programs build slower than with plain Zig.** Fil-C's checks make the code it compiles
   several times larger. Typical programs build in seconds; a TLS client (`std.http.Client`) takes
-  about 45 seconds against Zig's 17.
+  about 36 seconds against Zig's 17 (2 seconds to rebuild unchanged).
 - **Target musl** — Fil-C's libc is musl; a gnu target fails to link.
 - **Zig's own start code cannot run** — it builds a pointer out of an integer address
   (`@ptrFromInt(getauxval(AT_PHDR))`), which is precisely what the capability model forbids. zilc

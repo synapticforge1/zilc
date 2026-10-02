@@ -1,8 +1,8 @@
 diff --git a/llvm/lib/Transforms/Instrumentation/FilPizlonator.cpp b/llvm/lib/Transforms/Instrumentation/FilPizlonator.cpp
-index d8812aa74..5b54a34d0 100644
+index d8812aa74..be6799e86 100644
 --- a/llvm/lib/Transforms/Instrumentation/FilPizlonator.cpp
 +++ b/llvm/lib/Transforms/Instrumentation/FilPizlonator.cpp
-@@ -341,6 +341,17 @@ namespace {
+@@ -341,6 +341,28 @@ namespace {
  
  static constexpr size_t NumSpecialFrameObjects = 0;
  
@@ -17,38 +17,320 @@ index d8812aa74..5b54a34d0 100644
 +  return On;
 +}
 +
++// zilc (KI-22 lever b): with ZILC_VERIFY_INTERFERENCE=1, the original hash-set interference graph
++// is built too and the compile aborts unless it equals the dense one, neighbour set by neighbour
++// set. Off by default; it restores the original's cost.
++static bool zilcVerifyInterference() {
++  static const bool On = [] {
++    const char* V = getenv("ZILC_VERIFY_INTERFERENCE");
++    return V && V[0] == '1';
++  }();
++  return On;
++}
++
  enum class MATokenKind {
    None,
    Error,
-@@ -3054,14 +3065,38 @@ class Pizlonator {
+@@ -2956,35 +2978,101 @@ class Pizlonator {
+       }
+     }
  
+-    std::unordered_map<ValuePtr, std::unordered_set<ValuePtr>> Interference;
++    // zilc (KI-22 lever b): the SAME interference graph, built over dense ids. The original
++    // inserted every (definition x live value) pair into hash sets keyed by ValuePtr, ~40% of
++    // this pass on a big Zig module. Here every value gets a number and a range of ids (one per
++    // pointer slot), the live set is a dense set of value numbers, and a neighbour list is a
++    // plain vector. Duplicates are allowed: the colouring only asks which indices the
++    // neighbours hold. ZILC_VERIFY_INTERFERENCE=1 builds the original too and compares.
++    DenseMap<Value*, unsigned> ZilcValNum;  // value -> value number
++    std::vector<unsigned> ZilcValCount;     // countPtrsForValue: what the def x live edges use
++    std::vector<unsigned> ZilcValBase;      // the value's first id
++    std::vector<ValuePtr> ZilcPtrOf;        // id -> ValuePtr
++    std::vector<std::vector<uint32_t>> ZilcAdj;
++    auto ZilcNumber = [&](Value* V) -> unsigned {
++      auto Found = ZilcValNum.find(V);
++      if (Found != ZilcValNum.end())
++        return Found->second;
++      unsigned N = ZilcValCount.size();
++      ZilcValNum[V] = N;
++      size_t Count = countPtrsForValue(V);
++      size_t Slots = Count;
++      // The argument edges below count an argument's slots with countPtrs(type) instead.
++      if (Argument* A = dyn_cast<Argument>(V))
++        Slots = std::max(Slots, countPtrs(A->getType()));
++      ZilcValCount.push_back(Count);
++      ZilcValBase.push_back(ZilcPtrOf.size());
++      for (size_t PtrIndex = 0; PtrIndex < Slots; PtrIndex++)
++        ZilcPtrOf.push_back(ValuePtr(V, PtrIndex));
++      ZilcAdj.resize(ZilcPtrOf.size());
++      return N;
++    };
++    for (Argument& A : OldF->args())
++      ZilcNumber(&A);
++    for (BasicBlock* BB : Blocks) {
++      for (Instruction& I : *BB)
++        ZilcNumber(&I);
++    }
++
++    // The live set: value numbers, with each one's position for O(1) erase.
++    std::vector<uint32_t> ZilcLive;
++    std::vector<uint32_t> ZilcLivePos;
++    auto ZilcLiveInsert = [&](unsigned N) {
++      if (ZilcLivePos.size() <= N)
++        ZilcLivePos.resize(ZilcValCount.size(), UINT32_MAX);
++      if (ZilcLivePos[N] == UINT32_MAX) {
++        ZilcLivePos[N] = ZilcLive.size();
++        ZilcLive.push_back(N);
++      }
++    };
++    auto ZilcLiveErase = [&](Value* V) {
++      auto Found = ZilcValNum.find(V);
++      if (Found == ZilcValNum.end())
++        return;
++      unsigned N = Found->second;
++      if (N >= ZilcLivePos.size() || ZilcLivePos[N] == UINT32_MAX)
++        return;
++      uint32_t Pos = ZilcLivePos[N];
++      uint32_t Last = ZilcLive.back();
++      ZilcLive[Pos] = Last;
++      ZilcLivePos[Last] = Pos;
++      ZilcLive.pop_back();
++      ZilcLivePos[N] = UINT32_MAX;
++    };
+ 
+     for (size_t BlockIndex = Blocks.size(); BlockIndex--;) {
+       BasicBlock* BB = Blocks[BlockIndex];
+-      std::unordered_set<Value*> Live = LiveAtTail[BB];
+-      
++      for (uint32_t N : ZilcLive)
++        ZilcLivePos[N] = UINT32_MAX;
++      ZilcLive.clear();
++      for (Value* V : LiveAtTail[BB])
++        ZilcLiveInsert(ZilcNumber(V));
++
+       for (auto It = BB->rbegin(); It != BB->rend(); ++It) {
+         Instruction* I = &*It;
+ 
+         Instruction* Defined = nullptr;
+         if (LifetimeMarker LM = analyzeLifetimeMarker(I)) {
+           if (LM.LMK == LifetimeMarkerKind::Start) {
+-            Live.erase(LM.AI);
++            ZilcLiveErase(LM.AI);
+             Defined = LM.AI;
+           }
+         } else {
+-          Live.erase(I);
++          ZilcLiveErase(I);
+           Defined = I;
+         }
+ 
+         if (Defined) {
+-          size_t NumIPtrs = countPtrsForValue(Defined);
++          unsigned DN = ZilcNumber(Defined);
++          size_t NumIPtrs = ZilcValCount[DN];
+           if (NumIPtrs) {
+-            for (Value* LV : Live) {
+-              size_t NumVIPtrs = countPtrsForValue(LV);
+-              for (size_t LVPtrIndex = NumVIPtrs; LVPtrIndex--;) {
++            uint32_t DBase = ZilcValBase[DN];
++            for (uint32_t LN : ZilcLive) {
++              uint32_t LBase = ZilcValBase[LN];
++              for (size_t LVPtrIndex = ZilcValCount[LN]; LVPtrIndex--;) {
+                 for (size_t IPtrIndex = NumIPtrs; IPtrIndex--;) {
+-                  Interference[ValuePtr(Defined, IPtrIndex)].insert(ValuePtr(LV, LVPtrIndex));
+-                  Interference[ValuePtr(LV, LVPtrIndex)].insert(ValuePtr(Defined, IPtrIndex));
++                  ZilcAdj[DBase + IPtrIndex].push_back(LBase + LVPtrIndex);
++                  ZilcAdj[LBase + LVPtrIndex].push_back(DBase + IPtrIndex);
+                 }
+               }
+             }
+@@ -2993,11 +3081,11 @@ class Pizlonator {
+ 
+         if (LifetimeMarker LM = analyzeLifetimeMarker(I)) {
+           if (LM.LMK == LifetimeMarkerKind::End)
+-            Live.insert(LM.AI);
++            ZilcLiveInsert(ZilcNumber(LM.AI));
+         } else {
+           for (Value* V : I->operand_values()) {
+             if (Value* LV = LiveCast(V))
+-              Live.insert(LV);
++              ZilcLiveInsert(ZilcNumber(LV));
+           }
+         }
+       }
+@@ -3008,29 +3096,121 @@ class Pizlonator {
+       size_t NumA1Ptrs = countPtrs(A1.getType());
+       if (!NumA1Ptrs)
+         continue;
++      uint32_t Base1 = ZilcValBase[ZilcNumber(&A1)];
+       for (Argument& A2 : OldF->args()) {
+         size_t NumA2Ptrs = countPtrs(A2.getType());
++        uint32_t Base2 = ZilcValBase[ZilcNumber(&A2)];
+         for (size_t A2PtrIndex = NumA2Ptrs; A2PtrIndex--;) {
+           for (size_t A1PtrIndex = NumA1Ptrs; A1PtrIndex--;)
+-            Interference[ValuePtr(&A1, A1PtrIndex)].insert(ValuePtr(&A2, A2PtrIndex));
++            ZilcAdj[Base1 + A1PtrIndex].push_back(Base2 + A2PtrIndex);
+         }
+       }
+     }
+ 
+     // All indices for a value interfere with one another.
+     for (Argument& A : OldF->args()) {
++      uint32_t Base = ZilcValBase[ZilcNumber(&A)];
+       for (size_t PtrIndex = countPtrs(A.getType()); PtrIndex--;) {
+         for (size_t APtrIndex = countPtrs(A.getType()); APtrIndex--;)
+-          Interference[ValuePtr(&A, PtrIndex)].insert(ValuePtr(&A, APtrIndex));
++          ZilcAdj[Base + PtrIndex].push_back(Base + APtrIndex);
+       }
+     }
+     for (BasicBlock* BB : Blocks) {
+       for (Instruction& I : *BB) {
++        uint32_t Base = ZilcValBase[ZilcNumber(&I)];
+         for (size_t PtrIndex = countPtrsForValue(&I); PtrIndex--;) {
+           for (size_t APtrIndex = countPtrsForValue(&I); APtrIndex--;)
+-            Interference[ValuePtr(&I, PtrIndex)].insert(ValuePtr(&I, APtrIndex));
++            ZilcAdj[Base + PtrIndex].push_back(Base + APtrIndex);
++        }
++      }
++    }
++
++    if (zilcVerifyInterference()) {
++      // The original construction, verbatim, then the two graphs compared as sets.
++      std::unordered_map<ValuePtr, std::unordered_set<ValuePtr>> Interference;
++      for (size_t BlockIndex = Blocks.size(); BlockIndex--;) {
++        BasicBlock* BB = Blocks[BlockIndex];
++        std::unordered_set<Value*> Live = LiveAtTail[BB];
++        for (auto It = BB->rbegin(); It != BB->rend(); ++It) {
++          Instruction* I = &*It;
++          Instruction* Defined = nullptr;
++          if (LifetimeMarker LM = analyzeLifetimeMarker(I)) {
++            if (LM.LMK == LifetimeMarkerKind::Start) {
++              Live.erase(LM.AI);
++              Defined = LM.AI;
++            }
++          } else {
++            Live.erase(I);
++            Defined = I;
++          }
++          if (Defined) {
++            size_t NumIPtrs = countPtrsForValue(Defined);
++            if (NumIPtrs) {
++              for (Value* LV : Live) {
++                size_t NumVIPtrs = countPtrsForValue(LV);
++                for (size_t LVPtrIndex = NumVIPtrs; LVPtrIndex--;) {
++                  for (size_t IPtrIndex = NumIPtrs; IPtrIndex--;) {
++                    Interference[ValuePtr(Defined, IPtrIndex)].insert(ValuePtr(LV, LVPtrIndex));
++                    Interference[ValuePtr(LV, LVPtrIndex)].insert(ValuePtr(Defined, IPtrIndex));
++                  }
++                }
++              }
++            }
++          }
++          if (LifetimeMarker LM = analyzeLifetimeMarker(I)) {
++            if (LM.LMK == LifetimeMarkerKind::End)
++              Live.insert(LM.AI);
++          } else {
++            for (Value* V : I->operand_values()) {
++              if (Value* LV = LiveCast(V))
++                Live.insert(LV);
++            }
++          }
++        }
++      }
++      for (Argument& A1 : OldF->args()) {
++        size_t NumA1Ptrs = countPtrs(A1.getType());
++        if (!NumA1Ptrs)
++          continue;
++        for (Argument& A2 : OldF->args()) {
++          size_t NumA2Ptrs = countPtrs(A2.getType());
++          for (size_t A2PtrIndex = NumA2Ptrs; A2PtrIndex--;) {
++            for (size_t A1PtrIndex = NumA1Ptrs; A1PtrIndex--;)
++              Interference[ValuePtr(&A1, A1PtrIndex)].insert(ValuePtr(&A2, A2PtrIndex));
++          }
++        }
++      }
++      for (Argument& A : OldF->args()) {
++        for (size_t PtrIndex = countPtrs(A.getType()); PtrIndex--;) {
++          for (size_t APtrIndex = countPtrs(A.getType()); APtrIndex--;)
++            Interference[ValuePtr(&A, PtrIndex)].insert(ValuePtr(&A, APtrIndex));
+         }
+       }
++      for (BasicBlock* BB : Blocks) {
++        for (Instruction& I : *BB) {
++          for (size_t PtrIndex = countPtrsForValue(&I); PtrIndex--;) {
++            for (size_t APtrIndex = countPtrsForValue(&I); APtrIndex--;)
++              Interference[ValuePtr(&I, PtrIndex)].insert(ValuePtr(&I, APtrIndex));
++          }
++        }
++      }
++      for (size_t Id = 0; Id < ZilcAdj.size(); Id++) {
++        std::unordered_set<ValuePtr> Mine;
++        for (uint32_t N : ZilcAdj[Id])
++          Mine.insert(ZilcPtrOf[N]);
++        auto Found = Interference.find(ZilcPtrOf[Id]);
++        if (Found == Interference.end() ? !Mine.empty() : Found->second != Mine)
++          report_fatal_error("zilc (KI-22): interference graph differs from the original");
++      }
++      for (auto& Entry : Interference) {
++        if (Entry.second.empty())
++          continue;
++        auto Found = ZilcValNum.find(Entry.first.V);
++        if (Found == ZilcValNum.end()
++            || ZilcValBase[Found->second] + Entry.first.PtrIndex >= ZilcPtrOf.size()
++            || !(ZilcPtrOf[ZilcValBase[Found->second] + Entry.first.PtrIndex] == Entry.first))
++          report_fatal_error("zilc (KI-22): original interference has a value the dense graph lacks");
++      }
+     }
+ 
+     // Make this deterministic by having a known order in which we process stuff.
+@@ -3052,16 +3232,56 @@ class Pizlonator {
+       }
+     }
+ 
++    // zilc (KI-22 lever b): the index each id holds, mirrored from FrameIndexMap (which already
++    // holds the Ignored entries made just above), so the colouring makes no hash lookups.
++    std::vector<size_t> ZilcHeld(ZilcPtrOf.size(), SIZE_MAX);
++    for (auto& Entry : FrameIndexMap) {
++      auto Found = ZilcValNum.find(Entry.first.V);
++      if (Found == ZilcValNum.end())
++        continue;
++      size_t Id = ZilcValBase[Found->second] + Entry.first.PtrIndex;
++      if (Id < ZilcPtrOf.size() && ZilcPtrOf[Id] == Entry.first)
++        ZilcHeld[Id] = Entry.second.Index;
++    }
++
      for (ValuePtr IP : Order) {
-       const std::unordered_set<ValuePtr>& Adjacency = Interference[IP];
+-      const std::unordered_set<ValuePtr>& Adjacency = Interference[IP];
 -      for (size_t FrameIndex = NumSpecialFrameObjects; ; FrameIndex++) {
 -        bool Ok = true;
 -        for (ValuePtr AIP : Adjacency) {
 -          if (FrameIndexMap.count(AIP) && FrameIndexMap[AIP].Index == FrameIndex) {
 -            Ok = false;
 -            break;
++      const size_t IPId = ZilcValBase[ZilcNumber(IP.V)] + IP.PtrIndex;
++      const std::vector<uint32_t>& Adjacency = ZilcAdj[IPId];
 +      // zilc (KI-22): mark the indices the neighbours hold, then take the lowest free one.
 +      // The original rescanned every neighbour for each candidate index (cubic on large
-+      // functions); this picks the same index.
++      // functions); this picks the same index. (Lever b: neighbours are dense ids, which may
++      // repeat; the size bound still leaves a free index in range.)
 +      std::vector<bool> Taken(Adjacency.size() + 1, false);
-+      for (ValuePtr AIP : Adjacency) {
-+        auto Found = FrameIndexMap.find(AIP);
-+        if (Found != FrameIndexMap.end() && Found->second.Index >= NumSpecialFrameObjects
-+            && Found->second.Index - NumSpecialFrameObjects < Taken.size())
-+          Taken[Found->second.Index - NumSpecialFrameObjects] = true;
++      for (uint32_t N : Adjacency) {
++        size_t Held = ZilcHeld[N];
++        if (Held != SIZE_MAX && Held >= NumSpecialFrameObjects
++            && Held - NumSpecialFrameObjects < Taken.size())
++          Taken[Held - NumSpecialFrameObjects] = true;
 +      }
 +      size_t FirstFree = 0;
 +      while (Taken[FirstFree])
 +        FirstFree++;
 +      if (zilcVerifyColouring()) {
-+        // The original search, kept to prove the two agree (ZILC_VERIFY_COLOURING=1).
++        // The original search, kept to prove the two agree (ZILC_VERIFY_COLOURING=1). It reads
++        // FrameIndexMap itself, so it also checks the ZilcHeld mirror.
 +        size_t Expected = NumSpecialFrameObjects;
 +        for (;; Expected++) {
 +          bool Clash = false;
-+          for (ValuePtr AIP : Adjacency) {
++          for (uint32_t N : Adjacency) {
++            ValuePtr AIP = ZilcPtrOf[N];
 +            if (FrameIndexMap.count(AIP) && FrameIndexMap[AIP].Index == Expected) {
 +              Clash = true;
 +              break;
@@ -65,7 +347,15 @@ index d8812aa74..5b54a34d0 100644
          if (Ok) {
            FrameEntryKind FEK;
            PointerKind PK = pointerKindDirect(IP.V);
-@@ -3145,15 +3180,36 @@ class Pizlonator {
+@@ -3071,6 +3291,7 @@ class Pizlonator {
+           else
+             FEK = FrameEntryKind::Lower;
+           FrameIndexMap[IP] = FrameEntry(FEK, FrameIndex);
++          ZilcHeld[IPId] = FrameIndex;
+           FrameSize = std::max(FrameSize, FrameIndex + 1);
+           break;
+         }
+@@ -3145,15 +3366,36 @@ class Pizlonator {
  
      for (AllocaInst* AI : StackAuxOrder) {
        const std::unordered_set<AllocaInst*>& Adjacency = StackAuxInterference[AI];
@@ -109,7 +399,7 @@ index d8812aa74..5b54a34d0 100644
          if (Ok) {
            if (verbose) {
              errs() << "For explicit local " << AI->getName() << " using lowers index " << FrameIndex
-@@ -14488,6 +14544,60 @@ class Pizlonator {
+@@ -14488,6 +14730,60 @@ class Pizlonator {
          Twine(IBr->getAddress()->getName()) + ".switch_cast", IBr);
      };
  
