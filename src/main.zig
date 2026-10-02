@@ -44,8 +44,9 @@ const usage =
     \\Today's limits, each with a reason in cmem/known-issues.md:
     \\  * -O Debug needs zilc's patched Fil-C clang (KI-4; tools/filc/).
     \\  * Fil-C's libc is musl; a gnu target fails to link (KI-6).
-    \\  * Zig's start code trips Fil-C, so C must own main (KI-5):
-    \\    export C-ABI functions from Zig and link a C main.
+    \\  * Zig's own start code trips Fil-C (KI-5), so zilc generates the
+    \\    entry: a Zig `pub fn main` works, and so does a C main calling Zig
+    \\    exports; std.os.environ is not set.
     \\
     \\example:
     \\  zilc build examples/interop/c_caller.c examples/interop/bounds.zig -o prog

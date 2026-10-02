@@ -105,7 +105,7 @@ pub fn build(b: *std.Build) void {
         // The examples and the driver's output both change what this proves.
         run_gate.has_side_effects = true;
 
-        const gate_step = b.step("gate", "Build every example with zilc and assert it traps (needs Fil-C)");
+        const gate_step = b.step("gate", "Build every example with zilc: bugs must trap, library mode must run (needs Fil-C)");
         gate_step.dependOn(&run_gate.step);
     }
 

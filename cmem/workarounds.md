@@ -67,6 +67,7 @@ Every workaround gets an entry **when it is made**, not later. Use these heading
 | `Can't create a MachineFunction using a Module with a Target-incompatible DataLayout` (a module split before Fil-C's pass) | KI-22, lever (a): `datalayout_after_filc` lost |
 | `TLS reference in … mismatches non-TLS reference in …` (joining split parts) | KI-22, lever (a): unused hidden declarations |
 | `multiple definition of 'main'` … `filc_crt.o` / `filc_mincrt.o` after `clang -r` | KI-22, lever (a): Fil-C's driver adds its crt even to `-r -nostdlib` |
+| `filc safety error: stack overflow` on a Zig `@panic`, or the KI-12 / KI-20 traps, in a program whose `main` is C | the Zig file was compiled without zilc's generated root, so std's hooks were missing: fixed 2026-10-02 by the library root (`library_shim`, KI-5 short form below; gate cases 5–7) |
 | `patch-pass.ts` / `patch-split.ts`: `original found 0 times, expected 1` | an edit's original text no longer matches: upstream changed it (`check-upstream.sh`), or an editor trimmed a whitespace-only line in it (KI-22, lever (b)) |
 | `zilc (KI-22): interference graph differs from the original` / `frame-slot colouring differs` | only with `ZILC_VERIFY_INTERFERENCE=1` / `ZILC_VERIFY_COLOURING=1`: the patched pass disagrees with the original; KI-22 levers (b) and the colouring fix |
 
@@ -220,8 +221,8 @@ expects an error code natively. Read the std caller around the trace line. Look 
 **Cost and exit.** Negligible run-time cost. No exit needed. If Fil-C ever returns `EINVAL` for
 unknown advice, the option can stay anyway.
 
-**Where.** `src/driver.zig`, entry shim (`std_options`), commented. Library mode (C owns `main`) is
-**not** covered, like the other shim hooks (pre-publish checklist).
+**Where.** `src/driver.zig`, entry shim (`std_options`), commented. Library mode (C owns `main`):
+✅ covered since 2026-10-02 by the library root (`library_shim`), with the other hooks.
 
 ---
 
@@ -622,7 +623,7 @@ allowed, owner 2026-10-01).
   `ni:0` on address space 0 plus `datalayout_after_filc`. Stock IR lacks both. System limitation.
 - **KI-5, generated C-ABI entry shim.** *Why:* `start.zig` forges pointers from integers
   (`@ptrFromInt(getauxval(AT_PHDR))`), which InvisiCap forbids by design. F2. Also hosts the panic
-  handler and the `page_allocator` hook. ⚠️ Not applied in library mode.
+  handler and the `page_allocator` hook. Since 2026-10-02 the hooks live in `shim_hooks`, shared with a LIBRARY root for C-owns-`main` builds, and a user file's own `panic`/`os`/`std_options` are honoured (only `crypto_always_getrandom` is forced).
 - **KI-6, target `x86_64-linux-musl`.** *Why:* Fil-C's libc is musl; gnu-target Zig emits `*64`
   glibc names. F4.
 - **KI-7, raw `syscall` asm → `zilc_syscall`** (`ir.rewriteSyscalls`). *Why:* std makes raw syscalls

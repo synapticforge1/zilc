@@ -305,8 +305,8 @@ Hello-world's backtrace: `std.debug.print` → `debug.lockStderrWriter` → `Pro
   on panic and stack-trace paths. (Owner asked, 2026-09-30.) ✅ **Done the same day for whole
   programs:** the entry shim defines `pub const panic = std.debug.FullPanic(zilcPanic)`, which calls
   Fil-C's **`zerror`**. `42_panic` now prints `zig panic: a problem` with Fil-C's trace naming
-  `panic.zig:6:5`, instead of a stack overflow in the trace code. ⚠️ **Not yet covered: library mode**
-  (C owns `main`), where the user's file is the root, so the default handler still applies.
+  `panic.zig:6:5`, instead of a stack overflow in the trace code. ✅ **Library mode covered 2026-10-02**
+  (C owns `main`): a generated library root (`library_shim`) carries the same handler (gate case 7).
 - **Most zilc-shaped fix (to verify):** extend the IR rewrite (`src/ir.zig`) to replace
   `asm sideeffect "syscall"` with a call to libc's `syscall(n, …)`, which in Fil-C goes through the
   checked `zsys_*` layer (`filc-abi.md`). It needs checking that Fil-C's `syscall()` accepts these
@@ -352,7 +352,7 @@ pending:**~~ decided 2026-09-30, option 1.
 the previous mapping, a pointer at an object's upper bound (`zig-upstream-notes.md` **Z-2**; not a
 Zig bug). **Fix:** the entry shim declares std's official hook `root.os.heap.page_allocator =
 std.heap.c_allocator`, so pages are Fil-C malloc objects. 69 now gets past it and stops on Z-5
-(`DebugAllocator`) instead. ⚠️ Library mode (C owns `main`) is not covered, as with the panic
+(`DebugAllocator`) instead. ✅ Library mode (C owns `main`) covered 2026-10-02 by the library root, like the panic
 handler.
 
 ## ✅ KI-13 — Pointers rebuilt from integers lose their capability (the "null object" class). **MOSTLY FIXED 2026-09-30**
@@ -601,7 +601,7 @@ Trivial Debug programs 9.9 s → 2.1 s. Details: `workarounds.md` KI-21.
 CSPRNG deliberately passes `0xffffffff` to detect QEMU and expects `EINVAL`; Fil-C stops instead.
 **Fix:** the entry shim sets std's official `std_options.crypto_always_getrandom = true` (kernel
 CSPRNG on every fill, fork-safe). 69 now completes a real HTTPS request in every Release mode.
-Library mode is not covered (pre-publish checklist). Details: `workarounds.md` KI-20.
+Library mode covered 2026-10-02 (library root; gate case 6). Details: `workarounds.md` KI-20.
 
 ## ✅ KI-19 — Debug only: syscall POINTER arguments arrive without a capability (2026-09-30). **FIXED 2026-10-01 by moving Debug to `filc -O1`**
 

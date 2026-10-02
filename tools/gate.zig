@@ -1,10 +1,12 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception OR MIT
-//! The safety gate: every example must trap, with the fault attributed to the
-//! right source line.
+//! The safety gate: every bug example must trap, with the fault attributed to the
+//! right source line; and (since 2026-10-02) the library-mode example must RUN, with
+//! the std hooks zilc's generated root module supplies.
 //!
 //! ⚠️ **Checking the exit status alone would accept a crash for the wrong
 //! reason.** Fil-C prints a `semantic origin:` naming file:line:column, so the
-//! gate asserts on that as well as on the kind of violation.
+//! gate asserts on that as well as on the kind of violation. A case that must run
+//! asserts on its output too.
 //!
 //! Needs Fil-C and Zig 0.15.2 (`ZILC_FILC`, `ZILC_ZIG`). Where they are absent —
 //! Windows, CI without the toolchain — it prints what is missing and exits 0,
@@ -12,16 +14,31 @@
 
 const std = @import("std");
 
+const Expect = enum {
+    /// A Fil-C safety trap (`filc safety error`) at `origin`, naming `fault`.
+    safety_trap,
+    /// Exit 0, and the output contains `fault` (the expected line).
+    runs,
+    /// Stopped by Fil-C reporting a Zig panic (`filc user error: zig panic: <fault>`), the
+    /// way zilc's panic handler is designed to report it.
+    zig_panic,
+};
+
 const Case = struct {
     name: []const u8,
     /// Passed to `zilc build`, relative to the repo root.
     inputs: []const []const u8,
     optimize: []const u8 = "ReleaseSafe",
-    /// The `semantic origin:` the panic must name.
-    origin: []const u8,
-    /// A distinctive phrase from the expected violation.
+    /// Arguments for the built program.
+    args: []const []const u8 = &.{},
+    expect: Expect = .safety_trap,
+    /// The `semantic origin:` the panic must name (safety traps only).
+    origin: []const u8 = "",
+    /// A distinctive phrase from the expected violation, output line or panic message.
     fault: []const u8,
 };
+
+const library = [_][]const u8{ "examples/library/main.c", "examples/library/hooks.zig" };
 
 const cases = [_]Case{
     .{
@@ -47,6 +64,28 @@ const cases = [_]Case{
         .inputs = &.{"examples/use_after_free.c"},
         .origin = "use_after_free.c:13",
         .fault = "free object",
+    },
+    // Library mode (C owns main): the hooks the generated library root supplies.
+    .{
+        .name = "library mode: std.heap.page_allocator (KI-12 hook)",
+        .inputs = &library,
+        .args = &.{"page"},
+        .expect = .runs,
+        .fault = "page_allocator: 8",
+    },
+    .{
+        .name = "library mode: std.crypto.random (KI-20 hook)",
+        .inputs = &library,
+        .args = &.{"random"},
+        .expect = .runs,
+        .fault = "random: 1",
+    },
+    .{
+        .name = "library mode: @panic reported by Fil-C (panic hook)",
+        .inputs = &library,
+        .args = &.{"panic"},
+        .expect = .zig_panic,
+        .fault = "library panic",
     },
 };
 
@@ -126,10 +165,17 @@ pub fn main() !void {
             continue;
         }
 
-        const ran = try std.process.Child.run(.{ .allocator = gpa, .argv = &.{out_path} });
+        var run_argv: std.ArrayListUnmanaged([]const u8) = .{};
+        try run_argv.append(gpa, out_path);
+        try run_argv.appendSlice(gpa, case.args);
+        const ran = try std.process.Child.run(.{ .allocator = gpa, .argv = run_argv.items });
         const trapped = switch (ran.term) {
             .Signal => |sig| sig == sigtrap,
             .Exited => |c| c == 128 + sigtrap,
+            else => false,
+        };
+        const exited_ok = switch (ran.term) {
+            .Exited => |c| c == 0,
             else => false,
         };
 
@@ -138,25 +184,54 @@ pub fn main() !void {
         const report = try std.fmt.allocPrint(gpa, "{s}{s}", .{ ran.stdout, ran.stderr });
 
         var problems: usize = 0;
-        if (!trapped) {
-            std.debug.print("      FAIL: expected a SIGTRAP panic, got {any}\n", .{ran.term});
-            problems += 1;
-        }
-        if (std.mem.indexOf(u8, report, "filc safety error") == null) {
-            std.debug.print("      FAIL: no 'filc safety error' in the output\n", .{});
-            problems += 1;
-        }
-        if (std.mem.indexOf(u8, report, case.origin) == null) {
-            std.debug.print("      FAIL: panic did not name '{s}'\n", .{case.origin});
-            problems += 1;
-        }
-        if (std.mem.indexOf(u8, report, case.fault) == null) {
-            std.debug.print("      FAIL: expected fault '{s}'\n", .{case.fault});
-            problems += 1;
+        switch (case.expect) {
+            .safety_trap => {
+                if (!trapped) {
+                    std.debug.print("      FAIL: expected a SIGTRAP panic, got {any}\n", .{ran.term});
+                    problems += 1;
+                }
+                if (std.mem.indexOf(u8, report, "filc safety error") == null) {
+                    std.debug.print("      FAIL: no 'filc safety error' in the output\n", .{});
+                    problems += 1;
+                }
+                if (std.mem.indexOf(u8, report, case.origin) == null) {
+                    std.debug.print("      FAIL: panic did not name '{s}'\n", .{case.origin});
+                    problems += 1;
+                }
+                if (std.mem.indexOf(u8, report, case.fault) == null) {
+                    std.debug.print("      FAIL: expected fault '{s}'\n", .{case.fault});
+                    problems += 1;
+                }
+            },
+            .runs => {
+                if (!exited_ok) {
+                    std.debug.print("      FAIL: expected exit 0, got {any}\n", .{ran.term});
+                    problems += 1;
+                }
+                if (std.mem.indexOf(u8, report, case.fault) == null) {
+                    std.debug.print("      FAIL: expected output '{s}'\n", .{case.fault});
+                    problems += 1;
+                }
+            },
+            .zig_panic => {
+                if (!trapped) {
+                    std.debug.print("      FAIL: expected Fil-C to stop the program, got {any}\n", .{ran.term});
+                    problems += 1;
+                }
+                const want = try std.fmt.allocPrint(gpa, "filc user error: zig panic: {s}", .{case.fault});
+                if (std.mem.indexOf(u8, report, want) == null) {
+                    std.debug.print("      FAIL: expected '{s}'\n", .{want});
+                    problems += 1;
+                }
+            },
         }
 
         if (problems == 0) {
-            std.debug.print("      ok — trapped at {s}\n", .{case.origin});
+            switch (case.expect) {
+                .safety_trap => std.debug.print("      ok — trapped at {s}\n", .{case.origin}),
+                .runs => std.debug.print("      ok — ran: {s}\n", .{case.fault}),
+                .zig_panic => std.debug.print("      ok — Fil-C reported the panic: {s}\n", .{case.fault}),
+            }
         } else {
             std.debug.print("      --- output ---\n{s}\n", .{report});
             failures += 1;

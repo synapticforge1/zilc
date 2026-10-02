@@ -28,8 +28,12 @@ for structure and policy.
   gate 4/4, tests 25/25; toolchain re-archived; upstream: every edit still applies.
 - ✅ **Output comparison** (pre-publish item) done the same day: **0 unexplained differences**
   between zilc and native over the whole corpus, C and Zig, all four modes (`testing.md`).
-- ▶️ **Next: the rest of the PRE-PUBLISH CHECKLIST**: library mode, KI-5, `--version` and
-  release notes, the platforms scope pass. Still open from 2026-10-01: read the
+- ✅ **Library mode** (pre-publish item) done the same day: C-owns-`main` builds get a
+  generated library root with the same std hooks (panic, `page_allocator`, getrandom), and both
+  roots now honour a user file's own `panic`/`os`/`std_options` (getrandom stays forced).
+  `examples/library/`; gate 7/7 (new expectations: "runs", "zig panic").
+- ▶️ **Next: the rest of the PRE-PUBLISH CHECKLIST**: KI-5, `--version` and release notes, the
+  platforms scope pass. Still open from 2026-10-01: read the
   9 upstream `FilPizlonator.cpp` commits (above all `097f7b7`), then `--mark-reviewed`.
 
 ## ✅ 2026-10-02 — BUILD SPEED, lever (a)
@@ -187,8 +191,9 @@ for structure and policy.
   - [x] **Output comparison**: corpus output vs native, not just exit codes. ✅ 2026-10-02: 0
     unexplained differences in 624 comparisons (C + Zig, 4 modes); `tools/basics/compare-output.ts`,
     `testing.md` "Output comparison"
-  - [ ] **Library mode** (C owns `main`): panic handler, page-allocator hook and (KI-20)
-    `crypto_always_getrandom` not applied
+  - [x] **Library mode** (C owns `main`): panic handler, page-allocator hook and (KI-20)
+    `crypto_always_getrandom` not applied. ✅ 2026-10-02: a generated LIBRARY root module
+    (`library_shim`, sharing `shim_hooks` with the entry shim); gate cases 5–7 (gate 7/7)
   - [ ] **KI-5**: `std.os.environ` unset by the entry shim
   - [ ] `zilc --version` shows the user-code Zig and Fil-C release; create a **release-notes file**
   - [ ] **Platforms scope pass** (P6): per platform, the processors, the std OS-function count, the
@@ -375,7 +380,7 @@ the runtime-linking rule checked.
 | [reference-projects.md](reference-projects.md) | Fil-C, LLVM, Zig: verified licenses, what to mine each for, adoption status. |
 | [roadmap.md](roadmap.md) | P0 ✅ → P1 ✅ → P2 ✅ (`0.3.0`) → **P3 Zig runtime (plan 2026-09-30: Linux first, checked against Fil-C, `zsys_*` first; next step the `zsys_write` spike)** → P4 Zig-language fidelity → P5 C++ → **P6 other platforms (proposed 2026-09-30)**. |
 | [security-model.md](security-model.md) | The safety guarantees being targeted (spatial, temporal, thread-safe capability updates), and what is explicitly out of scope. |
-| [testing.md](testing.md) | Current gates (gate 4/4, tests 26/26 on 2026-10-02, with the exact commands), 🆕 the OUTPUT COMPARISON vs native (0 unexplained differences, 2026-10-02), corpus results per mode and (2026-10-01) build times, the recorded expected panics, and the planned gates: `-Druntime=both`, the between-versions comparison, and the benchmark suite. |
+| [testing.md](testing.md) | Current gates (gate 7/7, tests 26/26 on 2026-10-02, with the exact commands), 🆕 the OUTPUT COMPARISON vs native (0 unexplained differences, 2026-10-02), corpus results per mode and (2026-10-01) build times, the recorded expected panics, and the planned gates: `-Druntime=both`, the between-versions comparison, and the benchmark suite. |
 | [known-issues.md](known-issues.md) | 🆕 2026-10-01: **KI-4, KI-10, KI-18, KI-19, KI-20, KI-21 fixed; KI-22 (build time) DONE** (patched Fil-C clang; option 3 rejected; levers (a) parallel code generation, (b) dense interference graph, (c) object cache, all 2026-10-02: `69` 55.9 → 35.9 s cold, 2.3 s unchanged). Partly open: KI-7 (`getcontext`), KI-5. KI-23 (git maintenance on exFAT) closed with a final mitigation. 🔑 **KI-4 (2026-09-23): Fil-C's IR is a PATCHED-LLVM DIALECT** (`ni:0` + `datalayout_after_filc`), so stock IR cannot enter the pass — this decided the integration route. KI-1 ✅ resolved (WSL2 installed; `sudo` needs a password); KI-2 exFAT zig-cache; KI-3 LLVM 20 vs 21 skew. |
 | [workarounds.md](workarounds.md) | 🆕 2026-10-01 (2026-10-02: KI-22 levers (a), (b), (c), with the why of each piece: use-list order, unused TLS declarations, objcopy and Zig names, the dense graph's equal-graph details, the cache key). **The WHY of every workaround** (owner rule): symptom index, five failure families (F1 pass rejects valid IR, F2 capability lost through an integer, F3 inline asm, F4 code outside the pass, F5 std out of bounds), the entry template, KI-18 in full, and short forms of KI-4…KI-17. **Look up new failures here first.** |
 | [releasing.md](releasing.md) | 🔖 **Version `0.15.2-3`** (applied 2026-09-30): `<Zig line>-<release>`, the **basis** each latest-line release names, how to bump it, why `.` and `_` were rejected, no 1.0, `-N` restarts at 1 per Zig version, the four places the number lives. The old minor-per-phase cadence is retired. |
