@@ -37,7 +37,7 @@ pub const Options = struct {
     inputs: []const []const u8,
     output: []const u8,
     entry: Entry = .auto,
-    /// Zig optimize mode. ⚠️ Debug IR crashes the pass today (KI-4).
+    /// Zig optimize mode. ⚠️ Debug needs zilc's patched Fil-C clang (KI-4).
     optimize: []const u8 = "ReleaseSafe",
     /// ⚠️ Fil-C's libc is musl; a gnu target fails to link on `*64` symbols (KI-6).
     target: []const u8 = "x86_64-linux-musl",
@@ -48,6 +48,9 @@ pub const Options = struct {
     filc: []const u8,
     keep_temps: bool = false,
     verbose: bool = false,
+    /// Parallel parts for a big module's code generation: 0 = automatic (cores, at most
+    /// `max_auto_jobs`), 1 = never split. See `filcCompile`.
+    jobs: u32 = 0,
 };
 
 pub const Error = error{ ToolFailed, NoInputs, UnsupportedInput, RuntimeNotReady };
@@ -411,14 +414,125 @@ fn compileZig(
     try std.fs.cwd().writeFile(.{ .sub_path = filc_ll_path, .data = final_ir orelse wrapped.ir });
 
     // 3. Fil-C's clang runs the pass and emits the object.
-    //
-    // `-Wno-override-module`: Zig names the triple `…-linux-musl` while Fil-C's
-    // driver is `…-linux-gnu`, so clang warns that it is overriding ours. It is
-    // expected, not a mismatch to fix — Fil-C's libc *is* musl whatever its
-    // triple says, which is why the musl target is the one that links (KI-6).
-    run(gpa, &.{
-        opts.filc, "-O1", "-g", "-Wno-override-module", "-c", "-o", obj_path, filc_ll_path,
-    }, opts.verbose) catch |e| {
+    try filcCompile(gpa, opts, tmp_path, stem, filc_ll_path, obj_path);
+    return obj_path;
+}
+
+/// Modules whose Fil-C-dialect IR is at least this big get their code generation split into
+/// parallel parts. Below it, the extra processes cost more than they save.
+const split_min_bytes = 4 * 1024 * 1024;
+/// The automatic job count's cap. Each part costs a clang process (up to ~0.75 GB on `69`), and
+/// 32 parallel LLVM compiles once exhausted the 31 GB WSL VM (tools/filc/build-patched-clang.sh).
+const max_auto_jobs = 16;
+
+/// Fil-C's clang: Fil-C-dialect IR in, object out.
+///
+/// Big modules take three steps instead of one (build-speed lever (a), cmem/workarounds.md KI-22):
+///  1. clang runs Fil-C's pass and the -O1 optimizer on the WHOLE module and stops at bitcode,
+///     keeping use-list order (`-emit-llvm-uselists`), because x86 code generation depends on it.
+///  2. zilc's mode of `llvm-split` (tools/filc/patch-split.ts) cuts that bitcode into parts by
+///     deleting the other parts' bodies, one process per part, in parallel.
+///  3. clang generates each part's code in parallel (`-disable-llvm-passes`: no pass, no
+///     optimizer, the same code generation settings), `ld -r` joins the parts, and objcopy
+///     makes the locals the cut exposed local again.
+/// Every decision about the code is still made on the whole module, so the result is the same
+/// code as one clang run: checked function by function on `69` (2,840 functions identical,
+/// same global and undefined symbols, same stripped size). Step 1 alone took ~34 s of `69`'s
+/// ~56 s; code generation went from ~22 s to ~7 s.
+fn filcCompile(
+    gpa: std.mem.Allocator,
+    opts: Options,
+    tmp_path: []const u8,
+    stem: []const u8,
+    filc_ll_path: []const u8,
+    obj_path: []const u8,
+) !void {
+    const jobs: u32 = if (opts.jobs != 0) opts.jobs else @intCast(@min(std.Thread.getCpuCount() catch 1, max_auto_jobs));
+    const size = (try std.fs.cwd().statFile(filc_ll_path)).size;
+    const splitter = if (jobs >= 2 and size >= split_min_bytes) try toolPath(gpa, opts.filc, "llvm-split") else null;
+    defer if (splitter) |s| gpa.free(s);
+    if (splitter == null) {
+        if (jobs >= 2 and size >= split_min_bytes and opts.verbose)
+            std.debug.print("zilc: {s}: no llvm-split next to Fil-C's clang; one code generation job\n", .{stem});
+        // `-Wno-override-module`: Zig names the triple `…-linux-musl` while Fil-C's
+        // driver is `…-linux-gnu`, so clang warns that it is overriding ours. It is
+        // expected, not a mismatch to fix — Fil-C's libc *is* musl whatever its
+        // triple says, which is why the musl target is the one that links (KI-6).
+        return runFilc(gpa, opts, &.{
+            opts.filc, "-O1", "-g", "-Wno-override-module", "-c", "-o", obj_path, filc_ll_path,
+        });
+    }
+
+    // 1. The pass and the optimizer, whole.
+    const bc_path = try std.fmt.allocPrint(gpa, "{s}/{s}.opt.bc", .{ tmp_path, stem });
+    defer gpa.free(bc_path);
+    try runFilc(gpa, opts, &.{
+        opts.filc,  "-O1", "-g", "-Wno-override-module", "-c", "-emit-llvm",
+        "-Xclang", "-emit-llvm-uselists", "-o", bc_path, filc_ll_path,
+    });
+
+    // 2. The cut.
+    const parts_dir = try std.fmt.allocPrint(gpa, "{s}/{s}.parts", .{ tmp_path, stem });
+    defer gpa.free(parts_dir);
+    try std.fs.cwd().makePath(parts_dir);
+    const keep_path = try std.fmt.allocPrint(gpa, "{s}/keep-global.txt", .{parts_dir});
+    defer gpa.free(keep_path);
+
+    var arena_state = std.heap.ArenaAllocator.init(gpa);
+    defer arena_state.deinit();
+    const arena = arena_state.allocator();
+    const n_arg = try std.fmt.allocPrint(arena, "-j{d}", .{jobs});
+    const keep_arg = try std.fmt.allocPrint(arena, "--zilc-keep-global={s}", .{keep_path});
+    const cuts = try arena.alloc([]const []const u8, jobs);
+    const gens = try arena.alloc([]const []const u8, jobs);
+    const objs = try arena.alloc([]const u8, jobs);
+    for (0..jobs) |i| {
+        const bc = try std.fmt.allocPrint(arena, "{s}/part{d}.bc", .{ parts_dir, i });
+        objs[i] = try std.fmt.allocPrint(arena, "{s}/part{d}.o", .{ parts_dir, i });
+        const part_arg = try std.fmt.allocPrint(arena, "--zilc-part={d}", .{i});
+        cuts[i] = try arena.dupe([]const u8, &.{ splitter.?, n_arg, part_arg, keep_arg, "-o", bc, bc_path });
+        gens[i] = try arena.dupe([]const u8, &.{
+            opts.filc, "-O1", "-g", "-Xclang", "-disable-llvm-passes", "-c", "-x", "ir", "-o", objs[i], bc,
+        });
+    }
+    if (try runParallel(gpa, cuts, opts.verbose)) |code| {
+        // 2 = a module shape the cut does not handle; it said which. Generate the code whole.
+        if (code != 2) {
+            std.debug.print("zilc: llvm-split exited with {d}\n", .{code});
+            return Error.ToolFailed;
+        }
+        return run(gpa, &.{
+            opts.filc, "-O1", "-g", "-Xclang", "-disable-llvm-passes", "-c", "-x", "ir", "-o", obj_path, bc_path,
+        }, opts.verbose);
+    }
+
+    // 3. Code generation per part, then one object again.
+    if (try runParallel(gpa, gens, opts.verbose)) |code| {
+        std.debug.print("zilc: Fil-C's clang exited with {d} generating a part's code\n", .{code});
+        return Error.ToolFailed;
+    }
+    // Fil-C's clang driver adds its crt object even to `-r -nostdlib`, so the linker is run
+    // directly: the same one clang links with.
+    const ld = try toolPath(gpa, opts.filc, "ld") orelse try gpa.dupe(u8, "ld");
+    defer gpa.free(ld);
+    const objcopy = try toolPath(gpa, opts.filc, "objcopy") orelse try gpa.dupe(u8, "objcopy");
+    defer gpa.free(objcopy);
+    const joined = try std.fmt.allocPrint(arena, "{s}/joined.o", .{parts_dir});
+    var ld_args: std.ArrayListUnmanaged([]const u8) = .{};
+    try ld_args.appendSlice(arena, &.{ ld, "-r", "-o", joined });
+    try ld_args.appendSlice(arena, objs);
+    try run(gpa, ld_args.items, opts.verbose);
+    // The cut made locals used across parts hidden globals; everything the input did not
+    // define as global becomes local again. (A list of the input's globals, not of the exposed
+    // locals: Zig names contain spaces, which objcopy's symbol files cannot hold.)
+    const keep_flag = try std.fmt.allocPrint(arena, "--keep-global-symbols={s}", .{keep_path});
+    try run(gpa, &.{ objcopy, keep_flag, joined, obj_path }, opts.verbose);
+    if (opts.verbose) std.debug.print("zilc: {s}: code generated in {d} parallel parts\n", .{ stem, jobs });
+}
+
+/// Runs Fil-C's clang on Fil-C-dialect IR, which is where its pass runs.
+fn runFilc(gpa: std.mem.Allocator, opts: Options, argv: []const []const u8) !void {
+    run(gpa, argv, opts.verbose) catch |e| {
         if (isDebug(opts.optimize)) std.debug.print(
             \\zilc: Debug builds need zilc's patched Fil-C clang, which fixes Fil-C's crash on
             \\  several indirectbr in one function (cmem/known-issues.md KI-4; tools/filc/).
@@ -426,7 +540,67 @@ fn compileZig(
         , .{});
         return e;
     };
-    return obj_path;
+}
+
+/// A tool from Fil-C's toolchain, the way its clang finds it (its own directory first, then
+/// PATH). Null if clang only echoes the bare name back, i.e. found nowhere it looked.
+fn toolPath(gpa: std.mem.Allocator, filc: []const u8, name: []const u8) !?[]u8 {
+    const flag = try std.fmt.allocPrint(gpa, "-print-prog-name={s}", .{name});
+    defer gpa.free(flag);
+    const res = std.process.Child.run(.{ .allocator = gpa, .argv = &.{ filc, flag } }) catch return null;
+    defer gpa.free(res.stdout);
+    defer gpa.free(res.stderr);
+    const path = std.mem.trim(u8, res.stdout, " \t\r\n");
+    if (std.mem.indexOfScalar(u8, path, '/') == null) return null;
+    return try gpa.dupe(u8, path);
+}
+
+/// Runs every command at once and waits for all. Null if all exited 0, else the first
+/// non-zero exit code in command order (so the result does not depend on timing).
+fn runParallel(gpa: std.mem.Allocator, cmds: []const []const []const u8, verbose: bool) !?u8 {
+    const children = try gpa.alloc(std.process.Child, cmds.len);
+    defer gpa.free(children);
+    var started: usize = 0;
+    var spawn_error: ?anyerror = null;
+    for (cmds, 0..) |argv, i| {
+        if (verbose) {
+            for (argv, 0..) |a, k| std.debug.print("{s}{s}", .{ if (k == 0) "+ " else " ", a });
+            std.debug.print(" &\n", .{});
+        }
+        children[i] = std.process.Child.init(argv, gpa);
+        children[i].stdin_behavior = .Ignore;
+        children[i].stdout_behavior = .Inherit;
+        // Every part reports the same refusal; one copy is enough.
+        children[i].stderr_behavior = if (i == 0) .Inherit else .Ignore;
+        children[i].spawn() catch |e| {
+            spawn_error = e;
+            break;
+        };
+        started += 1;
+    }
+    var first: ?u8 = null;
+    var abnormal = false;
+    for (children[0..started]) |*c| {
+        const term = c.wait() catch {
+            abnormal = true;
+            continue;
+        };
+        switch (term) {
+            .Exited => |code| if (code != 0 and first == null) {
+                first = code;
+            },
+            else => abnormal = true,
+        }
+    }
+    if (spawn_error) |e| {
+        std.debug.print("zilc: cannot run '{s}': {s}\n", .{ cmds[started][0], @errorName(e) });
+        return Error.ToolFailed;
+    }
+    if (abnormal) {
+        std.debug.print("zilc: '{s}' terminated abnormally\n", .{cmds[0][0]});
+        return Error.ToolFailed;
+    }
+    return first;
 }
 
 pub fn build(gpa: std.mem.Allocator, opts: Options) !void {

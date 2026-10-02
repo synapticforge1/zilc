@@ -151,10 +151,13 @@ its `publishing.md`).
   reviewed commit in `tools/upstream/REVIEWED` (committed):
   - new commits and new release tags;
   - commits touching **watched files** (the pass zilc patches, `IndirectBrExpandPass.cpp`,
+    `llvm-split.cpp` and `SplitModule.cpp` (since 2026-10-02, KI-22 lever a),
     `configure_llvm.sh`, `libpas/common.sh`, the runtime headers, the design docs, the versioning
     checklist);
-  - **whether zilc's pass patch still applies** to upstream's newest `FilPizlonator.cpp`
-    (`patch-pass.ts --check`; exit 1 if an edit's original text is gone).
+  - **whether zilc's patches still apply** to upstream's newest `FilPizlonator.cpp`
+    (`patch-pass.ts --check`) and `llvm-split.cpp` (`patch-split.ts --check`, since 2026-10-02);
+    exit 1 if an edit's original text is gone. `llvm/tools/llvm-split` joined the sparse set for
+    this (`clone-upstream.sh`; on the existing clone: `sparse-checkout add llvm/tools/llvm-split`).
 
   After reviewing, `--mark-reviewed` records the new head; commit `REVIEWED`.
 - **First run (2026-10-01):** reviewed = v0.685 (`bb0d0a64`, our build). Upstream `deluge` is at
@@ -165,5 +168,10 @@ its `publishing.md`).
   ("Versioning"). **All four zilc edits still apply** textually. ⚠️ The stack-aux commit must be
   re-verified semantically (rebuild with `ZILC_VERIFY_COLOURING=1`) at the next Fil-C upgrade.
   **Not yet marked reviewed.**
+- **Run of 2026-10-02:** upstream `deluge` at `9e72307` (2026-10-01), **105 commits ahead**, no
+  new release tag. Watched-file hits unchanged (the same 9 to `FilPizlonator.cpp`, 1 to
+  `configure_llvm.sh`, 1 to `filc/include`); **none to `llvm-split.cpp` or `SplitModule.cpp`**.
+  **All four pass edits and all three `llvm-split` edits still apply.** Still not marked reviewed:
+  the 9 pass commits (above all `097f7b7`) have not been read yet.
 - **When to run it:** at every "update the project memory" (`INDEX.md` policy, step 5), and before
   any Fil-C upgrade (stage A above).

@@ -537,7 +537,16 @@ move git's object store. Moving `.git` to NTFS behind a `gitdir:` pointer file w
 **rejected** (portability). Other projects on D: are outside zilc's scope and are not tracked here.
 **Nothing about KI-23 is open.**
 
-## ◐ KI-22 — Build time: Fil-C's frame-slot colouring is cubic on big Zig functions (2026-10-01). **Option 2 DONE (patched Fil-C clang, the default); option 3 research next**
+## ◐ KI-22 — Build time: Fil-C's frame-slot colouring is cubic on big Zig functions (2026-10-01). **Option 2 DONE (patched Fil-C clang, the default); option 3 rejected; lever (a) DONE 2026-10-02; (b), (c) next**
+
+**Status 2026-10-02:** lever (a) is in: big modules (≥ 4 MB of Fil-C-dialect IR) run Fil-C's pass
+and the optimizer whole, then generate their code in parallel parts with zilc's mode of
+`llvm-split` (`-j`/`ZILC_JOBS`). Same code: 2,840/2,840 of `69`'s functions identical to the
+unsplit compile of the same bitcode. `69` ReleaseSafe alone 60.6 → **43.9 s**; under corpus load
+Debug 68 s, ReleaseSafe 70 s, ReleaseFast 97 s, ReleaseSmall 61 s; corpus 78/78 as designed in all
+four modes. Splitting BEFORE the pass was faster (~24 s) but made binaries 37% bigger and was
+rejected by the owner. Next: (b) the faster interference build in the pass (the whole-module step
+is now ~34 s of `69`), then (c) the object cache. Detail: `workarounds.md` KI-22 "Lever (a)".
 
 **Status 2026-10-01 (evening):** the patched clang is built and is the default in zilc's scripts
 (prebuilt kept for comparison). Its colouring was verified equal to the original's on every build

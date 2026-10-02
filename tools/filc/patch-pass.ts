@@ -231,6 +231,7 @@ const check = Deno.args[0] === "--check";
 const path = check ? Deno.args[1] : Deno.args[0];
 if (!path) throw new Error("usage: patch-pass.ts [--check] path/to/FilPizlonator.cpp");
 let text = await Deno.readTextFile(path);
+const original = text;
 if (check) {
   let broken = 0;
   for (const e of edits) {
@@ -253,4 +254,6 @@ for (const e of edits) {
   text = text.replace(e.old, e.new);
   console.log(`patched: ${e.name}`);
 }
-await Deno.writeTextFile(path, text);
+// Only on a change: rewriting an already-patched file bumps its timestamp, and ninja would then
+// recompile it and relink clang for nothing.
+if (text !== original) await Deno.writeTextFile(path, text);

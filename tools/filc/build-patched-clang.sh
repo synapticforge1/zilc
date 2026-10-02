@@ -12,7 +12,8 @@
 # (lld is not in Ubuntu's `main`); the linker changes build speed, not the compiler's output.
 #
 # Result: ~/zilc-work/tools/filc-0.685-zilc/  = a copy of the prebuilt tree with build/bin/clang-20
-# replaced. Point zilc at it with ZILC_FILC=…/filc-0.685-zilc/build/bin/clang.
+# replaced and build/bin/llvm-split added. Point zilc at it with
+# ZILC_FILC=…/filc-0.685-zilc/build/bin/clang.
 set -e
 W=$HOME/zilc-work
 SHA=bb0d0a64eed297ab8e171002033208fb08ad9941
@@ -25,9 +26,12 @@ export PATH=$W/tools/ninja:$PATH
 for t in cc c++ cmake ninja; do command -v $t >/dev/null || { echo "missing: $t"; exit 1; }; done
 test "$(git -C "$SRC" rev-parse HEAD)" = "$SHA" || { echo "source is not at $SHA"; exit 1; }
 
-# The patch (idempotent; fails loudly if the original text differs).
+# The patches (idempotent; fail loudly if the original text differs). The pass fixes (KI-4,
+# KI-22), and zilc's splitting mode of llvm-split for parallel code generation (KI-22 lever a).
 ~/.deno/bin/deno run --allow-read --allow-write "$REPO/tools/filc/patch-pass.ts" \
   "$SRC/llvm/lib/Transforms/Instrumentation/FilPizlonator.cpp"
+~/.deno/bin/deno run --allow-read --allow-write "$REPO/tools/filc/patch-split.ts" \
+  "$SRC/llvm/tools/llvm-split/llvm-split.cpp"
 
 mkdir -p "$SRC/build" && cd "$SRC/build"
 if [ ! -f build.ninja ]; then
@@ -42,11 +46,14 @@ fi
 # ⚠️ Not ninja's default (one job per core): 32 parallel RelWithDebInfo compiles of clang's largest
 # files exhausted the 31 GB WSL VM and crashed the WSL service twice (2026-10-01,
 # Wsl/Service/E_UNEXPECTED). The job count changes build speed only, never the result.
-ninja -j "${JOBS:-12}" clang
+ninja -j "${JOBS:-12}" clang llvm-split
 
-# Install: the prebuilt tree (headers, runtime, libc) with our clang binary in place.
+# Install: the prebuilt tree (headers, runtime, libc) with our clang binary in place, plus
+# llvm-split beside it, where zilc finds it through clang's -print-prog-name. Stripped: it is
+# ~1 GB of debug info otherwise, and debug info does not change what it writes.
 rm -rf "$OUT"
 cp -a "$PREBUILT" "$OUT"
 cp bin/clang-20 "$OUT/build/bin/clang-20"
+strip --strip-debug -o "$OUT/build/bin/llvm-split" bin/llvm-split
 "$OUT/build/bin/clang" --version | head -1
 echo "installed: $OUT/build/bin/clang"

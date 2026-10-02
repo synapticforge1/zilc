@@ -18,7 +18,8 @@ stale=0
 if [ -d "$SRC/.git" ]; then
   if ! git -C "$SRC" diff | cmp -s - "$PATCH"; then
     echo "STALE: the WSL Fil-C source differs from $PATCH."
-    echo "       Put the change in tools/filc/patch-pass.ts (the edit script is the source of truth),"
+    echo "       Put the change in tools/filc/patch-pass.ts or patch-split.ts (the edit scripts are the"
+    echo "       source of truth),"
     echo "       rebuild (build-patched-clang.sh), then save the diff:"
     echo "       git -C $SRC diff > third_party/filc-patches/zilc-filc-pass.patch"
     stale=1

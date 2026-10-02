@@ -64,6 +64,9 @@ Every workaround gets an entry **when it is made**, not later. Use these heading
 | a zilc build many times slower than native Zig; IR full of `debug.Dwarf` / `compress.flate` | [KI-21](#ki-21--stds-stack-trace-code-compiled-into-every-program-build-time) |
 | build time dominated by `FilPizlonatorPass` on one huge function; Debug builds that never finish | [KI-22](#ki-22--fil-cs-frame-slot-colouring-is-cubic-on-big-zig-functions-build-time-open) |
 | `attempting to use unrecognized madvise advice -1` (from `tlcsprng.zig`) | [KI-20](#ki-20--stdcryptorandom-probes-madvise-with-an-invalid-advice) |
+| `Can't create a MachineFunction using a Module with a Target-incompatible DataLayout` (a module split before Fil-C's pass) | KI-22, lever (a): `datalayout_after_filc` lost |
+| `TLS reference in … mismatches non-TLS reference in …` (joining split parts) | KI-22, lever (a): unused hidden declarations |
+| `multiple definition of 'main'` … `filc_crt.o` / `filc_mincrt.o` after `clang -r` | KI-22, lever (a): Fil-C's driver adds its crt even to `-r -nostdlib` |
 
 ---
 
@@ -424,6 +427,95 @@ option 2).**
   (a) split the module and run Fil-C's clang on the parts in parallel. Fil-C already compiles C
   one translation unit at a time, and 32 cores sit idle. (b) A faster interference build in the
   patched pass that produces the same graph. (c) Cache objects by IR hash for unchanged rebuilds.
+  ✅ **(a) done 2026-10-02**, as the code-generation-only split below. (b) and (c) are next.
+
+**Lever (a) carried out (2026-10-02): split CODE GENERATION only, after the whole-module pass.**
+
+- **What zilc does now** (`filcCompile` in `src/driver.zig`, for Fil-C-dialect IR ≥ 4 MB, `-j` /
+  `ZILC_JOBS` jobs, default = cores up to 16, `-j 1` = off):
+  1. Fil-C's clang runs the pass and the `-O1` optimizer on the WHOLE module and stops at bitcode:
+     `-c -emit-llvm -Xclang -emit-llvm-uselists`.
+  2. zilc's mode of `llvm-split` (`tools/filc/patch-split.ts`, installed next to clang) writes
+     each part, one process per part, in parallel: `-j N --zilc-part=I --zilc-keep-global=FILE`.
+  3. Fil-C's clang generates each part's code in parallel: `-Xclang -disable-llvm-passes -c -x ir`.
+     This skips the IR pipeline (no pass, no optimizer) and keeps clang's own code-generation
+     settings, so there is nothing to match by hand as there would be with `llc`.
+  4. `ld -r` joins the parts; `objcopy --keep-global-symbols=FILE` makes local again every symbol
+     the input did not define as global.
+  - The splitter exits 2 on a module shape it does not handle (ifuncs, comdats, unnamed locals,
+    a global named with whitespace, no globals at all); zilc then generates the code whole from
+    the step-1 bitcode. No `llvm-split` next to clang = the old single clang run.
+- **Result** (`69` ReleaseSafe, through the driver, alone): **60.6 s → 43.9 s**; `62`: 7.0 s →
+  5.0 s. Step 1 is now most of it (~34 s of `69`): code generation went from ~22 s to ~7 s, bounded
+  by `crypto.tls.Client.init` (100k IR lines, one function, cannot be split). Lever (b) attacks
+  step 1.
+- **Same code, checked like for like:** the parts' functions against the unsplit compile of the
+  SAME step-1 bitcode: **2,840 of 2,840 functions identical** (normalized disassembly, alignment
+  padding after each function excluded, since it depends on the next function's position), same
+  global definitions (name, binding, visibility), same undefined references, same stripped size.
+  Program output identical. Only the unstripped file grows (8.2 → 10.4 MB): each part carries
+  its own DWARF copy of the types it uses. Script: this session's scratchpad `cgsplit2.sh` +
+  `cmpfuncs.ts`.
+- **Why "same as one clang run" cannot be the test for `62`/`69`:** the step-1 process lays out
+  the pass's hash tables differently from a one-step run, so the PASS'S output differs (the
+  ASLR finding above, extended). Proof: a plain one-step build of `62` with only `-ftime-report`
+  added (timers, nothing else) already changes the object; the deterministic control
+  (`allocas2000`) does not. On every input whose pass output IS deterministic (the gate's C
+  examples, `zilc_syscall.c`, the KI-4 repro, the 2,000-alloca stress), one-step and two-step
+  objects are **byte-identical**.
+
+**Why each piece is the way it is (the workarounds inside lever (a)):**
+
+- ❌ **Split BEFORE the pass (rejected by the owner, 2026-10-02: bloat).** Measured first: stock
+  `llvm-split -j 16` on the Fil-C-dialect IR, then the full clang on each part: clang stage 55 s →
+  ~24 s, but the stripped binary **+37%** (6.5 → 8.9 MB), because the optimizer can no longer
+  inline across parts (each part is a separate C file, in effect). Owner: *"What is another option
+  that doesn't bloat the resulting binary, is reasonably speedy and maintains fidelity?"*
+- **`datalayout_after_filc` (seen only on the rejected route, kept for the record).** Stock
+  llvm-split drops Fil-C's second data layout: `CloneModule` does not copy the Fil-C-only
+  `Module` field, and bitcode has no record for it (the line exists only in Fil-C's text printer
+  and parser). The parts crash Fil-C's clang with the "Target-incompatible DataLayout"
+  assertion. After the pass the module no longer needs it, which is one reason to split there.
+- 🔑 **Use-list order decides x86 code generation (measured).** Stock llvm-split CLONES each part;
+  cloning rebuilds every value's use-list in a new order, and 80+ of `69`'s functions came out
+  with different register allocation. Same IR, same linkage: the function's IR body was identical
+  and changing `internal` → `hidden` on the whole module changed nothing; but the SAME module
+  read from text instead of bitcode (text does not keep use-list order) changed 13 of 797
+  functions. Hence: step 1 writes the use-lists (`-emit-llvm-uselists`), and zilc's splitter
+  makes each part by DELETING the bodies it does not own (`deleteBody`), which keeps the
+  surviving uses in their original order, and writes with use-list order preserved. Verified
+  with `llvm-extract` on one function before writing the splitter.
+- **Unused hidden declarations (`TLS reference … mismatches non-TLS reference`).** Every part
+  declares every global. An unused declaration with HIDDEN visibility is still emitted as an
+  undefined symbol, untyped (NOTYPE). Fil-C reads thread-locals directly
+  (`@pizlonatedTP_Thread.LinuxThreadImpl.tls_thread_id = … thread_local …`), so GNU ld saw an
+  untyped reference against the TLS definition in another part and refused. The splitter drops
+  unused declarations; an unused declaration emits no code.
+- **Locals used across parts.** Made `hidden` external with `dso_local` in every part (the
+  plan is computed identically in every process: largest function first, to the least-loaded
+  part, ties in module order; global variables in part 0). Linkage does not change code
+  generation (measured above). After `ld -r`, `objcopy --keep-global-symbols` makes them local
+  again, fed the input's OWN global definitions, not the list of exposed locals: (1) Zig names
+  contain spaces (`crypto.sha2.Sha2x64(.{ 7640… })`), and objcopy's symbol files end a name at
+  whitespace ("Ignoring rubbish found on this line"); the input's globals are few (49 in `69`)
+  and plain, and the splitter refuses a module whose globals are not. (2) Not
+  `--localize-hidden`: Fil-C's output has WEAK HIDDEN globals of its own (25 in `69`,
+  `pizlonatedFI27932_write` etc.), which must stay global. (3) An EMPTY keep list means "no list"
+  to objcopy, so the splitter refuses a module with no globals.
+- **`ld -r` directly, not `clang -r`.** Fil-C's clang driver adds `filc_mincrt.o` even to
+  `-r -nostdlib`, which put a second `main` into the joined object. zilc asks clang for its
+  linker (`-print-prog-name=ld`) and runs it.
+- **Memory.** Per process on `69`: splitter ~270 MB, code generation ≤ 740 MB, so 16 jobs stay
+  under ~8 GB. The corpus script, which already runs 12 builds at once, sets `ZILC_JOBS=4`.
+
+**Cost and exit.** Cost: an extra bitcode write and N parses of it (~2 s on `69`), larger
+unstripped binaries (debug info). Below 4 MB of IR it is off (the processes cost more than they
+save). Exit: none needed; it is how a parallel build works. If Fil-C's pass became deterministic,
+one-step and two-step objects could be compared byte for byte on every input.
+
+**Recognising a relative.** Any future "same IR, different machine code" puzzle: check use-list
+order first (text vs bitcode, cloned vs original module). Any "TLS mismatches non-TLS": look for
+an unused hidden declaration of a thread-local.
 
 **How the patch was proved output-identical, and why byte comparison could not do it:**
 

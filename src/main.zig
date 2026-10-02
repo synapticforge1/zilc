@@ -29,14 +29,15 @@ const usage =
     \\                   until that runtime is ready for testing (roadmap P3).
     \\  --zig <path>     zig binary    (env ZILC_ZIG)
     \\  --filc <path>    Fil-C's clang (env ZILC_FILC)
+    \\  -j <n>           parallel code generation parts for big modules
+    \\                   (default: cores, at most 16; 1 = off; env ZILC_JOBS)
     \\  --keep-temps     keep the intermediate .ll/.o files
     \\  -v, --verbose    print every command
     \\  -h, --help       this text
     \\      --version    version
     \\
     \\Today's limits, each with a reason in cmem/known-issues.md:
-    \\  * -O Debug works, but compiles at clang -O0 with -fno-stack-check and
-    \\    produces very large objects (KI-4).
+    \\  * -O Debug needs zilc's patched Fil-C clang (KI-4; tools/filc/).
     \\  * Fil-C's libc is musl; a gnu target fails to link (KI-6).
     \\  * Zig's start code trips Fil-C, so C must own main (KI-5):
     \\    export C-ABI functions from Zig and link a C main.
@@ -92,6 +93,7 @@ fn run(arena: std.mem.Allocator, args: []const []const u8) !u8 {
     var verbose = false;
     var zig_path = std.process.getEnvVarOwned(arena, "ZILC_ZIG") catch @as([]u8, @constCast("zig"));
     var filc_path = std.process.getEnvVarOwned(arena, "ZILC_FILC") catch @as([]u8, @constCast("clang"));
+    var jobs_text: ?[]const u8 = std.process.getEnvVarOwned(arena, "ZILC_JOBS") catch null;
 
     var i: usize = 2;
     while (i < args.len) : (i += 1) {
@@ -99,7 +101,7 @@ fn run(arena: std.mem.Allocator, args: []const []const u8) !u8 {
         const takes_value = std.mem.eql(u8, a, "-o") or std.mem.eql(u8, a, "-O") or
             std.mem.eql(u8, a, "--target") or std.mem.eql(u8, a, "--zig") or
             std.mem.eql(u8, a, "--filc") or std.mem.eql(u8, a, "--entry") or
-            std.mem.eql(u8, a, "--runtime");
+            std.mem.eql(u8, a, "--runtime") or std.mem.eql(u8, a, "-j");
         if (takes_value and i + 1 >= args.len) {
             std.debug.print("zilc: '{s}' needs a value\n", .{a});
             return exit_usage;
@@ -131,6 +133,9 @@ fn run(arena: std.mem.Allocator, args: []const []const u8) !u8 {
                 std.debug.print("zilc: --runtime must be filc or zig (got '{s}')\n", .{args[i]});
                 return exit_usage;
             };
+        } else if (std.mem.eql(u8, a, "-j")) {
+            i += 1;
+            jobs_text = args[i];
         } else if (std.mem.eql(u8, a, "-c")) {
             emit = .obj;
         } else if (std.mem.eql(u8, a, "--keep-temps")) {
@@ -149,6 +154,11 @@ fn run(arena: std.mem.Allocator, args: []const []const u8) !u8 {
         std.debug.print("zilc: no input files\n", .{});
         return exit_usage;
     }
+
+    const jobs: u32 = if (jobs_text) |t| std.fmt.parseInt(u32, t, 10) catch {
+        std.debug.print("zilc: -j / ZILC_JOBS must be a number (got '{s}')\n", .{t});
+        return exit_usage;
+    } else 0;
 
     if (std.mem.indexOf(u8, target, "-musl") == null) {
         std.debug.print(
@@ -170,6 +180,7 @@ fn run(arena: std.mem.Allocator, args: []const []const u8) !u8 {
         .filc = filc_path,
         .keep_temps = keep_temps,
         .verbose = verbose,
+        .jobs = jobs,
     });
     return 0;
 }

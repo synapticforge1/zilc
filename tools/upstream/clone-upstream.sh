@@ -13,7 +13,8 @@ REPO=$(cd "$(dirname "$0")/../.." && pwd)
 U=$REPO/upstream/fil-c
 URL=https://github.com/pizlonator/fil-c.git
 # filc/tests (15,603 small files) is left out: on exFAT each file takes a whole cluster (3.9 GB).
-PATHS="llvm/lib/Transforms/Instrumentation llvm/include/llvm/Transforms/Instrumentation llvm/lib/CodeGen libpas filc/include filc/src filc/main filc/benchmarks filc/manualtests"
+# llvm/tools/llvm-split: zilc patches it (KI-22 lever a), and check-upstream.sh checks that patch.
+PATHS="llvm/lib/Transforms/Instrumentation llvm/include/llvm/Transforms/Instrumentation llvm/lib/CodeGen llvm/tools/llvm-split libpas filc/include filc/src filc/main filc/benchmarks filc/manualtests"
 
 if [ -e "$U" ]; then echo "$U exists; delete it first to re-clone"; exit 1; fi
 mkdir -p "$REPO/upstream"

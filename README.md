@@ -75,7 +75,12 @@ handled:
 - a slow step that grew with the cube of a function's size. Large programs build several times
   faster.
 
-The stock Fil-C 0.685 prebuilt still works for the Release modes.
+The same build adds `llvm-split` with a zilc mode, which lets zilc generate a large module's
+machine code in parallel parts after Fil-C's pass has run on the whole module, so the code is
+the same as a single run. `-j <n>` (or `ZILC_JOBS`) sets the number of parts; the default is
+the number of cores, at most 16, and `-j 1` turns it off.
+
+The stock Fil-C 0.685 prebuilt still works for the Release modes, without the parallel step.
 
 `.zig` inputs go through Zig and the Fil-C pass; `.c`, `.cpp`, `.o` and `.a` go straight to Fil-C.
 `-v` prints every command it runs. `--runtime zig` is reserved for zilc's own runtime and is refused
@@ -91,7 +96,7 @@ Each has a reason recorded in [cmem/known-issues.md](cmem/known-issues.md):
   default anyway.
 - **Large programs build slower than with plain Zig.** Fil-C's checks make the code it compiles
   several times larger. Typical programs build in seconds; a TLS client (`std.http.Client`) takes
-  about a minute against Zig's 17 seconds.
+  about 45 seconds against Zig's 17.
 - **Target musl** — Fil-C's libc is musl; a gnu target fails to link.
 - **Zig's own start code cannot run** — it builds a pointer out of an integer address
   (`@ptrFromInt(getauxval(AT_PHDR))`), which is precisely what the capability model forbids. zilc

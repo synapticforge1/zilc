@@ -15,6 +15,9 @@ ZILC_FILC_DEFAULT=$WORK/tools/filc-0.685-zilc/build/bin/clang
 [ -x "$ZILC_FILC_DEFAULT" ] || ZILC_FILC_DEFAULT=$WORK/tools/filc-0.685-linux-x86_64/build/bin/clang
 export ZILC_FILC=${ZILC_FILC:-$ZILC_FILC_DEFAULT}
 export ZIG_LOCAL_CACHE_DIR=${ZIG_LOCAL_CACHE_DIR:-$HOME/.cache/zilc-basics}
+# Up to $JOBS builds run at once, and each big module splits its code generation into parallel
+# parts (KI-22 lever a): cap the parts so 12 builds cannot start 12 x 16 clang processes.
+export ZILC_JOBS=${ZILC_JOBS:-4}
 MODE=${MODE:-ReleaseSafe}
 OUT=$WORK/basics-zilc${MODE:+-$MODE}
 LANGS=${1:-"c zig"}

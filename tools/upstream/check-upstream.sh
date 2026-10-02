@@ -2,7 +2,7 @@
 # Monitor Fil-C upstream for changes that matter to zilc (cmem/upstream.md "The upstream/
 # reference folder"). Fetches upstream/fil-c, then reports, relative to the last REVIEWED commit:
 # new commits, new release tags, commits touching the files zilc patches or depends on, and
-# whether zilc's pass patch still applies to upstream's newest FilPizlonator.cpp.
+# whether zilc's patches still apply to upstream's newest FilPizlonator.cpp and llvm-split.cpp.
 # Run from Git Bash on Windows.
 #
 #   sh tools/upstream/check-upstream.sh                 report only
@@ -20,6 +20,8 @@ WATCH="
 llvm/lib/Transforms/Instrumentation/FilPizlonator.cpp   zilc patches it (KI-4, KI-22) and works around it (KI-18)
 llvm/include/llvm/Transforms/Instrumentation            the pass's interface
 llvm/lib/CodeGen/IndirectBrExpandPass.cpp               the code KI-4's broken lowering was copied from
+llvm/tools/llvm-split/llvm-split.cpp                    zilc patches it (KI-22 lever a, parallel code generation)
+llvm/lib/Transforms/Utils/SplitModule.cpp               the stock split zilc's mode replaces (use-list order)
 configure_llvm.sh                                       tools/filc/build-patched-clang.sh mirrors it
 libpas/common.sh                                        the build's architecture settings
 filc/include                                            the runtime's public ABI (filc-abi.md)
@@ -55,6 +57,9 @@ done
 echo "--- does zilc's pass patch still apply to upstream's newest FilPizlonator.cpp?"
 deno run --allow-read "$REPO/tools/filc/patch-pass.ts" --check \
   "$U/llvm/lib/Transforms/Instrumentation/FilPizlonator.cpp" && echo "  yes, every edit" || echo "  ⚠️ NO: re-derive the edits marked above before the next Fil-C upgrade"
+echo "--- does zilc's llvm-split patch still apply to upstream's newest llvm-split.cpp?"
+deno run --allow-read "$REPO/tools/filc/patch-split.ts" --check \
+  "$U/llvm/tools/llvm-split/llvm-split.cpp" && echo "  yes, every edit" || echo "  ⚠️ NO: re-derive the edits marked above before the next Fil-C upgrade"
 
 if [ "$1" = "--mark-reviewed" ]; then
   echo "$HEAD $(git -C "$U" describe --tags --always "$HEAD") $(date +%Y-%m-%d) reviewed" > "$REV_FILE"

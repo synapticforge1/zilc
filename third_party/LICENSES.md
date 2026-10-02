@@ -94,7 +94,8 @@ Newest first. Copy the template for each adopted component.
   prebuilt names in `clang --version`
 - **Upstream path(s):** `llvm/lib/Transforms/Instrumentation/FilPizlonator.cpp`: the two frame-slot
   colouring loops (about lines 3054–3076 and 3146–3160 at that commit), and
-  `lowerIndirectBrForFunction` (Fil-C's copy of LLVM's `IndirectBrExpandPass`)
+  `lowerIndirectBrForFunction` (Fil-C's copy of LLVM's `IndirectBrExpandPass`). **Added
+  2026-10-02:** `llvm/tools/llvm-split/llvm-split.cpp` (a `--zilc-part` mode, see below)
 - **License (SPDX):** `Apache-2.0 WITH LLVM-exception` (the file's own header)
 - **License file:** upstream `LLVM-LICENSE.txt` / `llvm/LICENSE.TXT`; nothing copied into zilc's
   source beyond the diff context
@@ -104,12 +105,17 @@ Newest first. Copy the template for each adopted component.
   of O(degree × colours) per value (KI-22, `cmem/workarounds.md`). **Added 2026-10-01 (KI-4):**
   with several `indirectbr`s in one function, each is lowered in place into its own `switch` over
   its own destinations, instead of all being merged into one `switch_bb` (which broke the
-  destinations' phis and dominance, and crashed). The single-`indirectbr` path is unchanged
-- **Where it lives in zilc:** `tools/filc/patch-pass.ts` (exact-match edit script, the diff
-  context), `third_party/filc-patches/zilc-filc-pass.patch` (the resulting diff, all edits),
+  destinations' phis and dominance, and crashed). The single-`indirectbr` path is unchanged.
+  **Added 2026-10-02 (KI-22 lever a):** `llvm-split` gains `--zilc-part=I` /
+  `--zilc-keep-global=FILE`: it writes one part of an already-compiled module by deleting the
+  other parts' function bodies (keeping use-list order), for parallel code generation. A separate
+  tool; it changes nothing in clang, and the code it lets clang generate is the same as unsplit
+- **Where it lives in zilc:** `tools/filc/patch-pass.ts` and `tools/filc/patch-split.ts`
+  (exact-match edit scripts, the diff context), `third_party/filc-patches/zilc-filc-pass.patch`
+  (the resulting diff, all edits to both files),
   `tools/filc/build-patched-clang.sh` (build recipe mirroring Fil-C's `configure_llvm.sh`).
-  **Local binary archive (owner, 2026-10-01):** `toolchain/` holds the built tree (stripped clang,
-  83 MB) and its debug info (966 MB), with `tools/filc/archive-patched-clang.sh` and
+  **Local binary archive (owner, 2026-10-01):** `toolchain/` holds the built tree (stripped clang
+  and, since 2026-10-02, stripped `llvm-split`: 95 MB) and clang's debug info (966 MB), with `tools/filc/archive-patched-clang.sh` and
   `restore-patched-clang.sh`. **It is gitignored, so pushing it is impossible by default, and it
   must stay that way:** pushing it would be a distribution of Fil-C
 - **Artifact destination:** **toolchain-only, and local only.** The patched clang lives in

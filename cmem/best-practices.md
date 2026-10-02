@@ -153,6 +153,12 @@ citation to the incident.
   producing results.
 - **Every declared symbol needs a link-time gate.** Tests that call only what exists never notice
   what is promised but missing. (wazmrt audit #20: 180 such symbols.)
+- **Prove "same code" like for like, and prove the comparison can tell.** Compare against a
+  reference built from the SAME input in the same form, not against a run whose own output
+  varies; show the variation with a harmless perturbation (a timing-only flag) and a
+  deterministic control. And keep LLVM use-list order (bitcode with use-lists, no text round
+  trip, no cloning) wherever machine code must match: it changes register allocation.
+  (KI-22 lever (a), 2026-10-02: 80+ functions "differed" until both were fixed; then 2,840/2,840.)
 
 ## 5. Tooling on this machine
 

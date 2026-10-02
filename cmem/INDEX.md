@@ -13,17 +13,31 @@ for structure and policy.
 
 ---
 
-## ⏸️ PAUSED 2026-10-01 (end of day). START HERE NEXT SESSION
+## ▶️ 2026-10-02 — BUILD SPEED, lever (a) DONE. START HERE
 
-- ▶️ **Next task (owner-approved, end of day): the three BUILD-SPEED options** for `69`-class
-  programs (`design-decisions.md` 2026-10-01, `workarounds.md` KI-22 "Levers that remain"):
-  **(a)** split each module and run Fil-C's clang on the parts in parallel (the biggest gain);
-  **(b)** an output-identical faster interference build in the patched pass (lines ~2959–2998,
-  with a `ZILC_VERIFY_…` check like the colouring fix); **(c)** an object cache keyed by IR hash.
-  Baseline to beat: `69` ReleaseSafe **55.9 s** alone vs native Zig **16.9 s**; Fil-C's pass is
-  11.4 s of it. Measure with the stage script pattern in `workarounds.md` KI-22 (F6 family).
+- ✅ **Lever (a), parallel code generation** (owner chose the route: *no bloat, same code*):
+  big modules (≥ 4 MB of Fil-C-dialect IR) run Fil-C's pass and `-O1` optimizer WHOLE, then
+  zilc's mode of `llvm-split` (`tools/filc/patch-split.ts`, built and installed next to clang by
+  `build-patched-clang.sh`, archived in `toolchain/`) cuts the bitcode, and clang generates the
+  parts' code in parallel; `ld -r` + objcopy rejoin them (`filcCompile` in `src/driver.zig`;
+  `-j`/`ZILC_JOBS`, 1 = off). **2,840/2,840 functions of `69` identical** to the unsplit compile
+  of the same bitcode; `69` alone **60.6 → 43.9 s**; corpus **78/78 as designed in all four
+  modes**, gate 4/4, tests 24/24. Splitting BEFORE the pass (~24 s) was rejected: +37% binary.
+  🔑 Learned: **use-list order changes x86 code generation**, so the splitter deletes bodies
+  instead of cloning (`workarounds.md` KI-22 "Lever (a)", with every why).
+- ▶️ **Next: lever (b)**, the faster liveness + interference build in the patched pass
+  (`FilPizlonator.cpp` ~2905–3050 at `bb0d0a64`: per-block `unordered_set` copies in liveness,
+  def × live hash-set inserts in interference; idea: dense value ids + bit vectors, same graph,
+  with a `ZILC_VERIFY_…` check like the colouring fix). The whole-module step is now ~34 s of
+  `69`'s 44 s; profile it first (pass vs optimizer). **Then (c)**, the object cache keyed by IR
+  hash.
 - **Then** the rest of the **PRE-PUBLISH CHECKLIST**: output comparison, library mode, KI-5,
   `--version` and release notes, the platforms scope pass.
+
+## ⏸️ 2026-10-01 (end of day)
+
+- **Next task then: the three BUILD-SPEED options** (approved by the owner; (a) done 2026-10-02,
+  above). Baseline then: `69` ReleaseSafe 55.9 s alone vs native Zig 16.9 s.
 - **Done 2026-10-01:** **KI-18** fixed (3-byte globals wrapped in a struct; `i21` and `<3 x i8>`),
   **KI-20** fixed (`crypto_always_getrandom`), **KI-21** fixed (std's stack-trace code no longer
   compiled: `62` 40 s → 8 s; Debug route too). New: `workarounds.md` (the why of every workaround,
@@ -52,8 +66,8 @@ for structure and policy.
   the patch, re-run `tools/filc/archive-patched-clang.sh`.
 - 📚 **Upstream reference (owner, end of day; settles open question 6):** `upstream/fil-c/`
   (gitignored, read-only, never built) as in binaryen-ts. `tools/upstream/check-upstream.sh`
-  monitors it (memory-update step 5). As of 2026-10-01: 104 commits past v0.685, 9 to
-  `FilPizlonator.cpp`, all zilc edits still apply. ⚠️ **Not yet reviewed**: read those 9 commits
+  monitors it (memory-update step 5). As of 2026-10-02: 105 commits past v0.685, 9 to
+  `FilPizlonator.cpp`, none to `llvm-split`; all zilc edits (pass and `llvm-split`) still apply. ⚠️ **Not yet reviewed**: read those 9 commits
   (above all `097f7b7`, stack auxes, next to our colouring fix) and then run `--mark-reviewed`.
 - 📏 **LF everywhere (owner):** `.gitattributes` is `* text=auto eol=lf`; reference clones use
   `core.autocrlf=false`; and since 2026-10-01 (owner) **global** `core.autocrlf=input`,
@@ -300,7 +314,8 @@ this for the project"), do all of the following:
    `wsl.exe -e sh /mnt/d/…/zilc/tools/filc/check-toolchain.sh`. If it reports STALE (a new patch
    or workaround in Fil-C's source in WSL, a rebuilt compiler, or an archive from an older patch),
    do what it says before finishing. In order:
-   1. Every change to Fil-C's source goes into `tools/filc/patch-pass.ts`, the source of truth.
+   1. Every change to Fil-C's source goes into an edit script, the source of truth:
+      `tools/filc/patch-pass.ts` (the pass) or `tools/filc/patch-split.ts` (`llvm-split`).
    2. Rebuild with `build-patched-clang.sh`.
    3. Save the diff to `third_party/filc-patches/zilc-filc-pass.patch`.
    4. Re-archive with `archive-patched-clang.sh`.
@@ -346,9 +361,9 @@ the runtime-linking rule checked.
 | [reference-projects.md](reference-projects.md) | Fil-C, LLVM, Zig: verified licenses, what to mine each for, adoption status. |
 | [roadmap.md](roadmap.md) | P0 ✅ → P1 ✅ → P2 ✅ (`0.3.0`) → **P3 Zig runtime (plan 2026-09-30: Linux first, checked against Fil-C, `zsys_*` first; next step the `zsys_write` spike)** → P4 Zig-language fidelity → P5 C++ → **P6 other platforms (proposed 2026-09-30)**. |
 | [security-model.md](security-model.md) | The safety guarantees being targeted (spatial, temporal, thread-safe capability updates), and what is explicitly out of scope. |
-| [testing.md](testing.md) | Current gates (gate 4/4, tests 24/24 on 2026-10-01, with the exact commands), corpus results per mode and (2026-10-01) build times, the recorded expected panics, and the planned gates: `-Druntime=both`, the between-versions comparison, and the benchmark suite. |
-| [known-issues.md](known-issues.md) | 🆕 2026-10-01: **KI-4, KI-10, KI-18, KI-19, KI-20, KI-21 fixed; KI-22 (build time) mostly done** (patched Fil-C clang; option 3 rejected; speed-up options (a)–(c) approved, not started). Partly open: KI-7 (`getcontext`), KI-5. KI-23 (git maintenance on exFAT) closed with a final mitigation. 🔑 **KI-4 (2026-09-23): Fil-C's IR is a PATCHED-LLVM DIALECT** (`ni:0` + `datalayout_after_filc`), so stock IR cannot enter the pass — this decided the integration route. KI-1 ✅ resolved (WSL2 installed; `sudo` needs a password); KI-2 exFAT zig-cache; KI-3 LLVM 20 vs 21 skew. |
-| [workarounds.md](workarounds.md) | 🆕 2026-10-01. **The WHY of every workaround** (owner rule): symptom index, five failure families (F1 pass rejects valid IR, F2 capability lost through an integer, F3 inline asm, F4 code outside the pass, F5 std out of bounds), the entry template, KI-18 in full, and short forms of KI-4…KI-17. **Look up new failures here first.** |
+| [testing.md](testing.md) | Current gates (gate 4/4, tests 24/24 on 2026-10-02, with the exact commands), corpus results per mode and (2026-10-01) build times, the recorded expected panics, and the planned gates: `-Druntime=both`, the between-versions comparison, and the benchmark suite. |
+| [known-issues.md](known-issues.md) | 🆕 2026-10-01: **KI-4, KI-10, KI-18, KI-19, KI-20, KI-21 fixed; KI-22 (build time) mostly done** (patched Fil-C clang; option 3 rejected; speed-up lever (a) parallel code generation DONE 2026-10-02, (b) and (c) next). Partly open: KI-7 (`getcontext`), KI-5. KI-23 (git maintenance on exFAT) closed with a final mitigation. 🔑 **KI-4 (2026-09-23): Fil-C's IR is a PATCHED-LLVM DIALECT** (`ni:0` + `datalayout_after_filc`), so stock IR cannot enter the pass — this decided the integration route. KI-1 ✅ resolved (WSL2 installed; `sudo` needs a password); KI-2 exFAT zig-cache; KI-3 LLVM 20 vs 21 skew. |
+| [workarounds.md](workarounds.md) | 🆕 2026-10-01 (2026-10-02: KI-22 lever (a), with the why of each of its pieces: use-list order, unused TLS declarations, objcopy and Zig names). **The WHY of every workaround** (owner rule): symptom index, five failure families (F1 pass rejects valid IR, F2 capability lost through an integer, F3 inline asm, F4 code outside the pass, F5 std out of bounds), the entry template, KI-18 in full, and short forms of KI-4…KI-17. **Look up new failures here first.** |
 | [releasing.md](releasing.md) | 🔖 **Version `0.15.2-3`** (applied 2026-09-30): `<Zig line>-<release>`, the **basis** each latest-line release names, how to bump it, why `.` and `_` were rejected, no 1.0, `-N` restarts at 1 per Zig version, the four places the number lives. The old minor-per-phase cadence is retired. |
 | [filc-abi.md](filc-abi.md) | 🆕 2026-09-30. **Fil-C 0.685's runtime ABI as OBSERVED** (post-pass IR, headers, binaries; no runtime source): flight pointers, the object-header word, function objects and getters, the fast and generic calling convention, the thread layout, linking and overriding. What P3 must match, and its scoping consequences. |
 | [zig-upstream-notes.md](zig-upstream-notes.md) | 🆕 2026-09-30. **Zig behaviours we may need to report** (owner asked): Z-1 `indexOfSentinel` over-read (fixed in 0.16.0; report draft and repro in `tools/zig-reports/`), Z-2 the `mmap` hint, Z-3 raw syscalls, Z-4 `getcontext`, Z-5 `DebugAllocator` integer arithmetic. Each with whether it is really a Zig bug. |

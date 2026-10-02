@@ -170,3 +170,215 @@ index d8812aa74..5b54a34d0 100644
      if (IndirectBrs.size() == 1) {
        // If we only have one indirectbr, we can just directly replace it within
        // its block.
+diff --git a/llvm/tools/llvm-split/llvm-split.cpp b/llvm/tools/llvm-split/llvm-split.cpp
+index 1b1f97f44..3a0030700 100644
+--- a/llvm/tools/llvm-split/llvm-split.cpp
++++ b/llvm/tools/llvm-split/llvm-split.cpp
+@@ -14,6 +14,13 @@
+ #include "llvm/ADT/StringExtras.h"
+ #include "llvm/Bitcode/BitcodeWriter.h"
+ #include "llvm/IR/LLVMContext.h"
++#include "llvm/ADT/DenseMap.h"
++#include "llvm/ADT/SmallPtrSet.h"
++#include "llvm/IR/Constants.h"
++#include "llvm/IR/Instruction.h"
++#include "llvm/IR/Module.h"
++#include <algorithm>
++#include <numeric>
+ #include "llvm/IR/Verifier.h"
+ #include "llvm/IRReader/IRReader.h"
+ #include "llvm/MC/TargetRegistry.h"
+@@ -70,6 +77,178 @@ static cl::opt<std::string>
+     MCPU("mcpu", cl::desc("Target CPU, ignored if --mtriple is not used"),
+          cl::value_desc("cpu"), cl::cat(SplitCategory));
+ 
++// zilc (KI-22 lever a): see tools/filc/patch-split.ts in zilc for the why.
++static cl::opt<int> ZilcPart("zilc-part", cl::init(-1),
++                             cl::desc("zilc: write only part I of -j N, cut by deleting the "
++                                      "other parts' bodies (keeps use-list order)"),
++                             cl::cat(SplitCategory));
++static cl::opt<std::string> ZilcKeepGlobal("zilc-keep-global",
++                                           cl::desc("zilc: write the names of the input's "
++                                                    "non-local definitions (for objcopy "
++                                                    "--keep-global-symbols after ld -r)"),
++                                           cl::value_desc("filename"), cl::cat(SplitCategory));
++
++namespace {
++// Which part owns a value's users: a function's part for an instruction, a global's part for an
++// initializer, found through any constant expressions in between.
++void zilcUserParts(const Value *V, const DenseMap<const GlobalValue *, unsigned> &Owner,
++                   SmallPtrSetImpl<const Value *> &Seen, SmallVectorImpl<unsigned> &Parts) {
++  for (const User *U : V->users()) {
++    if (const auto *I = dyn_cast<Instruction>(U)) {
++      Parts.push_back(Owner.lookup(I->getFunction()));
++    } else if (const auto *G = dyn_cast<GlobalValue>(U)) {
++      Parts.push_back(Owner.lookup(G));
++    } else if (Seen.insert(U).second) {
++      zilcUserParts(U, Owner, Seen, Parts);
++    }
++  }
++}
++
++int zilcSplitPart(Module &M, unsigned N, unsigned Part) {
++  if (!M.ifunc_empty() || !M.getComdatSymbolTable().empty()) {
++    errs() << "zilc-part: module has ifuncs or comdats; not split\n";
++    return 2;
++  }
++  std::vector<StringRef> Globals; // the input's non-local definitions, which stay global
++  for (const GlobalValue &G : M.global_values()) {
++    if (G.hasLocalLinkage() && !G.hasName()) {
++      errs() << "zilc-part: module has unnamed locals; not split\n";
++      return 2;
++    }
++    if (!G.hasLocalLinkage() && !G.isDeclaration()) {
++      // objcopy's symbol files end a name at whitespace.
++      if (G.getName().find_first_of(" \t\r\n") != StringRef::npos) {
++        errs() << "zilc-part: a global's name has whitespace; not split\n";
++        return 2;
++      }
++      Globals.push_back(G.getName());
++    }
++  }
++  if (Globals.empty()) {
++    // objcopy treats an empty --keep-global-symbols list as no list at all.
++    errs() << "zilc-part: module defines no globals; not split\n";
++    return 2;
++  }
++
++  // 1. The plan. Same input, same plan, in every process.
++  DenseMap<const GlobalValue *, unsigned> Owner;
++  std::vector<Function *> Defs;
++  std::vector<uint64_t> Cost;
++  for (Function &F : M) {
++    if (F.isDeclaration())
++      continue;
++    uint64_t C = 1;
++    for (const BasicBlock &BB : F)
++      C += BB.size();
++    Defs.push_back(&F);
++    Cost.push_back(C);
++  }
++  std::vector<size_t> Order(Defs.size());
++  std::iota(Order.begin(), Order.end(), 0);
++  std::stable_sort(Order.begin(), Order.end(),
++                   [&](size_t A, size_t B) { return Cost[A] > Cost[B]; });
++  std::vector<uint64_t> Load(N, 0);
++  for (size_t K : Order) {
++    unsigned P = std::min_element(Load.begin(), Load.end()) - Load.begin();
++    Owner[Defs[K]] = P;
++    Load[P] += Cost[K];
++  }
++  for (GlobalVariable &GV : M.globals())
++    Owner[&GV] = 0;
++  for (GlobalAlias &GA : M.aliases()) {
++    const GlobalObject *O = GA.getAliaseeObject();
++    Owner[&GA] = O ? Owner.lookup(O) : 0;
++  }
++
++  // 2. Locals used from another part than their own become hidden external (in every part).
++  std::vector<GlobalValue *> Shared;
++  for (GlobalValue &G : M.global_values()) {
++    if (!G.hasLocalLinkage() || G.isDeclaration())
++      continue;
++    SmallPtrSet<const Value *, 8> Seen;
++    SmallVector<unsigned, 8> Parts;
++    zilcUserParts(&G, Owner, Seen, Parts);
++    unsigned Mine = Owner.lookup(&G);
++    if (std::any_of(Parts.begin(), Parts.end(), [&](unsigned P) { return P != Mine; }))
++      Shared.push_back(&G);
++  }
++  if (Part == 0 && !ZilcKeepGlobal.empty()) {
++    std::error_code EC;
++    raw_fd_ostream OS(ZilcKeepGlobal, EC, sys::fs::OF_Text);
++    if (EC) {
++      errs() << ZilcKeepGlobal << ": " << EC.message() << "\n";
++      return 1;
++    }
++    for (StringRef Name : Globals)
++      OS << Name << "\n";
++  }
++  for (GlobalValue *G : Shared) {
++    G->setLinkage(GlobalValue::ExternalLinkage);
++    G->setVisibility(GlobalValue::HiddenVisibility);
++    G->setDSOLocal(true);
++  }
++
++  // 3. Keep only this part's definitions; the rest become declarations.
++  for (Function &F : M)
++    if (!F.isDeclaration() && Owner.lookup(&F) != Part) {
++      GlobalValue::VisibilityTypes Vis = F.getVisibility();
++      bool Local = F.isDSOLocal();
++      F.deleteBody();
++      F.setVisibility(Vis);
++      F.setDSOLocal(Local);
++    }
++  for (GlobalVariable &GV : llvm::make_early_inc_range(M.globals())) {
++    if (GV.isDeclaration() || Part == 0)
++      continue;
++    if (GV.hasAppendingLinkage()) {
++      GV.eraseFromParent(); // llvm.used and friends: part 0's copy is the one.
++      continue;
++    }
++    GV.setInitializer(nullptr);
++    GV.setLinkage(GlobalValue::ExternalLinkage);
++  }
++  for (GlobalAlias &GA : llvm::make_early_inc_range(M.aliases())) {
++    if (Owner.lookup(&GA) == Part)
++      continue;
++    GlobalValue *Decl;
++    if (auto *FT = dyn_cast<FunctionType>(GA.getValueType()))
++      Decl = Function::Create(FT, GlobalValue::ExternalLinkage, GA.getAddressSpace(), "", &M);
++    else
++      Decl = new GlobalVariable(M, GA.getValueType(), false, GlobalValue::ExternalLinkage,
++                                nullptr, "", nullptr, GA.getThreadLocalMode(),
++                                GA.getAddressSpace());
++    Decl->setVisibility(GA.getVisibility());
++    Decl->setDSOLocal(GA.isDSOLocal());
++    Decl->takeName(&GA);
++    GA.replaceAllUsesWith(Decl);
++    GA.eraseFromParent();
++  }
++
++  // 4. Unused declarations go: a hidden one still becomes an undefined symbol, and for a
++  // thread-local GNU ld then sees a non-TLS reference against the definition in another part.
++  for (GlobalVariable &GV : llvm::make_early_inc_range(M.globals()))
++    if (GV.isDeclaration() && GV.use_empty())
++      GV.eraseFromParent();
++  for (Function &F : llvm::make_early_inc_range(M.functions()))
++    if (F.isDeclaration() && F.use_empty() && !F.isIntrinsic())
++      F.eraseFromParent();
++
++  if (verifyModule(M, &errs())) {
++    errs() << "zilc-part: broken part\n";
++    return 1;
++  }
++  std::error_code EC;
++  ToolOutputFile Out(OutputFilename, EC, sys::fs::OF_None);
++  if (EC) {
++    errs() << EC.message() << "\n";
++    return 1;
++  }
++  WriteBitcodeToFile(M, Out.os(), /*ShouldPreserveUseListOrder=*/true);
++  Out.keep();
++  return 0;
++}
++} // namespace
++
+ int main(int argc, char **argv) {
+   InitLLVM X(argc, argv);
+ 
+@@ -102,6 +281,14 @@ int main(int argc, char **argv) {
+     return 1;
+   }
+ 
++  if (ZilcPart >= 0) {
++    if (unsigned(ZilcPart) >= NumOutputs) {
++      errs() << "zilc-part: part " << ZilcPart << " of " << NumOutputs << "\n";
++      return 1;
++    }
++    return zilcSplitPart(*M, NumOutputs, ZilcPart);
++  }
++
+   unsigned I = 0;
+   const auto HandleModulePart = [&](std::unique_ptr<Module> MPart) {
+     std::error_code EC;
