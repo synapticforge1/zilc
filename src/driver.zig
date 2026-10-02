@@ -289,6 +289,47 @@ fn declaresMain(gpa: std.mem.Allocator, path: []const u8) bool {
     return std.mem.indexOf(u8, src, "pub fn main(") != null;
 }
 
+/// Does this Zig source set `crypto_always_getrandom` to anything but `true`? zilc forces the
+/// field on (KI-20, owner decision 2026-10-02), so such a setting has no effect, and the owner
+/// asked that the user be told why. Textual, like `declaresMain`, and sound for this purpose:
+/// std reads `std_options` only from the ROOT file, which is the file zilc is given. Zig's
+/// default for the field is `false`, so an explicit setting cannot be told from an absent one
+/// in the compiled code; hence the source. Lines whose code part is a `//` comment are ignored.
+fn setsGetrandomOff(src: []const u8) bool {
+    const field = "crypto_always_getrandom";
+    var lines = std.mem.splitScalar(u8, src, '\n');
+    while (lines.next()) |line| {
+        const code = if (std.mem.indexOf(u8, line, "//")) |c| line[0..c] else line;
+        var from: usize = 0;
+        while (std.mem.indexOfPos(u8, code, from, field)) |at| {
+            from = at + field.len;
+            var rest = std.mem.trimLeft(u8, code[from..], " \t");
+            if (rest.len == 0 or rest[0] != '=' or (rest.len > 1 and rest[1] == '=')) continue;
+            rest = std.mem.trimLeft(u8, rest[1..], " \t");
+            const value_end = std.mem.indexOfAny(u8, rest, " \t,;}") orelse rest.len;
+            if (!std.mem.eql(u8, rest[0..value_end], "true")) return true;
+        }
+    }
+    return false;
+}
+
+/// Tells the user, at build time, that their `crypto_always_getrandom` setting is overridden.
+fn noteForcedGetrandom(gpa: std.mem.Allocator, path: []const u8) void {
+    const src = std.fs.cwd().readFileAlloc(gpa, path, 16 * 1024 * 1024) catch return;
+    defer gpa.free(src);
+    if (!setsGetrandomOff(src)) return;
+    std.debug.print(
+        \\zilc: note: {s} sets std_options.crypto_always_getrandom to something other than
+        \\  `true`; zilc builds it with `true` anyway. Zig's other random-number path first
+        \\  probes the kernel with a deliberately invalid madvise() call, and Fil-C stops the
+        \\  program on any madvise it cannot check, so the program would end at its first
+        \\  random number. With `true`, every random byte comes straight from the kernel's
+        \\  getrandom(): just as secure, fork-safe, one system call per request.
+        \\  (zilc's cmem/workarounds.md KI-20)
+        \\
+    , .{path});
+}
+
 /// What a given input file needs: Zig compiles it to IR first, or Fil-C takes it directly.
 fn classify(path: []const u8) !enum { zig, native } {
     const ext = std.fs.path.extension(path);
@@ -886,6 +927,7 @@ pub fn build(gpa: std.mem.Allocator, opts: Options) !void {
         switch (try classify(input)) {
             .zig => {
                 const shim: Shim = if (entry_index == i) .entry else .library;
+                noteForcedGetrandom(gpa, input);
                 const obj = try compileZig(gpa, opts, tmp_path, input, shim, &needs_syscall_helper, &uses_f128, null, overlay);
                 try owned.append(gpa, obj);
                 try link_args.append(gpa, obj);
@@ -975,6 +1017,25 @@ test "object cache key: stable for the same inputs, different when anything that
     const rebuilt = try objectKey(gpa, tool, "define void @f() { ret void }", one);
     defer gpa.free(rebuilt);
     try std.testing.expect(!std.mem.eql(u8, a, rebuilt));
+}
+
+test "a user's crypto_always_getrandom setting other than true is noticed (KI-20 note)" {
+    try std.testing.expect(setsGetrandomOff(
+        \\pub const std_options: std.Options = .{ .crypto_always_getrandom = false };
+    ));
+    try std.testing.expect(setsGetrandomOff(
+        \\pub const std_options: std.Options = .{
+        \\    .log_level = .err,
+        \\    .crypto_always_getrandom=false,
+        \\};
+    ));
+    // Computed values cannot be judged textually, so they are noted too.
+    try std.testing.expect(setsGetrandomOff(".crypto_always_getrandom = want_kernel_random,"));
+    // Not noted: `true`, a comparison, a comment, or no mention.
+    try std.testing.expect(!setsGetrandomOff(".crypto_always_getrandom = true,"));
+    try std.testing.expect(!setsGetrandomOff("if (std.options.crypto_always_getrandom == false) {}"));
+    try std.testing.expect(!setsGetrandomOff("// .crypto_always_getrandom = false,"));
+    try std.testing.expect(!setsGetrandomOff("const std = @import(\"std\");"));
 }
 
 test "--clean-cache removes the cached objects, keeps the rest of the cache, and tolerates no cache" {

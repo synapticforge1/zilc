@@ -208,7 +208,12 @@ either side**, so not for `UPSTREAM-ISSUES.md`.
   2026-10-02). Since then both generated roots FORWARD a user file's own `std_options`, and force
   only this one field to `true`. So a user who explicitly writes
   `crypto_always_getrandom = false` gets `true` anyway: with `false`, the program would stop at
-  its first random number. 🔸 Owner to confirm (`design-decisions.md` 2026-10-02, library mode).
+  its first random number. ✅ **Owner confirmed 2026-10-02**, with a stipulation: tell the user.
+  So `zilc build` prints a `zilc: note:` when the root Zig file sets the field to anything but
+  `true`, explaining the override and its reason (`setsGetrandomOff` / `noteForcedGetrandom` in
+  `src/driver.zig`, unit-tested). The check is textual because Zig's default is `false`: in the
+  compiled code an explicit `false` cannot be told from an absent setting. It is sound because
+  std reads `std_options` only from the root file, which is the file zilc is given.
 
 **Ruled out.** Patching `maybe_have_wipe_on_fork` to false in the std overlay: that falls back to
 `pthread_atfork` plus user-space state, which is more moving parts, and an overlay patch where an
