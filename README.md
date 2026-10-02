@@ -85,7 +85,7 @@ The stock Fil-C 0.685 prebuilt still works for the Release modes, without the pa
 zilc also keeps the objects Fil-C's clang produces, so rebuilding an unchanged program skips that
 step: a TLS client rebuilds in about 2 seconds instead of 36. The cache lives in
 `$ZILC_CACHE_DIR`, else `$XDG_CACHE_HOME/zilc`, else `~/.cache/zilc`; `--no-cache` (or
-`ZILC_CACHE=0`) turns it off, and deleting the folder clears it.
+`ZILC_CACHE=0`) turns it off, and `zilc --clean-cache` empties it.
 
 `.zig` inputs go through Zig and the Fil-C pass; `.c`, `.cpp`, `.o` and `.a` go straight to Fil-C.
 `-v` prints every command it runs. `--runtime zig` is reserved for zilc's own runtime and is refused

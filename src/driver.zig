@@ -486,6 +486,43 @@ fn cacheStore(opts: Options, key: []const u8, obj_path: []const u8) void {
     };
 }
 
+/// What `cleanCache` removed.
+pub const CleanResult = struct { root: []u8, files: usize, bytes: u64 };
+
+/// `zilc --clean-cache`: delete every cached object (`<cache>/objects`). The cache never evicts
+/// on its own, so this is how it is kept small. Only the objects go: the std-backport overlay
+/// beside them is small, and every Zig build would recreate it anyway. Caller frees `root`.
+pub fn cleanCache(gpa: std.mem.Allocator) !CleanResult {
+    const root = try cacheRoot(gpa);
+    errdefer gpa.free(root);
+    return cleanCacheAt(root);
+}
+
+fn cleanCacheAt(root: []u8) !CleanResult {
+    var result: CleanResult = .{ .root = root, .files = 0, .bytes = 0 };
+    var root_dir = std.fs.cwd().openDir(root, .{}) catch |e| switch (e) {
+        error.FileNotFound => return result, // nothing cached yet
+        else => return e,
+    };
+    defer root_dir.close();
+    if (root_dir.openDir("objects", .{ .iterate = true })) |dir_const| {
+        var dir = dir_const;
+        defer dir.close();
+        var it = dir.iterate();
+        while (try it.next()) |entry| {
+            if (entry.kind != .file) continue;
+            const st = dir.statFile(entry.name) catch continue;
+            result.files += 1;
+            result.bytes += st.size;
+        }
+    } else |e| switch (e) {
+        error.FileNotFound => return result,
+        else => return e,
+    }
+    try root_dir.deleteTree("objects");
+    return result;
+}
+
 fn openCacheObjects() !std.fs.Dir {
     var buf: [std.fs.max_path_bytes]u8 = undefined;
     var fba = std.heap.FixedBufferAllocator.init(&buf);
@@ -892,6 +929,28 @@ test "object cache key: stable for the same inputs, different when anything that
     const rebuilt = try objectKey(gpa, tool, "define void @f() { ret void }", one);
     defer gpa.free(rebuilt);
     try std.testing.expect(!std.mem.eql(u8, a, rebuilt));
+}
+
+test "--clean-cache removes the cached objects, keeps the rest of the cache, and tolerates no cache" {
+    const gpa = std.testing.allocator;
+    var tmp = std.testing.tmpDir(.{});
+    defer tmp.cleanup();
+    try tmp.dir.makePath("objects");
+    try tmp.dir.writeFile(.{ .sub_path = "objects/a.o", .data = "1234" });
+    try tmp.dir.writeFile(.{ .sub_path = "objects/b.o", .data = "567890" });
+    try tmp.dir.makePath("std-overlay"); // stands for the std backports beside the objects
+    const root = try tmp.dir.realpathAlloc(gpa, ".");
+    defer gpa.free(root);
+
+    const r = try cleanCacheAt(root);
+    try std.testing.expectEqual(@as(usize, 2), r.files);
+    try std.testing.expectEqual(@as(u64, 10), r.bytes);
+    try std.testing.expectError(error.FileNotFound, tmp.dir.access("objects", .{}));
+    try tmp.dir.access("std-overlay", .{});
+
+    // Cleaning again, with no objects folder, is not an error.
+    const again = try cleanCacheAt(root);
+    try std.testing.expectEqual(@as(usize, 0), again.files);
 }
 
 test "--runtime zig is refused before anything runs" {

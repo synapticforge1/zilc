@@ -582,7 +582,9 @@ an unused hidden declaration of a thread-local.
 - **Limits:** (1) The key includes the OUTPUT path in effect: the entry shim lives in
   `<output>.zilc-tmp/`, and its path is in the IR's debug info, so the same program built to a
   different output path misses (seen in the first test, which used a new directory per run).
-  (2) No eviction: each entry is a full object (`69` ~11 MB); delete the folder to reclaim.
+  (2) No automatic eviction: each entry is a full object (`69` ~11 MB). `zilc --clean-cache`
+  (owner asked for it, 2026-10-02) deletes `<cache>/objects` and reports the files and MB freed;
+  it keeps the std overlay, which every Zig build needs and would only recreate.
   (3) The corpus script sets `ZILC_CACHE=0` so its recorded build times stay real compiles.
 
 **How the patch was proved output-identical, and why byte comparison could not do it:**

@@ -12,6 +12,7 @@ const usage =
     \\zilc {s} — a Fil-C-style memory-safe target for the Zig toolchain
     \\
     \\usage: zilc build [options] <inputs...>
+    \\       zilc --clean-cache    delete every cached Fil-C object
     \\
     \\  Inputs: .zig go through Zig, then the Fil-C pass.
     \\          .c .cc .cpp .o .a .s .ll go straight to Fil-C.
@@ -34,6 +35,7 @@ const usage =
     \\  --no-cache       always run Fil-C's clang, even for an unchanged module
     \\                   (env ZILC_CACHE=0; the cache is in $ZILC_CACHE_DIR,
     \\                   else $XDG_CACHE_HOME/zilc, else ~/.cache/zilc)
+    \\  --clean-cache    delete every cached object first, then build
     \\  --keep-temps     keep the intermediate .ll/.o files
     \\  -v, --verbose    print every command
     \\  -h, --help       this text
@@ -80,6 +82,10 @@ fn run(arena: std.mem.Allocator, args: []const []const u8) !u8 {
         std.debug.print("zilc {s}\n", .{zilc.version_string});
         return 0;
     }
+    if (std.mem.eql(u8, args[1], "--clean-cache")) {
+        try cleanCache(arena);
+        return 0;
+    }
     if (!std.mem.eql(u8, args[1], "build")) {
         std.debug.print("zilc: unknown command '{s}'. Try 'zilc --help'.\n", .{args[1]});
         return exit_usage;
@@ -98,6 +104,7 @@ fn run(arena: std.mem.Allocator, args: []const []const u8) !u8 {
     var filc_path = std.process.getEnvVarOwned(arena, "ZILC_FILC") catch @as([]u8, @constCast("clang"));
     var jobs_text: ?[]const u8 = std.process.getEnvVarOwned(arena, "ZILC_JOBS") catch null;
     var cache = if (std.process.getEnvVarOwned(arena, "ZILC_CACHE")) |v| !std.mem.eql(u8, v, "0") else |_| true;
+    var clean_cache = false;
 
     var i: usize = 2;
     while (i < args.len) : (i += 1) {
@@ -144,6 +151,8 @@ fn run(arena: std.mem.Allocator, args: []const []const u8) !u8 {
             emit = .obj;
         } else if (std.mem.eql(u8, a, "--no-cache")) {
             cache = false;
+        } else if (std.mem.eql(u8, a, "--clean-cache")) {
+            clean_cache = true;
         } else if (std.mem.eql(u8, a, "--keep-temps")) {
             keep_temps = true;
         } else if (isFlag(a, "-v", "--verbose")) {
@@ -174,6 +183,8 @@ fn run(arena: std.mem.Allocator, args: []const []const u8) !u8 {
         , .{target});
     }
 
+    if (clean_cache) try cleanCache(arena);
+
     try driver.build(arena, .{
         .inputs = inputs.items,
         .output = output,
@@ -190,6 +201,13 @@ fn run(arena: std.mem.Allocator, args: []const []const u8) !u8 {
         .cache = cache,
     });
     return 0;
+}
+
+fn cleanCache(arena: std.mem.Allocator) !void {
+    const r = try driver.cleanCache(arena);
+    std.debug.print("zilc: cleaned the object cache in {s}/objects: {d} object(s), {d:.1} MB\n", .{
+        r.root, r.files, @as(f64, @floatFromInt(r.bytes)) / (1024 * 1024),
+    });
 }
 
 test {
