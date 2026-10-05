@@ -12,8 +12,8 @@ At publish time:
   rewrites nobody's history: `git tag -f -a v0.15.2-3 <final>`, `git branch -f v0.15.2 <final>`.
 - Push `main`, `v0.15.2` and `v0.15.2-3`.
 - The version stays `0.15.2-3` everywhere; it was never published, so there is nothing to bump.
-- Release notes (the file still to be created) state the user-code Zig (0.15.2) and the Fil-C
-  release (0.685).
+- Release notes (`RELEASE-NOTES.md`, created 2026-10-05) state the user-code Zig (0.15.2) and
+  the Fil-C release (0.685).
 
 ## 🔖 THE VERSION IS **`0.15.2-3`** — APPLIED 2026-09-30 (was `0.3.0`; same release, new scheme)
 
@@ -78,9 +78,9 @@ code needs.** `zilc --version` and the release notes must state it, along with t
     branch, and git would call the name ambiguous. Release tags always carry `-N`: `v0.15.2-3`.
   - ✅ **Put in place 2026-09-30:** the commit with this change is tagged **`v0.15.2-3`**, the first
     release tag, and the **`v0.15.2`** branch was created there. Both are local; nothing was pushed.
-- **Where the basis is recorded:** the release notes (`Basis: 0.15.2-100`), and the line's entry
-  in `ports/<version>.md`. ⚠️ **zilc has no release-notes file yet.** It is needed before the first
-  latest-line release.
+- **Where the basis is recorded:** the release notes (`RELEASE-NOTES.md`, the **Basis** row of each
+  release's table), `basis` in `src/root.zig` (printed by `zilc --version`), and the line's entry
+  in `ports/<version>.md`.
 
 **Why:** the old minor-per-phase ladder (`0.3.0`, `0.4.0`, …) would eventually climb into
 Zig's own numbers (`0.15.x`) and be mistaken for them (owner). Switching early costs nothing: `0.3.0`
@@ -130,11 +130,15 @@ line of zilc releases: `0.16.1-1 … 0.16.1-5`, then `0.16.2-1`. Consequences:
 2. ~~Continue or restart~~: restart at 1, settled above.
 3. ~~What `1.0` means~~: there is none, settled above.
 
-**Still to act on:**
-4. **What the number doesn't say must be shown elsewhere.** `zilc --version` and the release notes
-   should state **the Zig user code needs** (0.15.2 today; it can lag the line's Zig), **the Fil-C
-   release** (0.685, which fixes the runtime ABI), and on a latest line, **the basis**. Not done
-   yet: `--version` prints only `zilc 0.15.2-3`.
+4. ✅ **DONE 2026-10-05: what the number doesn't say is shown elsewhere.** `src/root.zig` holds
+   `user_zig` (0.15.2), `filc_release` ("0.685") and `basis` (null = reference line), with a test
+   tying `user_zig` to `zig_line` on the reference line. **`zilc --version`** (stdout) prints them,
+   then checks this machine: the Zig and Fil-C clang it would use (ZILC_ZIG/ZILC_FILC/PATH), each
+   `ok` or `MISMATCH`, and whether the clang is zilc's patched build. That cannot be read from
+   `clang --version`, which the patched build keeps identical; the `llvm-split` beside it tells
+   them apart. **`zilc build` warns** when the Zig it runs is not `user_zig`, and now says why
+   when Zig cannot run at all (it used to exit 1 silently). **`RELEASE-NOTES.md`** (repo root,
+   public) states the same facts per release.
 
 Neither open question blocked the change to `0.15.2-3`. **The minor-per-phase cadence below is
 retired** and kept for history.
@@ -153,13 +157,15 @@ P2 landed the same day, so `0.2.0` was never a separate release; the ladder stil
 `0.x` means the target's semantics and ABI may change without notice. `1.0.0` should mean at least
 the P2 exit criterion (C programs panic correctly under Zig's toolchain). Confirm with the owner.
 
-## 🔢 Where the number lives — FOUR places, and only a grep keeps them honest
+## 🔢 Where the number lives — FIVE places, and only a grep keeps them honest
 
 1. `build.zig.zon` → `.version`
 2. `src/root.zig` → `version` **and the test that asserts `version_string`** — that test is what
-   makes a half-done bump fail loudly instead of shipping a lying `zilc --version`
+   makes a half-done bump fail loudly instead of shipping a lying `zilc --version`. Beside it:
+   `user_zig`, `filc_release`, `basis`
 3. `cmem/INDEX.md` → the STATE table
 4. `README.md` → the status line
+5. `RELEASE-NOTES.md` → a new section per release, with its table (line, user Zig, Fil-C, basis)
 
 ⚠️ **`minimum_zig_version` is a SEPARATE number.** It names the Zig that *builds* zilc. The version's
 leading `0.15.2` names the Zig that compiles *user code*. They match at upgrade stage A, and they
@@ -175,9 +181,12 @@ changes**, patch releases included. There is no major/minor of our own and no 1.
 ## Per-release checklist (draft)
 
 - [ ] `zig build test`, `capi-smoke`, and every active gate in `testing.md` are green.
-- [ ] Version synced in all four places above.
-- [ ] Release notes state: **the basis** (latest-line releases), **the Zig user code needs**, and
-      **the Fil-C release**. A new Zig line also gets its `ports/<version>.md` entry.
+- [ ] Version synced in all five places above.
+- [ ] `RELEASE-NOTES.md` has the release's section: **the basis** (latest-line releases), **the Zig
+      user code needs**, **the Fil-C release**, what changed, what to know. Its claims are checked
+      against the gates (2026-10-05: a "C++" claim was removed, C++ is untested). A new Zig line
+      also gets its `ports/<version>.md` entry.
+- [ ] `zilc --version` on the release machine shows `ok` for Zig and Fil-C.
 - [ ] `third_party/LICENSES.md` ledger matches what is actually in the tree. Any license that must
       travel with `zig-out/` is installed by `build.zig`.
 - [ ] `cmem/INDEX.md` STATE updated.

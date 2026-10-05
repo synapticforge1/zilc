@@ -80,7 +80,7 @@ fn run(arena: std.mem.Allocator, args: []const []const u8) !u8 {
         return if (args.len < 2) exit_usage else 0;
     }
     if (std.mem.eql(u8, args[1], "--version")) {
-        std.debug.print("zilc {s}\n", .{zilc.version_string});
+        try printVersion(arena);
         return 0;
     }
     if (std.mem.eql(u8, args[1], "--clean-cache")) {
@@ -202,6 +202,57 @@ fn run(arena: std.mem.Allocator, args: []const []const u8) !u8 {
         .cache = cache,
     });
     return 0;
+}
+
+/// `zilc --version`: the version, then what the number does not say (cmem/releasing.md): the Zig
+/// user code needs, the Fil-C release, the line and its basis; then what this machine actually
+/// has, since a mismatch there is the likeliest reason a build misbehaves.
+fn printVersion(arena: std.mem.Allocator) !void {
+    var buf: [4096]u8 = undefined;
+    var stdout = std.fs.File.stdout().writer(&buf);
+    const out = &stdout.interface;
+    try out.print("zilc {s} ({s} line)\n", .{ zilc.version_string, zilc.line_kind });
+    try out.print("  user code needs  Zig {f}\n", .{zilc.user_zig});
+    try out.print("  built on         Fil-C {s}\n", .{zilc.filc_release});
+    if (zilc.basis) |b| try out.print("  basis            {s}\n", .{b});
+
+    const zig_path = std.process.getEnvVarOwned(arena, "ZILC_ZIG") catch @as([]u8, @constCast("zig"));
+    const filc_path = std.process.getEnvVarOwned(arena, "ZILC_FILC") catch @as([]u8, @constCast("clang"));
+    try out.print("on this machine (ZILC_ZIG, ZILC_FILC, else PATH):\n", .{});
+
+    const want_zig = try std.fmt.allocPrint(arena, "{f}", .{zilc.user_zig});
+    if (toolOutput(arena, &.{ zig_path, "version" })) |v| {
+        try out.print("  zig              {s}  {s}\n", .{ v, if (std.mem.eql(u8, v, want_zig)) "ok" else "MISMATCH: user code needs the Zig above" });
+    } else try out.print("  zig              not found\n", .{});
+    try out.print("                   {s}\n", .{zig_path});
+
+    if (toolOutput(arena, &.{ filc_path, "--version" })) |v| {
+        // e.g. "clang version 20.1.8 (Fil-C 0.685 git@github.com:…)"
+        const at = std.mem.indexOf(u8, v, "Fil-C ");
+        const release = if (at) |i| std.mem.sliceTo(v[i + "Fil-C ".len ..], ' ') else "";
+        if (at == null) {
+            try out.print("  Fil-C clang      not Fil-C's clang: {s}\n", .{v});
+        } else {
+            try out.print("  Fil-C clang      {s}  {s}\n", .{ release, if (std.mem.eql(u8, release, zilc.filc_release)) "ok" else "MISMATCH: other Fil-C release" });
+            // The patched build reports the prebuilt's exact version string; zilc's llvm-split
+            // beside it is what tells them apart (and enables parallel code generation).
+            const split = driver.toolPath(arena, filc_path, "llvm-split") catch null;
+            try out.print("                   {s}\n", .{if (split != null) "zilc's patched build: Debug builds and parallel code generation available" else "stock prebuilt: Debug builds need zilc's patched clang (tools/filc/)"});
+        }
+    } else try out.print("  Fil-C clang      not found\n", .{});
+    try out.print("                   {s}\n", .{filc_path});
+    try out.flush();
+}
+
+/// First line of a command's stdout, trimmed; null if it cannot run or fails.
+fn toolOutput(arena: std.mem.Allocator, argv: []const []const u8) ?[]const u8 {
+    const res = std.process.Child.run(.{ .allocator = arena, .argv = argv }) catch return null;
+    switch (res.term) {
+        .Exited => |c| if (c != 0) return null,
+        else => return null,
+    }
+    const first = std.mem.sliceTo(res.stdout, '\n');
+    return std.mem.trim(u8, first, " \t\r");
 }
 
 fn cleanCache(arena: std.mem.Allocator) !void {

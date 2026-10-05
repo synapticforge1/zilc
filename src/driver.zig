@@ -252,12 +252,23 @@ const ZigEnv = struct {
 };
 
 fn zigEnv(gpa: std.mem.Allocator, zig: []const u8) !ZigEnv {
-    const res = try std.process.Child.run(.{ .allocator = gpa, .argv = &.{ zig, "env" } });
+    // Every failure is reported here: the caller's ToolFailed is printed without a message.
+    const res = std.process.Child.run(.{ .allocator = gpa, .argv = &.{ zig, "env" } }) catch |e| {
+        std.debug.print("zilc: cannot run '{s} env': {s}. Set ZILC_ZIG or --zig (`zilc --version` checks the setup).\n", .{ zig, @errorName(e) });
+        return Error.ToolFailed;
+    };
     defer gpa.free(res.stdout);
     defer gpa.free(res.stderr);
-    const lib_dir = try zonString(gpa, res.stdout, ".lib_dir = \"");
+    const lib_dir = zonString(gpa, res.stdout, ".lib_dir = \"") catch {
+        std.debug.print("zilc: '{s} env' did not report a lib_dir; is it Zig? `zilc --version` checks the setup.\n", .{zig});
+        return Error.ToolFailed;
+    };
     errdefer gpa.free(lib_dir);
-    return .{ .lib_dir = lib_dir, .version = try zonString(gpa, res.stdout, ".version = \"") };
+    const version = zonString(gpa, res.stdout, ".version = \"") catch {
+        std.debug.print("zilc: '{s} env' did not report a version; is it Zig?\n", .{zig});
+        return Error.ToolFailed;
+    };
+    return .{ .lib_dir = lib_dir, .version = version };
 }
 
 fn zonString(gpa: std.mem.Allocator, zon: []const u8, key: []const u8) ![]u8 {
@@ -786,7 +797,7 @@ fn runFilc(gpa: std.mem.Allocator, opts: Options, argv: []const []const u8) !voi
 
 /// A tool from Fil-C's toolchain, the way its clang finds it (its own directory first, then
 /// PATH). Null if clang only echoes the bare name back, i.e. found nowhere it looked.
-fn toolPath(gpa: std.mem.Allocator, filc: []const u8, name: []const u8) !?[]u8 {
+pub fn toolPath(gpa: std.mem.Allocator, filc: []const u8, name: []const u8) !?[]u8 {
     const flag = try std.fmt.allocPrint(gpa, "-print-prog-name={s}", .{name});
     defer gpa.free(flag);
     const res = std.process.Child.run(.{ .allocator = gpa, .argv = &.{ filc, flag } }) catch return null;
@@ -910,6 +921,14 @@ pub fn build(gpa: std.mem.Allocator, opts: Options) !void {
     for (opts.inputs) |input| {
         if ((try classify(input)) != .zig) continue;
         env = try zigEnv(gpa, opts.zig);
+        // User code must be compiled by this release's Zig: its LLVM has to match Fil-C's, and the
+        // std backports are written against its exact sources (cmem/releasing.md).
+        const want = std.fmt.comptimePrint("{d}.{d}.{d}", .{ @import("zilc").user_zig.major, @import("zilc").user_zig.minor, @import("zilc").user_zig.patch });
+        if (!std.mem.eql(u8, env.?.version, want)) std.debug.print(
+            \\zilc: warning: {s} is Zig {s}, but zilc {s} compiles user code with Zig {s}
+            \\  (its LLVM must match Fil-C's). Set ZILC_ZIG or --zig; `zilc --version` checks the setup.
+            \\
+        , .{ opts.zig, env.?.version, @import("zilc").version_string, want });
         const cache = try cacheRoot(gpa);
         defer gpa.free(cache);
         overlay = ir_std.ensureOverlay(gpa, env.?.lib_dir, env.?.version, cache) catch |e| {

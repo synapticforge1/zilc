@@ -35,6 +35,29 @@ pub const version = std.SemanticVersion{
 /// Version string, e.g. "0.15.2-3".
 pub const version_string = std.fmt.comptimePrint("{d}.{d}.{d}-{s}", .{ version.major, version.minor, version.patch, version.pre.? });
 
+// What the version number does NOT say (cmem/releasing.md "Still to act on" 4): `zilc --version`
+// and RELEASE-NOTES.md state these. Keep RELEASE-NOTES.md in step when one changes.
+
+/// The Zig that compiles USER code: its LLVM must match Fil-C's. On the reference line it equals
+/// `zig_line`; on a latest line (built with a newer Zig) it can lag behind it.
+pub const user_zig = std.SemanticVersion{ .major = 0, .minor = 15, .patch = 2 };
+
+/// The Fil-C release zilc is built against: its compiler pass, runtime ABI and checked libc.
+pub const filc_release = "0.685";
+
+/// The reference release a latest-line release was ported from (e.g. "0.15.2-100"), or null on
+/// the reference line itself, which is checked directly against Fil-C (cmem/releasing.md).
+pub const basis: ?[]const u8 = null;
+
+/// Which kind of line this is, derived from `basis`.
+pub const line_kind = if (basis == null) "reference" else "latest";
+
+test "the reference line compiles user code with its own Zig" {
+    // On the reference line the two Zigs are the same; a latest line has a basis instead.
+    if (basis == null) try std.testing.expectEqual(std.math.Order.eq, user_zig.order(zig_line));
+    try std.testing.expectEqualStrings("0.685", filc_release);
+}
+
 test "version string matches version" {
     try std.testing.expectEqualStrings("0.15.2-3", version_string);
 }
