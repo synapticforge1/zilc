@@ -664,7 +664,7 @@ environment, not zilc's patches: look at links and paths outside the compiler fi
 source"; `platforms.md`) runs upstream's own `build_base_cosmo.sh`, unmodified, through
 `tools/filc/build-cosmo.ts`. Upstream's reference host is its build container
 (`Dockerfile-build-env`, Ubuntu 25.04) plus `cosmo.txt`'s aarch64 package list. This machine is
-Ubuntu 26.04 in WSL2, so three things differ. None of them changes what Fil-C produces.
+Ubuntu 26.04 in WSL2, so five things differ. None of them changes what Fil-C produces.
 
 1. **`libstdc++-15-dev-arm64-cross` instead of `-13`.** *Why:* `cosmo.txt` itself says to install
    the libstdc++ cross headers matching the cross GCC's version (it gives GCC 12 → `-12` as the
@@ -674,7 +674,28 @@ Ubuntu 26.04 in WSL2, so three things differ. None of them changes what Fil-C pr
    Dockerfile builds it by hand only because its base image lacks the package; it is a
    dependency of Fil-C's BUILD tooling, never compiled into the compiler's output or a user
    program. *Revisit* if the build fails on a BLAKE3 API newer than 1.8.2: then build 1.8.7 from
-   `projects/BLAKE3-1.8.7.tar.gz` as the Dockerfile does.
+   `projects/BLAKE3-1.8.7.tar.gz` as the Dockerfile does. (First run, 2026-10-05: `projeny`, the
+   first build step, compiles its OWN bundled BLAKE3 (`projects/projeny/src/blake3`), so it does
+   not use this one at all.)
+4. **`libcurl4-openssl-dev` added** (not in upstream's Dockerfile, which installs only the `curl`
+   program). *Why:* `projeny` links `-lcurl` and includes `<curl/curl.h>`; the first run stopped
+   there (`fatal error: curl/curl.h: No such file or directory`, 2026-10-05). Upstream's image
+   presumably gets the headers some other way; the build only needs them to compile its tool.
+5. **Cosmo's APE loader registered with binfmt_misc (WSL only).** *Symptom:* clang built fine
+   (~20 min at 12 jobs), then `build_yolocosmo.sh` failed at once: every cosmo compile ended in
+   make's `Error 5` with no message. *Root cause, measured:* cosmo's build tools (`cocmd`,
+   `tlscc`, `compile.ape`, …) are APE binaries starting with `MZqFpD`; WSL's `WSLInterop`
+   binfmt_misc entry claims every file starting with `MZ` and runs it as a WINDOWS program, so the
+   tools never ran (run directly: nothing; through `build/bootstrap/ape.elf`: they work). Not a
+   Fil-C or cosmo defect, and upstream's Linux hosts have no WSLInterop. *Fix (cosmo's documented
+   one):* install cosmo's own loader (`projects/yolocosmo/build/bootstrap/ape.elf`, the version
+   Fil-C's tree ships) as `/usr/bin/ape` and register it for `MZqFpD` and `jartsr`;
+   binfmt_misc tries the newest entry first, so it wins over WSLInterop. Root-only, so the
+   owner runs it; `build-cosmo.ts` detects the missing `APE` entry and prints the commands.
+   *Side effect:* none for Windows `.exe` files (they start `MZ` but not `MZqFpD`). Lost on a WSL
+   restart unless `/etc/binfmt.d/cosmo-ape.conf` is written (the tool prints that too).
+   *Bears on the evaluation itself:* a zilc user on WSL would need the same registration to run
+   cosmo-mode (APE) programs there.
 3. **Parallelism capped at 12 jobs** (`JOBS`). *Why:* upstream uses every core (`NCPU=$(nproc)` in
    `libpas/common.sh`, ninja's default for clang); on this 32-core, 31 GB WSL VM, 32 parallel
    RelWithDebInfo clang compiles crashed the WSL service twice (2026-10-01). *How, without editing
@@ -683,8 +704,14 @@ Ubuntu 26.04 in WSL2, so three things differ. None of them changes what Fil-C pr
    count changes build speed only.
 
 **Also:** the root-only step (apt) is the owner's to run: `sudo` here needs a password, and the
-tool prints the exact `apt-get install` line for whatever is missing. Ruby is not installed:
-upstream's Ruby test runner is replaced by zilc's Deno port (`run-filc-tests.ts`).
+tool prints the exact `apt-get install` line for whatever is missing. ~~Ruby is not installed:
+upstream's Ruby test runner is replaced by zilc's Deno port (`run-filc-tests.ts`).~~ **Corrected
+2026-10-05: Ruby IS a build dependency.** The runtime's Makefile (`libpas`) runs
+`generate_pizlonated_forwarders.rb` and `` `./find_clang_include_dir.rb` `` while compiling; the
+build stopped there (`env: 'ruby': No such file or directory`, plus clang errors that were only a
+side effect of the empty include-dir result). Only the TEST runner is replaced by the Deno port.
+This matters for the all-Zig goal: Fil-C's runtime build needs Ruby, so building it from
+`zig build` means porting those two generators too.
 
 ---
 

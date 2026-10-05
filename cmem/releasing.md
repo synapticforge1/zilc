@@ -83,13 +83,13 @@ code needs.** `zilc --version` and the release notes must state it, along with t
   `0.15.2-100`.
 - **When a new Zig line starts, port from the LATEST reference release** so the conversion is as
   small as possible, and use the port notes from the previous line (`ports/<version>.md`). With notes from
-  the `0.16.1-1` port, `0.16.2-1` should go faster.
+  the `0.16.0-0.686.1` port, the `0.18.0` one should go faster.
 - **Why (owner):** if Fil-C stays on an old LLVM for a long time, the reference line keeps moving
   (`0.15.2-100`, `-101`, …) and remains the fixed point every latest-line release can be checked
   against. The changes are made on the reference line first, then carried to the latest line,
   taking the latest Zig's own changes into account.
-- **ONE GIT BRANCH PER ZIG LINE (owner, 2026-09-30):** `0.15.1-N`, `0.15.2-N`, `0.16.1-N` and
-  `0.16.2-N` each live on their own branch, for compatibility with that upstream Zig release.
+- **ONE GIT BRANCH PER ZIG LINE (owner, 2026-09-30):** today `v0.15.2`, next `v0.16.0`
+  (owner 2026-10-05: 0.16.0, held until Zig 0.18.0), each on its own branch, for compatibility with that upstream Zig release.
   What follows from it:
   - A new line's branch is **created from its basis release**, e.g. the `0.16.2` branch starts at
     the `0.15.2-100` commit. The basis is then visible in git history, not only in the notes.
@@ -152,9 +152,10 @@ milestone of ours. Consequences:
 ✅ **`N` RESTARTS AT 1 FOR EVERY NEW ZIG VERSION, patch releases included (owner, 2026-09-30).**
 "When zig hits 0.16.2, which seems to be a breaking change in the grand scheme of Zig world, we
 start back at -1." Zig breaks APIs even between patch releases, so each Zig release starts its own
-line of zilc releases: `0.16.1-1 … 0.16.1-5`, then `0.16.2-1`. Consequences:
+line of zilc releases (in today's form, `<Zig>-<Fil-C>.N`): `0.16.0-0.686.1 … 0.16.0-0.686.5`, then
+`0.18.0-0.686.1`. Consequences:
 - **`N` alone does not identify a release; the full version does.** Always quote it whole.
-- **Ordering still holds across Zig versions:** `0.16.1-5 < 0.16.2-1`, the same kind of comparison
+- **Ordering still holds across Zig versions:** `0.16.0-0.686.5 < 0.18.0-0.686.1`, the same kind of comparison
   as `0.15.2-12 < 0.16.0-1`, which was verified with Zig's parser.
 - **Today's `0.15.2-3` keeps its `3`.** It carries the existing count (`0.1.0` → `0.3.0`) and is not
   renumbered. The restart rule applies from the next Zig change on.

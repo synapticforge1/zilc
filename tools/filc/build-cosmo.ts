@@ -28,12 +28,17 @@ const need: [string, string][] = [
   ["clang", "clang"], ["ld.lld", "lld"], ["ninja", "ninja-build"], ["cmake", "cmake"], ["unzip", "unzip"],
   ["patchelf", "patchelf"], ["bison", "bison"], ["flex", "flex"], ["makeinfo", "texinfo"], ["autoconf", "autoconf"],
   ["libtoolize", "libtool"], ["pkg-config", "pkg-config"], ["automake", "automake"], ["msgfmt", "gettext"],
+  // Ruby: the RUNTIME build (libpas Makefile) runs generate_pizlonated_forwarders.rb and
+  // find_clang_include_dir.rb, not only the test runner. Found missing 2026-10-05.
+  ["ruby", "ruby"],
   ["aarch64-linux-gnu-gcc", "gcc-aarch64-linux-gnu"],
   ["aarch64-linux-gnu-ld", "binutils-aarch64-linux-gnu"], ["qemu-aarch64", "qemu-user"],
 ];
 const missing: string[] = [];
 for (const [cmd, pkg] of need) if ((await run(["sh", "-c", `command -v ${cmd}`])).code !== 0) missing.push(pkg);
-for (const [file, pkg] of [["/usr/include/blake3.h", "libblake3-dev"], ["/usr/aarch64-linux-gnu/include/stdio.h", "libc6-dev-arm64-cross"],
+// curl/curl.h: Fil-C's `projeny` (its source-package tool, the build's FIRST step) links -lcurl.
+// Upstream's Dockerfile installs only the curl program; found missing on the first run, 2026-10-05.
+for (const [file, pkg] of [["/usr/include/x86_64-linux-gnu/curl/curl.h", "libcurl4-openssl-dev"], ["/usr/include/blake3.h", "libblake3-dev"],["/usr/aarch64-linux-gnu/include/stdio.h", "libc6-dev-arm64-cross"],
   ["/usr/aarch64-linux-gnu/include/linux/types.h", "linux-libc-dev-arm64-cross"]]) {
   if (!(await exists(file)) && !(await exists(file.replace("/usr/include", "/usr/local/include")))) missing.push(pkg);
 }
@@ -45,6 +50,24 @@ if ((await run(["sh", "-c", "command -v wine"])).code !== 0) missing.push("wine6
 if (missing.length) {
   console.log("Missing host packages. Run this yourself in WSL (it needs your sudo password):\n");
   console.log(`  sudo apt-get update && sudo apt-get install -y ${[...new Set(missing)].join(" ")}\n`);
+  Deno.exit(1);
+}
+
+// 1b. WSL only: cosmo's build tools (cocmd, tlscc, compile.ape, …) are APE binaries, which start
+//     with "MZqFpD". WSL registers a binfmt_misc handler, WSLInterop, for every file starting with
+//     "MZ" and hands them to WINDOWS, where they fail: every cosmo compile died with make's
+//     `Error 5` and no message (first run, 2026-10-05). Cosmo's documented fix is to register its
+//     APE loader for APE files; binfmt_misc tries the newest entry first, so it wins over
+//     WSLInterop. Not persistent across a WSL restart unless the /etc/binfmt.d file is written.
+const binfmt = "/proc/sys/fs/binfmt_misc";
+if ((await exists(`${binfmt}/WSLInterop`)) && !(await exists(`${binfmt}/APE`))) {
+  console.log("WSL hands cosmo's APE build tools to Windows (binfmt WSLInterop). Run this yourself in");
+  console.log("WSL (sudo), then re-run this tool. The loader is the one in Fil-C's own cosmo tree:\n");
+  console.log(`  sudo install -m 755 ${src}/projects/yolocosmo/build/bootstrap/ape.elf /usr/bin/ape`);
+  console.log(`  sudo sh -c "echo ':APE:M::MZqFpD::/usr/bin/ape:' > ${binfmt}/register"`);
+  console.log(`  sudo sh -c "echo ':APE-jart:M::jartsr::/usr/bin/ape:' > ${binfmt}/register"\n`);
+  console.log("Optional, to survive a WSL restart (systemd-binfmt reads it at boot):\n");
+  console.log(`  printf ':APE:M::MZqFpD::/usr/bin/ape:\\n:APE-jart:M::jartsr::/usr/bin/ape:\\n' | sudo tee /etc/binfmt.d/cosmo-ape.conf\n`);
   Deno.exit(1);
 }
 

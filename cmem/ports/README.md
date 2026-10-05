@@ -2,7 +2,7 @@
 
 **Purpose (owner, 2026-09-30):** every time zilc moves to a new Zig release, record what changed
 and how it was fixed, so the next port reads the notes instead of rediscovering them. With notes
-from the `0.16.1-1` port, `0.16.2-1` should go faster. How lines, bases and versions work:
+from the `0.16.0-0.686.1` port (the next line, owner 2026-10-05), the `0.18.0` port should go faster. How lines, bases and versions work:
 `../releasing.md` "Two kinds of line". The procedure: `../upstream.md` stage B.
 
 **Layout (owner, 2026-09-30):** these files live on **`main`** with the rest of `cmem/`, one per new

@@ -177,7 +177,7 @@ for structure and policy.
   `<Zig>-<Fil-C>.<zilc release>` = `0.15.2-0.686.1`** (`releasing.md`). Was:, `<Zig line>-<zilc
   release>` (was `0.3.0`). Spelling verified with Zig's parser (`0.15.2_3` rejected: Zig reads it as
   `0.15.23`). **No 1.0, ever**: only `-N` advances, and **`N` restarts at 1 for every new Zig
-  version, patch releases included** (e.g. `0.16.1-1`, `0.16.2-1`). Scheme fully settled
+  version, patch releases included** (today's form: `0.15.2-0.686.1`, next `0.16.0-0.686.1`). Scheme fully settled
   (`releasing.md`).
 - 🧭 **Lines and basis (owner):** the Zig part names the Zig a line is **built with**, not the Zig
   user code needs (corrected the same day; `root.zig`'s constant is now `zig_line`). The
