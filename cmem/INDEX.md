@@ -83,9 +83,11 @@ for structure and policy.
   cosmo mode; its suite 5,821/5,822; Zig programs via zilc run as Linux ELF + APE, and under Wine as
   Windows programs; gap: `statx`; ⚠️ ALL cosmo programs (even Fil-C's C) crash on REAL Windows.
 - ✅ **2026-10-05: ZIG VERSION OF FIL-C SCOPED on 0.15.2** (`zig-filc-scope.md`).
-- ❓ **Owner idea (2026-10-05), to decide: a NEW project** built on Zig + Fil-C for the all-Zig
-  platform, keeping zilc as the stable, upstream-faithful reference and test oracle. Open: name and
-  repo, its Zig version, zilc's future version line, when to start.
+- 🌱 **2026-10-05 (owner): NEW PROJECT "Zaig"** — "we will zag where they zig. We will fix what
+  they did not and cleanup what they left a mess of" (AI-assisted). Built on Zig + Fil-C; **zilc
+  stays the stable reference and Zaig's test oracle**, its version cadence unchanged. Zaig stays on
+  **Zig 0.15.2** until proven to produce the same as zilc. Starts once the cosmo evaluation and the
+  scope are complete; its brief is `zig-filc-scope.md` + `platforms.md`. (`design-decisions.md`)
 - (was) ▶️ IN PROGRESS: evaluate Fil-C's COSMO mode, starting by building Fil-C
   from source (`platforms.md` "Cosmo evaluation"). Tool `tools/filc/build-cosmo.ts` (stock
   upstream `build_base_cosmo.sh`, 12 jobs); source cloned to `$WORK/filc-cosmo` at `v0.686`.
