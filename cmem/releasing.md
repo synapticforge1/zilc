@@ -187,6 +187,8 @@ changes**, patch releases included. There is no major/minor of our own and no 1.
       against the gates (2026-10-05: a "C++" claim was removed, C++ is untested). A new Zig line
       also gets its `ports/<version>.md` entry.
 - [ ] `zilc --version` on the release machine shows `ok` for Zig and Fil-C.
+- [ ] Fil-C's own test suite: stock vs zilc's patched clang, **0 differences**
+      (`tools/filc/run-filc-tests.ts`; `testing.md`).
 - [ ] `third_party/LICENSES.md` ledger matches what is actually in the tree. Any license that must
       travel with `zig-out/` is installed by `build.zig`.
 - [ ] `cmem/INDEX.md` STATE updated.

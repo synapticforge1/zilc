@@ -38,9 +38,10 @@ for structure and policy.
   `false`, AND the user is told: `zilc build` prints a `zilc: note:` with the reason
   (`workarounds.md` KI-20; tests 27/27).
 - ✅ **2026-10-05: `zilc --version` + `RELEASE-NOTES.md`** (pre-publish item; `releasing.md`).
+- ✅ **2026-10-05: Fil-C's own 7,003 tests** run against zilc's patched clang: identical to stock;
+  found and fixed a broken kernel-header link on this machine (`testing.md`).
 - ▶️ **Next: the rest of the PRE-PUBLISH CHECKLIST**: the platforms scope pass; the 9 upstream
-  commits to review; and, if the owner agrees, Fil-C's own test suite against the patched clang
-  (proposed 2026-10-05, needs Ruby). Still open from 2026-10-01: read the
+  commits to review. Still open from 2026-10-01: read the
   9 upstream `FilPizlonator.cpp` commits (above all `097f7b7`), then `--mark-reviewed`.
 
 ## ✅ 2026-10-02 — BUILD SPEED, lever (a)
@@ -207,12 +208,11 @@ for structure and policy.
   - [x] `zilc --version` shows the user-code Zig and Fil-C release; create a **release-notes file**.
     ✅ 2026-10-05: `--version` also checks the machine's Zig and Fil-C clang (ok/MISMATCH, patched
     build or stock); `zilc build` warns on the wrong Zig; `RELEASE-NOTES.md` (`releasing.md`)
-  - [ ] 🔸 **PROPOSED (owner's question, 2026-10-05): run Fil-C's own test suite** (7,165 C tests,
-    `filc/tests` + Ruby runner `filc/run-tests`) against zilc's PATCHED clang and the stock one,
-    and compare: the strongest check that zilc's three pass patches change nothing Fil-C tests.
-    Needs Ruby in WSL (not installed; `sudo apt install ruby` needs the owner's password) and the
-    tests checked out in the WSL home (exFAT D: would take 3.9 GB). Run from the reference clone,
-    nothing copied into zilc. Awaiting the owner's go-ahead
+  - [x] **Fil-C's own test suite against zilc's patched clang** (owner, 2026-10-05). ✅ Same day:
+    **0 differences** between stock and patched on all 7,003 tests (0.685); 5,778/5,779 runnable
+    pass with both (the 1 needs a CPU feature WSL lacks). No Ruby needed: `tools/filc/run-filc-tests.ts`
+    (Deno port). It also found a MACHINE problem: a dangling `os-include/asm` link broke every
+    program using kernel headers; fixed (`fix-os-include.sh`). `testing.md`, `workarounds.md`
   - [ ] **Platforms scope pass** (P6): per platform, the processors, the std OS-function count, the
     libc story, KI-5-family code, and the host toolchain
   - [ ] Then: move tag `v0.15.2-3` + branch `v0.15.2` to the final commit, and push
@@ -353,7 +353,9 @@ this for the project"), do all of the following:
    do what it says before finishing. In order:
    1. Every change to Fil-C's source goes into an edit script, the source of truth:
       `tools/filc/patch-pass.ts` (the pass) or `tools/filc/patch-split.ts` (`llvm-split`).
-   2. Rebuild with `build-patched-clang.sh`.
+   2. Rebuild with `build-patched-clang.sh`. Then run Fil-C's own test suite with the stock and
+      the patched clang and compare (`tools/filc/run-filc-tests.ts`, `testing.md`): the result
+      must stay **0 differences** (2026-10-05).
    3. Save the diff to `third_party/filc-patches/zilc-filc-pass.patch`.
    4. Re-archive with `archive-patched-clang.sh`.
    5. Update the ledger entry `filc-pass-fixes` and `workarounds.md`.

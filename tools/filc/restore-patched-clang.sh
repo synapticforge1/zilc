@@ -19,5 +19,7 @@ if [ "$1" = "--with-debug-info" ]; then
   # gdb finds it next to the binary through the .gnu_debuglink section.
   xz -dc "$NAME-clang-20.debug.xz" > "$DEST/$NAME/build/bin/clang-20.debug"
 fi
+# The archive's kernel-header links point wherever they pointed on the machine that made it.
+sh "$REPO/tools/filc/fix-os-include.sh" "$DEST/$NAME"
 "$DEST/$NAME/build/bin/clang" --version | head -1
 echo "restored: $DEST/$NAME/build/bin/clang"

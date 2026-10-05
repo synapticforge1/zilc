@@ -83,7 +83,8 @@ Run this **before** incorporating code from any project.
 ## Component Ledger
 
 ~~EMPTY as of 2026-09-18.~~ **First entries 2026-09-30:** test programs, and a 4-line Zig std backport (MIT).
-**2026-10-01:** a local patch to Fil-C's compiler pass (toolchain-only, not distributed). **Still no
+**2026-10-01:** a local patch to Fil-C's compiler pass (toolchain-only, not distributed).
+**2026-10-05:** Fil-C's test runner, ported to Deno (BSD-2-Clause, test tool). **Still no
 third-party runtime code in zilc.**
 
 Newest first. Copy the template for each adopted component.
@@ -163,6 +164,33 @@ Newest first. Copy the template for each adopted component.
 - **Benefit / drawback note:** removes an out-of-bounds read in 0.15.2's std that Fil-C rightly
   rejects (`getenv`, every C-string span), by adopting **upstream's own fix**, not an invention.
   Drawback: each Zig version needs its patch set re-checked (`cmem/ports/`).
+
+### filc-test-runner-port (Fil-C's test runner, ported from Ruby to Deno; a TEST TOOL)
+- **Source:** https://github.com/pizlonator/fil-c (`deluge` branch)
+- **Version / commit:** `bb0d0a64eed297ab8e171002033208fb08ad9941` (tag `v0.685`), the commit zilc's
+  patched Fil-C clang is built from
+- **Upstream path(s):** `filc/run-tests` (Ruby). Its LOGIC is ported; no line is copied verbatim
+- **License (SPDX):** `BSD-2-Clause` (the file's own header: Copyright 2023-2025 Epic Games, Inc.;
+  2026 Filip Pizlo)
+- **License file:** the full BSD-2-Clause text and both copyright lines are reproduced in the header
+  of the port itself, `tools/filc/run-filc-tests.ts`, which is licensed BSD-2-Clause as a whole
+  (not zilc's usual dual licence), so the notice travels with the only file that carries the code
+- **What we reused:** how a test is built and judged: the skips, the compile and link commands, the
+  library handling, the four runs with their environment variables, the expected-return and
+  output checks, as shell scripts per test
+- **Where it lives in zilc:** `tools/filc/run-filc-tests.ts`
+- **Artifact destination:** **test-only, toolchain side.** Never linked into zilc or user programs.
+  The TESTS themselves are NOT in zilc: they are cloned into the WSL home (`~/zilc-work/filc-tests`)
+  and only read there, so nothing of them is redistributed
+- **Modifications:** a Deno worker pool with a per-test timeout instead of `make -k -j`; CPU
+  features read from `/proc/cpuinfo` instead of compiled probes; duplicate YAML keys accepted (last
+  wins) as Ruby's parser does. Listed in the file's header
+- **Obligations satisfied:** [x] licence and copyright notice retained (file header)  [x] change-notes
+  (file header)  [x] SPDX header  [n/a] binary-distribution notice (a source-only test tool)
+- **Benefit / drawback note:** runs upstream's 7,003 tests against zilc's patched clang without Ruby
+  (owner, 2026-10-05: "to make sure we are not missing anything that upstream has already
+  identified"). Cost: the port can drift from upstream's runner, guarded by running the stock clang
+  as the baseline, so only differences between the two compilers count
 
 ### basics-of-coding (C and Zig example programs, used as TESTS)
 - **Source:** https://github.com/jrmarcum/BasicsOfCodingC and https://github.com/jrmarcum/BasicsOfCodingZig

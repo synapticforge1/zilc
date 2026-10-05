@@ -43,5 +43,18 @@ if [ -f "$BIN" ] && [ -f "$TAR" ] && [ "$BIN" -nt "$TAR" ]; then
   stale=1
 fi
 
+# 4. The installed tree's kernel-header links must resolve, or programs that include
+#    <linux/futex.h> and friends do not compile (fix-os-include.sh says why).
+OSI=$W/tools/filc-0.685-zilc/pizfix/os-include
+if [ -d "$OSI" ]; then
+  for l in asm linux asm-generic; do
+    if [ ! -e "$OSI/$l/." ]; then
+      echo "BROKEN: $OSI/$l -> $(readlink "$OSI/$l") does not exist."
+      echo "        Run: sh tools/filc/fix-os-include.sh $W/tools/filc-0.685-zilc"
+      stale=1
+    fi
+  done
+fi
+
 [ $stale = 0 ] && echo "toolchain/ is up to date (patch sha256 $want)."
 exit $stale

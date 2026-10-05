@@ -73,6 +73,43 @@ inside). Zig zilc ReleaseSafe/ReleaseSafe **1.26** stripped; zilc ReleaseSmall/R
 stripped (instrumentation plus Fil-C's calling-convention thunks). Tools:
 `tools/basics/size-compare.sh`, `size-report.sh`.
 
+## 🧬 Fil-C's OWN test suite, against zilc's patched clang (✅ 2026-10-05)
+
+Owner: run upstream's tests *"to make sure we are not missing anything that upstream has already
+identified"*. **Result: stock Fil-C 0.685 clang and zilc's patched clang give the SAME result on
+all 7,003 tests (0 differences).** So zilc's three pass patches (colouring, `indirectbr` lowering,
+dense interference graph) change nothing Fil-C's own suite checks.
+
+| | stock 0.685 | zilc patched |
+| --- | --- | --- |
+| run (x86_64 + SHA-NI, musl build) | 5,779 | 5,779 |
+| **pass** | **5,778** | **5,778** |
+| fail | 1: `inlineasm_rdpkru` | the same 1 |
+| skipped (cannot run here) | 1,224: 694 need AVX-512, 504 ARM-only, 24 glibc-build-only, 1 macOS-only, 1 marked skip | the same |
+| time, 24 jobs | ~6 min | ~6.5 min |
+
+- `inlineasm_rdpkru` executes `rdpkru` (memory protection keys); this CPU, under WSL2, has no
+  `pku` flag: "Illegal instruction". A hardware/VM limit, the same for both compilers.
+- 🔑 **What the suite found on its first run: 9 more failures that were OUR MACHINE's setup.** The
+  prebuilt's `pizfix/os-include/asm` link pointed at `/usr/include/asm`, which does not exist
+  (Fil-C's `setup.sh` had run before the kernel headers were installed). Every program including
+  `<linux/futex.h>`, `<linux/seccomp.h>`, … failed with `'asm/types.h' file not found`: the 7
+  `seccomp-ssh*` tests, `futextimeout`, `lockchaosfutex`, and ANY zilc program using those headers.
+  Fixed with `tools/filc/fix-os-include.sh` (setup.sh's own rule), now run by
+  `build-patched-clang.sh` and `restore-patched-clang.sh`, and checked by `check-toolchain.sh`.
+  `workarounds.md` has the entry.
+
+**How to run it** (WSL): `tools/filc/run-filc-tests.ts`, a Deno port of Fil-C's Ruby
+`filc/run-tests` (same build, run and check rules; ledger `filc-test-runner-port`). The tests are
+NOT in zilc: clone them at the compiler's commit into `~/zilc-work/filc-tests`
+(`git clone --depth 1 --branch v0.685 --filter=blob:none --no-checkout
+https://github.com/pizlonator/fil-c.git`, then `sparse-checkout set filc/tests`, `checkout`),
+then from that folder:
+`deno run -A …/run-filc-tests.ts run --pizfix <tree>/pizfix --label stock` (and `--label patched`
+with zilc's tree), then `… compare results-stock.json results-patched.json` (exit 0 = same).
+⚠️ Use the tests of the COMPILER's commit (`v0.685`: 7,003), not upstream's newest (7,165), which
+test features 0.685 lacks.
+
 ## 🔍 Output comparison: zilc vs native, not just exit codes (pre-publish item, ✅ 2026-10-02)
 
 **Result: 0 unexplained differences.** Every tests/basics program, C and Zig, in all four modes

@@ -63,5 +63,7 @@ rm -rf "$OUT"
 cp -a "$PREBUILT" "$OUT"
 cp bin/clang-20 "$OUT/build/bin/clang-20"
 strip --strip-debug -o "$OUT/build/bin/llvm-split" bin/llvm-split
+# The copied tree's kernel-header links may be stale (fix-os-include.sh says why).
+sh "$REPO/tools/filc/fix-os-include.sh" "$OUT"
 "$OUT/build/bin/clang" --version | head -1
 echo "installed: $OUT/build/bin/clang"

@@ -68,6 +68,7 @@ Every workaround gets an entry **when it is made**, not later. Use these heading
 | `TLS reference in … mismatches non-TLS reference in …` (joining split parts) | KI-22, lever (a): unused hidden declarations |
 | `multiple definition of 'main'` … `filc_crt.o` / `filc_mincrt.o` after `clang -r` | KI-22, lever (a): Fil-C's driver adds its crt even to `-r -nostdlib` |
 | `filc safety error: stack overflow` on a Zig `@panic`, or the KI-12 / KI-20 traps, in a program whose `main` is C | the Zig file was compiled without zilc's generated root, so std's hooks were missing: fixed 2026-10-02 by the library root (`library_shim`, KI-5 short form below; gate cases 6–8) |
+| `fatal error: 'asm/types.h' file not found` (from `pizfix/os-include/linux/types.h`) | the Fil-C tree's `os-include/asm` link points at headers this machine lacks: `tools/filc/fix-os-include.sh <tree>` (see "Machine setup" below) |
 | `patch-pass.ts` / `patch-split.ts`: `original found 0 times, expected 1` | an edit's original text no longer matches: upstream changed it (`check-upstream.sh`), or an editor trimmed a whitespace-only line in it (KI-22, lever (b)) |
 | `zilc (KI-22): interference graph differs from the original` / `frame-slot colouring differs` | only with `ZILC_VERIFY_INTERFERENCE=1` / `ZILC_VERIFY_COLOURING=1`: the patched pass disagrees with the original; KI-22 levers (b) and the colouring fix |
 
@@ -617,6 +618,35 @@ an unused hidden declaration of a thread-local.
 `sample.sh` + `sampler.py`, gdb from `apt-get download` into `~/zilc-work/tools/gdb`, needs
 `LD_LIBRARY_PATH`). Pass source: `~/zilc-work/filc-src/FilPizlonator.cpp` (reading the pass is
 allowed, owner 2026-10-01).
+
+---
+
+## Machine setup — Fil-C's kernel-header links (`os-include`), 2026-10-05
+
+**Symptom.** `fatal error: 'asm/types.h' file not found`, included from
+`pizfix/os-include/linux/types.h`, for any C file that includes `<linux/futex.h>`,
+`<linux/seccomp.h>` or another kernel header reaching `<asm/types.h>`.
+
+**Class.** System setup (this machine), not a Fil-C or zilc defect.
+
+**Root cause, measured.** Fil-C's prebuilt does not ship kernel headers. Its `setup.sh`, run once
+after unpacking, links `pizfix/os-include/{linux,asm,asm-generic}` to the host's `/usr/include`,
+choosing `asm` = `/usr/include/x86_64-linux-gnu/asm` **if it exists**, else `/usr/include/asm`.
+Here setup.sh ran before `build-essential` (and with it `linux-libc-dev`) was installed, so `asm`
+pointed at `/usr/include/asm`, which Ubuntu does not have: a dangling link. zilc's patched tree is a
+copy of the prebuilt, so it inherited the link, and so does the archive in `toolchain/`.
+
+**Why the fix is correct.** `tools/filc/fix-os-include.sh` re-applies setup.sh's own rule against
+the machine as it is now; nothing else in the tree changes. `build-patched-clang.sh` and
+`restore-patched-clang.sh` run it after installing, so a restored archive is repaired on the
+machine it lands on; `check-toolchain.sh` reports a dangling link (`BROKEN`).
+
+**How it was found.** Fil-C's own test suite (`tools/filc/run-filc-tests.ts`): 9 tests failed with
+BOTH the stock and the patched clang, which pointed away from zilc's patches and at the setup. No
+zilc test had hit it: the corpus and gate include no kernel headers.
+
+**Recognising a relative.** A failure shared by the stock and the patched compiler is the
+environment, not zilc's patches: look at links and paths outside the compiler first.
 
 ---
 
