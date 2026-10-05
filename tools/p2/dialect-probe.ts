@@ -18,6 +18,15 @@
 // p2-minimal.ll from a session scratchpad that no longer exists (the cp failed and the copy already
 // in $WORK/p2 was used); this copies the committed tools/p2/minimal-dialect.ll, byte-identical to
 // it. tiny-ni2.ll is still copied from $WORK/p1 only if present, as before (silently otherwise).
+//
+// 📌 RECORD (owner, 2026-10-05): tiny-ni2.ll (11.7 MB) is the ONE input of the phase experiments
+// that has no committed source of its own. It is GENERATED: tools/p1/tiny.zig → (Zig 0.15.2)
+// $WORK/p1/tiny.ll → tools/p1/zig-ir-spike.ts (patches in Fil-C's two data layouts) →
+// $WORK/p1/tiny-ni2.ll → copied here. If $WORK/p1 is lost, rebuild it in that order: the exact
+// Zig command for tiny.ll is in zig-ir-spike.ts's header (recovered and verified 2026-10-05: same
+// code, only 3 debug-info path lines differ), then run zig-ir-spike.ts, then this tool. Copies on
+// 2026-10-05: tiny.ll 11,669,818 bytes (sha256 5db471c2…), tiny-ni2.ll 11,669,936 bytes (sha256
+// 3e81eb75…), in $WORK/p1 and $WORK/p2.
 import { existsSync, FILC_PREBUILT_TREE, linuxOnly, mkdirp, REPO, WORK } from "../lib/tool.ts";
 
 await linuxOnly(import.meta);

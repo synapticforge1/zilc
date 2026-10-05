@@ -73,6 +73,25 @@ inside). Zig zilc ReleaseSafe/ReleaseSafe **1.26** stripped; zilc ReleaseSmall/R
 stripped (instrumentation plus Fil-C's calling-convention thunks). Tools:
 `tools/basics/size-compare.ts`, `size-report.ts`.
 
+## 📌 Experiment inputs that live outside the repo (record, owner 2026-10-05)
+
+The phase experiments (`tools/p1`–`p3`) read some inputs from the Linux work area, not the repo.
+All are committed sources EXCEPT three generated Zig IR files in `$WORK/p1` (≈12 MB each). Their
+exact Zig 0.15.2 commands were recovered on 2026-10-05 and verified to reproduce the originals
+(same code; only 3 debug-info lines differ: the build directory, and the hash of Zig's cache folder
+for `builtin.zig`):
+
+| file | made from | how |
+| --- | --- | --- |
+| `$WORK/p1/tiny.ll` | `tools/p1/tiny.zig` | `zig build-obj -target x86_64-linux-gnu -femit-llvm-ir=tiny.ll -fno-emit-bin tiny.zig` (in `$WORK/p1`) |
+| `$WORK/p1/zig_oob-x86_64-linux-gnu.ll` | `tools/p1/zig_oob.zig` | `zig build-exe -target x86_64-linux-gnu -lc -femit-llvm-ir=zig_oob-x86_64-linux-gnu.ll -fno-emit-bin zig_oob.zig` |
+| **`tiny-ni2.ll`** (`$WORK/p1`, copied to `$WORK/p2`) | `tiny.ll` | `deno run -A tools/p1/zig-ir-spike.ts`; read by `tools/p2/dialect-probe.ts` part C. **The one input with no committed source of its own** |
+
+The full notes are in `tools/p1/README.md` and `tools/p2/README.md` ("Record: tiny-ni2.ll") and in
+both tools' headers. Found during the Deno conversion: two experiment scripts used to copy inputs
+from a session scratchpad that no longer existed and silently ran on leftovers; they now use the
+committed copies.
+
 ## 🧬 Fil-C's OWN test suite, against zilc's patched clang (✅ 2026-10-05)
 
 Owner: run upstream's tests *"to make sure we are not missing anything that upstream has already

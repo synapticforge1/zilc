@@ -174,5 +174,12 @@ its `publishing.md`).
   **All pass edits (five, with KI-22 lever (b)'s, re-checked later the same day) and all three
   `llvm-split` edits still apply.** Still not marked reviewed:
   the 9 pass commits (above all `097f7b7`) have not been read yet.
+- **Run of 2026-10-05** (now `deno run -A tools/upstream/check-upstream.ts`, any OS): upstream
+  `deluge` at `163fae5` (2026-10-04), **123 commits ahead**, and a **NEW RELEASE TAG `v0.686`**.
+  Watched-file hits: **10** to `FilPizlonator.cpp` (one more than before), 1 to `configure_llvm.sh`,
+  2 to `libpas/common.sh`, 2 to `filc/include`, and 41 to `filc/tests` (newly watched: Fil-C's
+  own suite, run against zilc's clang). **All five pass edits and all three `llvm-split` edits
+  still apply.** zilc stays on 0.685 for `v0.15.2-3`; the 10 pass commits and 0.686 are on the
+  review item. Still not marked reviewed.
 - **When to run it:** at every "update the project memory" (`INDEX.md` policy, step 5), and before
   any Fil-C upgrade (stage A above).

@@ -45,8 +45,12 @@ for structure and policy.
   WSL by themselves (`tools/lib/tool.ts`, `tools/README.md`). Each of the 31 conversions was checked
   against its shell original; the end-to-end re-run: corpus 78/78 in four modes, output comparison
   0 unexplained (505 identical), gate 8/8, toolchain build/archive/restore OK.
+- 📌 **Record (owner): `tiny-ni2.ll`**, the one phase-experiment input with no committed source,
+  and the two P1 IR files it comes from: their exact Zig commands were recovered and verified;
+  `testing.md` "Experiment inputs that live outside the repo", `tools/p1/README.md`,
+  `tools/p2/README.md`.
 - 📌 **Upstream released Fil-C 0.686 (2026-10-04)**, seen by `check-upstream.ts`: new commits to
-  `FilPizlonator.cpp` and 41 to `filc/tests`. To review with the 9 below; zilc stays on 0.685 for
+  `FilPizlonator.cpp` (10 in all now) and 41 to `filc/tests`. To review with the 9 below; zilc stays on 0.685 for
   this release.
 - ▶️ **Next: the rest of the PRE-PUBLISH CHECKLIST**: the platforms scope pass; the upstream
   commits to review. Still open from 2026-10-01: read the 9 upstream `FilPizlonator.cpp` commits

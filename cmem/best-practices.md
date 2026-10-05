@@ -176,6 +176,12 @@ citation to the incident.
 - **Script in Deno or Bun, never Python** (owner, 2026-09-18). Tooling in `tools/` is `.ts`/`.mjs`,
   run with `deno run` or `bun`. This follows the project's memory-safety stance and matches
   wazmrt's Deno tooling.
+- **Every generated input a recorded result depends on needs its exact recipe written down, next
+  to the tool that reads it.** "Made during P1" is not a recipe. The commands for three P1 IR files
+  had to be recovered by trial (one was `build-exe -lc`, readable only from the file's own
+  `output_mode` and `link_libc`); two scripts had silently copied inputs from a vanished scratchpad.
+  Commit small inputs; for big generated ones, record the command and a checksum. (tiny-ni2.ll,
+  2026-10-05.)
 - **A harness that captures a program's output must keep stdout and stderr in ONE stream.** Read
   through two pipes, the lines of a program writing to both come out in a different order each run;
   the shell's `> f 2>&1` shares one file and keeps the order. `tools/lib/tool.ts` `run()` does the
