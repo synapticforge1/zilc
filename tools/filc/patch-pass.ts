@@ -586,7 +586,7 @@ static bool zilcVerifyInterference() {
 ];
 
 // `--check`: report, edit by edit, whether the patch would apply, WITHOUT writing. Used by
-// tools/upstream/check-upstream.sh against upstream's newest FilPizlonator.cpp. Exit 1 if any
+// tools/upstream/check-upstream.ts against upstream's newest FilPizlonator.cpp. Exit 1 if any
 // edit's original text is gone (upstream changed the code we patch: re-derive that edit).
 const check = Deno.args[0] === "--check";
 const path = check ? Deno.args[1] : Deno.args[0];

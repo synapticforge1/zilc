@@ -119,10 +119,10 @@ Newest first. Copy the template for each adopted component.
 - **Where it lives in zilc:** `tools/filc/patch-pass.ts` and `tools/filc/patch-split.ts`
   (exact-match edit scripts, the diff context), `third_party/filc-patches/zilc-filc-pass.patch`
   (the resulting diff, all edits to both files),
-  `tools/filc/build-patched-clang.sh` (build recipe mirroring Fil-C's `configure_llvm.sh`).
+  `tools/filc/build-patched-clang.ts` (build recipe mirroring Fil-C's `configure_llvm.sh`).
   **Local binary archive (owner, 2026-10-01):** `toolchain/` holds the built tree (stripped clang
-  and, since 2026-10-02, stripped `llvm-split`: 95 MB) and clang's debug info (966 MB), with `tools/filc/archive-patched-clang.sh` and
-  `restore-patched-clang.sh`. **It is gitignored, so pushing it is impossible by default, and it
+  and, since 2026-10-02, stripped `llvm-split`: 95 MB) and clang's debug info (966 MB), with `tools/filc/archive-patched-clang.ts` and
+  `restore-patched-clang.ts`. **It is gitignored, so pushing it is impossible by default, and it
   must stay that way:** pushing it would be a distribution of Fil-C
 - **Artifact destination:** **toolchain-only, and local only.** The patched clang lives in
   `~/zilc-work/tools/filc-0.685-zilc/` and is **not distributed**. It is the default for zilc's

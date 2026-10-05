@@ -22,7 +22,7 @@ completely unrelated reason (a missing stack probe).*
 the gate **failed** and printed the real panic. A gate that cannot fail proves nothing.
 
 ```powershell
-wsl.exe -e sh /mnt/d/…/zilc/tools/run-gate-wsl.sh            # from Windows
+deno run -A tools/run-gate.ts            # from Windows
 ```
 ```sh
 ZILC_FILC=…/build/bin/clang ZILC_ZIG=…/zig zig build gate    # from Linux
@@ -44,12 +44,12 @@ programs don't**, and gives size numbers against plain Zig. Tools in `tools/basi
 | runs as designed, plain ReleaseSafe | **78/78** | **78/78** exit codes. ⚠️ Outputs were wrong when redirected until the stdio streaming fix (2026-09-30, `tests/basics/README.md`) |
 | **builds with zilc** | **78/78** | ReleaseSafe ~~50/78~~ → **77/78** after the KI-8 fix (only KI-9 left) · ReleaseSmall **77/78** (KI-9) |
 | **runs as designed under zilc** (ReleaseSafe) | **78/78** (`42_panic` traps via Fil-C, as designed) | ~~24~~ → 26 (KI-8) → 45 (KI-7) → 50 (panic handler + KI-9) → **71/78** (KI-13 overflow fold + `fromPage` patch, KI-14 `-fno-valgrind`). 65 clean exits plus 6 intentional (`42` panic, `66` exit 1 without a subcommand, `77` exit 3, three servers). Then the **unoptimized-IR route** (KI-17, the default since 2026-09-30) → **76/78**: the 5 thread joins pass, and `76_signals` now runs (it waits, as designed). **Left, 2:** the KI-18 Fil-C assertion (`22_strings-and-runes`, `69_http-client`) |
-| **every mode** (KI-16, default route) | same in every mode (C ignores `-O`) | ~~ReleaseSafe 76 · ReleaseFast 76 · ReleaseSmall 76 · Debug 63~~ → 2026-10-01: 78 · 78 · 78 · 65 (KI-18, KI-20) → **2026-10-01 (evening): 78/78 as designed in ALL FOUR MODES**, with the patched Fil-C clang (KI-22 colouring, KI-4 `indirectbr`) and Debug at `filc -O1` (fixes KI-19). Gate 4/4 with it. Tool: `tools/basics/all-modes.sh` (defaults to the patched clang) |
-| **+ dense interference graph, object cache** (KI-22 levers (b), (c); 2026-10-02, same load, `ZILC_JOBS=4`, `ZILC_CACHE=0`) | — | **Still 78/78 as designed in all four modes**, gate 4/4, tests **25/25** (26/26 with `--clean-cache`, same day). **Verified run:** the whole corpus in all four modes with `ZILC_VERIFY_INTERFERENCE=1` and `ZILC_VERIFY_COLOURING=1`: 78/78 as designed, **no graph or colouring difference** (verified `69` builds 154–431 s, so the original code really ran). `69` under load: Debug **56 s** (was 68), ReleaseSafe **58 s** (70), ReleaseFast **82 s** (97), ReleaseSmall **52 s** (61). Alone, through the driver: `69` ReleaseSafe **35.9 s** split (43.9 before (b)), 49.9 s at `-j 1`; rebuild unchanged, same output path: **2.3 s** (cache hit; `62` 0.5 s). Byte-identical to the prebuilt on every deterministic input (`compare-clangs.sh`) |
+| **every mode** (KI-16, default route) | same in every mode (C ignores `-O`) | ~~ReleaseSafe 76 · ReleaseFast 76 · ReleaseSmall 76 · Debug 63~~ → 2026-10-01: 78 · 78 · 78 · 65 (KI-18, KI-20) → **2026-10-01 (evening): 78/78 as designed in ALL FOUR MODES**, with the patched Fil-C clang (KI-22 colouring, KI-4 `indirectbr`) and Debug at `filc -O1` (fixes KI-19). Gate 4/4 with it. Tool: `tools/basics/all-modes.ts` (defaults to the patched clang) |
+| **+ dense interference graph, object cache** (KI-22 levers (b), (c); 2026-10-02, same load, `ZILC_JOBS=4`, `ZILC_CACHE=0`) | — | **Still 78/78 as designed in all four modes**, gate 4/4, tests **25/25** (26/26 with `--clean-cache`, same day). **Verified run:** the whole corpus in all four modes with `ZILC_VERIFY_INTERFERENCE=1` and `ZILC_VERIFY_COLOURING=1`: 78/78 as designed, **no graph or colouring difference** (verified `69` builds 154–431 s, so the original code really ran). `69` under load: Debug **56 s** (was 68), ReleaseSafe **58 s** (70), ReleaseFast **82 s** (97), ReleaseSmall **52 s** (61). Alone, through the driver: `69` ReleaseSafe **35.9 s** split (43.9 before (b)), 49.9 s at `-j 1`; rebuild unchanged, same output path: **2.3 s** (cache hit; `62` 0.5 s). Byte-identical to the prebuilt on every deterministic input (`compare-clangs.ts`) |
 | **build time, + parallel code generation** (KI-22 lever (a); 2026-10-02, same load, `ZILC_JOBS=4` per build) | — | **Still 78/78 as designed in all four modes** (71 OK + the designed 7: `42` panic, `66` exit 1, `77` exit 3, `70`/`71`/`72` servers, `76_signals`), gate 4/4, tests 24/24. Medians unchanged (Debug 4 s, ReleaseSafe 4 s, ReleaseFast 4 s, ReleaseSmall 3 s). `69`: Debug **68 s** (was 79), ReleaseSafe **70 s** (81), ReleaseFast **97 s** (107), ReleaseSmall **61 s** (70). Alone, through the driver: `69` ReleaseSafe **60.6 s → 43.9 s** (`-j 1` vs default 16 parts), `62` 7.0 → 5.0 s, same program output. Code identity: 2,840/2,840 functions of `69` identical to the unsplit compile of the same bitcode (`workarounds.md` KI-22) |
 | **build time, + overlay v5** (Debug-only KI-21 route guarded; 2026-10-01 late, same load) | — | Still 78/78 as designed in all four modes, gate 4/4. Medians: **Debug 4 s** (was 19), ReleaseSafe 4 s, ReleaseFast 3 s, ReleaseSmall 2 s. `69`: Debug 79 s, ReleaseSafe 81 s, ReleaseFast 107 s, ReleaseSmall 70 s. Alone: `04_constants` Debug 2.1 s (was 9.9; native Zig with LLVM 1.1 s), `69` ReleaseSafe 55.9 s (native 16.9 s) |
 | **build time with the patched clang** (2026-10-01 evening, same load) | — | `69`: ReleaseSafe **112 s**, ReleaseFast **154 s**, ReleaseSmall **87 s**, Debug **83 s** (was a 30-min timeout). Medians: Debug 19 s, ReleaseSafe 4 s, ReleaseFast 3 s, ReleaseSmall 2 s. Alone, Fil-C's clang on `69` (`-O1`): prebuilt 112 s, patched 54 s |
-| **build time** (2026-10-01, all 4 modes × 8 jobs at once, so inflated) | — | After KI-21: ReleaseSafe median **4 s**, `62` 19 s (was 92), `48_json` 30 s (was 86); `69` 214 s (ReleaseSafe), 754 s (ReleaseFast), timeout (Debug), all KI-22. Alone: `62` ReleaseSafe 8.0 s vs native 6.7 s; `69` 132 s vs native 20 s. `zilc-check.sh` now reports `BUILD-TIMEOUT` (`TBUILD`, default 1800 s) and writes `build seconds:` into each `build.log` |
+| **build time** (2026-10-01, all 4 modes × 8 jobs at once, so inflated) | — | After KI-21: ReleaseSafe median **4 s**, `62` 19 s (was 92), `48_json` 30 s (was 86); `69` 214 s (ReleaseSafe), 754 s (ReleaseFast), timeout (Debug), all KI-22. Alone: `62` ReleaseSafe 8.0 s vs native 6.7 s; `69` 132 s vs native 20 s. `zilc-check.ts` now reports `BUILD-TIMEOUT` (`TBUILD`, default 1800 s) and writes `build seconds:` into each `build.log` |
 
 **C already works under zilc across the whole corpus. Zig's gaps are all in std**, not the pipeline:
 raw system calls, stack probes, f128 helpers, thread handles. That is P4, now with a
@@ -71,7 +71,7 @@ machine, not per program. zilc passes `-g`, so stripped sizes are the fair compa
 Per-program ratios (median): C zilc/ReleaseSmall **0.86** stripped (smaller, since libc is not
 inside). Zig zilc ReleaseSafe/ReleaseSafe **1.26** stripped; zilc ReleaseSmall/ReleaseSmall **4.36**
 stripped (instrumentation plus Fil-C's calling-convention thunks). Tools:
-`tools/basics/size-compare.sh`, `size-report.sh`.
+`tools/basics/size-compare.ts`, `size-report.ts`.
 
 ## 🧬 Fil-C's OWN test suite, against zilc's patched clang (✅ 2026-10-05)
 
@@ -95,8 +95,8 @@ dense interference graph) change nothing Fil-C's own suite checks.
   (Fil-C's `setup.sh` had run before the kernel headers were installed). Every program including
   `<linux/futex.h>`, `<linux/seccomp.h>`, … failed with `'asm/types.h' file not found`: the 7
   `seccomp-ssh*` tests, `futextimeout`, `lockchaosfutex`, and ANY zilc program using those headers.
-  Fixed with `tools/filc/fix-os-include.sh` (setup.sh's own rule), now run by
-  `build-patched-clang.sh` and `restore-patched-clang.sh`, and checked by `check-toolchain.sh`.
+  Fixed with `tools/filc/fix-os-include.ts` (setup.sh's own rule), now run by
+  `build-patched-clang.ts` and `restore-patched-clang.ts`, and checked by `check-toolchain.ts`.
   `workarounds.md` has the entry.
 
 **How to run it** (WSL): `tools/filc/run-filc-tests.ts`, a Deno port of Fil-C's Ruby
@@ -111,6 +111,10 @@ with zilc's tree), then `… compare results-stock.json results-patched.json` (e
 test features 0.685 lacks.
 
 ## 🔍 Output comparison: zilc vs native, not just exit codes (pre-publish item, ✅ 2026-10-02)
+
+**Re-run 2026-10-05 with the Deno tools: still 0 unexplained differences, and 505 byte-identical**
+(the tools now keep stdout and stderr in order, so nine more programs match exactly; 39_logging
+only matched by luck before). The numbers below are the first run's.
 
 **Result: 0 unexplained differences.** Every tests/basics program, C and Zig, in all four modes
 (624 comparisons): **496 byte-identical** to plain Zig 0.15.2; **68** whose NATIVE output already
@@ -130,9 +134,9 @@ Also learned: the program's **environment** works under zilc (67 lists it and re
 and so do `argv`, files, stdin, child processes and threads.
 
 **How to run it** (WSL; ~40 s per native pass, the corpus as usual):
-1. `OUTROOT=~/zilc-work/outcmp/native1 sh tools/basics/run-native.sh`, then the same with
+1. `OUTROOT=~/zilc-work/outcmp/native1 deno run -A tools/basics/run-native.ts`, then the same with
    `native2` (two runs, to tell programs whose own output varies).
-2. `LANGS="c zig" sh tools/basics/all-modes.sh`.
+2. `LANGS="c zig" deno run -A tools/basics/all-modes.ts`.
 3. `deno run --allow-read tools/basics/compare-output.ts ~/zilc-work/outcmp/native1
    ~/zilc-work/outcmp/native2 ~/zilc-work` (exit 0 = no unexplained difference).
 
@@ -140,12 +144,13 @@ and so do `argv`, files, stdin, child processes and threads.
 - Both runners now start programs with the SAME fixed environment (`env -i HOME PATH USER
   LANG=C.UTF-8 TERM=dumb`): each script's own variables (`ZILC_*`, `OUTROOT`, `JOBS`) were
   showing up in 67's listing.
-- `run-native.sh` runs in parallel (`JOBS`, default 8) and writes where `OUTROOT` says: one at a
+- `run-native.ts` runs in parallel (`JOBS`, default 8) and writes where `OUTROOT` says: one at a
   time into the repo on exFAT, its Zig half alone took over 30 minutes; now ~40 s per pass.
-- `zilc-check.sh` works under `sh` (dash) again: `export -f` is bash-only and made dash exit 2,
-  silently, before any program ran (`all-modes.sh` used bash, which hid it).
-- `zilc-check.sh` clears its WHOLE mode folder, so a C-only run deletes that mode's Zig results:
-  run both languages together (`LANGS="c zig"` in `all-modes.sh`).
+- (In the shell version, before the 2026-10-05 move to Deno:) `zilc-check.sh` worked under `sh`
+  (dash) again: `export -f` is bash-only and made dash exit 2, silently, before any program ran
+  (`all-modes.sh` used bash, which hid it). Moot in the Deno version.
+- `zilc-check.ts` clears its WHOLE mode folder, so a C-only run deletes that mode's Zig results:
+  run both languages together (`LANGS="c zig"` in `all-modes.ts`).
 
 ## Current gates (re-run 2026-10-02)
 
@@ -181,7 +186,7 @@ Both end with `filc panic: thwarted a futile attempt to violate memory safety.` 
 🔑 **The gate should assert the fault KIND and the file:line, not the exit code.** Fil-C gives both,
 and 133 alone would accept a crash for the wrong reason.
 
-### ✅ The Zig ⇄ C gate, measured 2026-09-23 (`tools/p2/milestone.sh`)
+### ✅ The Zig ⇄ C gate, measured 2026-09-23 (`tools/p2/milestone.ts`)
 
 `c_caller.c` allocates 4 ints and calls Zig's `zig_add(a, 4, 99)`. Exit **133**:
 

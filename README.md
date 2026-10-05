@@ -66,7 +66,7 @@ zilc build [-O ReleaseSafe] [--target x86_64-linux-musl] [--entry auto|zig|c] [-
 ```
 
 **Which Fil-C clang.** zilc works best with **Fil-C 0.685's clang rebuilt with two fixes** to its
-compiler pass (`tools/filc/build-patched-clang.sh`, about an hour; the diff is in
+compiler pass (`tools/filc/build-patched-clang.ts`, about an hour; the diff is in
 `third_party/filc-patches/`). The fixes don't change what the compiler emits for code it already
 handled:
 

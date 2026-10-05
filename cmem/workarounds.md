@@ -68,8 +68,8 @@ Every workaround gets an entry **when it is made**, not later. Use these heading
 | `TLS reference in … mismatches non-TLS reference in …` (joining split parts) | KI-22, lever (a): unused hidden declarations |
 | `multiple definition of 'main'` … `filc_crt.o` / `filc_mincrt.o` after `clang -r` | KI-22, lever (a): Fil-C's driver adds its crt even to `-r -nostdlib` |
 | `filc safety error: stack overflow` on a Zig `@panic`, or the KI-12 / KI-20 traps, in a program whose `main` is C | the Zig file was compiled without zilc's generated root, so std's hooks were missing: fixed 2026-10-02 by the library root (`library_shim`, KI-5 short form below; gate cases 6–8) |
-| `fatal error: 'asm/types.h' file not found` (from `pizfix/os-include/linux/types.h`) | the Fil-C tree's `os-include/asm` link points at headers this machine lacks: `tools/filc/fix-os-include.sh <tree>` (see "Machine setup" below) |
-| `patch-pass.ts` / `patch-split.ts`: `original found 0 times, expected 1` | an edit's original text no longer matches: upstream changed it (`check-upstream.sh`), or an editor trimmed a whitespace-only line in it (KI-22, lever (b)) |
+| `fatal error: 'asm/types.h' file not found` (from `pizfix/os-include/linux/types.h`) | the Fil-C tree's `os-include/asm` link points at headers this machine lacks: `tools/filc/fix-os-include.ts <tree>` (see "Machine setup" below) |
+| `patch-pass.ts` / `patch-split.ts`: `original found 0 times, expected 1` | an edit's original text no longer matches: upstream changed it (`check-upstream.ts`), or an editor trimmed a whitespace-only line in it (KI-22, lever (b)) |
 | `zilc (KI-22): interference graph differs from the original` / `frame-slot colouring differs` | only with `ZILC_VERIFY_INTERFERENCE=1` / `ZILC_VERIFY_COLOURING=1`: the patched pass disagrees with the original; KI-22 levers (b) and the colouring fix |
 
 ---
@@ -410,7 +410,7 @@ harder. Re-check list: `ports/README.md`.
    hundreds of escaping locals (TLS, big crypto) are slow, and Debug builds of them are impractical.
 
 **Option 2, carried out (2026-10-01).** Fil-C's clang was built from the prebuilt's own commit with
-the patch (`tools/filc/build-patched-clang.sh`; ~1 h; GCC 15.2 and CMake 4.2.3 from apt, Ninja
+the patch (`tools/filc/build-patched-clang.ts`; ~1 h; GCC 15.2 and CMake 4.2.3 from apt, Ninja
 1.12.1 release binary). The version string matches the prebuilt exactly (the source remote must be
 `git@github.com:…`, and the generated `VCSVersion.inc`/`VCSRevision.h` deleted to regenerate).
 `69` at `-O1`: **112 s → 54 s** for Fil-C's clang alone.
@@ -566,7 +566,7 @@ an unused hidden declaration of a thread-local.
 - ⚠️ **Whitespace trap in the edit's original text:** `FilPizlonator.cpp` has a line of six spaces
   after `Live = LiveAtTail[BB];`. The file editor trimmed it from the edit, and the patch failed
   with "original found 0 times". Restored with `sed`, and marked in `patch-pass.ts`.
-- `build-patched-clang.sh` now applies each edit script to a fresh copy of the PRISTINE file
+- `build-patched-clang.ts` now applies each edit script to a fresh copy of the PRISTINE file
   (`git show $SHA:path`) and replaces the tree's file only if the result differs: changing an
   edit's replacement text used to require resetting the file by hand, and rewriting an unchanged
   file made ninja rebuild clang.
@@ -606,7 +606,7 @@ an unused hidden declaration of a thread-local.
   off, and probably only for one exact build of the compiler. Any byte-identity check must run
   with `setarch -R`, and between two DIFFERENT compiler binaries it can still differ on large
   inputs (heap layout differs).
-- Under those rules (`tools/filc/compare-clangs.sh`), prebuilt vs patched is **identical** for the
+- Under those rules (`tools/filc/compare-clangs.ts`), prebuilt vs patched is **identical** for the
   gate's C examples, `zilc_syscall.c`, the KI-18 repro (both assert) and the 2,000-alloca stress
   test at `-O0` and `-O1`, but **different** for `62` and `69`: two different binaries.
 - So equivalence is checked **inside one run**: with `ZILC_VERIFY_COLOURING=1`, the patched pass
@@ -636,10 +636,10 @@ Here setup.sh ran before `build-essential` (and with it `linux-libc-dev`) was in
 pointed at `/usr/include/asm`, which Ubuntu does not have: a dangling link. zilc's patched tree is a
 copy of the prebuilt, so it inherited the link, and so does the archive in `toolchain/`.
 
-**Why the fix is correct.** `tools/filc/fix-os-include.sh` re-applies setup.sh's own rule against
-the machine as it is now; nothing else in the tree changes. `build-patched-clang.sh` and
-`restore-patched-clang.sh` run it after installing, so a restored archive is repaired on the
-machine it lands on; `check-toolchain.sh` reports a dangling link (`BROKEN`).
+**Why the fix is correct.** `tools/filc/fix-os-include.ts` re-applies setup.sh's own rule against
+the machine as it is now; nothing else in the tree changes. `build-patched-clang.ts` and
+`restore-patched-clang.ts` run it after installing, so a restored archive is repaired on the
+machine it lands on; `check-toolchain.ts` reports a dangling link (`BROKEN`).
 
 **How it was found.** Fil-C's own test suite (`tools/filc/run-filc-tests.ts`): 9 tests failed with
 BOTH the stock and the patched clang, which pointed away from zilc's patches and at the setup. No

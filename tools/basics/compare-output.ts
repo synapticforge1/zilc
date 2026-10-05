@@ -7,9 +7,9 @@
 //
 //   deno run --allow-read compare-output.ts <native1> <native2> <zilc-work> [modes] [langs]
 //
-//   native1, native2  two runs of tools/basics/run-native.sh (its zig-out/basics-run folder):
+//   native1, native2  two runs of tools/basics/run-native.ts (its zig-out/basics-run folder):
 //                     <dir>/<lang>/<name>.out
-//   zilc-work         the folder holding zilc-check.sh's results: basics-zilc-<MODE>/bin/<lang>/<name>/run.out
+//   zilc-work         the folder holding zilc-check.ts's results: basics-zilc-<MODE>/bin/<lang>/<name>/run.out
 //   modes             comma list, default Debug,ReleaseSafe,ReleaseFast,ReleaseSmall
 //   langs             comma list, default zig,c (a missing mode/lang folder is skipped)
 //
@@ -54,7 +54,9 @@ const read = async (p: string): Promise<string | null> => {
 };
 const exists = async (p: string) => (await Deno.stat(p).catch(() => null)) !== null;
 const lines = (s: string) => s.split("\n");
-const shape = (s: string) => lines(s).map((l) => l.replace(/[0-9]+/g, "#"));
+// A `+` inside a number counts as part of it: 51_epoch prints nanoseconds zero-padded AND signed,
+// so its shape is `+#` with 9 digits but `#+#` with 8 (Zig pads before the sign). Seen 2026-10-05.
+const shape = (s: string) => lines(s).map((l) => l.replace(/[0-9+]+/g, "#"));
 
 const diffHead = (a: string, b: string, max = 6): string[] => {
   const x = lines(a), y = lines(b);

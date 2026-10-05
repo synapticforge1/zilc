@@ -1,0 +1,100 @@
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception OR MIT
+//
+// The experiment that settled the integration route (P1, 2026-09-23): retry with Fil-C's EXACT
+// "before" datalayout (ni:0 right after m:e) patched into Zig-emitted IR, plus the
+// `datalayout_after_filc` line, and feed it to Fil-C's pass. Recorded in cmem/roadmap.md P1 ("`-ni:0`
+// in the exact position Fil-C uses … assert passed, SIGSEGV again, on both a tiny module and a
+// std-using one") and cmem/known-issues.md KI-4. Still fails with the stock prebuilt Fil-C — kept
+// because re-running it is how we would notice upstream making it work. Linux; from Windows it
+// runs inside WSL.
+//
+//   deno run -A tools/p1/zig-ir-spike.ts
+//   env: WORK (default ~/zilc-work)
+// Inputs, in $WORK/p1 (Zig 0.15.2 `-femit-llvm-ir` output, made during P1; not regenerated here):
+// tiny.ll (from tools/p1/tiny.zig) and zig_oob-x86_64-linux-gnu.ll (from tools/p1/zig_oob.zig).
+// Output: <base>-ni2.ll, <base>-ni2.log, <base>-ni2.o if the pass survives; if zig_oob compiles,
+// prog-ni2, link-ni2.log and run-ni2.log. Same report as the shell version (zig-ir-spike.sh).
+//
+// Fil-C's clang is the STOCK PREBUILT 0.685 on purpose (not filc()): the question is whether
+// upstream Fil-C accepts Zig's IR, not whether zilc's patched build does.
+import { existsSync, FILC_PREBUILT_TREE, linuxOnly, run, WORK } from "../lib/tool.ts";
+
+await linuxOnly(import.meta);
+const BIN = `${FILC_PREBUILT_TREE}/build/bin`;
+const FILC = `${BIN}/clang`;
+const OUT = `${WORK}/p1`;
+// Paths stay relative to $WORK/p1 (the shell version `cd`s there), as in the recorded logs.
+const cwd = OUT;
+
+const BEFORE = "e-m:e-ni:0-p270:32:32-p271:32:32-p272:64:64-i64:64-i128:128-f80:128-n8:16:32:64-S128";
+const AFTER = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-i128:128-f80:128-n8:16:32:64-S128";
+
+/** Text lines as awk/grep see them (a final newline ends the last line, it does not start one). */
+const lines = (text: string) => text.split("\n").filter((_, i, a) => i < a.length - 1 || a[i] !== "");
+/** `grep -m<max> -E <re> <file>` */
+const grepM = (text: string, re: RegExp, max: number) => lines(text).filter((l) => re.test(l)).slice(0, max);
+
+/** What sh (dash) writes to a job's redirected stderr when it dies by a signal (see below). */
+const SHELL_SIGNAL_TEXT: Record<number, string> = {
+  4: "Illegal instruction", 5: "Trace/breakpoint trap", 6: "Aborted", 7: "Bus error",
+  8: "Floating point exception", 9: "Killed", 11: "Segmentation fault",
+};
+
+/**
+ * Was an awk program: replace the FIRST `target datalayout = ` line with the BEFORE layout plus a
+ * `target datalayout_after_filc` line holding AFTER, and drop any existing
+ * `target datalayout_after_filc` line. Position matters (`ni:0` right after `m:e`): LLVM compares
+ * layout strings textually, so appending `-ni:0` gives a different layout (cmem KI-4).
+ */
+async function patchDl(src: string, dest: string): Promise<void> {
+  const out: string[] = [];
+  let done = false;
+  for (const l of lines(await Deno.readTextFile(`${OUT}/${src}`))) {
+    if (!done && /^target datalayout = /.test(l)) {
+      out.push(`target datalayout = "${BEFORE}"`, `target datalayout_after_filc = "${AFTER}"`);
+      done = true;
+      continue;
+    }
+    if (/^target datalayout_after_filc = /.test(l)) continue;
+    out.push(l);
+  }
+  await Deno.writeTextFile(`${OUT}/${dest}`, out.join("\n") + "\n");
+}
+
+for (const base of ["tiny", "zig_oob-x86_64-linux-gnu"]) {
+  console.log("======================================================================");
+  console.log(`== ${base}`);
+  console.log("======================================================================");
+  await patchDl(`${base}.ll`, `${base}-ni2.ll`);
+  // `head -4 | tail -2`: the two layout lines.
+  console.log(lines(await Deno.readTextFile(`${OUT}/${base}-ni2.ll`)).slice(2, 4).join("\n"));
+  // The log was clang's stderr only (`2>`); with -c it writes nothing to stdout.
+  const r = await run([FILC, "-O1", "-c", "-o", `${base}-ni2.o`, `${base}-ni2.ll`], { cwd, outFile: `${OUT}/${base}-ni2.log` });
+  if (r.code === 0) {
+    // `llvm-nm obj 2>/dev/null | grep -c pizlonated_`
+    const nm = await run([`${BIN}/llvm-nm`, `${base}-ni2.o`], { cwd });
+    console.log(`-- PASS SURVIVED. pizlonated_ symbols in object: ${lines(nm.out).filter((l) => l.includes("pizlonated_")).length}`);
+  } else {
+    console.log("-- FAILED:");
+    for (const l of grepM(await Deno.readTextFile(`${OUT}/${base}-ni2.log`), /Assertion|error:|Segmentation|UNREACHABLE/, 4)) console.log(l);
+  }
+  console.log();
+}
+
+console.log("== if zig_oob compiled, try linking and running it");
+if (existsSync(`${OUT}/zig_oob-x86_64-linux-gnu-ni2.o`)) {
+  const link = await run([FILC, "-O1", "-o", "prog-ni2", "zig_oob-x86_64-linux-gnu-ni2.ll"], { cwd, outFile: `${OUT}/link-ni2.log` });
+  if (link.code === 0) {
+    console.log("-- LINKED");
+    const r = await run(["./prog-ni2"], { cwd, outFile: `${OUT}/run-ni2.log` });
+    // The shell version ran `./prog-ni2 > run-ni2.log 2>&1`, so dash's own signal line (e.g.
+    // "Trace/breakpoint trap" for a Fil-C panic) ended up in the log; Deno writes none, so add it.
+    const sig = r.code > 128 ? SHELL_SIGNAL_TEXT[r.code - 128] : undefined;
+    if (sig) await Deno.writeTextFile(`${OUT}/run-ni2.log`, `${sig}\n`, { append: true });
+    console.log(`-- exit=${r.code}`);
+    await Deno.stdout.write(await Deno.readFile(`${OUT}/run-ni2.log`));
+  } else {
+    console.log("-- LINK FAILED:");
+    for (const l of grepM(await Deno.readTextFile(`${OUT}/link-ni2.log`), /error:|undefined/, 6)) console.log(l);
+  }
+}

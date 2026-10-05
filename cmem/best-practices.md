@@ -176,8 +176,14 @@ citation to the incident.
 - **Script in Deno or Bun, never Python** (owner, 2026-09-18). Tooling in `tools/` is `.ts`/`.mjs`,
   run with `deno run` or `bun`. This follows the project's memory-safety stance and matches
   wazmrt's Deno tooling.
+- **A harness that captures a program's output must keep stdout and stderr in ONE stream.** Read
+  through two pipes, the lines of a program writing to both come out in a different order each run;
+  the shell's `> f 2>&1` shares one file and keeps the order. `tools/lib/tool.ts` `run()` does the
+  same (`exec "$@" 2>&1` in the child). (39_logging, 2026-10-05: it "differed" until fixed; nine
+  more programs then matched native exactly.)
 - **A shell script whose usage line says `sh` must run under dash.** `export -f` (bash-only)
-  makes dash exit 2 with no message. Test with `sh -x`. (zilc-check.sh, 2026-10-02.)
+  makes dash exit 2 with no message. Test with `sh -x`. (zilc-check.sh, 2026-10-02; the tools
+  have been Deno since 2026-10-05, but the rule holds for any shell script that remains.)
 - **Stopping a WSL command from the Windows side does not stop its Linux processes.** A
   "killed" background job kept running and polled on; check `ps` in WSL after a timeout, and
   give long jobs a long timeout up front. (2026-10-02.)

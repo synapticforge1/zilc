@@ -6,5 +6,5 @@ zig-out/
 toolchain/*
 !toolchain/README.md
 
-# Read-only reference clone of Fil-C upstream (tools/upstream/clone-upstream.sh; cmem/upstream.md).
+# Read-only reference clone of Fil-C upstream (tools/upstream/clone-upstream.ts; cmem/upstream.md).
 /upstream/

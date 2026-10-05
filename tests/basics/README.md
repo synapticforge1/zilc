@@ -69,9 +69,9 @@ and 76 at all.
 
 | script | what it does |
 | --- | --- |
-| `tools/basics/compile-check.sh` | compile + link every example for `x86_64-linux-musl` with plain Zig 0.15.2 and `-lc` (Git Bash on Windows) |
-| `tools/basics/run-native.sh` | build and **run** every example on Linux with plain Zig (WSL): the behaviour baseline |
-| `tools/basics/size-compare.sh` | Zig ReleaseSmall vs ReleaseSafe vs zilc: binary sizes, and whether zilc's build runs like the plain one |
+| `tools/basics/compile-check.ts` | compile + link every example for `x86_64-linux-musl` with plain Zig 0.15.2 and `-lc` (any OS; on Windows it uses `C:\zig\0.15.2\zig.exe`) |
+| `tools/basics/run-native.ts` | build and **run** every example on Linux with plain Zig (WSL): the behaviour baseline |
+| `tools/basics/size-compare.ts` | Zig ReleaseSmall vs ReleaseSafe vs zilc: binary sizes, and whether zilc's build runs like the plain one |
 
 **Examples that don't exit 0 by design:** `42_panic` (aborts, 134), `66_command-line-subcommands`
 (exits 1 without a subcommand argument), `77_exit` (exits 3). Servers `70`–`72` wait for connections,

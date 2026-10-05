@@ -679,7 +679,7 @@ fn resolveExe(gpa: std.mem.Allocator, name: []const u8) ![]u8 {
 /// parallel parts. Below it, the extra processes cost more than they save.
 const split_min_bytes = 4 * 1024 * 1024;
 /// The automatic job count's cap. Each part costs a clang process (up to ~0.75 GB on `69`), and
-/// 32 parallel LLVM compiles once exhausted the 31 GB WSL VM (tools/filc/build-patched-clang.sh).
+/// 32 parallel LLVM compiles once exhausted the 31 GB WSL VM (tools/filc/build-patched-clang.ts).
 const max_auto_jobs = 16;
 
 /// Fil-C's clang: Fil-C-dialect IR in, object out.

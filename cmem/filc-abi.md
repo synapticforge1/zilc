@@ -6,7 +6,7 @@ prebuilt libraries, and from the public headers in `pizfix/stdfil-include/`. **N
 the runtime's source** (`libpas/`, `filc_runtime.c`). That matters for open question #3: a
 clean-room runtime needs a spec like this one (`design-decisions.md`).
 
-Scripts: `tools/p3/abi-probe.sh` and `tools/p3/cc-decode.sh` (run with `wsl.exe -e sh`).
+Scripts: `tools/p3/abi-probe.ts` and `tools/p3/cc-decode.ts` (`deno run -A …`; from Windows they run inside WSL by themselves).
 Legend: ✅ observed directly · 🔸 inferred, **verify before building on it**.
 
 ## 1. Pointers in flight
@@ -93,7 +93,7 @@ hash is accepted.
 | offset | field |
 | --- | --- |
 | `+0` | ✅ **stack limit**. Every function entry does `cmp rsp, [thread]; jae filc_stack_overflow_failure` |
-| `+8` | ✅ **state byte**. Every loop's **pollcheck** loads it and tests the mask **`0x0E`** (bits 1–3: GC work pending), calling **`filc_pollcheck_slow(thread, origin)`** if set. The runtime's own `filc_pollcheck_outline` is literally `testb $0xe, 8(%rdi); jne → filc_pollcheck_slow` (probed 2026-09-30, `tools/p3/gc-probe.sh`) |
+| `+8` | ✅ **state byte**. Every loop's **pollcheck** loads it and tests the mask **`0x0E`** (bits 1–3: GC work pending), calling **`filc_pollcheck_slow(thread, origin)`** if set. The runtime's own `filc_pollcheck_outline` is literally `testb $0xe, 8(%rdi); jne → filc_pollcheck_slow` (probed 2026-09-30, `tools/p3/gc-probe.ts`) |
 | `+16` | ✅ **top frame**. Each function pushes a frame `{ parent, origin, [0 x ptr] }` and pops it on return: a **shadow stack, which is how FUGC finds roots precisely**. `origin` is the source location used in panic traces |
 | `+128` | ✅ **cc payload buffer**: arguments/results, 8 bytes per word |
 | `+384` | ✅ **cc aux buffer**: one capability (`lower`) per payload word, 0 for a non-pointer; 64-byte aligned |
@@ -138,7 +138,7 @@ demands from a runtime and from compiled code:
 | **safe signal delivery** | signals are delivered at safepoints (see `zincrement_signal_deferral_depth` in `pizlonated_runtime.h`) |
 | **safepoint guarantee** | a pointer loaded from the heap is safe to use until the next pollcheck or exit, so it only has to be visible to stack scanning by then |
 
-**Observed entry points (2026-09-30, `tools/p3/gc-probe.sh`, `nm`/`objdump` of `libpizlo.so`):**
+**Observed entry points (2026-09-30, `tools/p3/gc-probe.ts`, `nm`/`objdump` of `libpizlo.so`):**
 
 | export | role |
 | --- | --- |

@@ -49,7 +49,7 @@ with a report naming the source line, instead of corrupting memory.
 ### Requirements
 
 - Fil-C 0.685's clang (`--filc` or `ZILC_FILC`) and Zig 0.15.2 (`--zig` or `ZILC_ZIG`).
-- **Recommended: zilc's patched build of Fil-C's clang** (`tools/filc/build-patched-clang.sh`).
+- **Recommended: zilc's patched build of Fil-C's clang** (`tools/filc/build-patched-clang.ts`).
   It fixes a crash on Zig's Debug code and a compile-time slowdown on large functions, without
   changing the code it emits for anything else, and adds the parallel code generation. With the
   stock Fil-C 0.685 clang, the Release modes work; Debug does not.

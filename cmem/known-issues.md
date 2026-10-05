@@ -203,7 +203,7 @@ automatically and announced:
    checks are what make the program safe and they do not rely on guard pages.
 
 📏 **The cost is size: 13,766,024 bytes vs 127,424 for ReleaseSafe — 108×.** Same panic, same line.
-`tools/p2/debug-mode.sh` runs both.
+`tools/p2/debug-mode.ts` runs both.
 
 ## ✅ KI-5 — Zig's start code traps under Fil-C. **SOLVED 2026-09-23 with a generated entry shim**
 
@@ -264,7 +264,7 @@ semantic origin:  hello.zig:25:6: hello.main (inlined)  ←  zilc_entry.zig:16:2
 ```
 
 `--entry auto|zig|c` overrides the choice; `auto` picks the shim when a lone `.zig` input declares
-`pub fn main` and no C/C++ input is present. `tools/p2/whole-program.sh` runs it.
+`pub fn main` and no C/C++ input is present. `tools/p2/whole-program.ts` runs it.
 
 ~~⚠️ **What this does NOT do:** the program gets no `std.os.environ`, no Zig stack-size expansion,
 and no Zig segfault handler.~~ **Settled 2026-10-02 (pre-publish item), each measured:**
@@ -665,7 +665,7 @@ these found conditions."** The conditions found so far **depend on the mode**:
 | stack-probe symbol (KI-8) | yes | yes (large frames) | ? | ? |
 | stack-trace / panic code in the binary | full | full | full | **mostly stripped** |
 
-So **the corpus runs in every mode** (`tools/basics/zilc-check.sh`, `MODE=…`), and results are
+So **the corpus runs in every mode** (`tools/basics/zilc-check.ts`, `MODE=…`), and results are
 recorded per mode in `testing.md`.
 
 **Measured 2026-09-30 (Zig corpus, as designed out of 78):**

@@ -1,4 +1,4 @@
-// For the GC-protocol probe (gc-probe.sh): a loop, so the pass emits pollchecks, and a
+// For the GC-protocol probe (gc-probe.ts): a loop, so the pass emits pollchecks, and a
 // blocking system call, so the runtime must exit and re-enter around it.
 #include <stdio.h>
 #include <unistd.h>

@@ -40,16 +40,24 @@ for structure and policy.
 - ✅ **2026-10-05: `zilc --version` + `RELEASE-NOTES.md`** (pre-publish item; `releasing.md`).
 - ✅ **2026-10-05: Fil-C's own 7,003 tests** run against zilc's patched clang: identical to stock;
   found and fixed a broken kernel-header link on this machine (`testing.md`).
-- ▶️ **Next: the rest of the PRE-PUBLISH CHECKLIST**: the platforms scope pass; the 9 upstream
-  commits to review. Still open from 2026-10-01: read the
-  9 upstream `FilPizlonator.cpp` commits (above all `097f7b7`), then `--mark-reviewed`.
+- ✅ **2026-10-05: every tool is Deno** (owner: cross-platform; all but `tools/p1/setup-wsl.sh`).
+  `deno run -A tools/<group>/<tool>.ts` works from Windows and Linux; Linux-only tools bridge into
+  WSL by themselves (`tools/lib/tool.ts`, `tools/README.md`). Each of the 31 conversions was checked
+  against its shell original; the end-to-end re-run: corpus 78/78 in four modes, output comparison
+  0 unexplained (505 identical), gate 8/8, toolchain build/archive/restore OK.
+- 📌 **Upstream released Fil-C 0.686 (2026-10-04)**, seen by `check-upstream.ts`: new commits to
+  `FilPizlonator.cpp` and 41 to `filc/tests`. To review with the 9 below; zilc stays on 0.685 for
+  this release.
+- ▶️ **Next: the rest of the PRE-PUBLISH CHECKLIST**: the platforms scope pass; the upstream
+  commits to review. Still open from 2026-10-01: read the 9 upstream `FilPizlonator.cpp` commits
+  (above all `097f7b7`), then `--mark-reviewed`.
 
 ## ✅ 2026-10-02 — BUILD SPEED, lever (a)
 
 - ✅ **Lever (a), parallel code generation** (owner chose the route: *no bloat, same code*):
   big modules (≥ 4 MB of Fil-C-dialect IR) run Fil-C's pass and `-O1` optimizer WHOLE, then
   zilc's mode of `llvm-split` (`tools/filc/patch-split.ts`, built and installed next to clang by
-  `build-patched-clang.sh`, archived in `toolchain/`) cuts the bitcode, and clang generates the
+  `build-patched-clang.ts`, archived in `toolchain/`) cuts the bitcode, and clang generates the
   parts' code in parallel; `ld -r` + objcopy rejoin them (`filcCompile` in `src/driver.zig`;
   `-j`/`ZILC_JOBS`, 1 = off). **2,840/2,840 functions of `69` identical** to the unsplit compile
   of the same bitcode; `69` alone **60.6 → 43.9 s**; corpus **78/78 as designed in all four
@@ -70,8 +78,8 @@ for structure and policy.
   a ban on reading Fil-C's source; compliance is **documentation only**; **KI-22: option 2, then
   research option 3.**
 - ✅ **KI-22 option 2 done:** a **patched Fil-C clang** (`~/zilc-work/tools/filc-0.685-zilc/`, built
-  by `tools/filc/build-patched-clang.sh` from the prebuilt's own commit `bb0d0a64`) is now the
-  **default** in zilc's scripts; the prebuilt stays for comparison (`tools/filc/compare-clangs.sh`).
+  by `tools/filc/build-patched-clang.ts` from the prebuilt's own commit `bb0d0a64`) is now the
+  **default** in zilc's scripts; the prebuilt stays for comparison (`tools/filc/compare-clangs.ts`).
   Two fixes in it: the cubic frame-slot colouring (KI-22, verified equal to the original on the whole
   corpus) and Fil-C's `indirectbr` lowering (**KI-4**). KI-4's fix lets **Debug compile at `-O1`**,
   which **fixed KI-19**. **The corpus is 78/78 as designed in ALL FOUR MODES**, gate 4/4, tests 24/24.
@@ -86,10 +94,10 @@ for structure and policy.
 - 📦 **The patched clang is also archived IN THE PROJECT** (owner, end of day): `toolchain/` (gitignored,
   never push) holds the tree (83 MB) and its debug info (966 MB), verified by a restore into a
   scratch directory: same objects, gate 4/4. A fresh machine restores it with
-  `tools/filc/restore-patched-clang.sh` in a minute instead of a ~1 h rebuild. After any change to
-  the patch, re-run `tools/filc/archive-patched-clang.sh`.
+  `tools/filc/restore-patched-clang.ts` in a minute instead of a ~1 h rebuild. After any change to
+  the patch, re-run `tools/filc/archive-patched-clang.ts`.
 - 📚 **Upstream reference (owner, end of day; settles open question 6):** `upstream/fil-c/`
-  (gitignored, read-only, never built) as in binaryen-ts. `tools/upstream/check-upstream.sh`
+  (gitignored, read-only, never built) as in binaryen-ts. `tools/upstream/check-upstream.ts`
   monitors it (memory-update step 5). As of 2026-10-02: 105 commits past v0.685, 9 to
   `FilPizlonator.cpp`, none to `llvm-split`; all zilc edits (pass and `llvm-split`) still apply. ⚠️ **Not yet reviewed**: read those 9 commits
   (above all `097f7b7`, stack auxes, next to our colouring fix) and then run `--mark-reviewed`.
@@ -105,8 +113,8 @@ for structure and policy.
 - **State:** everything committed on `main`, **nothing pushed**. WSL has
   `build-essential` + `cmake` (owner installed; `ninja` 1.12.1 and gdb in `~/zilc-work/tools/`, no
   sudo needed). ⚠️ Build LLVM with `JOBS` ≤ 12 (32 crashed the WSL VM).
-- **How to run things:** `tools/run-gate-wsl.sh` (gate); `tools/basics/zilc-check.sh` (`MODE=…`) and
-  `all-modes.sh` (corpus); Windows-side builds need `C:\zig\0.15.2\zig.exe` and
+- **How to run things:** `tools/run-gate.ts` (gate); `tools/basics/zilc-check.ts` (`MODE=…`) and
+  `all-modes.ts` (corpus); Windows-side builds need `C:\zig\0.15.2\zig.exe` and
   `ZIG_LOCAL_CACHE_DIR=C:\zig-cache\zilc`. Pass shell text to WSL as a **file** (KI-1).
 
 ## 🆕 2026-09-30 — the Zig runtime and other platforms now have a plan (no version bump)
@@ -212,7 +220,7 @@ for structure and policy.
     **0 differences** between stock and patched on all 7,003 tests (0.685); 5,778/5,779 runnable
     pass with both (the 1 needs a CPU feature WSL lacks). No Ruby needed: `tools/filc/run-filc-tests.ts`
     (Deno port). It also found a MACHINE problem: a dangling `os-include/asm` link broke every
-    program using kernel headers; fixed (`fix-os-include.sh`). `testing.md`, `workarounds.md`
+    program using kernel headers; fixed (`fix-os-include.ts`). `testing.md`, `workarounds.md`
   - [ ] **Platforms scope pass** (P6): per platform, the processors, the std OS-function count, the
     libc story, KI-5-family code, and the host toolchain
   - [ ] Then: move tag `v0.15.2-3` + branch `v0.15.2` to the final commit, and push
@@ -310,7 +318,7 @@ shim leaves `std.os.environ` unset (nothing tested needs it yet — KI-5). *(Bot
 report is not planned, 2026-10-01; `std.os.environ` is set, 2026-10-02.)*
 
 **Where to start next session:** `zig build gate` must be 4/4 before anything is believed. Run
-`tools/run-gate-wsl.sh`, and read the first line — it prints `SKIPPED` rather than failing when the
+`tools/run-gate.ts`, and read the first line — it prints `SKIPPED` rather than failing when the
 Fil-C toolchain is missing.
 
 ### 🔒 Three things to know before touching anything
@@ -318,6 +326,8 @@ Fil-C toolchain is missing.
 1. **Fil-C work happens in WSL2** (Ubuntu 26.04), under `~/zilc-work/`. ⚠️ **`sudo` needs an
    interactive password**, so install prebuilt binaries into `$HOME` rather than using `apt`. ⚠️
    **Pass shell text to WSL as a FILE** (`wsl.exe -e sh <file>`); PowerShell mangles it inline.
+   (zilc's own tools no longer need this: since 2026-10-05 they are Deno and bridge into WSL with an
+   argument list, `tools/README.md`. The rule stays for ad-hoc commands.)
    See `known-issues.md` KI-1.
 2. **D: is exFAT. Set `ZIG_LOCAL_CACHE_DIR=C:\zig-cache\zilc` before any `zig build`.** A
    `.zig-cache` on exFAT works for exactly one build, then fails with `error: Unexpected` until it
@@ -348,22 +358,22 @@ this for the project"), do all of the following:
 3. **If the work produced a transferable METHOD lesson, add it to
    [`best-practices.md`](best-practices.md)** as one bold rule plus a citation to the incident.
 4. **Keep the patched Fil-C clang archived in the project (owner, 2026-10-01).** Run
-   `wsl.exe -e sh /mnt/d/…/zilc/tools/filc/check-toolchain.sh`. If it reports STALE (a new patch
+   `deno run -A tools/filc/check-toolchain.ts`. If it reports STALE (a new patch
    or workaround in Fil-C's source in WSL, a rebuilt compiler, or an archive from an older patch),
    do what it says before finishing. In order:
    1. Every change to Fil-C's source goes into an edit script, the source of truth:
       `tools/filc/patch-pass.ts` (the pass) or `tools/filc/patch-split.ts` (`llvm-split`).
-   2. Rebuild with `build-patched-clang.sh`. Then run Fil-C's own test suite with the stock and
+   2. Rebuild with `build-patched-clang.ts`. Then run Fil-C's own test suite with the stock and
       the patched clang and compare (`tools/filc/run-filc-tests.ts`, `testing.md`): the result
       must stay **0 differences** (2026-10-05).
    3. Save the diff to `third_party/filc-patches/zilc-filc-pass.patch`.
-   4. Re-archive with `archive-patched-clang.sh`.
+   4. Re-archive with `archive-patched-clang.ts`.
    5. Update the ledger entry `filc-pass-fixes` and `workarounds.md`.
 
    `toolchain/` is gitignored, so the archive itself is never committed, but the patch, the
    scripts and the checksum line in the ledger are.
-5. **Check Fil-C upstream for changes (owner, 2026-10-01):** `sh tools/upstream/check-upstream.sh`
-   (Git Bash). Record in `upstream.md` anything that touches a watched file, above all whether
+5. **Check Fil-C upstream for changes (owner, 2026-10-01):** `deno run -A tools/upstream/check-upstream.ts`
+   (any OS). Record in `upstream.md` anything that touches a watched file, above all whether
    zilc's pass patch still applies. After reviewing, `--mark-reviewed`, and commit
    `tools/upstream/REVIEWED`. The reference clone is `upstream/fil-c/` (gitignored, never built).
 

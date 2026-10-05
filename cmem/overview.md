@@ -32,7 +32,7 @@ zilc/
 │       └── bounds.zig     #   C-ABI functions whose stores are capability-checked
 ├── tools/
 │   ├── gate.zig           # 🎯 the safety gate's runner (`zig build gate`)
-│   ├── run-gate-wsl.sh    # run that gate inside WSL, where Fil-C lives
+│   ├── run-gate.ts    # run that gate inside WSL, where Fil-C lives
 │   ├── p1/                # feasibility scripts: install, reference behavior, IR spike
 │   └── p2/                # integration scripts, the Debug-crash repro, llreduce.ts
 ├── third_party/

@@ -138,7 +138,7 @@ its `publishing.md`).
   `CodeGen` (`IndirectBrExpandPass.cpp`, which KI-4's broken lowering was copied from), the runtime
   (`libpas`, and `filc` without its 15,603-file `tests/`), plus the top-level docs and build
   scripts. About 450 MB.
-- **Create:** `sh tools/upstream/clone-upstream.sh` (Git Bash). It sets, **in the clone only**:
+- **Create:** `deno run -A tools/upstream/clone-upstream.ts` (any OS; normally Windows, where the clone lives). It sets, **in the clone only**:
   - `core.autocrlf=false`: upstream's exact LF bytes; the global `true` broke exact-text matching;
   - `core.protectNTFS=false`: Fil-C bundles files whose names Windows forbids (`aux.h`, `:`, `\`),
     all outside the sparse set, which Git for Windows otherwise refuses even to index;
@@ -147,7 +147,7 @@ its `publishing.md`).
   Once per machine, because D: is exFAT (no file ownership):
   `git config --global --add safe.directory …/zilc/upstream/fil-c`. That's the same as every other
   project's `upstream/` in your global config.
-- **Monitor:** `sh tools/upstream/check-upstream.sh`. It fetches, then reports, relative to the last
+- **Monitor:** `deno run -A tools/upstream/check-upstream.ts`. It fetches, then reports, relative to the last
   reviewed commit in `tools/upstream/REVIEWED` (committed):
   - new commits and new release tags;
   - commits touching **watched files** (the pass zilc patches, `IndirectBrExpandPass.cpp`,
@@ -157,7 +157,7 @@ its `publishing.md`).
   - **whether zilc's patches still apply** to upstream's newest `FilPizlonator.cpp`
     (`patch-pass.ts --check`) and `llvm-split.cpp` (`patch-split.ts --check`, since 2026-10-02);
     exit 1 if an edit's original text is gone. `llvm/tools/llvm-split` joined the sparse set for
-    this (`clone-upstream.sh`; on the existing clone: `sparse-checkout add llvm/tools/llvm-split`).
+    this (`clone-upstream.ts`; on the existing clone: `sparse-checkout add llvm/tools/llvm-split`).
 
   After reviewing, `--mark-reviewed` records the new head; commit `REVIEWED`.
 - **First run (2026-10-01):** reviewed = v0.685 (`bb0d0a64`, our build). Upstream `deluge` is at
