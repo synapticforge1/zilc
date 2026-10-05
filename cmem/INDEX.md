@@ -79,8 +79,11 @@ for structure and policy.
   five places, `zilc --version` ok/ok on this machine, `capi-smoke` OK, nothing from `toolchain/`
   but its README tracked, fast-forward push (43 commits). No GitHub Release page was made (no `gh`
   here); the tag and `RELEASE-NOTES.md` carry the release.
-- ▶️ **Next (owner, 2026-10-05): evaluate Fil-C's COSMO mode, starting by building Fil-C from
-  source** (`platforms.md` Finding 1 and its open questions).
+- ▶️ **IN PROGRESS (owner, 2026-10-05): evaluate Fil-C's COSMO mode, starting by building Fil-C
+  from source** (`platforms.md` "Cosmo evaluation"). Tool `tools/filc/build-cosmo.ts` (stock
+  upstream `build_base_cosmo.sh`, 12 jobs); source cloned to `$WORK/filc-cosmo` at `v0.686`.
+  ⏸️ **Blocked on the owner running one `sudo apt-get install` line** (in `platforms.md`; the tool
+  prints it): clang, lld, ninja, the aarch64 cross toolchain, qemu, wine64, …
 
 ## ✅ 2026-10-02 — BUILD SPEED, lever (a)
 

@@ -100,6 +100,27 @@ filtering.
   TARGETS become cross-OS. For a Windows or macOS developer that means WSL2 / a Linux VM or
   container, as today.
 
+## Cosmo evaluation (owner, 2026-10-05: "evaluate cosmo mode by first building Fil-C from source")
+
+**Step 1, build Fil-C v0.686 in cosmo mode from source: IN PROGRESS.**
+- Tool: `tools/filc/build-cosmo.ts` (upstream's `build_base_cosmo.sh`, unmodified, STOCK Fil-C:
+  no zilc patches), tree `$WORK/filc-cosmo` (depth-1 clone of `v0.686`, checked against
+  `FILC_SHA`), log `$WORK/filc-cosmo/zilc-build.log`.
+- ⏸️ **Waiting on the owner:** host packages need `sudo` (password). The tool prints the line;
+  on 2026-10-05 it was:
+  `sudo apt-get update && sudo apt-get install -y clang lld ninja-build unzip patchelf bison flex
+  texinfo autoconf libtool pkg-config automake gettext gcc-aarch64-linux-gnu
+  binutils-aarch64-linux-gnu qemu-user libblake3-dev libc6-dev-arm64-cross
+  linux-libc-dev-arm64-cross libstdc++-15-dev-arm64-cross autotools-dev wine64`
+- Departures from upstream's build host, each with its why: `workarounds.md` "Machine setup —
+  building Fil-C from source in cosmo mode".
+
+**Then (planned):** (2) upstream's own checks: `cosmo.txt` "Verification checklist" items 1, 3–6
+and Fil-C's test suite with `run-filc-tests.ts` against the cosmo `pizfix/`; (3) the zilc
+questions: a hand-made Zig `x86_64-linux-musl` module through cosmo-mode clang, run as an APE on
+Linux and under Wine; what `syscall()` does off Linux (open question 1); static linking
+(question 3).
+
 ## What this changes in the plan (proposals, owner to decide after publish)
 
 - **Linux aarch64 first** (already tier 1, first in `roadmap.md`'s order): the four gaps above,

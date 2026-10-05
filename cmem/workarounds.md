@@ -658,6 +658,36 @@ environment, not zilc's patches: look at links and paths outside the compiler fi
 
 ---
 
+## Machine setup — building Fil-C from source in cosmo mode, 2026-10-05
+
+**Context.** The cosmo evaluation (owner: "evaluate cosmo mode by first building Fil-C from
+source"; `platforms.md`) runs upstream's own `build_base_cosmo.sh`, unmodified, through
+`tools/filc/build-cosmo.ts`. Upstream's reference host is its build container
+(`Dockerfile-build-env`, Ubuntu 25.04) plus `cosmo.txt`'s aarch64 package list. This machine is
+Ubuntu 26.04 in WSL2, so three things differ. None of them changes what Fil-C produces.
+
+1. **`libstdc++-15-dev-arm64-cross` instead of `-13`.** *Why:* `cosmo.txt` itself says to install
+   the libstdc++ cross headers matching the cross GCC's version (it gives GCC 12 → `-12` as the
+   example), and 26.04's `gcc-aarch64-linux-gnu` is GCC 15. They are the headers the aarch64
+   compiler-rt/libpas cross builds compile against.
+2. **`libblake3-dev` 1.8.2 from apt instead of BLAKE3 1.8.7 built into `/usr/local`.** *Why:* the
+   Dockerfile builds it by hand only because its base image lacks the package; it is a
+   dependency of Fil-C's BUILD tooling, never compiled into the compiler's output or a user
+   program. *Revisit* if the build fails on a BLAKE3 API newer than 1.8.2: then build 1.8.7 from
+   `projects/BLAKE3-1.8.7.tar.gz` as the Dockerfile does.
+3. **Parallelism capped at 12 jobs** (`JOBS`). *Why:* upstream uses every core (`NCPU=$(nproc)` in
+   `libpas/common.sh`, ninja's default for clang); on this 32-core, 31 GB WSL VM, 32 parallel
+   RelWithDebInfo clang compiles crashed the WSL service twice (2026-10-01). *How, without editing
+   upstream:* GNU `nproc` honours `OMP_NUM_THREADS`, and `build_clang.sh`/`build_compiler_rt.sh`
+   source an optional `clang-build-overrides.sh` (written by the tool) for `NINJAFLAGS`. The job
+   count changes build speed only.
+
+**Also:** the root-only step (apt) is the owner's to run: `sudo` here needs a password, and the
+tool prints the exact `apt-get install` line for whatever is missing. Ruby is not installed:
+upstream's Ruby test runner is replaced by zilc's Deno port (`run-filc-tests.ts`).
+
+---
+
 ## Earlier workarounds (short form; expand to the full template when next touched)
 
 - ~~**KI-4, Debug compiled at `filc -O0`.**~~ **Superseded 2026-10-01** by the KI-4 patch (full entry above); Debug is now at `-O1`. *Original why:* Fil-C's pass segfaults on Zig's Debug IR at
