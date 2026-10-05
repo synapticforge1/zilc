@@ -102,7 +102,7 @@ filtering.
 
 ## Cosmo evaluation (owner, 2026-10-05: "evaluate cosmo mode by first building Fil-C from source")
 
-**Step 1, build Fil-C v0.686 in cosmo mode from source: IN PROGRESS.**
+**Step 1, build Fil-C v0.686 in cosmo mode from source: ✅ DONE 2026-10-05 (18:48).** Clang (X86 + AArch64) built in ~20 min at 12 jobs; the whole cosmo flow (yolo cosmo x86_64 + aarch64, APE tools, libpizlo, the Fil-C-built cosmo libc `libc.a` 70 MB, libc++/libc++abi, minilute, sarcasm) completed. **First program:** a C hello world compiled by the cosmo-mode clang runs as a static ELF, and its `.com` twin is an APE (`MZqFpD`) that runs on Linux and passes `pecheck` (the Windows PE half). Took four stops for host setup, each recorded with its why in `workarounds.md` "Machine setup — building Fil-C from source in cosmo mode": libcurl headers (projeny), Ruby (libpas generators), and WSL's `WSLInterop` binfmt sending APE tools to Windows (owner disabled WSL interop in `/etc/wsl.conf`).
 - Tool: `tools/filc/build-cosmo.ts` (upstream's `build_base_cosmo.sh`, unmodified, STOCK Fil-C:
   no zilc patches), tree `$WORK/filc-cosmo` (depth-1 clone of `v0.686`, checked against
   `FILC_SHA`), log `$WORK/filc-cosmo/zilc-build.log`.
@@ -115,7 +115,14 @@ filtering.
 - Departures from upstream's build host, each with its why: `workarounds.md` "Machine setup —
   building Fil-C from source in cosmo mode".
 
-**Then (planned):** (2) upstream's own checks: `cosmo.txt` "Verification checklist" items 1, 3–6
+**Step 2 ✅ 2026-10-05: Fil-C's suite in cosmo mode, 5,821 / 5,822 pass**; the 1 is `inlineasm_rdpkru` (CPU feature WSL lacks, as on musl). Skips beyond musl's: 108 `unsupportedOnCOSMO`, 39 shared-library tests (upstream's count too).
+
+**Step 3 ✅ 2026-10-05: ZIG through cosmo mode, with zilc as it is** (`zilc build --filc <cosmo clang>`):
+- **Open question 1 answered:** in cosmo mode Fil-C's `syscall()` takes the target's NATIVE LINUX numbers on every OS and hands them to the runtime's `zsys_syscall`, which implements them per host OS (`pizfix/include/sys/syscall.h` comment; ~26 numbers listed, others trap). So zilc's KI-7 routing by Linux number carries over. One fix: cosmo's header has no `SYS_clock_nanosleep`, so zilc's helper now defines it (230 / 115) when missing (`src/driver.zig`; musl unchanged, tests 29/29, gate 8/8).
+- **Results:** `01_hello-world` and `31_timers` (threads, sleep) build and run as static Linux ELFs AND as `.com` APEs; the same APE files **run as Windows programs under Wine**. `58_reading-files` stops: `filc internal error: statx not supported` (Zig's std uses `statx`; the cosmo runtime does not implement it). Question 3 (static linking) is moot: the cosmo clang links static by itself and zilc's link worked unchanged.
+- ⚠️ **On REAL Windows (this machine, 2026-10-05) every cosmo-mode program crashes at start with 0xC0000005**, the Zig ones AND a plain C hello world from Fil-C's own cosmo clang (which prints, then crashes). So it is Fil-C's cosmo mode on real Windows, not zilc; upstream only verified Windows under Wine (`cosmo.txt` "Windows retest checklist"). Not diagnosed further (WinDbg on `.com.dbg` is upstream's suggested next step).
+
+**Was planned:** Fil-C's suite against the cosmo `pizfix/` (`run-filc-tests.ts`, which gained 0.686's "shared libraries not supported on COSMO" skip). **Then (planned):** (2) upstream's own checks: `cosmo.txt` "Verification checklist" items 1, 3–6
 and Fil-C's test suite with `run-filc-tests.ts` against the cosmo `pizfix/`; (3) the zilc
 questions: a hand-made Zig `x86_64-linux-musl` module through cosmo-mode clang, run as an APE on
 Linux and under Wine; what `syscall()` does off Linux (open question 1); static linking

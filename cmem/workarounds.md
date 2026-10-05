@@ -705,6 +705,13 @@ Ubuntu 26.04 in WSL2, so five things differ. None of them changes what Fil-C pro
    way:** remove it (`echo -1 > /proc/sys/fs/binfmt_misc/WSLInterop`, until WSL re-adds it) or stop
    WSL creating it (`/etc/wsl.conf`: `[interop]` `enabled=false`, then `wsl --shutdown`), which also
    stops running Windows `.exe` files from inside WSL. Owner's choice.
+   ✅ **Owner chose the permanent fix (2026-10-05):** `/etc/wsl.conf` now has `[interop]`
+   `enabled=false`; after `wsl --shutdown` the `WSLInterop` entry is gone, the `APE`/`APE-jart`
+   entries came back by themselves from `/etc/binfmt.d/cosmo-ape.conf`, and `cocmd` runs directly.
+   (A later `echo -1 > …/WSLInterop` fails with "Permission denied": the entry no longer exists, and
+   binfmt_misc does not let a new file be created there. Harmless.) Consequence: Windows `.exe`
+   files cannot be started from inside WSL on this machine; zilc's tools only go the other way
+   (Windows → WSL).
 3. **Parallelism capped at 12 jobs** (`JOBS`). *Why:* upstream uses every core (`NCPU=$(nproc)` in
    `libpas/common.sh`, ninja's default for clang); on this 32-core, 31 GB WSL VM, 32 parallel
    RelWithDebInfo clang compiles crashed the WSL service twice (2026-10-01). *How, without editing

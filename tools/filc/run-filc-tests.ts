@@ -131,6 +131,13 @@ async function runAll() {
     const missing = Object.keys(has).find((k) => m[k] && !has[k]);
     if (missing) { results[name] = `SKIP: ${missing}`; continue; }
     if (m["unsupportedOnCOSMO"] && has.needsCOSMO) { results[name] = "SKIP: unsupported on cosmo"; continue; }
+    // run-tests: "Structural cosmo limitations: cosmo builds are static-only", so a test with any
+    // library not marked isStatic cannot even link there. (Missing from the first port; added
+    // 2026-10-05 for the first cosmo run.)
+    if (has.needsCOSMO && Object.values((m["libraries"] ?? {}) as Record<string, { isStatic?: boolean }>).some((d) => !d?.isStatic)) {
+      results[name] = "SKIP: shared libraries not supported on cosmo";
+      continue;
+    }
     if (m["skip"]) { results[name] = "SKIP: skip"; continue; }
 
     const expected = String(m["return"]);

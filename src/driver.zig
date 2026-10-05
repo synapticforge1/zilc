@@ -195,6 +195,16 @@ const syscall_helper_c =
     \\#include <time.h>
     \\#include <unistd.h>
     \\
+    \\// Fil-C's cosmo flavour lists only the numbers its runtime implements (no
+    \\// clock_nanosleep), but Zig's std still passes the target's native Linux number.
+    \\#ifndef SYS_clock_nanosleep
+    \\#if defined(__aarch64__)
+    \\#define SYS_clock_nanosleep 115
+    \\#else
+    \\#define SYS_clock_nanosleep 230
+    \\#endif
+    \\#endif
+    \\
     \\long zilc_syscall(long n, void *a1, void *a2, void *a3, void *a4, void *a5, void *a6) {
     \\    long r;
     \\    switch (n) {

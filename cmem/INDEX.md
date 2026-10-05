@@ -79,8 +79,15 @@ for structure and policy.
   five places, `zilc --version` ok/ok on this machine, `capi-smoke` OK, nothing from `toolchain/`
   but its README tracked, fast-forward push (43 commits). No GitHub Release page was made (no `gh`
   here); the tag and `RELEASE-NOTES.md` carry the release.
-- ▶️ **IN PROGRESS (owner, 2026-10-05): evaluate Fil-C's COSMO mode, starting by building Fil-C
-  from source** (`platforms.md` "Cosmo evaluation"). Tool `tools/filc/build-cosmo.ts` (stock
+- ✅ **2026-10-05: COSMO EVALUATION, steps 1–3 done** (`platforms.md`): Fil-C built from source in
+  cosmo mode; its suite 5,821/5,822; Zig programs via zilc run as Linux ELF + APE, and under Wine as
+  Windows programs; gap: `statx`; ⚠️ ALL cosmo programs (even Fil-C's C) crash on REAL Windows.
+- ✅ **2026-10-05: ZIG VERSION OF FIL-C SCOPED on 0.15.2** (`zig-filc-scope.md`).
+- ❓ **Owner idea (2026-10-05), to decide: a NEW project** built on Zig + Fil-C for the all-Zig
+  platform, keeping zilc as the stable, upstream-faithful reference and test oracle. Open: name and
+  repo, its Zig version, zilc's future version line, when to start.
+- (was) ▶️ IN PROGRESS: evaluate Fil-C's COSMO mode, starting by building Fil-C
+  from source (`platforms.md` "Cosmo evaluation"). Tool `tools/filc/build-cosmo.ts` (stock
   upstream `build_base_cosmo.sh`, 12 jobs); source cloned to `$WORK/filc-cosmo` at `v0.686`.
   ⏸️ **Blocked on the owner running one `sudo apt-get install` line** (in `platforms.md`; the tool
   prints it): clang, lld, ninja, the aarch64 cross toolchain, qemu, wine64, …
@@ -446,6 +453,7 @@ the runtime-linking rule checked.
 | [upstream.md](upstream.md) | 🆕 2026-10-05: **"Review of Fil-C 0.686"** (the 10 pass commits; what zilc gains; KI-4/KI-18 still upstream). 2026-10-01: **the `upstream/fil-c/` reference clone and its monitor** (`tools/upstream/`, first-run results), and reporting marked not planned. How zilc relates to Fil-C upstream: what to track, which files matter, pinned commit, and 🔄 **the three-stage upgrade procedure (2026-09-30)**: Fil-C + compatible Zig → latest Zig → benchmarks. |
 | [licensing.md](licensing.md) | **License = `Apache-2.0 WITH LLVM-exception OR MIT`** (2026-09-18). Why, the runtime-linking rule, the copyleft exclusion. |
 | [reference-projects.md](reference-projects.md) | Fil-C, LLVM, Zig: verified licenses, what to mine each for, adoption status. |
+| [zig-filc-scope.md](zig-filc-scope.md) | 🆕 2026-10-05: **scope of a Zig version of Fil-C on 0.15.2** (owner). Step 2 (runtime from source with `zig build`): the stock-compiled half PROVEN buildable by Zig alone; 3 pieces still need a Fil-C compiler. Step 3 (the pass in Zig): ~25–35k lines, output is plain LLVM 20 IR; costs: no pre-pass optimisation, C through `zig cc` miscompiles varargs/pointer unions/atomics. Written as the brief for the owner's proposed NEW project |
 | [platforms.md](platforms.md) | 🆕 2026-10-05: **the P6 scope pass**: per platform the processors, OS-function counts (corpus and whole std), int-to-pointer sites, libc and host story. Linux aarch64 measured (4 gaps); Fil-C's new **cosmo mode** (APE binaries for macOS/x86_64 Windows, Linux-x86_64 C ABI) |
 | [roadmap.md](roadmap.md) | P0 ✅ → P1 ✅ → P2 ✅ (`0.3.0`) → **P3 Zig runtime (plan 2026-09-30: Linux first, checked against Fil-C, `zsys_*` first; next step the `zsys_write` spike)** → P4 Zig-language fidelity → P5 C++ → **P6 other platforms (proposed 2026-09-30)**. |
 | [security-model.md](security-model.md) | The safety guarantees being targeted (spatial, temporal, thread-safe capability updates), and what is explicitly out of scope. |
