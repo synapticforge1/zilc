@@ -1,6 +1,14 @@
 # Releasing & Versioning
 
-## 📦 PUBLISH PLAN (owner, 2026-09-30; updated 2026-10-05: Fil-C 0.686 and the new version)
+## ✅ PUBLISHED 2026-10-05: `v0.15.2-0.686.1`
+
+Pushed to `https://github.com/jrmarcum/zilc`: `main` + branch `v0.15.2` at `19e7172`, annotated tag
+`v0.15.2-0.686.1`. The local `v0.15.2-3` tag was deleted, never pushed. No GitHub Release page (no
+`gh` CLI on this machine); add one from the tag if wanted, with `RELEASE-NOTES.md` as its text.
+From here on, every release follows "Per-release checklist" below and pushes only when the owner
+says.
+
+## 📦 PUBLISH PLAN (owner, 2026-09-30; updated 2026-10-05: Fil-C 0.686 and the new version) — DONE
 
 **Publish as `v0.15.2-0.686.1`** once (1) the remaining open-items list is done and (2) the
 platforms scope pass is done (`roadmap.md` P6), and **before** the port efforts begin. Nothing is

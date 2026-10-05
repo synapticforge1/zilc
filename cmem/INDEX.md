@@ -73,8 +73,14 @@ for structure and policy.
   come from Fil-C's clang; KI-7 rewrite is x86-only; aarch64 tree + qemu). **Upstream Fil-C
   now has a COSMO mode** whose binaries run on macOS and x86_64 Windows, with Linux x86_64's C
   ABI: evaluate before any per-OS runtime.
-- ▶️ **Next: PUBLISH** `v0.15.2-0.686.1` when the owner says (`releasing.md`): every pre-publish
-  item is closed.
+- 🚀 **2026-10-05: PUBLISHED `v0.15.2-0.686.1`** (owner: "publish"). Pushed to
+  `github.com/jrmarcum/zilc`: `main` and branch `v0.15.2` at `19e7172`, annotated tag
+  `v0.15.2-0.686.1`. Local tag `v0.15.2-3` deleted (never pushed). Checked first: version in all
+  five places, `zilc --version` ok/ok on this machine, `capi-smoke` OK, nothing from `toolchain/`
+  but its README tracked, fast-forward push (43 commits). No GitHub Release page was made (no `gh`
+  here); the tag and `RELEASE-NOTES.md` carry the release.
+- ▶️ **Next (owner, 2026-10-05): evaluate Fil-C's COSMO mode, starting by building Fil-C from
+  source** (`platforms.md` Finding 1 and its open questions).
 
 ## ✅ 2026-10-02 — BUILD SPEED, lever (a)
 
@@ -251,8 +257,8 @@ for structure and policy.
     (corpus, output comparison, gate, Fil-C suite); version `0.15.2-0.686.1`
   - [x] **Platforms scope pass** (P6): per platform, the processors, the std OS-function count, the
     libc story, KI-5-family code, and the host toolchain. ✅ 2026-10-05: `platforms.md`
-  - [ ] Then: tag `v0.15.2-0.686.1`, DELETE the local tag `v0.15.2-3` (it sorts above the new
-    one), move branch `v0.15.2` to the final commit, and push when the owner says (`releasing.md`)
+  - [x] Then: tag `v0.15.2-0.686.1`, DELETE the local tag `v0.15.2-3` (it sorts above the new
+    one), move branch `v0.15.2` to the final commit, and push. ✅ 2026-10-05, published
   - Deferred past publish (with the port): `-Druntime=both`, the byte-identity check, the
     benchmark suite (stage C), and the 0.16.0 examples under zilc
 - 🔑 **Pipeline change (2026-09-30): zilc now takes Zig's UNOPTIMIZED IR (KI-17).** Zig's `-femit-llvm-ir` is
