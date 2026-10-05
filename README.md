@@ -3,7 +3,7 @@
 **A Fil-C-style memory-safe compilation target for the Zig toolchain**, covering Zig, C and C++ with
 one compiler binary.
 
-> **Status: working prototype (v0.15.2-3: zilc release 3, for Zig 0.15.2), Linux x86_64 only.** `zilc build` compiles Zig and C into
+> **Status: working prototype (v0.15.2-0.686.1: zilc release 1 for Zig 0.15.2 and Fil-C 0.686), Linux x86_64 only.** `zilc build` compiles Zig and C into
 > one binary where out-of-bounds access and use-after-free trap at a named source line — using
 > Fil-C's existing pass and runtime, with no Zig fork and no LLVM build. See [Limits](#limits).
 
@@ -65,7 +65,7 @@ export ZILC_FILC=/path/to/filc/build/bin/clang   # Fil-C's clang (see below)
 zilc build [-O ReleaseSafe] [--target x86_64-linux-musl] [--entry auto|zig|c] [--runtime filc] [-o out] <inputs...>
 ```
 
-**Which Fil-C clang.** zilc works best with **Fil-C 0.685's clang rebuilt with two fixes** to its
+**Which Fil-C clang.** zilc works best with **Fil-C 0.686's clang rebuilt with two fixes** to its
 compiler pass (`tools/filc/build-patched-clang.ts`, about an hour; the diff is in
 `third_party/filc-patches/`). The fixes don't change what the compiler emits for code it already
 handled:
@@ -80,7 +80,7 @@ machine code in parallel parts after Fil-C's pass has run on the whole module, s
 the same as a single run. `-j <n>` (or `ZILC_JOBS`) sets the number of parts; the default is
 the number of cores, at most 16, and `-j 1` turns it off.
 
-The stock Fil-C 0.685 prebuilt still works for the Release modes, without the parallel step.
+The stock Fil-C 0.686 prebuilt still works for the Release modes, without the parallel step.
 
 zilc also keeps the objects Fil-C's clang produces, so rebuilding an unchanged program skips that
 step: a TLS client rebuilds in about 2 seconds instead of 36. The cache lives in
@@ -105,7 +105,7 @@ Each has a reason recorded in [cmem/known-issues.md](cmem/known-issues.md):
   default anyway.
 - **Large programs build slower than with plain Zig.** Fil-C's checks make the code it compiles
   several times larger. Typical programs build in seconds; a TLS client (`std.http.Client`) takes
-  about 36 seconds against Zig's 17 (2 seconds to rebuild unchanged).
+  about 38 seconds against Zig's 17 (2 seconds to rebuild unchanged).
 - **Target musl** — Fil-C's libc is musl; a gnu target fails to link.
 - **Zig's own start code cannot run** — it builds a pointer out of an integer address
   (`@ptrFromInt(getauxval(AT_PHDR))`), which is precisely what the capability model forbids. zilc

@@ -14,12 +14,12 @@
 // zig_oob.zig is NOT copied here, as in the shell version: milestone.ts puts it in $WORK/p2.
 //
 // Converted from whole-zig-program.sh (2026-10-05).
-import { FILC_PREBUILT_TREE, linuxOnly, mkdirp, WORK } from "../lib/tool.ts";
+import { FILC_0685_PREBUILT_TREE, linuxOnly, mkdirp, WORK } from "../lib/tool.ts";
 
 await linuxOnly(import.meta);
 const ZIG = `${WORK}/tools/zig-0.15.2/zig`;
 // The stock prebuilt on purpose: this records what Fil-C 0.685 itself does with Zig's IR.
-const FILC = `${FILC_PREBUILT_TREE}/build/bin/clang`;
+const FILC = `${FILC_0685_PREBUILT_TREE}/build/bin/clang`;
 const OUT = `${WORK}/p2`;
 // Fil-C's two layout lines. Position matters: LLVM compares layout strings textually, so `ni:0`
 // goes right after `m:e` (cmem/known-issues.md KI-4).

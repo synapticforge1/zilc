@@ -1,21 +1,45 @@
 # Releasing & Versioning
 
-## 📦 PUBLISH PLAN (owner, 2026-09-30)
+## 📦 PUBLISH PLAN (owner, 2026-09-30; updated 2026-10-05: Fil-C 0.686 and the new version)
 
-**Publish as `v0.15.2-3`** once (1) the remaining open-items list is done and (2) the platforms
-scope pass is done (`roadmap.md` P6), and **before** the port efforts begin. Nothing is pushed until
-then.
+**Publish as `v0.15.2-0.686.1`** once (1) the remaining open-items list is done and (2) the
+platforms scope pass is done (`roadmap.md` P6), and **before** the port efforts begin. Nothing is
+pushed until then. (Planned as `v0.15.2-3` until 2026-10-05; see the scheme below.)
 
 At publish time:
-- **Move the local tag `v0.15.2-3` and branch `v0.15.2`** from `5464a17` (where they were made
-  this morning) to the final commit. Both are **local only** and were never pushed, so moving them
-  rewrites nobody's history: `git tag -f -a v0.15.2-3 <final>`, `git branch -f v0.15.2 <final>`.
-- Push `main`, `v0.15.2` and `v0.15.2-3`.
-- The version stays `0.15.2-3` everywhere; it was never published, so there is nothing to bump.
-- Release notes (`RELEASE-NOTES.md`, created 2026-10-05) state the user-code Zig (0.15.2) and
-  the Fil-C release (0.685).
+- **Tag `v0.15.2-0.686.1`** on the final commit and **move branch `v0.15.2`** there
+  (`git branch -f v0.15.2 <final>`; local only, never pushed, so moving it rewrites nobody's history).
+- ⚠️ **DELETE the old local tag `v0.15.2-3`** (`git tag -d v0.15.2-3`), never push it: it was never
+  published, and under semantic-version ordering `0.15.2-3` sorts ABOVE `0.15.2-0.686.1` (the leading
+  `3` beats the leading `0`), so a tool picking "the latest" would pick the wrong one.
+- Push `main`, `v0.15.2` and `v0.15.2-0.686.1`.
+- Release notes (`RELEASE-NOTES.md`) state the user-code Zig (0.15.2) and the Fil-C release (0.686).
 
-## 🔖 THE VERSION IS **`0.15.2-3`** — APPLIED 2026-09-30 (was `0.3.0`; same release, new scheme)
+## 🔖 THE VERSION IS **`0.15.2-0.686.1`** — `<Zig>-<Fil-C>.<zilc release>` (owner, 2026-10-05)
+
+When zilc moved to Fil-C 0.686, the owner asked for the version to name the Fil-C release too:
+*"we may need to make our release version 0.15.2.686-? to indicate the zig release version, the
+Fil-C release version and the zilc release version."*
+
+- **`0.15.2.686-N` cannot be used:** Zig rejects four numbers (`InvalidVersion`, as `0.15.2.3` was on
+  2026-09-30), and `build.zig.zon` needs Zig's form.
+- **Chosen (owner): `0.15.2-0.686.N`**, Fil-C's FULL version in the pre-release part, which semantic
+  versioning compares identifier by identifier, numbers as numbers. Verified with Zig 0.15.2
+  (2026-10-05): parses and prints back unchanged; `build.zig.zon` accepts it; and it orders right:
+  next zilc release `-0.686.1 < -0.686.2`; `-0.686.9 < -0.686.10`; newer Fil-C `-0.686.9 < -0.687.1`;
+  `-0.699.9 < -0.700.1`; Fil-C 1.0 `-0.999.5 < -1.0.1`; Fil-C 1.0.2 `-1.0.1 < -1.0.2.1`; newer Zig
+  `0.15.2-0.686.12 < 0.16.2-0.686.1`. (Rejected: `-686.N`, which assumes Fil-C stays 0.x;
+  `-686-N`, one text identifier that sorts `686-10` before `686-9`; `+filc…`, ignored in ordering.)
+- **N RESTARTS AT 1 for every new Fil-C release** (owner), as it already did for every new Zig
+  release. So this release is `0.15.2-0.686.1`, not `.3`.
+- In code: `src/root.zig` builds `version` from `zig_line`, `filc_release` and `release`, so the
+  number cannot disagree with the Fil-C release it names; tests pin the string and the ordering.
+  `build.zig.zon` must match (the five places below).
+- Everything else in the 2026-09-30 scheme below holds: one branch per Zig line (`v0.15.2`), the
+  basis for latest lines, no 1.0. The cost noted there grows slightly: generic semver tools read
+  the whole suffix as a pre-release.
+
+## ~~🔖 THE VERSION IS `0.15.2-3`~~ — APPLIED 2026-09-30 (was `0.3.0`), SUPERSEDED 2026-10-05 by `0.15.2-0.686.1` (above)
 
 In code, `src/root.zig` builds it from two named constants, `zig_line` (0.15.2) and `release`
 (3), so a release bump changes one number and a Zig move changes the other. (`zig_line` was briefly
@@ -24,9 +48,11 @@ string must be `0.15.2-3`, and it must **parse back to the same fields** (the `_
 Verified at the change: tests 11/11, `zig build` accepts the zon, capi-smoke prints
 `zilc 0.15.2-3`, gate 4/4 in WSL.
 
-**Bumping:** a zilc release → `release += 1`. A new Zig line, **patch releases included** →
-change `zig_line` **and reset `release` to 1**, and record its **basis** (below). Either way,
-update `build.zig.zon`, the README status line and INDEX's STATE table (the four places, below).
+**Bumping** (rule as of 2026-10-05): a zilc release → `release += 1`. A new Zig line, **patch
+releases included** → change `zig_line` **and reset `release` to 1**, and record its **basis**
+(below). A new **Fil-C release** → change `filc_release` (and `tools/lib/tool.ts` `FILC_VERSION`,
+`FILC_SHA`) **and reset `release` to 1**. Every time, update `build.zig.zon`, the README status
+line, INDEX's STATE table and `RELEASE-NOTES.md` (the five places, below).
 
 ## 🔖 THE SCHEME (owner, 2026-09-30): the version NAMES THE ZIG LINE, then our release
 

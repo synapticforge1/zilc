@@ -7,13 +7,13 @@
 //   deno run -A tools/filc/check-toolchain.ts
 //
 // Exit 0 = up to date. Exit 1 = stale or broken; the message names the step to run.
-import { exists, FILC_PATCHED_TREE, linuxOnly, REPO, run, WORK } from "../lib/tool.ts";
+import { exists, FILC_PATCHED_TREE, FILC_VERSION, linuxOnly, REPO, run, WORK } from "../lib/tool.ts";
 
 await linuxOnly(import.meta);
 const src = `${WORK}/filc-src/repo`;
 const patch = `${REPO}/third_party/filc-patches/zilc-filc-pass.patch`;
 const sums = `${REPO}/toolchain/SHA256SUMS`;
-const tar = `${REPO}/toolchain/filc-0.685-zilc-linux-x86_64.tar.xz`;
+const tar = `${REPO}/toolchain/filc-${FILC_VERSION}-zilc-linux-x86_64.tar.xz`;
 const bin = `${FILC_PATCHED_TREE}/build/bin/clang-20`;
 let stale = false;
 

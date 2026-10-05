@@ -9,7 +9,13 @@ mkdir -p "$DL" "$TOOLS"
 
 ZIG_URL="https://ziglang.org/download/0.15.2/zig-x86_64-linux-0.15.2.tar.xz"
 ZIG_SHA="02aa270f183da276e5b5920b1dac44a63f1a49e55050ebde3aecc9eb82f93239"
-FILC_URL="https://github.com/pizlonator/fil-c/releases/download/v0.685/filc-0.685-linux-x86_64.tar.xz"
+# Fil-C: the release zilc builds on (tools/lib/tool.ts FILC_VERSION). Upstream publishes no
+# checksum; this is the SHA-256 of the file as downloaded on 2026-10-05, recorded so a later
+# download can be checked against it. FILC_VERSION=0.685 still installs the release the phase
+# experiments (tools/p1–p3) record (its SHA was only printed then, so it is not checked).
+FILC_VERSION=${FILC_VERSION:-0.686}
+FILC_URL="https://github.com/pizlonator/fil-c/releases/download/v$FILC_VERSION/filc-$FILC_VERSION-linux-x86_64.tar.xz"
+[ "$FILC_VERSION" = 0.686 ] && FILC_SHA="60bfbe8ee63d7e462394aa8d5e44fee675de892bcf800d9cc80d86378cad6b07" || FILC_SHA=""
 
 echo "== 1/4 Zig 0.15.2"
 if [ -x "$TOOLS/zig-0.15.2/zig" ]; then
@@ -28,14 +34,20 @@ fi
 "$TOOLS/zig-0.15.2/zig" version
 "$TOOLS/zig-0.15.2/zig" cc --version | head -1
 
-echo "== 2/4 Fil-C 0.685"
-FILC="$TOOLS/filc-0.685-linux-x86_64"
+echo "== 2/4 Fil-C $FILC_VERSION"
+FILC="$TOOLS/filc-$FILC_VERSION-linux-x86_64"
 if [ -d "$FILC" ]; then
   echo "already unpacked"
 else
-  [ -f "$DL/filc.tar.xz" ] || curl -fsSL "$FILC_URL" -o "$DL/filc.tar.xz"
-  sha256sum "$DL/filc.tar.xz" | tee "$DL/filc.sha256"
-  tar -xJf "$DL/filc.tar.xz" -C "$TOOLS"
+  T="$DL/filc-$FILC_VERSION.tar.xz"
+  [ -f "$T" ] || curl -fsSL "$FILC_URL" -o "$T"
+  got=$(sha256sum "$T" | cut -d' ' -f1)
+  echo "$got  $T" | tee "$DL/filc-$FILC_VERSION.sha256"
+  if [ -n "$FILC_SHA" ] && [ "$got" != "$FILC_SHA" ]; then
+    echo "SHA MISMATCH: got $got want $FILC_SHA" >&2
+    exit 1
+  fi
+  tar -xJf "$T" -C "$TOOLS"
 fi
 ls "$FILC" | head -20
 

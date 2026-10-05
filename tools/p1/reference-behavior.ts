@@ -12,10 +12,10 @@
 //
 // Fil-C's clang is the STOCK PREBUILT 0.685 on purpose (not filc(), which prefers zilc's patched
 // build): the recorded reference is upstream Fil-C's behavior, before any zilc patch existed.
-import { FILC_PREBUILT_TREE, linuxOnly, mkdirp, REPO, run, show, WORK } from "../lib/tool.ts";
+import { FILC_0685_PREBUILT_TREE, linuxOnly, mkdirp, REPO, run, show, WORK } from "../lib/tool.ts";
 
 await linuxOnly(import.meta);
-const FILC = `${FILC_PREBUILT_TREE}/build/bin/clang`;
+const FILC = `${FILC_0685_PREBUILT_TREE}/build/bin/clang`;
 const OUT = `${WORK}/p1`;
 await mkdirp(OUT);
 

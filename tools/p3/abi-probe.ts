@@ -12,11 +12,11 @@
 //
 // Same commands, flags and printed sections as abi-probe.sh; each Unix pipeline's filter
 // (grep/head/sed/tr) is done in TypeScript on the program's output.
-import { FILC_PREBUILT_TREE, glob, linuxOnly, REPO, run } from "../lib/tool.ts";
+import { FILC_0685_PREBUILT_TREE, glob, linuxOnly, REPO, run } from "../lib/tool.ts";
 
 await linuxOnly(import.meta);
 
-const F = FILC_PREBUILT_TREE;
+const F = FILC_0685_PREBUILT_TREE;
 const CC = `${F}/build/bin/clang`;
 const L = `${F}/pizfix/lib`;
 const I = `${F}/pizfix/stdfil-include`;

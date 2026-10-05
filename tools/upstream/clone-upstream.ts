@@ -10,7 +10,7 @@
 //
 // ⚠️ Every git command names its repo with -C and an absolute path. A partial-clone fetch run in the
 // wrong directory once rewrote zilc's own .git/config (2026-10-01).
-import { exists, mkdirp, must, REPO, show } from "../lib/tool.ts";
+import { exists, FILC_VERSION, mkdirp, must, REPO, show } from "../lib/tool.ts";
 
 const u = `${REPO}/upstream/fil-c`;
 const url = "https://github.com/pizlonator/fil-c.git";
@@ -40,8 +40,9 @@ await must(["git", "-C", u, "config", "core.longpaths", "true"]);
 await must(["git", "-C", u, "config", "core.protectNTFS", "false"]);
 await must(["git", "-C", u, "sparse-checkout", "set", ...paths]);
 await must(["git", "-C", u, "checkout", "-q", "deluge"]);
-await must(["git", "-C", u, "fetch", "-q", "origin", "+refs/tags/v0.685:refs/tags/v0.685"]);
+// The tag of the release zilc builds on (tools/lib/tool.ts FILC_VERSION), for diffs against it.
+await must(["git", "-C", u, "fetch", "-q", "origin", `+refs/tags/v${FILC_VERSION}:refs/tags/v${FILC_VERSION}`]);
 await show(["git", "-C", u, "log", "-1", "--format=upstream/fil-c at %h %ad %s", "--date=short"]);
-console.log(`v0.685 = ${(await must(["git", "-C", u, "rev-parse", "--short", "v0.685"])).trim()}`);
+console.log(`v${FILC_VERSION} = ${(await must(["git", "-C", u, "rev-parse", "--short", `v${FILC_VERSION}`])).trim()}`);
 console.log("⚠️ exFAT drive: also run once:");
 console.log(`   git config --global --add safe.directory ${u}`);

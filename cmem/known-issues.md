@@ -562,7 +562,7 @@ move git's object store. Moving `.git` to NTFS behind a `gitdir:` pointer file w
 interference graph over dense ids: the pass on `69` 11.2 → 4.3 s, verified equal to the original
 on the whole corpus in all four modes (`ZILC_VERIFY_INTERFERENCE=1`). (c) caches Fil-C objects by
 a key over the IR and the tools' identity: an unchanged `69` rebuilds in 2.3 s. `69` ReleaseSafe
-alone: **55.9 s (2026-10-01) → 35.9 s** cold, against native Zig's 16.9 s. What remains is mostly
+alone: **55.9 s (2026-10-01) → 35.9 s** cold (38.0 s on Fil-C 0.686, 2026-10-05), against native Zig's 16.9 s. What remains is mostly
 LLVM's own `-O1` optimizer on the instrumented code (~20 s of the whole-module step), which zilc
 cannot change without changing the output. Detail: `workarounds.md` KI-22.
 

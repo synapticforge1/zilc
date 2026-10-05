@@ -39,8 +39,27 @@ export const WORK = env("WORK", `${HOME}/zilc-work`);
 
 /** The Zig that compiles user code, as installed in WSL. */
 export const ZIG = env("ZILC_ZIG", `${WORK}/tools/zig-0.15.2/zig`);
-export const FILC_PATCHED_TREE = `${WORK}/tools/filc-0.685-zilc`;
-export const FILC_PREBUILT_TREE = `${WORK}/tools/filc-0.685-linux-x86_64`;
+/**
+ * The Fil-C release zilc builds on, and the commit its clang names in `clang --version` (the
+ * source zilc's patched clang is built from). Change both together with src/root.zig's
+ * `filc_release`; every tree, archive and tag name below follows. (0.685 → 0.686 on 2026-10-05.)
+ */
+export const FILC_VERSION = "0.686";
+export const FILC_SHA = "163fae598eaf249b74065b0156f3a7e7ba8c0e5a";
+/** The URL the source's `origin` must have: clang's version string prints it (build-patched-clang.ts). */
+export const FILC_SOURCE_URL = "git@github.com:pizlonator/fil-c.git";
+
+/** A release's stock prebuilt, as setup-wsl.sh unpacks it. */
+export function filcPrebuiltTree(version: string): string {
+  return `${WORK}/tools/filc-${version}-linux-x86_64`;
+}
+export const FILC_PATCHED_TREE = `${WORK}/tools/filc-${FILC_VERSION}-zilc`;
+export const FILC_PREBUILT_TREE = filcPrebuiltTree(FILC_VERSION);
+/**
+ * Fil-C 0.685's prebuilt: the phase experiments (tools/p1–p3) RECORD what that release did, so they
+ * keep running it after zilc moved on. Kept installed for them.
+ */
+export const FILC_0685_PREBUILT_TREE = filcPrebuiltTree("0.685");
 
 /** Fil-C's clang for zilc: ZILC_FILC, else the patched build (KI-22), else the prebuilt. */
 export function filc(): string {

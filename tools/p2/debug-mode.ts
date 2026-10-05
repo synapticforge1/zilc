@@ -14,11 +14,11 @@
 // Work in $WORK/drive-debug: interop-<mode>, run-<mode>.log.
 //
 // Converted from debug-mode.sh (2026-10-05).
-import { FILC_PREBUILT_TREE, linuxOnly, mkdirp, REPO, run, show, size, WORK } from "../lib/tool.ts";
+import { FILC_0685_PREBUILT_TREE, linuxOnly, mkdirp, REPO, run, show, size, WORK } from "../lib/tool.ts";
 
 await linuxOnly(import.meta);
 const ZILC = `${REPO}/zig-out/bin/zilc`;
-const env = { ZILC_ZIG: `${WORK}/tools/zig-0.15.2/zig`, ZILC_FILC: `${FILC_PREBUILT_TREE}/build/bin/clang` };
+const env = { ZILC_ZIG: `${WORK}/tools/zig-0.15.2/zig`, ZILC_FILC: `${FILC_0685_PREBUILT_TREE}/build/bin/clang` };
 
 const cwd = `${WORK}/drive-debug`;
 await mkdirp(cwd);

@@ -49,12 +49,24 @@ for structure and policy.
   and the two P1 IR files it comes from: their exact Zig commands were recovered and verified;
   `testing.md` "Experiment inputs that live outside the repo", `tools/p1/README.md`,
   `tools/p2/README.md`.
-- 📌 **Upstream released Fil-C 0.686 (2026-10-04)**, seen by `check-upstream.ts`: new commits to
-  `FilPizlonator.cpp` (10 in all now) and 41 to `filc/tests`. To review with the 9 below; zilc stays on 0.685 for
-  this release.
-- ▶️ **Next: the rest of the PRE-PUBLISH CHECKLIST**: the platforms scope pass; the upstream
-  commits to review. Still open from 2026-10-01: read the 9 upstream `FilPizlonator.cpp` commits
-  (above all `097f7b7`), then `--mark-reviewed`.
+- ✅ **2026-10-05: zilc MOVED TO FIL-C 0.686** (owner: "move the release to the Fil-C 0.686
+  version just released"). Same LLVM (20.1.8); the LLVM fork is now `pizlonator/fil-c.git`, tag
+  `v0.686` = `163fae5`. One place names the release: `tools/lib/tool.ts` (`FILC_VERSION`,
+  `FILC_SHA`, `FILC_SOURCE_URL`); the p1–p3 tools stay on 0.685 (`FILC_0685_PREBUILT_TREE`): they
+  are records of what 0.685 did. zilc's 8 edits apply unchanged (the saved patch moved only its
+  line offsets). Upstream review of the 10 `FilPizlonator.cpp` commits: `upstream.md` "Review of
+  Fil-C 0.686". Gains: **`musttail`** (Zig `@call(.always_tail)` no longer overflows the stack) and
+  the stack-aux GC fix (`097f7b7`, not reproduced on 0.685 but relevant to Zig's IR). **KI-4 and
+  KI-18 still crash stock 0.686**, so the patched clang stays recommended.
+  Verified on 0.686: corpus **78/78 as designed in all four modes** (71 clean + the 7 intentional),
+  0 verification differences; output comparison **0 unexplained** (503 identical); gate 8/8;
+  `69` ReleaseSafe **38.0 s** cold; Fil-C's own 7,205 tests: **0 differences** stock vs patched, every runnable test passes except `inlineasm_rdpkru` (CPU feature WSL lacks; `sarcasm-mb-pl-sink-att` needed an OpenSSL file in the test checkout, `testing.md`). Toolchain re-archived as `filc-0.686-zilc`
+  (the 0.685 archive kept in `toolchain/filc-0.685/`).
+- ✅ **2026-10-05: VERSION SCHEME (owner): `<Zig>-<Fil-C>.<zilc release>`**, this release
+  **`0.15.2-0.686.1`**; the last number restarts at 1 for every new Zig or Fil-C release
+  (`releasing.md`, `design-decisions.md`). ⚠️ The never-pushed local tag `v0.15.2-3` SORTS ABOVE
+  it and must be deleted at publish.
+- ▶️ **Next: the platforms scope pass**, the last pre-publish item; then publish (`releasing.md`).
 
 ## ✅ 2026-10-02 — BUILD SPEED, lever (a)
 
@@ -144,7 +156,8 @@ for structure and policy.
   reference) → **B** port to the latest Zig if different, and require identical gate results →
   **C** benchmark comparison between versions. `upstream.md` "Upgrade procedure". The benchmark
   suite doesn't exist yet (`testing.md`).
-- 🔖 **Versioning (owner), APPLIED: the version is now `0.15.2-3`**, `<Zig line>-<zilc
+- 🔖 ~~**Versioning (owner), APPLIED: the version is now `0.15.2-3`**~~ → **superseded 2026-10-05 by
+  `<Zig>-<Fil-C>.<zilc release>` = `0.15.2-0.686.1`** (`releasing.md`). Was:, `<Zig line>-<zilc
   release>` (was `0.3.0`). Spelling verified with Zig's parser (`0.15.2_3` rejected: Zig reads it as
   `0.15.23`). **No 1.0, ever**: only `-N` advances, and **`N` restarts at 1 for every new Zig
   version, patch releases included** (e.g. `0.16.1-1`, `0.16.2-1`). Scheme fully settled
@@ -193,11 +206,11 @@ for structure and policy.
   Fil-C's source (pass and runtime) may be read; the Zig runtime is new Zig code; every adaptation
   is ledgered and its notice carried (`licensing.md`). **(2) upstream defects are noted for the
   record, not filed** (refined 2026-10-01: a short email pointing to `UPSTREAM-ISSUES.md`).
-  **(3) publish as `v0.15.2-3`** after the open items and the platforms scope, before the port
+  **(3) publish as `v0.15.2-3`** (now `v0.15.2-0.686.1`) after the open items and the platforms scope, before the port
   (move the local tag and branch, `releasing.md`). **(4) platforms: Linux, macOS, Windows on every
   prevalent processor, then iOS, Android later** (`roadmap.md` P6; ✅ x86_64 + aarch64 confirmed;
   riscv64 out of scope for now, low interest).
-- 📋 **PRE-PUBLISH CHECKLIST (all must close before `v0.15.2-3` is pushed):**
+- 📋 **PRE-PUBLISH CHECKLIST (all must close before `v0.15.2-0.686.1` is pushed; was `v0.15.2-3`):**
   - [x] **KI-18**: Fil-C assertion on 2 programs (every mode). ✅ 2026-10-01, `ir.wrapThreeByteGlobals`
   - [x] **KI-20**: `madvise` probe in `std.crypto.random`. ✅ 2026-10-01, `crypto_always_getrandom`
   - [x] **KI-21**: dead stack-trace code compiled into every program. ✅ 2026-10-01, std-overlay guards
@@ -225,9 +238,13 @@ for structure and policy.
     pass with both (the 1 needs a CPU feature WSL lacks). No Ruby needed: `tools/filc/run-filc-tests.ts`
     (Deno port). It also found a MACHINE problem: a dangling `os-include/asm` link broke every
     program using kernel headers; fixed (`fix-os-include.ts`). `testing.md`, `workarounds.md`
+  - [x] **Upstream review + move to Fil-C 0.686** (owner, 2026-10-05). ✅ Same day: the 10
+    `FilPizlonator.cpp` commits reviewed (`upstream.md`), zilc rebuilt on 0.686 and re-verified
+    (corpus, output comparison, gate, Fil-C suite); version `0.15.2-0.686.1`
   - [ ] **Platforms scope pass** (P6): per platform, the processors, the std OS-function count, the
     libc story, KI-5-family code, and the host toolchain
-  - [ ] Then: move tag `v0.15.2-3` + branch `v0.15.2` to the final commit, and push
+  - [ ] Then: tag `v0.15.2-0.686.1`, DELETE the local tag `v0.15.2-3` (it sorts above the new
+    one), move branch `v0.15.2` to the final commit, and push when the owner says (`releasing.md`)
   - Deferred past publish (with the port): `-Druntime=both`, the byte-identity check, the
     benchmark suite (stage C), and the 0.16.0 examples under zilc
 - 🔑 **Pipeline change (2026-09-30): zilc now takes Zig's UNOPTIMIZED IR (KI-17).** Zig's `-femit-llvm-ir` is
@@ -272,7 +289,7 @@ C allocated the memory, **Zig** overflowed it, and the capability survived the l
 
 | gate | value | note |
 | --- | --- | --- |
-| version | **`0.15.2-3`** | zilc release 3, for Zig 0.15.2 (was `0.3.0`; scheme changed 2026-09-30, `releasing.md`) |
+| version | **`0.15.2-0.686.1`** | zilc release 1 for Zig 0.15.2 and Fil-C 0.686 (was `0.3.0`, then `0.15.2-3`; scheme changed 2026-09-30 and 2026-10-05, `releasing.md`) |
 | **`zig build gate`** | **4/4** | 🎯 **the safety gate** — every example traps at the right file:line. **Inversion-tested.** ⚠️ SKIPS (exit 0) without Fil-C |
 | `zig build test` | 11/11 | incl. the IR-rewrite unit tests, which caught two real bugs, the `--runtime zig` refusal, and the version round-trip (2026-09-30) |
 | `zig build` | green | CLI `zilc` + static `zilc_runtime` + `zilc.h` |
@@ -409,15 +426,15 @@ the runtime-linking rule checked.
 | [vision.md](vision.md) | The goal: one `zig` binary that compiles Zig, C and C++ to a single memory-safe target. Owner's framing (via a Gemini discussion, 2026-09-18), with the claims that still need verifying marked. |
 | [architecture.md](architecture.md) | Target pipeline (frontend → LLVM IR → zilc pass → `zilc_runtime`), the InvisiCap and FUGC components, what exists today, and 🔑 **the runtime contract measured 2026-09-30** (`libpizlo`'s four layers, by symbol count). |
 | [design-decisions.md](design-decisions.md) | Invariants, decisions made so far, and the **open questions** that must be settled with the owner. **2026-09-30: Linux-first Zig runtime checked against Fil-C, `--runtime filc\|zig`, the pass not ported; #4 platform analysis; #3 now blocks runtime code.** Zig 0.15.2 API + Windows build notes (0.15.2 is at `C:\zig\0.15.2`, not on PATH). |
-| [upstream.md](upstream.md) | 🆕 2026-10-01: **the `upstream/fil-c/` reference clone and its monitor** (`tools/upstream/`, first-run results), and reporting marked not planned. How zilc relates to Fil-C upstream: what to track, which files matter, pinned commit, and 🔄 **the three-stage upgrade procedure (2026-09-30)**: Fil-C + compatible Zig → latest Zig → benchmarks. |
+| [upstream.md](upstream.md) | 🆕 2026-10-05: **"Review of Fil-C 0.686"** (the 10 pass commits; what zilc gains; KI-4/KI-18 still upstream). 2026-10-01: **the `upstream/fil-c/` reference clone and its monitor** (`tools/upstream/`, first-run results), and reporting marked not planned. How zilc relates to Fil-C upstream: what to track, which files matter, pinned commit, and 🔄 **the three-stage upgrade procedure (2026-09-30)**: Fil-C + compatible Zig → latest Zig → benchmarks. |
 | [licensing.md](licensing.md) | **License = `Apache-2.0 WITH LLVM-exception OR MIT`** (2026-09-18). Why, the runtime-linking rule, the copyleft exclusion. |
 | [reference-projects.md](reference-projects.md) | Fil-C, LLVM, Zig: verified licenses, what to mine each for, adoption status. |
 | [roadmap.md](roadmap.md) | P0 ✅ → P1 ✅ → P2 ✅ (`0.3.0`) → **P3 Zig runtime (plan 2026-09-30: Linux first, checked against Fil-C, `zsys_*` first; next step the `zsys_write` spike)** → P4 Zig-language fidelity → P5 C++ → **P6 other platforms (proposed 2026-09-30)**. |
 | [security-model.md](security-model.md) | The safety guarantees being targeted (spatial, temporal, thread-safe capability updates), and what is explicitly out of scope. |
-| [testing.md](testing.md) | Current gates (gate 8/8, tests 28/28 on 2026-10-02, with the exact commands), 🆕 the OUTPUT COMPARISON vs native (0 unexplained differences, 2026-10-02), corpus results per mode and (2026-10-01) build times, the recorded expected panics, and the planned gates: `-Druntime=both`, the between-versions comparison, and the benchmark suite. |
+| [testing.md](testing.md) | Current gates (gate 8/8, tests 29/29 on 2026-10-05, re-verified on Fil-C 0.686, with the exact commands), 🆕 the OUTPUT COMPARISON vs native (0 unexplained differences, 2026-10-02), corpus results per mode and (2026-10-01) build times, the recorded expected panics, and the planned gates: `-Druntime=both`, the between-versions comparison, and the benchmark suite. |
 | [known-issues.md](known-issues.md) | 🆕 2026-10-01: **KI-4, KI-10, KI-18, KI-19, KI-20, KI-21 fixed; KI-22 (build time) DONE** (patched Fil-C clang; option 3 rejected; levers (a) parallel code generation, (b) dense interference graph, (c) object cache, all 2026-10-02: `69` 55.9 → 35.9 s cold, 2.3 s unchanged). Partly open: KI-7 (`getcontext`), KI-5. KI-23 (git maintenance on exFAT) closed with a final mitigation. 🔑 **KI-4 (2026-09-23): Fil-C's IR is a PATCHED-LLVM DIALECT** (`ni:0` + `datalayout_after_filc`), so stock IR cannot enter the pass — this decided the integration route. KI-1 ✅ resolved (WSL2 installed; `sudo` needs a password); KI-2 exFAT zig-cache; KI-3 LLVM 20 vs 21 skew. |
 | [workarounds.md](workarounds.md) | 🆕 2026-10-01 (2026-10-02: KI-22 levers (a), (b), (c), with the why of each piece: use-list order, unused TLS declarations, objcopy and Zig names, the dense graph's equal-graph details, the cache key). **The WHY of every workaround** (owner rule): symptom index, five failure families (F1 pass rejects valid IR, F2 capability lost through an integer, F3 inline asm, F4 code outside the pass, F5 std out of bounds), the entry template, KI-18 in full, and short forms of KI-4…KI-17. **Look up new failures here first.** |
-| [releasing.md](releasing.md) | 🔖 **Version `0.15.2-3`** (applied 2026-09-30): `<Zig line>-<release>`, the **basis** each latest-line release names, how to bump it, why `.` and `_` were rejected, no 1.0, `-N` restarts at 1 per Zig version, the four places the number lives. The old minor-per-phase cadence is retired. |
+| [releasing.md](releasing.md) | 🔖 **Version `0.15.2-0.686.1`** (2026-10-05): `<Zig>-<Fil-C>.<zilc release>`, the publish plan (delete local tag `v0.15.2-3`). Earlier: `<Zig line>-<release>`, the **basis** each latest-line release names, how to bump it, why `.` and `_` were rejected, no 1.0, `-N` restarts at 1 per Zig version, the four places the number lives. The old minor-per-phase cadence is retired. |
 | [filc-abi.md](filc-abi.md) | 🆕 2026-09-30. **Fil-C 0.685's runtime ABI as OBSERVED** (post-pass IR, headers, binaries; no runtime source): flight pointers, the object-header word, function objects and getters, the fast and generic calling convention, the thread layout, linking and overriding. What P3 must match, and its scoping consequences. |
 | [zig-upstream-notes.md](zig-upstream-notes.md) | 🆕 2026-09-30. **Zig behaviours we may need to report** (owner asked): Z-1 `indexOfSentinel` over-read (fixed in 0.16.0; report draft and repro in `tools/zig-reports/`), Z-2 the `mmap` hint, Z-3 raw syscalls, Z-4 `getcontext`, Z-5 `DebugAllocator` integer arithmetic. Each with whether it is really a Zig bug. |
 | [ports/](ports/README.md) | 🆕 2026-09-30. **Port notes: one file per new Zig line, named by its first release** (`ports/0.16.2-1.md`): its basis, each API change and fix, the sites touched. `ports/README.md` holds the guide, the template, and, seeded with the 2026-09-18 0.16 → 0.15.2 move, whose API list is the 0.15.2 → 0.16 port in reverse. |

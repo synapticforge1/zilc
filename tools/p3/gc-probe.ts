@@ -11,11 +11,11 @@
 //
 // Same commands, flags and printed sections as gc-probe.sh; each Unix pipeline's filter
 // (awk/grep/sed/sort/head) is done in TypeScript on the program's output.
-import { FILC_PREBUILT_TREE, linuxOnly, REPO } from "../lib/tool.ts";
+import { FILC_0685_PREBUILT_TREE, linuxOnly, REPO } from "../lib/tool.ts";
 
 await linuxOnly(import.meta);
 
-const F = FILC_PREBUILT_TREE;
+const F = FILC_0685_PREBUILT_TREE;
 const CC = `${F}/build/bin/clang`;
 const L = `${F}/pizfix/lib`;
 const S = `${REPO}/tools/p3`;

@@ -27,10 +27,10 @@
 //
 // Fil-C's clang is the STOCK PREBUILT 0.685 on purpose (not filc()): the question is whether
 // upstream Fil-C accepts Zig's IR, not whether zilc's patched build does.
-import { existsSync, FILC_PREBUILT_TREE, linuxOnly, run, WORK } from "../lib/tool.ts";
+import { existsSync, FILC_0685_PREBUILT_TREE, linuxOnly, run, WORK } from "../lib/tool.ts";
 
 await linuxOnly(import.meta);
-const BIN = `${FILC_PREBUILT_TREE}/build/bin`;
+const BIN = `${FILC_0685_PREBUILT_TREE}/build/bin`;
 const FILC = `${BIN}/clang`;
 const OUT = `${WORK}/p1`;
 // Paths stay relative to $WORK/p1 (the shell version `cd`s there), as in the recorded logs.

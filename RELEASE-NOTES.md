@@ -4,19 +4,19 @@ Each release states what its version number does not: the Zig your code is compi
 Fil-C release it is built on, and, for a release on a newer Zig line, the release it was ported
 from (its basis). `zilc --version` prints the same facts and checks them against your machine.
 
-How versions read: `<Zig line>-<release>`. `0.15.2-3` is zilc release 3 on the Zig 0.15.2 line.
-The number restarts at 1 for every new Zig release. There is no 1.0: breaking changes are
-announced here, not in the number.
+How versions read: `<Zig line>-<Fil-C release>.<zilc release>`. `0.15.2-0.686.1` is zilc release 1
+for Zig 0.15.2 and Fil-C 0.686. The last number restarts at 1 for every new Zig release and every
+new Fil-C release. There is no 1.0: breaking changes are announced here, not in the number.
 
 ---
 
-## 0.15.2-3
+## 0.15.2-0.686.1
 
 | | |
 | --- | --- |
 | **Line** | reference (built with Zig 0.15.2 and checked directly against Fil-C) |
 | **Your Zig code is compiled with** | Zig 0.15.2 |
-| **Built on** | Fil-C 0.685 (compiler pass, runtime and its checked musl libc) |
+| **Built on** | Fil-C 0.686 (compiler pass, runtime and its checked musl libc), released 2026-10-04 |
 | **Basis** | none: this is the reference line |
 | **Platform** | Linux x86_64, the platform Fil-C supports (on Windows, through WSL2) |
 
@@ -35,6 +35,8 @@ with a report naming the source line, instead of corrupting memory.
   designed in every mode, and prints the same as plain Zig except where a program prints
   addresses, timing or thread order.
 - **Panics** are reported by Fil-C, with its stack trace, and stop the program.
+- **Guaranteed tail calls** (`@call(.always_tail, …)`) no longer grow the stack: Fil-C 0.686
+  added `musttail` support. On Fil-C 0.685, a deep tail-call loop overflowed the stack.
 
 ### Build speed
 
@@ -43,16 +45,16 @@ with a report naming the source line, instead of corrupting memory.
   at most 16; `-j 1` turns it off).
 - Unchanged modules are reused from a cache. `--no-cache` or `ZILC_CACHE=0` turns it off;
   `zilc --clean-cache` empties it.
-- Example: a TLS client (`std.http.Client`) builds in about 36 seconds (plain Zig: 17) and
+- Example: a TLS client (`std.http.Client`) builds in about 38 seconds (plain Zig: 17) and
   rebuilds unchanged in about 2.
 
 ### Requirements
 
-- Fil-C 0.685's clang (`--filc` or `ZILC_FILC`) and Zig 0.15.2 (`--zig` or `ZILC_ZIG`).
+- Fil-C 0.686's clang (`--filc` or `ZILC_FILC`) and Zig 0.15.2 (`--zig` or `ZILC_ZIG`).
 - **Recommended: zilc's patched build of Fil-C's clang** (`tools/filc/build-patched-clang.ts`).
   It fixes a crash on Zig's Debug code and a compile-time slowdown on large functions, without
   changing the code it emits for anything else, and adds the parallel code generation. With the
-  stock Fil-C 0.685 clang, the Release modes work; Debug does not.
+  stock Fil-C 0.686 clang, the Release modes work; Debug does not.
 - Target musl (`x86_64-linux-musl`, the default): Fil-C's libc is musl.
 
 ### Things to know

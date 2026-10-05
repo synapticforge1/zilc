@@ -45,6 +45,7 @@ programs don't**, and gives size numbers against plain Zig. Tools in `tools/basi
 | **builds with zilc** | **78/78** | ReleaseSafe ~~50/78~~ → **77/78** after the KI-8 fix (only KI-9 left) · ReleaseSmall **77/78** (KI-9) |
 | **runs as designed under zilc** (ReleaseSafe) | **78/78** (`42_panic` traps via Fil-C, as designed) | ~~24~~ → 26 (KI-8) → 45 (KI-7) → 50 (panic handler + KI-9) → **71/78** (KI-13 overflow fold + `fromPage` patch, KI-14 `-fno-valgrind`). 65 clean exits plus 6 intentional (`42` panic, `66` exit 1 without a subcommand, `77` exit 3, three servers). Then the **unoptimized-IR route** (KI-17, the default since 2026-09-30) → **76/78**: the 5 thread joins pass, and `76_signals` now runs (it waits, as designed). **Left, 2:** the KI-18 Fil-C assertion (`22_strings-and-runes`, `69_http-client`) |
 | **every mode** (KI-16, default route) | same in every mode (C ignores `-O`) | ~~ReleaseSafe 76 · ReleaseFast 76 · ReleaseSmall 76 · Debug 63~~ → 2026-10-01: 78 · 78 · 78 · 65 (KI-18, KI-20) → **2026-10-01 (evening): 78/78 as designed in ALL FOUR MODES**, with the patched Fil-C clang (KI-22 colouring, KI-4 `indirectbr`) and Debug at `filc -O1` (fixes KI-19). Gate 4/4 with it. Tool: `tools/basics/all-modes.ts` (defaults to the patched clang) |
+| **on Fil-C 0.686** (2026-10-05; patched 0.686 clang, `ZILC_VERIFY_INTERFERENCE=1` + `ZILC_VERIFY_COLOURING=1`) | — | **Still 78/78 as designed in all four modes** (71 OK + the designed 7, C and Zig alike), **0 builds with a verification difference**, gate 8/8, tests **29/29**. `69` ReleaseSafe alone **38.0 s** cold (35.9 on 0.685). Output comparison re-run: 0 unexplained |
 | **+ dense interference graph, object cache** (KI-22 levers (b), (c); 2026-10-02, same load, `ZILC_JOBS=4`, `ZILC_CACHE=0`) | — | **Still 78/78 as designed in all four modes**, gate 4/4, tests **25/25** (26/26 with `--clean-cache`, same day). **Verified run:** the whole corpus in all four modes with `ZILC_VERIFY_INTERFERENCE=1` and `ZILC_VERIFY_COLOURING=1`: 78/78 as designed, **no graph or colouring difference** (verified `69` builds 154–431 s, so the original code really ran). `69` under load: Debug **56 s** (was 68), ReleaseSafe **58 s** (70), ReleaseFast **82 s** (97), ReleaseSmall **52 s** (61). Alone, through the driver: `69` ReleaseSafe **35.9 s** split (43.9 before (b)), 49.9 s at `-j 1`; rebuild unchanged, same output path: **2.3 s** (cache hit; `62` 0.5 s). Byte-identical to the prebuilt on every deterministic input (`compare-clangs.ts`) |
 | **build time, + parallel code generation** (KI-22 lever (a); 2026-10-02, same load, `ZILC_JOBS=4` per build) | — | **Still 78/78 as designed in all four modes** (71 OK + the designed 7: `42` panic, `66` exit 1, `77` exit 3, `70`/`71`/`72` servers, `76_signals`), gate 4/4, tests 24/24. Medians unchanged (Debug 4 s, ReleaseSafe 4 s, ReleaseFast 4 s, ReleaseSmall 3 s). `69`: Debug **68 s** (was 79), ReleaseSafe **70 s** (81), ReleaseFast **97 s** (107), ReleaseSmall **61 s** (70). Alone, through the driver: `69` ReleaseSafe **60.6 s → 43.9 s** (`-j 1` vs default 16 parts), `62` 7.0 → 5.0 s, same program output. Code identity: 2,840/2,840 functions of `69` identical to the unsplit compile of the same bitcode (`workarounds.md` KI-22) |
 | **build time, + overlay v5** (Debug-only KI-21 route guarded; 2026-10-01 late, same load) | — | Still 78/78 as designed in all four modes, gate 4/4. Medians: **Debug 4 s** (was 19), ReleaseSafe 4 s, ReleaseFast 3 s, ReleaseSmall 2 s. `69`: Debug 79 s, ReleaseSafe 81 s, ReleaseFast 107 s, ReleaseSmall 70 s. Alone: `04_constants` Debug 2.1 s (was 9.9; native Zig with LLVM 1.1 s), `69` ReleaseSafe 55.9 s (native 16.9 s) |
@@ -94,6 +95,21 @@ committed copies.
 
 ## 🧬 Fil-C's OWN test suite, against zilc's patched clang (✅ 2026-10-05)
 
+**Re-run on Fil-C 0.686 (2026-10-05, tests at `v0.686`: 7,205): 0 differences between stock and
+patched.** Run 5,968, skipped 1,237. Both fail the same 2 on the first pass:
+- `inlineasm_rdpkru`: the CPU limit below (unchanged).
+- `sarcasm-mb-pl-sink-att` (new in 0.686, added by `163fae5`): a TEST-SETUP gap, not a compiler
+  fault. It reads OpenSSL's `projects/openssl-3.6.4/crypto/aes/asm/aesni-mb-x86_64.pl` from
+  Fil-C's repo root (or `$FILC_REPO_ROOT`), outside `filc/tests`, so our sparse test checkout
+  lacked it (`BAD cannot open aesni-mb-x86_64.pl`). With that folder added to the checkout, it
+  **passes with both compilers** (`mb pl sink ok`). It is the only test that reads `projects/`.
+
+**So on 0.686 every runnable test passes with zilc's patched clang except `inlineasm_rdpkru`**
+(hardware). `compare-clangs.ts` against stock 0.686: the usual pattern (identical on the small
+inputs and the stress test, both assert on the KI-18 repro, `62` different: two binaries).
+
+The 0.685 run, first:
+
 Owner: run upstream's tests *"to make sure we are not missing anything that upstream has already
 identified"*. **Result: stock Fil-C 0.685 clang and zilc's patched clang give the SAME result on
 all 7,003 tests (0 differences).** So zilc's three pass patches (colouring, `indirectbr` lowering,
@@ -120,16 +136,19 @@ dense interference graph) change nothing Fil-C's own suite checks.
 
 **How to run it** (WSL): `tools/filc/run-filc-tests.ts`, a Deno port of Fil-C's Ruby
 `filc/run-tests` (same build, run and check rules; ledger `filc-test-runner-port`). The tests are
-NOT in zilc: clone them at the compiler's commit into `~/zilc-work/filc-tests`
-(`git clone --depth 1 --branch v0.685 --filter=blob:none --no-checkout
-https://github.com/pizlonator/fil-c.git`, then `sparse-checkout set filc/tests`, `checkout`),
-then from that folder:
+NOT in zilc: clone them at the compiler's commit into `~/zilc-work/filc-tests-<release>`
+(`git clone --depth 1 --branch v0.686 --filter=blob:none --no-checkout
+https://github.com/pizlonator/fil-c.git`, then `sparse-checkout set filc/tests
+projects/openssl-3.6.4/crypto/aes/asm`, `checkout`; the second path is the input of
+`sarcasm-mb-pl-sink-att`, see above), then from that folder:
 `deno run -A …/run-filc-tests.ts run --pizfix <tree>/pizfix --label stock` (and `--label patched`
 with zilc's tree), then `… compare results-stock.json results-patched.json` (exit 0 = same).
-⚠️ Use the tests of the COMPILER's commit (`v0.685`: 7,003), not upstream's newest (7,165), which
-test features 0.685 lacks.
+`--filter REGEX` runs a subset. ⚠️ Use the tests of the COMPILER's commit (`v0.686`: 7,205;
+`v0.685`: 7,003), not upstream's newest, which test features the release lacks.
 
 ## 🔍 Output comparison: zilc vs native, not just exit codes (pre-publish item, ✅ 2026-10-02)
+
+**Re-run on Fil-C 0.686 (2026-10-05): 0 unexplained, 503 identical, 0 differing** (`{same 503, expected 56, varies 65, variesBad 0, differs 0}`, 624 in all).
 
 **Re-run 2026-10-05 with the Deno tools: still 0 unexplained differences, and 505 byte-identical**
 (the tools now keep stdout and stderr in order, so nine more programs match exactly; 39_logging
@@ -171,12 +190,12 @@ and so do `argv`, files, stdin, child processes and threads.
 - `zilc-check.ts` clears its WHOLE mode folder, so a C-only run deletes that mode's Zig results:
   run both languages together (`LANGS="c zig"` in `all-modes.ts`).
 
-## Current gates (re-run 2026-10-02)
+## Current gates (re-run 2026-10-05, on Fil-C 0.686)
 
 | Step | Checks | State |
 | --- | --- | --- |
-| `zig build gate` | Every bug example traps at the right line; the library-mode example runs (needs Fil-C) | **8/8** (2026-10-02, KI-5 environ and library mode added; earlier 4/4 with the parallel code generation of KI-22 lever (a)) |
-| `zig build test` | Runtime module + CLI module + the IR rewrites (incl. the KI-18 three-byte-global wrap) + the std-overlay patches (incl. the KI-21 guards) + the `--runtime zig` refusal + the version round-trip + the object cache key and `--clean-cache` (KI-22 lever c) | **28/28** pass (2026-10-05, incl. `--clean-cache`, the KI-20 note and the version facts) |
+| `zig build gate` | Every bug example traps at the right line; the library-mode example runs (needs Fil-C) | **8/8** (2026-10-05 on Fil-C 0.686; 2026-10-02, KI-5 environ and library mode added; earlier 4/4 with the parallel code generation of KI-22 lever (a)) |
+| `zig build test` | Runtime module + CLI module + the IR rewrites (incl. the KI-18 three-byte-global wrap) + the std-overlay patches (incl. the KI-21 guards) + the `--runtime zig` refusal + the version round-trip + the object cache key and `--clean-cache` (KI-22 lever c) | **29/29** pass (2026-10-05, incl. `--clean-cache`, the KI-20 note, the version facts and the `0.15.2-0.686.1` scheme) |
 | `zig build capi-smoke` | `tests/capi_smoke.c` links `zilc_runtime` via `zilc.h` and calls it | pass |
 | `zig build baseline` | Builds `examples/*.c` with plain `zig cc` | builds. `baseline_oob_write` prints `a[3] = 3`, exit 0: **the undetected bug** |
 

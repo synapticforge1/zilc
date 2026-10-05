@@ -227,7 +227,7 @@ fn printVersion(arena: std.mem.Allocator) !void {
     try out.print("                   {s}\n", .{zig_path});
 
     if (toolOutput(arena, &.{ filc_path, "--version" })) |v| {
-        // e.g. "clang version 20.1.8 (Fil-C 0.685 git@github.com:…)"
+        // e.g. "clang version 20.1.8 (Fil-C 0.686 git@github.com:pizlonator/fil-c.git …)"
         const at = std.mem.indexOf(u8, v, "Fil-C ");
         const release = if (at) |i| std.mem.sliceTo(v[i + "Fil-C ".len ..], ' ') else "";
         if (at == null) {

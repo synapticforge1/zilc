@@ -90,11 +90,13 @@ third-party runtime code in zilc.**
 Newest first. Copy the template for each adopted component.
 
 ### filc-pass-fixes (local patches to Fil-C's compiler pass; LOCAL USE ONLY)
-- **Source:** https://github.com/pizlonator/llvm-project-deluge (Fil-C's LLVM fork)
-- **Version / commit:** `bb0d0a64eed297ab8e171002033208fb08ad9941`, the commit the Fil-C **0.685**
-  prebuilt names in `clang --version`
+- **Source:** https://github.com/pizlonator/fil-c (Fil-C's LLVM fork; named `llvm-project-deluge`
+  until 0.685, same history)
+- **Version / commit:** `163fae598eaf249b74065b0156f3a7e7ba8c0e5a`, the commit the Fil-C **0.686**
+  prebuilt names in `clang --version` (since 2026-10-05; before that `bb0d0a64`, Fil-C 0.685). The
+  same edits applied to both unchanged
 - **Upstream path(s):** `llvm/lib/Transforms/Instrumentation/FilPizlonator.cpp`: the two frame-slot
-  colouring loops (about lines 3054–3076 and 3146–3160 at that commit), and
+  colouring loops (about lines 3054–3076 and 3146–3160 at `bb0d0a64`), and
   `lowerIndirectBrForFunction` (Fil-C's copy of LLVM's `IndirectBrExpandPass`). **Added
   2026-10-02:** `llvm/tools/llvm-split/llvm-split.cpp` (a `--zilc-part` mode, see below)
 - **License (SPDX):** `Apache-2.0 WITH LLVM-exception` (the file's own header)
@@ -125,7 +127,7 @@ Newest first. Copy the template for each adopted component.
   `restore-patched-clang.ts`. **It is gitignored, so pushing it is impossible by default, and it
   must stay that way:** pushing it would be a distribution of Fil-C
 - **Artifact destination:** **toolchain-only, and local only.** The patched clang lives in
-  `~/zilc-work/tools/filc-0.685-zilc/` and is **not distributed**. It is the default for zilc's
+  `~/zilc-work/tools/filc-0.686-zilc/` and is **not distributed**. It is the default for zilc's
   scripts (owner, 2026-10-01); the prebuilt stays for comparison. The colouring fix emits the same
   code; the KI-4 fix only changes functions that crashed before. User binaries carry no new code
 - **Modifications:** each changed block is marked `// zilc (KI-22): …` or `// zilc (KI-4): …` in the
@@ -167,8 +169,9 @@ Newest first. Copy the template for each adopted component.
 
 ### filc-test-runner-port (Fil-C's test runner, ported from Ruby to Deno; a TEST TOOL)
 - **Source:** https://github.com/pizlonator/fil-c (`deluge` branch)
-- **Version / commit:** `bb0d0a64eed297ab8e171002033208fb08ad9941` (tag `v0.685`), the commit zilc's
-  patched Fil-C clang is built from
+- **Version / commit:** `163fae598eaf249b74065b0156f3a7e7ba8c0e5a` (tag `v0.686`), the commit zilc's
+  patched Fil-C clang is built from since 2026-10-05. (First recorded as `bb0d0a64`/0.685 by
+  mistake: the runner was read from upstream's newest commit, which was already 0.686's.)
 - **Upstream path(s):** `filc/run-tests` (Ruby). Its LOGIC is ported; no line is copied verbatim
 - **License (SPDX):** `BSD-2-Clause` (the file's own header: Copyright 2023-2025 Epic Games, Inc.;
   2026 Filip Pizlo)

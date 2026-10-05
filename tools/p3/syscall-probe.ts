@@ -14,11 +14,11 @@
 // 0) and a trapped case still said "exit 0". Here it is the probe's own status (a trap shows as
 // 128 + signal, e.g. 133 for SIGTRAP). The shell's message for a case killed by a signal
 // ("Trace/breakpoint trap") is printed the same way the shell did.
-import { FILC_PREBUILT_TREE, linuxOnly, REPO, run } from "../lib/tool.ts";
+import { FILC_0685_PREBUILT_TREE, linuxOnly, REPO, run } from "../lib/tool.ts";
 
 await linuxOnly(import.meta);
 
-const F = FILC_PREBUILT_TREE;
+const F = FILC_0685_PREBUILT_TREE;
 const S = `${REPO}/tools/p3`;
 const T = await Deno.makeTempDir();
 

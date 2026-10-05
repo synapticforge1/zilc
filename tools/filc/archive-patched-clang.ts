@@ -12,11 +12,11 @@
 // And clang-20 built RelWithDebInfo is 3.6 GB, almost all debug info. The tree gets a STRIPPED
 // clang-20 (debug info does not change what it compiles); the debug info goes to its own file,
 // linked by .gnu_debuglink, for profiling with gdb (as KI-22 was diagnosed).
-import { FILC_PATCHED_TREE, linuxOnly, mkdirp, must, REPO, rmrf, run, show, WORK } from "../lib/tool.ts";
+import { FILC_PATCHED_TREE, FILC_SHA, FILC_VERSION, linuxOnly, mkdirp, must, REPO, rmrf, run, show, WORK } from "../lib/tool.ts";
 
 await linuxOnly(import.meta);
 const out = `${REPO}/toolchain`;
-const name = "filc-0.685-zilc";
+const name = `filc-${FILC_VERSION}-zilc`;
 const tmp = `${WORK}/archive-tmp`;
 await rmrf(tmp);
 await mkdirp(tmp);
@@ -46,7 +46,7 @@ const patchSum = (await must(["sha256sum", `${REPO}/third_party/filc-patches/zil
 const fileSums = await must(["sha256sum", `${name}-linux-x86_64.tar.xz`, `${name}-clang-20.debug.xz`], { cwd: out });
 const stamp = new Date().toISOString().slice(0, 16) + "Z";
 await Deno.writeTextFile(`${out}/SHA256SUMS`, [
-  `# ${name}: Fil-C 0.685 clang built from llvm-project-deluge bb0d0a64 with zilc's pass fixes`,
+  `# ${name}: Fil-C ${FILC_VERSION} clang built from fil-c.git ${FILC_SHA.slice(0, 8)} with zilc's pass fixes`,
   `# patch: third_party/filc-patches/zilc-filc-pass.patch sha256 ${patchSum}`,
   `# archived ${stamp} by tools/filc/archive-patched-clang.ts`,
   fileSums.trimEnd(),

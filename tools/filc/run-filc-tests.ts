@@ -27,9 +27,11 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //
 // ---------------------------------------------------------------------------------------------
-// Fil-C's own test suite, run without Ruby. A port of Fil-C's `filc/run-tests` (Ruby, at commit
-// bb0d0a64 = Fil-C 0.685; ledger entry `filc-test-runner-port` in third_party/LICENSES.md).
-// Purpose (owner, 2026-10-05): run upstream's 7,003 tests against zilc's PATCHED Fil-C clang and
+// Fil-C's own test suite, run without Ruby. A port of Fil-C's `filc/run-tests` (Ruby) as of commit
+// 163fae5 = tag v0.686 (it was read from upstream's newest commit on 2026-10-05, which was 0.686's;
+// it also ran 0.685's tests correctly); ledger entry `filc-test-runner-port` in
+// third_party/LICENSES.md. Purpose (owner, 2026-10-05): run upstream's tests (7,003 at 0.685,
+// 7,205 at 0.686) against zilc's PATCHED Fil-C clang and
 // against the stock one, and compare, "to make sure we are not missing anything that upstream
 // has already identified".
 //
@@ -52,6 +54,9 @@
 //        [--filter REGEX] [--timeout 900]
 //   deno run -A run-filc-tests.ts compare results-stock.json results-patched.json
 // `run` leaves filc/test-output-<label>/ (per-test scripts and outputs) and results-<label>.json.
+// ⚠️ The cwd must be Fil-C's REPO ROOT checkout, and it must also contain
+// projects/openssl-3.6.4/crypto/aes/asm: test `sarcasm-mb-pl-sink-att` (since v0.686) reads
+// aesni-mb-x86_64.pl from there and fails "BAD cannot open" without it (cmem/testing.md).
 
 import { parse as parseYaml } from "jsr:@std/yaml@1";
 

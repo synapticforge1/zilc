@@ -16,12 +16,12 @@
 // Converted from optmode-matrix.sh (2026-10-05). The one input change: tiny.zig was copied from
 // $WORK/p1, which no longer has it (the cp failed silently and the copy already in $WORK/p2 was
 // used); this copies the committed tools/p2/tiny.zig, byte-identical to it.
-import { FILC_PREBUILT_TREE, linuxOnly, mkdirp, REPO, WORK } from "../lib/tool.ts";
+import { FILC_0685_PREBUILT_TREE, linuxOnly, mkdirp, REPO, WORK } from "../lib/tool.ts";
 
 await linuxOnly(import.meta);
 const ZIG = `${WORK}/tools/zig-0.15.2/zig`;
 // The stock prebuilt on purpose: this records what Fil-C 0.685 itself does with Zig's IR.
-const FILC = `${FILC_PREBUILT_TREE}/build/bin/clang`;
+const FILC = `${FILC_0685_PREBUILT_TREE}/build/bin/clang`;
 const OUT = `${WORK}/p2`;
 // Fil-C's two layout lines. Position matters: LLVM compares layout strings textually, so `ni:0`
 // goes right after `m:e` (cmem/known-issues.md KI-4).

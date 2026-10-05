@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception OR MIT
 //
-// Prove the patched Fil-C clang emits BYTE-IDENTICAL objects to the 0.685 prebuilt, and time both
+// Prove the patched Fil-C clang emits BYTE-IDENTICAL objects to the stock prebuilt of the same release, and time both
 // (KI-22, cmem/workarounds.md). Every input is compiled by both; objects are compared byte for byte.
 // Linux; from Windows it runs inside WSL.
 //
@@ -14,7 +14,7 @@
 //     SAME prebuilt clang on the SAME input gives different objects run to run with ASLR on.
 //  2. Both binaries run from the SAME directory. Clang finds its headers relative to itself, and the
 //     include paths land in the debug info. (Hence the prebuilt's clang-20 is copied next to ours.)
-// For whole-suite equivalence, see run-filc-tests.ts (Fil-C's own 7,003 tests).
+// For whole-suite equivalence, see run-filc-tests.ts (Fil-C's own tests: 7,205 at v0.686).
 import { basename, env, exists, FILC_PATCHED_TREE, FILC_PREBUILT_TREE, glob, linuxOnly, mkdirp, must, pool, REPO, rmrf, run, WORK } from "../lib/tool.ts";
 
 await linuxOnly(import.meta);

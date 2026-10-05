@@ -27,11 +27,11 @@
 // code, only 3 debug-info path lines differ), then run zig-ir-spike.ts, then this tool. Copies on
 // 2026-10-05: tiny.ll 11,669,818 bytes (sha256 5db471c2…), tiny-ni2.ll 11,669,936 bytes (sha256
 // 3e81eb75…), in $WORK/p1 and $WORK/p2.
-import { existsSync, FILC_PREBUILT_TREE, linuxOnly, mkdirp, REPO, WORK } from "../lib/tool.ts";
+import { existsSync, FILC_0685_PREBUILT_TREE, linuxOnly, mkdirp, REPO, WORK } from "../lib/tool.ts";
 
 await linuxOnly(import.meta);
 // The stock prebuilt on purpose: this records what Fil-C 0.685 itself accepts.
-const FILC = `${FILC_PREBUILT_TREE}/build/bin/clang`;
+const FILC = `${FILC_0685_PREBUILT_TREE}/build/bin/clang`;
 const OUT = `${WORK}/p2`;
 await mkdirp(OUT);
 Deno.chdir(OUT);

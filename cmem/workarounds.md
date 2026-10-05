@@ -82,6 +82,10 @@ exit code 134`):
 Seen on `22_strings-and-runes` and `69_http-client`, in **every** mode, only on the unoptimized IR
 route (KI-17).
 
+**Still needed on Fil-C 0.686 (checked 2026-10-05).** Stock 0.686 still fails the same assertion
+on the saved repro (`tools/p2/repro/filc-0.685-i21-global.ll`), so this workaround stays
+(`upstream.md` "Review of Fil-C 0.686").
+
 **Class.** Upstream defect in Fil-C 0.685's pass: an assertion on valid IR. Noted for the record,
 not filed (owner decision 2026-09-30).
 
@@ -240,6 +244,10 @@ unknown advice, the option can stay anyway.
 (segfault) while running `FilPizlonatorPass`; the same IR compiles at `-O0`. From 2026-09-23 until
 2026-10-01 zilc therefore compiled Debug at `filc -O0`, which caused KI-19 (12 Debug programs
 trapping on syscall pointers) and much of KI-22's Debug build time.
+
+**Still needed on Fil-C 0.686 (checked 2026-10-05).** Stock 0.686 still crashes on the saved repro
+(`tools/p2/repro/filc-0.685-O1-crash.ll`: `Stack dump`, exit 1), so the patched `indirectbr` lowering
+stays. Its edit applied to 0.686 unchanged (only the line offsets moved).
 
 **Class.** Upstream defect, **inherited by Fil-C from LLVM's own `IndirectBrExpandPass`**, which has
 the same code. It lies in a path clang never exercises; Zig does.

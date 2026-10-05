@@ -7,24 +7,33 @@
 //   deno run -A tools/filc/build-patched-clang.ts      env: JOBS (ninja jobs, default 12)
 //
 // Needs: build-essential + cmake (apt, `main`), Ninja in ~/zilc-work/tools/ninja (official release
-// binary), Deno. The source is Fil-C's LLVM fork at the commit the 0.685 prebuilt names in
+// binary), Deno. The source is Fil-C's LLVM fork at the commit the current prebuilt names in
 // `clang --version`, so the only difference from the prebuilt is the patch.
 //
 // Configuration mirrors Fil-C's own configure_llvm.sh at that commit, except LLVM_ENABLE_LLD (lld
 // is not in Ubuntu's `main`); the linker changes build speed, not the compiler's output.
 //
-// Result: ~/zilc-work/tools/filc-0.685-zilc/ = a copy of the prebuilt tree with build/bin/clang-20
+// Result: ~/zilc-work/tools/filc-<FILC_VERSION>-zilc/ = a copy of the prebuilt tree with build/bin/clang-20
 // replaced and build/bin/llvm-split added. Point zilc at it with
-// ZILC_FILC=…/filc-0.685-zilc/build/bin/clang. Then (cmem/INDEX.md policy): run Fil-C's own test
+// ZILC_FILC=…/filc-<FILC_VERSION>-zilc/build/bin/clang. Then (cmem/INDEX.md policy): run Fil-C's own test
 // suite against it (run-filc-tests.ts) and re-archive (archive-patched-clang.ts).
 import { fixOsInclude } from "./fix-os-include.ts";
 import {
-  env, exists, FILC_PATCHED_TREE, FILC_PREBUILT_TREE, linuxOnly, mkdirp, must, REPO, rmrf, run, show, WORK,
+  env, exists, FILC_PATCHED_TREE, FILC_PREBUILT_TREE, FILC_SHA, FILC_SOURCE_URL, linuxOnly, mkdirp, must, REPO, rmrf, run, show, WORK,
 } from "../lib/tool.ts";
 
 await linuxOnly(import.meta);
-const sha = "bb0d0a64eed297ab8e171002033208fb08ad9941";
+const sha = FILC_SHA;
 const src = `${WORK}/filc-src/repo`;
+// clang's version string prints the source's origin URL (LLVM's VersionFromVCS.cmake runs
+// `git remote get-url origin`); it must read as the prebuilt's, or the patched clang would not
+// report "the same compiler, patched". (0.686: Fil-C's LLVM fork moved from llvm-project-deluge.git
+// to fil-c.git, same history.) ⚠️ To FETCH without ssh keys, add a repo-local
+// `url.https://github.com/.insteadOf git@github.com:` for the fetch and REMOVE it before building:
+// `get-url` applies the rewrite, so it would stamp the https URL into the version string (caught by
+// this very check on 2026-10-05).
+const origin = (await must(["git", "-C", src, "remote", "get-url", "origin"])).trim();
+if (origin !== FILC_SOURCE_URL) throw new Error(`source origin is ${origin}, expected ${FILC_SOURCE_URL}`);
 const path = `${WORK}/tools/ninja:${env("PATH")}`;
 const withNinja = { env: { PATH: path } };
 

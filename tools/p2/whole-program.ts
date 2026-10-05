@@ -18,11 +18,11 @@
 //     status (always 0): the mistake debug-mode.sh's comment warns about.
 //   * When hello.zilc-tmp/zilc_entry.zig is absent, the "(temps removed; …)" note now prints. In
 //     the shell `sed … 2>/dev/null | sed … || echo` the echo could never run (sed's status again).
-import { FILC_PREBUILT_TREE, linuxOnly, mkdirp, REPO, run, WORK } from "../lib/tool.ts";
+import { FILC_0685_PREBUILT_TREE, linuxOnly, mkdirp, REPO, run, WORK } from "../lib/tool.ts";
 
 await linuxOnly(import.meta);
 const ZILC = `${REPO}/zig-out/bin/zilc`;
-const env = { ZILC_ZIG: `${WORK}/tools/zig-0.15.2/zig`, ZILC_FILC: `${FILC_PREBUILT_TREE}/build/bin/clang` };
+const env = { ZILC_ZIG: `${WORK}/tools/zig-0.15.2/zig`, ZILC_FILC: `${FILC_0685_PREBUILT_TREE}/build/bin/clang` };
 
 const cwd = `${WORK}/drive-whole`;
 await mkdirp(cwd);

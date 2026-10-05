@@ -12,11 +12,11 @@
 //
 // Same commands, flags and printed sections as cc-decode.sh; each Unix pipeline's filter
 // (grep/sed/head) is done in TypeScript on the file's text.
-import { FILC_PREBUILT_TREE, linuxOnly, REPO } from "../lib/tool.ts";
+import { FILC_0685_PREBUILT_TREE, linuxOnly, REPO } from "../lib/tool.ts";
 
 await linuxOnly(import.meta);
 
-const F = FILC_PREBUILT_TREE;
+const F = FILC_0685_PREBUILT_TREE;
 const CC = `${F}/build/bin/clang`;
 const I = `${F}/pizfix/stdfil-include`;
 const S = `${REPO}/tools/p3`;
