@@ -696,6 +696,15 @@ Ubuntu 26.04 in WSL2, so five things differ. None of them changes what Fil-C pro
    restart unless `/etc/binfmt.d/cosmo-ape.conf` is written (the tool prints that too).
    *Bears on the evaluation itself:* a zilc user on WSL would need the same registration to run
    cosmo-mode (APE) programs there.
+   ⚠️ **Not reliable on WSL (measured 2026-10-05, ~10 minutes later).** With `APE` registered and
+   enabled, cosmo's libc built (18:29); at 18:40 the next step (`make filcapetools`) failed the same
+   way: cosmo's Makefile runs EVERY recipe through `SHELL = build/bootstrap/cocmd` (an APE), and
+   `cocmd -c 'echo hi'` run directly exited 5 with no output, while `/usr/bin/ape cocmd -c …`
+   printed `hi`. So WSLInterop was in front again: WSL evidently re-registers its entry, and
+   "newest entry wins" does not hold for long. **The dependable fix is to take WSLInterop out of the
+   way:** remove it (`echo -1 > /proc/sys/fs/binfmt_misc/WSLInterop`, until WSL re-adds it) or stop
+   WSL creating it (`/etc/wsl.conf`: `[interop]` `enabled=false`, then `wsl --shutdown`), which also
+   stops running Windows `.exe` files from inside WSL. Owner's choice.
 3. **Parallelism capped at 12 jobs** (`JOBS`). *Why:* upstream uses every core (`NCPU=$(nproc)` in
    `libpas/common.sh`, ninja's default for clang); on this 32-core, 31 GB WSL VM, 32 parallel
    RelWithDebInfo clang compiles crashed the WSL service twice (2026-10-01). *How, without editing

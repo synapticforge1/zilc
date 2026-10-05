@@ -59,15 +59,25 @@ if (missing.length) {
 //     `Error 5` and no message (first run, 2026-10-05). Cosmo's documented fix is to register its
 //     APE loader for APE files; binfmt_misc tries the newest entry first, so it wins over
 //     WSLInterop. Not persistent across a WSL restart unless the /etc/binfmt.d file is written.
+//     ⚠️ Measured the same day: that is NOT enough on WSL. WSL re-registers WSLInterop, which then
+//     sits in front of APE again (cosmo's libc built, then the next step's `cocmd` went to Windows
+//     ten minutes later). So the check is functional: an APE must actually run, and while
+//     WSLInterop is enabled, it must be taken out of the way (workarounds.md, item 5).
 const binfmt = "/proc/sys/fs/binfmt_misc";
-if ((await exists(`${binfmt}/WSLInterop`)) && !(await exists(`${binfmt}/APE`))) {
+const interop = (await Deno.readTextFile(`${binfmt}/WSLInterop`).catch(() => "")).startsWith("enabled");
+if (interop || !(await exists(`${binfmt}/APE`))) {
   console.log("WSL hands cosmo's APE build tools to Windows (binfmt WSLInterop). Run this yourself in");
   console.log("WSL (sudo), then re-run this tool. The loader is the one in Fil-C's own cosmo tree:\n");
-  console.log(`  sudo install -m 755 ${src}/projects/yolocosmo/build/bootstrap/ape.elf /usr/bin/ape`);
-  console.log(`  sudo sh -c "echo ':APE:M::MZqFpD::/usr/bin/ape:' > ${binfmt}/register"`);
-  console.log(`  sudo sh -c "echo ':APE-jart:M::jartsr::/usr/bin/ape:' > ${binfmt}/register"\n`);
-  console.log("Optional, to survive a WSL restart (systemd-binfmt reads it at boot):\n");
-  console.log(`  printf ':APE:M::MZqFpD::/usr/bin/ape:\\n:APE-jart:M::jartsr::/usr/bin/ape:\\n' | sudo tee /etc/binfmt.d/cosmo-ape.conf\n`);
+  if (!(await exists(`${binfmt}/APE`))) {
+    console.log(`  sudo install -m 755 ${src}/projects/yolocosmo/build/bootstrap/ape.elf /usr/bin/ape`);
+    console.log(`  sudo sh -c "echo ':APE:M::MZqFpD::/usr/bin/ape:' > ${binfmt}/register"`);
+    console.log(`  sudo sh -c "echo ':APE-jart:M::jartsr::/usr/bin/ape:' > ${binfmt}/register"`);
+  }
+  if (interop) {
+    console.log(`  sudo sh -c "echo -1 > ${binfmt}/WSLInterop"     # remove WSL's MZ entry (until WSL re-adds it)`);
+    console.log("\nOr permanently: add `[interop]` / `enabled=false` to /etc/wsl.conf and run `wsl --shutdown` from");
+    console.log("Windows. That also stops running Windows .exe files from inside WSL.");
+  }
   Deno.exit(1);
 }
 
