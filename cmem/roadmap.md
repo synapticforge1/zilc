@@ -289,6 +289,8 @@ are in `design-decisions.md` open question #4.
 come after publishing (`design-decisions.md`). Every non-Linux row depends on **P3**, the
 runtime, because Fil-C's own runtime and libc exist only for Linux.
 
+**✅ Scope pass DONE 2026-10-05 → `platforms.md`** (Linux aarch64: 4 small gaps, measured; upstream Fil-C now has a COSMO mode whose binaries run on macOS and x86_64 Windows, with a Linux-x86_64-compatible C ABI: evaluate it before writing any macOS/Windows runtime).
+
 **Scope pass (pre-publish), per platform:** confirm the processor list; count the OS functions Zig's
 std references (the size of the checked-wrapper layer); identify the libc story (C on that OS needs
 a checked libc); find the std code that builds pointers from integers (KI-5 family); and work out the

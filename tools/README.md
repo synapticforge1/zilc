@@ -32,6 +32,7 @@ The same command works **from Windows and from Linux**:
 | `filc/` | zilc's patched Fil-C toolchain: patch, build, archive, restore, check; Fil-C's own test suite (`run-filc-tests`); clang comparison |
 | `upstream/` | the read-only Fil-C reference clone and its monitor |
 | `p1/` `p2/` `p3/` | the phase experiments, kept as the record of how each result was measured (each folder has a README) |
+| `p6/` | the platforms scope pass: `os-surface.ts` counts the OS functions, raw kernel asm and int-to-pointer functions Zig's std needs per target (`cmem/platforms.md`) |
 | `lib/tool.ts` | the shared helper every tool imports |
 
 ## Writing a tool

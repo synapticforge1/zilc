@@ -66,7 +66,15 @@ for structure and policy.
   **`0.15.2-0.686.1`**; the last number restarts at 1 for every new Zig or Fil-C release
   (`releasing.md`, `design-decisions.md`). ⚠️ The never-pushed local tag `v0.15.2-3` SORTS ABOVE
   it and must be deleted at publish.
-- ▶️ **Next: the platforms scope pass**, the last pre-publish item; then publish (`releasing.md`).
+- ✅ **2026-10-05: PLATFORMS SCOPE PASS** (`platforms.md`, `tools/p6/os-surface.ts`). All 78
+  corpus programs compile for 9 targets. OS functions (corpus): Linux 75, macOS 79 (22 differ),
+  Windows 86 (78 differ); whole std: kernel32 90 + ntdll 49 + ws2_32 83. **Linux aarch64: the
+  pass already runs; 4 gaps** (patched clang built X86-only, unlike upstream; data layout must
+  come from Fil-C's clang; KI-7 rewrite is x86-only; aarch64 tree + qemu). **Upstream Fil-C
+  now has a COSMO mode** whose binaries run on macOS and x86_64 Windows, with Linux x86_64's C
+  ABI: evaluate before any per-OS runtime.
+- ▶️ **Next: PUBLISH** `v0.15.2-0.686.1` when the owner says (`releasing.md`): every pre-publish
+  item is closed.
 
 ## ✅ 2026-10-02 — BUILD SPEED, lever (a)
 
@@ -241,8 +249,8 @@ for structure and policy.
   - [x] **Upstream review + move to Fil-C 0.686** (owner, 2026-10-05). ✅ Same day: the 10
     `FilPizlonator.cpp` commits reviewed (`upstream.md`), zilc rebuilt on 0.686 and re-verified
     (corpus, output comparison, gate, Fil-C suite); version `0.15.2-0.686.1`
-  - [ ] **Platforms scope pass** (P6): per platform, the processors, the std OS-function count, the
-    libc story, KI-5-family code, and the host toolchain
+  - [x] **Platforms scope pass** (P6): per platform, the processors, the std OS-function count, the
+    libc story, KI-5-family code, and the host toolchain. ✅ 2026-10-05: `platforms.md`
   - [ ] Then: tag `v0.15.2-0.686.1`, DELETE the local tag `v0.15.2-3` (it sorts above the new
     one), move branch `v0.15.2` to the final commit, and push when the owner says (`releasing.md`)
   - Deferred past publish (with the port): `-Druntime=both`, the byte-identity check, the
@@ -429,6 +437,7 @@ the runtime-linking rule checked.
 | [upstream.md](upstream.md) | 🆕 2026-10-05: **"Review of Fil-C 0.686"** (the 10 pass commits; what zilc gains; KI-4/KI-18 still upstream). 2026-10-01: **the `upstream/fil-c/` reference clone and its monitor** (`tools/upstream/`, first-run results), and reporting marked not planned. How zilc relates to Fil-C upstream: what to track, which files matter, pinned commit, and 🔄 **the three-stage upgrade procedure (2026-09-30)**: Fil-C + compatible Zig → latest Zig → benchmarks. |
 | [licensing.md](licensing.md) | **License = `Apache-2.0 WITH LLVM-exception OR MIT`** (2026-09-18). Why, the runtime-linking rule, the copyleft exclusion. |
 | [reference-projects.md](reference-projects.md) | Fil-C, LLVM, Zig: verified licenses, what to mine each for, adoption status. |
+| [platforms.md](platforms.md) | 🆕 2026-10-05: **the P6 scope pass**: per platform the processors, OS-function counts (corpus and whole std), int-to-pointer sites, libc and host story. Linux aarch64 measured (4 gaps); Fil-C's new **cosmo mode** (APE binaries for macOS/x86_64 Windows, Linux-x86_64 C ABI) |
 | [roadmap.md](roadmap.md) | P0 ✅ → P1 ✅ → P2 ✅ (`0.3.0`) → **P3 Zig runtime (plan 2026-09-30: Linux first, checked against Fil-C, `zsys_*` first; next step the `zsys_write` spike)** → P4 Zig-language fidelity → P5 C++ → **P6 other platforms (proposed 2026-09-30)**. |
 | [security-model.md](security-model.md) | The safety guarantees being targeted (spatial, temporal, thread-safe capability updates), and what is explicitly out of scope. |
 | [testing.md](testing.md) | Current gates (gate 8/8, tests 29/29 on 2026-10-05, re-verified on Fil-C 0.686, with the exact commands), 🆕 the OUTPUT COMPARISON vs native (0 unexplained differences, 2026-10-02), corpus results per mode and (2026-10-01) build times, the recorded expected panics, and the planned gates: `-Druntime=both`, the between-versions comparison, and the benchmark suite. |
