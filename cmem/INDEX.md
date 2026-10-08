@@ -28,8 +28,11 @@ for structure and policy.
   aarch64 under qemu, fat APE both halves + `pecheck`, C++ threads), and the fat APE's Windows half
   runs under `wine64` in WSL. Leaves for the plan: `statx` missing from the cosmo runtime; real
   Windows unverified; aarch64 Windows / iOS / Android outside cosmo (P3 route).
-- ▶️ **NEXT: Zaig starts** (its brief: `zig-filc-scope.md` + `platforms.md`; decision below and
-  in `design-decisions.md`). Nothing in zilc is blocked.
+- 🌱 **Zaig STARTED 2026-10-08** (owner: "Proceed with the zig-filc-scope.md and platforms.md
+  brief"): sibling repo `../zaig`, its own `cmem/` (its brief is a copy of `zig-filc-scope.md`
+  with the Windows-crash correction). First piece: Fil-C's forwarder generator in Zig,
+  byte-identical to Ruby. zilc is its oracle; nothing in zilc changes for it. The GitHub name is
+  open ("zaig" is taken; candidates in Zaig's `design-decisions.md`).
 
 ## ✅ 2026-10-02 (later) — BUILD SPEED DONE: levers (a), (b), (c)
 
