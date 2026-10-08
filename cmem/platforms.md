@@ -120,13 +120,18 @@ filtering.
 **Step 3 ✅ 2026-10-05: ZIG through cosmo mode, with zilc as it is** (`zilc build --filc <cosmo clang>`):
 - **Open question 1 answered:** in cosmo mode Fil-C's `syscall()` takes the target's NATIVE LINUX numbers on every OS and hands them to the runtime's `zsys_syscall`, which implements them per host OS (`pizfix/include/sys/syscall.h` comment; ~26 numbers listed, others trap). So zilc's KI-7 routing by Linux number carries over. One fix: cosmo's header has no `SYS_clock_nanosleep`, so zilc's helper now defines it (230 / 115) when missing (`src/driver.zig`; musl unchanged, tests 29/29, gate 8/8).
 - **Results:** `01_hello-world` and `31_timers` (threads, sleep) build and run as static Linux ELFs AND as `.com` APEs; the same APE files **run as Windows programs under Wine**. `58_reading-files` stops: `filc internal error: statx not supported` (Zig's std uses `statx`; the cosmo runtime does not implement it). Question 3 (static linking) is moot: the cosmo clang links static by itself and zilc's link worked unchanged.
-- ⚠️ **On REAL Windows (this machine, 2026-10-05) every cosmo-mode program crashes at start with 0xC0000005**, the Zig ones AND a plain C hello world from Fil-C's own cosmo clang (which prints, then crashes). So it is Fil-C's cosmo mode on real Windows, not zilc; upstream only verified Windows under Wine (`cosmo.txt` "Windows retest checklist"). Not diagnosed further (WinDbg on `.com.dbg` is upstream's suggested next step).
+- ⚠️ **Real Windows: UNVERIFIED, and not to be retried on this machine.** On 2026-10-05 every cosmo-mode program run on this Windows host crashed at start with 0xC0000005 (DEP violation, WER `BEX64`), the Zig ones AND a plain C hello world from Fil-C's own cosmo clang. Those runs were made with the machine's EDR (**SentinelOne**) injected into the processes, and they triggered it: the files were quarantined and Claude Code was cut off. So the crash may be EDR-induced rather than an upstream defect; upstream itself only verified Windows under Wine (`cosmo.txt` "Windows retest checklist"). **Rule (owner, 2026-10-08): nothing built by Fil-C, cosmo or zilc is ever executed on the Windows host; the Windows half of an APE is exercised only under Wine inside WSL.** The why, the event-log evidence and what was ruled out: `workarounds.md` "Nothing built by Fil-C or cosmo is ever EXECUTED on the Windows host".
 
-**Was planned:** Fil-C's suite against the cosmo `pizfix/` (`run-filc-tests.ts`, which gained 0.686's "shared libraries not supported on COSMO" skip). **Then (planned):** (2) upstream's own checks: `cosmo.txt` "Verification checklist" items 1, 3–6
-and Fil-C's test suite with `run-filc-tests.ts` against the cosmo `pizfix/`; (3) the zilc
-questions: a hand-made Zig `x86_64-linux-musl` module through cosmo-mode clang, run as an APE on
-Linux and under Wine; what `syscall()` does off Linux (open question 1); static linking
-(question 3).
+**Step 4 ✅ 2026-10-08: upstream's own `cosmo.txt` "Verification checklist", items 1 and 3–6, all pass, run entirely inside WSL** (item 2 is the suite, step 2 above; item 7 is macOS documentation only):
+1. flavour state: both `libyolocosmo.a` present, no `libc.so.6666`, `libexec/` has `apelink`, `pecheck`, `ape-m1.c`;
+3. x86_64: `hello` (static ELF) and `hello.com` (`MZqFpD`, `pecheck` exit 0) both print;
+4. aarch64: `--target=aarch64-linux-gnu` under `qemu-aarch64` prints;
+5. fat APE (`--filc-fat-ape`): x86_64 half native, `hellofat.aarch64.elf` under qemu, `pecheck` exit 0;
+6. C++ (`<iostream>` + 4 `std::thread`s, `std::atomic`) prints `threads sum 40`;
+plus the fat APE's Windows half under `wine64` inside WSL: prints, exit 0.
+Script: the session scratchpad's `cosmo-check.sh` (outputs in `~/zilc-work/cosmo-check/`).
+
+**Cosmo evaluation: CLOSED 2026-10-08.** Everything planned is done: Fil-C's suite in cosmo mode (step 2), the zilc questions (step 3: `syscall()` off Linux, static linking, Zig programs as ELF + APE + under Wine), upstream's checklist (step 4). What it leaves for the plan: (a) `statx` is missing from the cosmo runtime (Zig's std uses it: `58_reading-files`); (b) real Windows is unverified and stays so from this machine; (c) aarch64 Windows, iOS and Android are outside cosmo's reach (the native-runtime route, P3, stays for them).
 
 ## What this changes in the plan (proposals, owner to decide after publish)
 

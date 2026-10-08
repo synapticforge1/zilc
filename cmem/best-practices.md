@@ -190,6 +190,11 @@ citation to the incident.
 - **A shell script whose usage line says `sh` must run under dash.** `export -f` (bash-only)
   makes dash exit 2 with no message. Test with `sh -x`. (zilc-check.sh, 2026-10-02; the tools
   have been Deno since 2026-10-05, but the rule holds for any shell script that remains.)
+- 🛑 **Never execute anything built by Fil-C, cosmo or zilc on the Windows host** (owner,
+  2026-10-08). The machine runs SentinelOne; on 2026-10-05 running cosmo APE files as `.exe` from
+  Claude's Windows scratchpad got them quarantined and Claude Code killed. Run programs in WSL; the
+  Windows half of an APE only under `wine64` inside WSL; no WinDbg here. Why and evidence:
+  `workarounds.md` "Nothing built by Fil-C or cosmo is ever EXECUTED on the Windows host".
 - **Stopping a WSL command from the Windows side does not stop its Linux processes.** A
   "killed" background job kept running and polled on; check `ps` in WSL after a timeout, and
   give long jobs a long timeout up front. (2026-10-02.)

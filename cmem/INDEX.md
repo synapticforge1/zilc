@@ -13,7 +13,25 @@ for structure and policy.
 
 ---
 
-## ▶️ 2026-10-02 (later) — BUILD SPEED DONE: levers (a), (b), (c). START HERE
+## ▶️ 2026-10-08 — COSMO EVALUATION CLOSED; the WSL-only rule. START HERE
+
+- 🛑 **RULE (owner, 2026-10-08): nothing built by Fil-C, cosmo or zilc is ever EXECUTED on the
+  Windows host.** On 2026-10-05 the session copied cosmo APE programs to Claude's Windows scratchpad
+  as `.exe` and ran them; each died with a DEP violation, and the machine's EDR (**SentinelOne**)
+  quarantined them and cut Claude Code off. All Fil-C/cosmo work runs inside WSL; the Windows half
+  of an APE only under Wine in WSL; WinDbg on this machine is not an option. Evidence (Application
+  log 1000/1001, 18:38–19:12) and the why: `workarounds.md` "Nothing built by Fil-C or cosmo is
+  ever EXECUTED on the Windows host". The 2026-10-05 "crashes on real Windows" finding is
+  therefore **unverified** (EDR injected), not an upstream defect.
+- ✅ **Cosmo evaluation closed** (`platforms.md` "Cosmo evaluation", step 4): upstream's
+  `cosmo.txt` verification checklist items 1, 3–6 all pass inside WSL (x86_64 ELF + `.com`,
+  aarch64 under qemu, fat APE both halves + `pecheck`, C++ threads), and the fat APE's Windows half
+  runs under `wine64` in WSL. Leaves for the plan: `statx` missing from the cosmo runtime; real
+  Windows unverified; aarch64 Windows / iOS / Android outside cosmo (P3 route).
+- ▶️ **NEXT: Zaig starts** (its brief: `zig-filc-scope.md` + `platforms.md`; decision below and
+  in `design-decisions.md`). Nothing in zilc is blocked.
+
+## ✅ 2026-10-02 (later) — BUILD SPEED DONE: levers (a), (b), (c)
 
 - ✅ **(b) dense interference graph** in the patched pass (`patch-pass.ts`): the pass on `69`
   11.2 → 4.3 s; the same graph, verified on the whole corpus in all four modes with
@@ -88,11 +106,9 @@ for structure and policy.
   stays the stable reference and Zaig's test oracle**, its version cadence unchanged. Zaig stays on
   **Zig 0.15.2** until proven to produce the same as zilc. Starts once the cosmo evaluation and the
   scope are complete; its brief is `zig-filc-scope.md` + `platforms.md`. (`design-decisions.md`)
-- (was) ▶️ IN PROGRESS: evaluate Fil-C's COSMO mode, starting by building Fil-C
-  from source (`platforms.md` "Cosmo evaluation"). Tool `tools/filc/build-cosmo.ts` (stock
-  upstream `build_base_cosmo.sh`, 12 jobs); source cloned to `$WORK/filc-cosmo` at `v0.686`.
-  ⏸️ **Blocked on the owner running one `sudo apt-get install` line** (in `platforms.md`; the tool
-  prints it): clang, lld, ninja, the aarch64 cross toolchain, qemu, wine64, …
+- ✅ (was in progress, closed 2026-10-08) evaluate Fil-C's COSMO mode (`platforms.md` "Cosmo
+  evaluation"). Tool `tools/filc/build-cosmo.ts` (stock upstream `build_base_cosmo.sh`, 12 jobs);
+  tree `$WORK/filc-cosmo` at `v0.686`; the owner installed the host packages on 2026-10-05.
 
 ## ✅ 2026-10-02 — BUILD SPEED, lever (a)
 
@@ -456,12 +472,12 @@ the runtime-linking rule checked.
 | [licensing.md](licensing.md) | **License = `Apache-2.0 WITH LLVM-exception OR MIT`** (2026-09-18). Why, the runtime-linking rule, the copyleft exclusion. |
 | [reference-projects.md](reference-projects.md) | Fil-C, LLVM, Zig: verified licenses, what to mine each for, adoption status. |
 | [zig-filc-scope.md](zig-filc-scope.md) | 🆕 2026-10-05: **scope of a Zig version of Fil-C on 0.15.2** (owner). Step 2 (runtime from source with `zig build`): the stock-compiled half PROVEN buildable by Zig alone; 3 pieces still need a Fil-C compiler. Step 3 (the pass in Zig): ~25–35k lines, output is plain LLVM 20 IR; costs: no pre-pass optimisation, C through `zig cc` miscompiles varargs/pointer unions/atomics. Written as the brief for the owner's proposed NEW project |
-| [platforms.md](platforms.md) | 🆕 2026-10-05: **the P6 scope pass**: per platform the processors, OS-function counts (corpus and whole std), int-to-pointer sites, libc and host story. Linux aarch64 measured (4 gaps); Fil-C's new **cosmo mode** (APE binaries for macOS/x86_64 Windows, Linux-x86_64 C ABI) |
+| [platforms.md](platforms.md) | 🆕 2026-10-08: **cosmo evaluation CLOSED** (step 4: upstream's checklist passes in WSL; real Windows unverified, never retried on this host). 2026-10-05: **the P6 scope pass**: per platform the processors, OS-function counts (corpus and whole std), int-to-pointer sites, libc and host story. Linux aarch64 measured (4 gaps); Fil-C's new **cosmo mode** (APE binaries for macOS/x86_64 Windows, Linux-x86_64 C ABI) |
 | [roadmap.md](roadmap.md) | P0 ✅ → P1 ✅ → P2 ✅ (`0.3.0`) → **P3 Zig runtime (plan 2026-09-30: Linux first, checked against Fil-C, `zsys_*` first; next step the `zsys_write` spike)** → P4 Zig-language fidelity → P5 C++ → **P6 other platforms (proposed 2026-09-30)**. |
 | [security-model.md](security-model.md) | The safety guarantees being targeted (spatial, temporal, thread-safe capability updates), and what is explicitly out of scope. |
 | [testing.md](testing.md) | Current gates (gate 8/8, tests 29/29 on 2026-10-05, re-verified on Fil-C 0.686, with the exact commands), 🆕 the OUTPUT COMPARISON vs native (0 unexplained differences, 2026-10-02), corpus results per mode and (2026-10-01) build times, the recorded expected panics, and the planned gates: `-Druntime=both`, the between-versions comparison, and the benchmark suite. |
 | [known-issues.md](known-issues.md) | 🆕 2026-10-01: **KI-4, KI-10, KI-18, KI-19, KI-20, KI-21 fixed; KI-22 (build time) DONE** (patched Fil-C clang; option 3 rejected; levers (a) parallel code generation, (b) dense interference graph, (c) object cache, all 2026-10-02: `69` 55.9 → 35.9 s cold, 2.3 s unchanged). Partly open: KI-7 (`getcontext`), KI-5. KI-23 (git maintenance on exFAT) closed with a final mitigation. 🔑 **KI-4 (2026-09-23): Fil-C's IR is a PATCHED-LLVM DIALECT** (`ni:0` + `datalayout_after_filc`), so stock IR cannot enter the pass — this decided the integration route. KI-1 ✅ resolved (WSL2 installed; `sudo` needs a password); KI-2 exFAT zig-cache; KI-3 LLVM 20 vs 21 skew. |
-| [workarounds.md](workarounds.md) | 🆕 2026-10-01 (2026-10-02: KI-22 levers (a), (b), (c), with the why of each piece: use-list order, unused TLS declarations, objcopy and Zig names, the dense graph's equal-graph details, the cache key). **The WHY of every workaround** (owner rule): symptom index, five failure families (F1 pass rejects valid IR, F2 capability lost through an integer, F3 inline asm, F4 code outside the pass, F5 std out of bounds), the entry template, KI-18 in full, and short forms of KI-4…KI-17. **Look up new failures here first.** |
+| [workarounds.md](workarounds.md) | 🛑 2026-10-08: **"Nothing built by Fil-C or cosmo is ever EXECUTED on the Windows host"** (SentinelOne; the event-log evidence, why Wine-in-WSL is enough, what it means for the Windows-crash finding). 2026-10-05: machine setup for the cosmo build (WSL interop vs APE, Ruby, libcurl). 🆕 2026-10-01 (2026-10-02: KI-22 levers (a), (b), (c), with the why of each piece: use-list order, unused TLS declarations, objcopy and Zig names, the dense graph's equal-graph details, the cache key). **The WHY of every workaround** (owner rule): symptom index, five failure families (F1 pass rejects valid IR, F2 capability lost through an integer, F3 inline asm, F4 code outside the pass, F5 std out of bounds), the entry template, KI-18 in full, and short forms of KI-4…KI-17. **Look up new failures here first.** |
 | [releasing.md](releasing.md) | 🔖 **Version `0.15.2-0.686.1`** (2026-10-05): `<Zig>-<Fil-C>.<zilc release>`, the publish plan (delete local tag `v0.15.2-3`). Earlier: `<Zig line>-<release>`, the **basis** each latest-line release names, how to bump it, why `.` and `_` were rejected, no 1.0, `-N` restarts at 1 per Zig version, the four places the number lives. The old minor-per-phase cadence is retired. |
 | [filc-abi.md](filc-abi.md) | 🆕 2026-09-30. **Fil-C 0.685's runtime ABI as OBSERVED** (post-pass IR, headers, binaries; no runtime source): flight pointers, the object-header word, function objects and getters, the fast and generic calling convention, the thread layout, linking and overriding. What P3 must match, and its scoping consequences. |
 | [zig-upstream-notes.md](zig-upstream-notes.md) | 🆕 2026-09-30. **Zig behaviours we may need to report** (owner asked): Z-1 `indexOfSentinel` over-read (fixed in 0.16.0; report draft and repro in `tools/zig-reports/`), Z-2 the `mmap` hint, Z-3 raw syscalls, Z-4 `getcontext`, Z-5 `DebugAllocator` integer arithmetic. Each with whether it is really a Zig bug. |

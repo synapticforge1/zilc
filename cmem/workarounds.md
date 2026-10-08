@@ -731,6 +731,67 @@ This matters for the all-Zig goal: Fil-C's runtime build needs Ruby, so building
 
 ---
 
+## Nothing built by Fil-C or cosmo is ever EXECUTED on the Windows host (SentinelOne), 2026-10-05 / 2026-10-08
+
+**Symptom.** After the cosmo evaluation on 2026-10-05 the machine's endpoint agent (**SentinelOne**,
+`Sentinel Agent 26.1.2.177`; Datto AV also present; Windows Defender is off, so `Get-MpThreat`
+shows nothing) raised an incident, the APE copies vanished from the session's scratchpad (only the
+`.out`/`.err` logs are left) and Claude Code lost its connection. The owner confirmed it was
+SentinelOne (2026-10-08).
+
+**Class.** System limitation (a managed EDR, by design; it will not change). Not a Fil-C, cosmo or
+zilc defect.
+
+**Root cause (the why).** *Measured*, from the Windows Application log (Event IDs 1000/1001):
+- 18:38:32–18:38:57: cosmo's build tools `cocmd` and `compile.ape` ran as WINDOWS processes from
+  `\\wsl.localhost\Ubuntu\...\filc-cosmo\...` (WSL interop sent them there; see the entry above)
+  and crashed with `0xC0000005`, five times.
+- 18:59–19:12: the session copied APE programs into Claude's Windows scratchpad
+  (`%TEMP%\claude\...\scratchpad\ape\`), renamed them `.exe` (`01_hello-world.exe`,
+  `31_timers.exe`, `chello.exe`, `plain.exe`) and ran them on real Windows, seven times. Each died
+  as WER event `BEX64` with `P9 = 0000000000000008`: a DEP violation (execute from non-executable
+  memory), "faulting module: unknown", no version resource, no signature.
+*Surmised, consistent with how SentinelOne's behavioral engine is documented:* unsigned, versionless
+binaries in a Temp folder, launched by a `node.exe` process tree (Claude Code), repeatedly faulting
+on execute-from-data, is the profile it classifies as a loader/injector. Its mitigation kills the
+whole process tree (which includes Claude Code) and quarantines the files; the "cut off Claude
+access" was that, or the network-quarantine policy, which we cannot see from here (the agent's
+console is IT's).
+
+**Why the rule is correct.** Nothing in the cosmo evaluation NEEDS the Windows host. The Linux half
+of an APE runs in WSL through cosmo's own `ape` binfmt entry; the Windows (PE) half runs under
+`wine64` INSIDE WSL, which is also the only way upstream verified it (`cosmo.txt` "Windows retest
+checklist": real Windows is untested upstream). With `/etc/wsl.conf` `[interop] enabled=false`
+nothing in WSL can reach a Windows process by accident any more, so the only remaining path is a
+deliberate copy to the Windows side. **That path is closed: no file produced by Fil-C, cosmo or
+zilc is copied to a Windows path and executed there, in any session, and WinDbg on this machine is
+not an option.** If real-Windows behaviour ever matters, it is done on a box without a managed EDR,
+or with IT's exclusion for a dedicated folder, and from a plain terminal, never from Claude's
+process tree.
+
+**Consequence for the evaluation record.** The 2026-10-05 finding "every cosmo program crashes on
+real Windows" was measured with SentinelOne's in-process agent injected into those processes and
+with DEP enforcement around a loader that maps and jumps into its own image. It may be entirely
+EDR-induced. It is therefore recorded as **unverified**, not as an upstream defect, and left to
+upstream's "next person with a Windows box".
+
+**Ruled out.** That the Windows *build* side was involved: nothing from the Windows side compiled or
+linked anything; all faulting images are APE files. That WSL itself was flagged: the WSL distro,
+work tree, Wine prefix and cosmo `pizfix/` are intact (checked 2026-10-08), and the checklist runs
+there without incident.
+
+**Recognising a relative.** Claude Code dies mid-task, no error in the repo, the just-run binaries
+are gone from disk, and the Application log shows `Application Error` 1000 / WER `BEX64` for them.
+First thing to try: nothing on Windows; move the step into WSL (or Wine in WSL).
+
+**Cost and exit.** No cost to zilc: Windows is not a build host for zilc. Exit: none; the rule stands
+while this machine is managed.
+
+**Where.** `platforms.md` "Cosmo evaluation"; `best-practices.md` (the rule in one line);
+machine-local memory `no-windows-host-execution`.
+
+---
+
 ## Earlier workarounds (short form; expand to the full template when next touched)
 
 - ~~**KI-4, Debug compiled at `filc -O0`.**~~ **Superseded 2026-10-01** by the KI-4 patch (full entry above); Debug is now at `-O1`. *Original why:* Fil-C's pass segfaults on Zig's Debug IR at
