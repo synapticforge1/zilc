@@ -105,6 +105,13 @@ precompiled", unless the C front-end differences are also solved.
 - **A Zig program built by zilc, unchanged except one header guard, runs through cosmo mode:**
   hello world and the timers program, as Linux ELF and as one APE file that also runs under
   Wine as a Windows program. Gap found: Zig's `statx` is not implemented by the cosmo runtime.
-- **On REAL Windows every cosmo-mode program crashes at start** (0xC0000005), including a plain C
-  hello world, so the crash is in Fil-C's cosmo mode, not zilc. Upstream only verified Windows
-  under Wine.
+- ~~**On REAL Windows every cosmo-mode program crashes at start** (0xC0000005), including a plain C
+  hello world, so the crash is in Fil-C's cosmo mode, not zilc.~~ **Corrected 2026-10-08:** those
+  runs were made on the Windows host with the machine's EDR (SentinelOne) injected into the
+  processes, and they triggered it; the finding is UNVERIFIED, not an upstream defect, and real
+  Windows is never tried on this machine again (`platforms.md`, `workarounds.md` "Nothing built by
+  Fil-C or cosmo is ever EXECUTED on the Windows host"). Upstream only verified Windows under Wine.
+
+**This brief became the starting brief of zailc** (`../zailc/cmem/scope.md`, 2026-10-08), where
+progress against it is tracked (`../zailc/cmem/roadmap.md`): step 2's stock half of the runtime
+builds from `zig build` as of 2026-10-08.

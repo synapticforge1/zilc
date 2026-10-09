@@ -33,7 +33,12 @@ for structure and policy.
   zaiglang would look like copying ziglang): sibling repo `../zailc`, its own `cmem/` (its brief
   is a copy of `zig-filc-scope.md` with the Windows-crash correction). First piece: Fil-C's
   forwarder generator in Zig, byte-identical to Ruby. zilc is its oracle; nothing in zilc changes
-  for it. Mentions of "Zaig" elsewhere in this cmem are the history and mean zailc.
+  for it. Mentions of "Zaig" elsewhere in this cmem are the history and mean zailc. **Same
+  evening:** zailc has a team and a remote (`github.com/jrmarcum/zailc`, branch
+  `step2/stock-runtime`), and step 2's stock half of Fil-C's runtime (libpas, crt objects,
+  yolounwind, musl's headers) builds from `zig build` with every object matching the release
+  tarball's symbols. zilc's part as oracle: the release tarball and the cosmo tree in
+  `~/zilc-work` (`../zailc/cmem/oracle.md`). Progress lives in zailc's cmem, not here.
 
 ## ✅ 2026-10-02 (later) — BUILD SPEED DONE: levers (a), (b), (c)
 
