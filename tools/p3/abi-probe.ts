@@ -6,12 +6,15 @@
 // Fil-C 0.685 and inspects the post-pass IR, the prebuilt libraries and the public headers; it
 // never reads the runtime's source. Findings: cmem/filc-abi.md.
 //
-//   deno run -A tools/p3/abi-probe.ts            (Linux; from Windows it runs inside WSL)
+//   bun tools/p3/abi-probe.ts            (Linux; from Windows it runs inside WSL)
 //   env: WORK (default ~/zilc-work; Fil-C expected at $WORK/tools/filc-0.685-linux-x86_64, as
 //        set up in roadmap.md P1)
 //
 // Same commands, flags and printed sections as abi-probe.sh; each Unix pipeline's filter
 // (grep/head/sed/tr) is done in TypeScript on the program's output.
+import { mkdtemp, readFile, rm, stat } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { FILC_0685_PREBUILT_TREE, glob, linuxOnly, REPO, run } from "../lib/tool.ts";
 
 await linuxOnly(import.meta);
@@ -21,7 +24,7 @@ const CC = `${F}/build/bin/clang`;
 const L = `${F}/pizfix/lib`;
 const I = `${F}/pizfix/stdfil-include`;
 const S = `${REPO}/tools/p3`;
-const T = await Deno.makeTempDir();
+const T = await mkdtemp(join(tmpdir(), "zilc-"));
 
 // ---- local helpers: the shell pipeline pieces, on lines of text ----
 /** A program's output as lines, as a pipe reads them (no extra empty line for the final newline). */
@@ -50,34 +53,33 @@ async function out(argv: string[], o: { cwd?: string; stderr?: "inherit" | "null
     const r = await run(["sh", "-c", 'exec "$@" 2>&1', "sh", ...argv], { cwd: o.cwd });
     return { code: r.code, text: r.out };
   }
-  const r = await new Deno.Command(argv[0], {
-    args: argv.slice(1), cwd: o.cwd, stdin: "null", stdout: "piped", stderr: o.stderr ?? "inherit",
-  }).output();
-  return { code: r.code, text: new TextDecoder().decode(r.stdout) };
+  const p = Bun.spawn(argv, { cwd: o.cwd, stdin: "ignore", stdout: "pipe", stderr: o.stderr === "null" ? "ignore" : "inherit" });
+  const text = await new Response(p.stdout).text();
+  return { code: await p.exited, text };
 }
 
 try {
   console.log("== (a1) post-pass IR: how pass-compiled main is defined and how it calls write");
   say(lines((await out([CC, "-O1", "-S", "-emit-llvm", "-o", `${T}/w.ll`, `${S}/write1.c`], { stderr: "merge" })).text).slice(0, 3));
-  const ll = lines(await Deno.readTextFile(`${T}/w.ll`).catch(() => ""));
+  const ll = lines(await readFile(`${T}/w.ll`, "utf8").catch(() => ""));
   say(grep(ll, /^define|^declare/, { n: true }).slice(0, 20));
   console.log("-- call sites:");
   say(grep(ll, /call .*@(pizlonated_|filc_)/, { n: true }).slice(0, 12));
 
   console.log("== (a2) how checked musl's write() reaches the runtime");
   await out(["ar", "x", `${L}/libc.a`, "write.o"], { cwd: T, stderr: "null" });
-  if (await Deno.stat(`${T}/write.o`).catch(() => null)) {
+  if (await stat(`${T}/write.o`).catch(() => null)) {
     console.log("write.o");
     say(lines((await out(["nm", "write.o"], { cwd: T })).text));
   }
   say(lines((await out(["objdump", "-d", "--no-show-raw-insn", "write.o"], { cwd: T, stderr: "null" })).text).slice(0, 60));
 
   console.log("== (a3) the header's view of zsys_write and the Fil-C calling-convention bits");
-  say(grep(lines(await Deno.readTextFile(`${I}/pizlonated_syscalls.h`)), /zsys_write\b|zsys_write\(/, { n: true }));
+  say(grep(lines(await readFile(`${I}/pizlonated_syscalls.h`, "utf8")), /zsys_write\b|zsys_write\(/, { n: true }));
   // `grep -n -i … $I/*.h`: several files, so each line is prefixed with its file, as grep does.
   const cc: string[] = [];
   for (const h of await glob(`${I}/*.h`)) {
-    for (const l of grep(lines(await Deno.readTextFile(h)), /calling convention|filc_cc|cc_args|cc_rets/i, { n: true })) cc.push(`${h}:${l}`);
+    for (const l of grep(lines(await readFile(h, "utf8")), /calling convention|filc_cc|cc_args|cc_rets/i, { n: true })) cc.push(`${h}:${l}`);
   }
   say(cc.slice(0, 20));
 
@@ -93,7 +95,7 @@ try {
   say(grep(lines((await out(["readelf", "-d", "w"], { cwd: T })).text), /NEEDED|RPATH|RUNPATH/));
   say(grep(lines((await out(["readelf", "-l", "w"], { cwd: T })).text), /interpreter/i));
   const w = await out([`${T}/w`], { cwd: T });
-  await Deno.stdout.write(new TextEncoder().encode(w.text));
+  process.stdout.write(w.text);
   console.log(`exit ${w.code}`);
 
   console.log("== (b2) who defines pizlonated_zsys_write, and is it preemptible (default visibility, dynamic)?");
@@ -104,5 +106,5 @@ try {
   console.log("-- libc.so DT_FLAGS:");
   say(grep(lines((await out(["readelf", "-d", `${L}/libc.so`])).text), /FLAGS|SYMBOLIC|NEEDED/));
 } finally {
-  await Deno.remove(T, { recursive: true }).catch(() => {});
+  await rm(T, { recursive: true, force: true });
 }

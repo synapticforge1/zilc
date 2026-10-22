@@ -6,7 +6,7 @@
 // Fil-C 0.685's libc.so and libpizlo.so. Results: cmem/known-issues.md KI-7, src/driver.zig
 // (the syscall reroute, "Measured 2026-09-30 by tools/p3/syscall-probe.c").
 //
-//   deno run -A tools/p3/syscall-probe.ts        (Linux; from Windows it runs inside WSL)
+//   bun tools/p3/syscall-probe.ts        (Linux; from Windows it runs inside WSL)
 //   env: WORK (default ~/zilc-work; Fil-C expected at $WORK/tools/filc-0.685-linux-x86_64)
 //
 // Same commands, flags and printed sections as syscall-probe.sh, with one deliberate change: the
@@ -14,13 +14,16 @@
 // 0) and a trapped case still said "exit 0". Here it is the probe's own status (a trap shows as
 // 128 + signal, e.g. 133 for SIGTRAP). The shell's message for a case killed by a signal
 // ("Trace/breakpoint trap") is printed the same way the shell did.
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { FILC_0685_PREBUILT_TREE, linuxOnly, REPO, run } from "../lib/tool.ts";
 
 await linuxOnly(import.meta);
 
 const F = FILC_0685_PREBUILT_TREE;
 const S = `${REPO}/tools/p3`;
-const T = await Deno.makeTempDir();
+const T = await mkdtemp(join(tmpdir(), "zilc-"));
 
 // ---- local helpers: the shell pipeline pieces, on lines of text ----
 /** A program's output as lines, as a pipe reads them (no extra empty line for the final newline). */
@@ -38,8 +41,10 @@ function say(ls: string[]): void {
 }
 /** A program's stdout; its stderr goes to this terminal, as in the shell. */
 async function stdout(argv: string[]): Promise<string> {
-  const r = await new Deno.Command(argv[0], { args: argv.slice(1), stdin: "null", stdout: "piped", stderr: "inherit" }).output();
-  return new TextDecoder().decode(r.stdout);
+  const p = Bun.spawn(argv, { stdin: "ignore", stdout: "pipe", stderr: "inherit" });
+  const text = await new Response(p.stdout).text();
+  await p.exited;
+  return text;
 }
 /** What sh (dash) prints when a program it ran was killed by this signal. */
 const SIGNAL_MESSAGE: Record<number, string> = {
@@ -53,8 +58,8 @@ try {
   // `grep -w`: whole words only (word characters are letters, digits and _).
   say(grep(lines(await stdout(["nm", "-D", "--defined-only", `${F}/pizfix/lib/libc.so`])), /(?<![A-Za-z0-9_])(syscall|gettid)(?![A-Za-z0-9_])/));
   say(grep(lines(await stdout(["nm", "-D", "--defined-only", `${F}/pizfix/lib/libpizlo.so`])), /zsys_(syscall|gettid|clock_nanosleep|futex[a-z_]*)$|^[0-9a-f]+ T pizlonated_zsys_[a-z_]*futex/i));
-  const cc = await new Deno.Command(`${F}/build/bin/clang`, { args: ["-O1", "-g", "-o", `${T}/probe`, `${S}/syscall-probe.c`], stdin: "null", stdout: "inherit", stderr: "inherit" }).output();
-  if (cc.code !== 0) {
+  const cc = await Bun.spawn([`${F}/build/bin/clang`, "-O1", "-g", "-o", `${T}/probe`, `${S}/syscall-probe.c`], { stdin: "ignore", stdout: "inherit", stderr: "inherit" }).exited;
+  if (cc !== 0) {
     code = 1;
   } else {
     for (const c of ["gettid", "futex-ptr", "futex-err", "nanosleep", "futex-int"]) {
@@ -68,6 +73,6 @@ try {
     }
   }
 } finally {
-  await Deno.remove(T, { recursive: true }).catch(() => {});
+  await rm(T, { recursive: true, force: true });
 }
-Deno.exit(code);
+process.exit(code);

@@ -1,4 +1,4 @@
-#!/usr/bin/env -S deno run --allow-read --allow-write --allow-run --allow-env --allow-net=jsr.io
+#!/usr/bin/env bun
 // SPDX-License-Identifier: BSD-2-Clause
 //
 // Copyright (c) 2023-2025 Epic Games, Inc. All Rights Reserved.
@@ -43,27 +43,27 @@
 // (a Fil-C stop exits 42) and checked for the expected return and `output-includes/-excludes`.
 // The per-test shell scripts are generated as run-tests generates them.
 //
-// Where it differs, on purpose: (1) Deno runs the per-test `run.sh` scripts in its own worker
+// Where it differs, on purpose: (1) Bun runs the per-test `run.sh` scripts in its own worker
 // pool instead of `make -k -j`, with a per-test TIMEOUT (one hung test cannot stall the run), and
 // records each test's result; (2) CPU features come from /proc/cpuinfo, not from compiling the
 // `has_*.c` probes with a system clang (this machine has none; on x86_64 only AVX-512 and SHA-NI
 // can be present); (3) `slow` tests start first, as run-tests orders them.
 //
 // Usage (in WSL, cwd = the folder holding Fil-C's `filc/tests`):
-//   deno run -A run-filc-tests.ts run --pizfix <toolchain>/pizfix --label stock [--jobs 24]
+//   bun run-filc-tests.ts run --pizfix <toolchain>/pizfix --label stock [--jobs 24]
 //        [--filter REGEX] [--timeout 900]
-//   deno run -A run-filc-tests.ts compare results-stock.json results-patched.json
+//   bun run-filc-tests.ts compare results-stock.json results-patched.json
 // `run` leaves filc/test-output-<label>/ (per-test scripts and outputs) and results-<label>.json.
 // ⚠️ The cwd must be Fil-C's REPO ROOT checkout, and it must also contain
 // projects/openssl-3.6.4/crypto/aes/asm: test `sarcasm-mb-pl-sink-att` (since v0.686) reads
 // aesni-mb-x86_64.pl from there and fails "BAD cannot open" without it (cmem/testing.md).
 
-import { parse as parseYaml } from "jsr:@std/yaml@1";
+import { mkdir, readdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
 
 type Manifest = Record<string, unknown>;
 type Status = "PASS" | "FAIL" | "TIMEOUT" | `SKIP: ${string}`;
 
-const args = Deno.args;
+const args = process.argv.slice(2);
 const mode = args[0];
 const opt = (name: string, def?: string) => {
   const i = args.indexOf(`--${name}`);
@@ -77,11 +77,11 @@ const isSource = (e: string) => /\.(c|ll|cpp|s)$/.test(e); // run-tests: isSourc
 const isCpp = (e: string) => e.endsWith(".cpp"); // run-tests: isCppEntry
 
 async function exists(p: string) {
-  return (await Deno.stat(p).catch(() => null)) !== null;
+  return (await stat(p).catch(() => null)) !== null;
 }
 async function sh(cmd: string, timeoutSec?: number): Promise<number | "timeout"> {
   const argv = timeoutSec ? ["timeout", "-k", "10", String(timeoutSec), "sh", "-c", cmd] : ["sh", "-c", cmd];
-  const { code } = await new Deno.Command(argv[0], { args: argv.slice(1), stdout: "null", stderr: "null" }).output();
+  const code = await Bun.spawn(argv, { stdout: "ignore", stderr: "ignore" }).exited;
   return timeoutSec && code === 124 ? "timeout" : code;
 }
 
@@ -96,7 +96,7 @@ async function runAll() {
 
   // run-tests: CPU feature checks. x86_64: only AVX-512 and SHA-NI can be present; the ARM ones
   // are absent by construction.
-  const cpu = await Deno.readTextFile("/proc/cpuinfo");
+  const cpu = await readFile("/proc/cpuinfo", "utf8");
   const has: Record<string, boolean> = {
     needsAVX512: /\bavx512f\b/.test(cpu),
     needsSHANI: /\bsha_ni\b/.test(cpu),
@@ -110,13 +110,13 @@ async function runAll() {
   if (await sh(`${sq(bin)}/clang -O3 -c -o filc/tests/utils.o filc/tests/utils.c -g`) !== 0) throw new Error("cannot compile filc/tests/utils.c");
 
   const outRoot = "filc/test-output";
-  await Deno.remove(outRoot, { recursive: true }).catch(() => {});
-  await Deno.mkdir(outRoot, { recursive: true });
+  await rm(outRoot, { recursive: true, force: true });
+  await mkdir(outRoot, { recursive: true });
 
   const results: Record<string, Status> = {};
   const queue: { name: string; slow: boolean }[] = [];
   const names: string[] = [];
-  for await (const e of Deno.readDir("filc/tests")) if (e.isDirectory) names.push(e.name);
+  for (const e of await readdir("filc/tests", { withFileTypes: true })) if (e.isDirectory()) names.push(e.name);
   names.sort();
 
   for (const name of names) {
@@ -124,8 +124,10 @@ async function runAll() {
     const full = `filc/tests/${name}`;
     if (!(await exists(`${full}/manifest`))) continue; // run-tests: "no manifest"
     // Ruby's YAML takes a repeated key, the last one winning; six 0.685 manifests repeat
-    // `only-on-platform` (same value), and Deno's parser rejects that unless told.
-    const m = (parseYaml(await Deno.readTextFile(`${full}/manifest`), { allowDuplicateKeys: true }) ?? {}) as Manifest;
+    // `only-on-platform` (same value). Bun.YAML takes it, last one winning; the Deno port needed
+    // @std/yaml's allowDuplicateKeys. (Checked 2026-10-22: Bun.YAML and that parser give identical
+    // results on every manifest of 0.685 and 0.686, 14,252 in all.)
+    const m = (Bun.YAML.parse(await readFile(`${full}/manifest`, "utf8")) ?? {}) as Manifest;
     // run-tests: the skips, in its order.
     if (m["only-on-platform"] && !new RegExp(String(m["only-on-platform"])).test(platform)) { results[name] = `SKIP: only on ${m["only-on-platform"]}`; continue; }
     const missing = Object.keys(has).find((k) => m[k] && !has[k]);
@@ -146,11 +148,11 @@ async function runAll() {
     const excludes = arr(m["output-excludes"]);
     const optFlags = m["optFlags"] ? String(m["optFlags"]) : "-O2";
     const out = `${outRoot}/${name}`;
-    await Deno.mkdir(out, { recursive: true });
-    for (const d of arr(m["mkdirs"])) await Deno.mkdir(`${out}/${d}`, { recursive: true });
+    await mkdir(out, { recursive: true });
+    for (const d of arr(m["mkdirs"])) await mkdir(`${out}/${d}`, { recursive: true });
 
     const entries: string[] = [];
-    for await (const e of Deno.readDir(full)) if (e.isFile && isSource(e.name)) entries.push(e.name);
+    for (const e of await readdir(full, { withFileTypes: true })) if (e.isFile() && isSource(e.name)) entries.push(e.name);
     entries.sort();
     const compilerOutput = `${out}/compilerOutput.txt`;
     const binary = `${out}/${name}`;
@@ -200,7 +202,7 @@ async function runAll() {
       if (expected === "linkFailure") c.push("if [ $? -eq 0 ]", "then", `    echo ${sq(`${runScript}: FAIL: linked but shouldn't have`)}`, `    cat ${sq(compilerOutput)}`, "    exit 1", "fi");
       else c.push("if [ $? -ne 0 ]", "then", `    echo ${sq(`${runScript}: FAIL: couldn't link`)}`, `    cat ${sq(compilerOutput)}`, "    exit 1", "fi");
     }
-    await Deno.writeTextFile(`${out}/compile.sh`, c.join("\n") + "\n", { mode: 0o755 });
+    await writeFile(`${out}/compile.sh`, c.join("\n") + "\n", { mode: 0o755 });
 
     // run-tests: justRun.sh / justRunRelease.sh and the four sub-runs.
     const runs = expected !== "compileFailure" && expected !== "compileOnly" && expected !== "linkFailure";
@@ -209,9 +211,9 @@ async function runAll() {
       const extraArgs = arr(m["extraArgs"]).map(sq).join(" ");
       const env = arr(m["extra-env"]).map((e) => `${e} `).join("");
       const ld = m["extraLDPath"] ? `:${m["extraLDPath"]}` : "";
-      await Deno.writeTextFile(`${out}/justRun.sh`, `#!/bin/sh\nset -e\nLD_LIBRARY_PATH=${pizfix}/lib_test${ld} ${env}${sq(binary)} ${extraArgs}\n`, { mode: 0o755 });
+      await writeFile(`${out}/justRun.sh`, `#!/bin/sh\nset -e\nLD_LIBRARY_PATH=${pizfix}/lib_test${ld} ${env}${sq(binary)} ${extraArgs}\n`, { mode: 0o755 });
       const ldRel = m["extraLDPath"] ? `LD_LIBRARY_PATH=${m["extraLDPath"]} ` : "";
-      await Deno.writeTextFile(`${out}/justRunRelease.sh`, `#!/bin/sh\nset -e\n${ldRel}${env}${sq(binary)} ${extraArgs}\n`, { mode: 0o755 });
+      await writeFile(`${out}/justRunRelease.sh`, `#!/bin/sh\nset -e\n${ldRel}${env}${sq(binary)} ${extraArgs}\n`, { mode: 0o755 });
       const subRuns = m["subRuns"] as Record<string, unknown> | undefined;
       const kinds = [
         { key: "default", file: "subRun.sh", prefix: "FUGC_RAGE_MODE=1", just: "justRun.sh", output: "output.txt" },
@@ -236,12 +238,12 @@ async function runAll() {
         for (const x of includes) s.push(`grep -F -- ${sq(x)} ${sq(output)} > /dev/null || {`, `    echo ${sq(`${script}: FAIL: expected output to contain ${x}`)}`, `    cat ${sq(output)}`, "    exit 1", "}");
         for (const x of excludes) s.push(`grep -F -- ${sq(x)} ${sq(output)} > /dev/null && {`, `    echo ${sq(`${script}: FAIL: expected output to NOT contain ${x}`)}`, `    cat ${sq(output)}`, "    exit 1", "}");
         s.push(":");
-        await Deno.writeTextFile(script, s.join("\n") + "\n", { mode: 0o755 });
+        await writeFile(script, s.join("\n") + "\n", { mode: 0o755 });
         if (!subRuns || subRuns[k.key]) subScripts.push(script);
       }
     }
     // run-tests: run.sh
-    await Deno.writeTextFile(runScript, ["#!/bin/sh", "set -e", sq(`${out}/compile.sh`), ...subScripts.map(sq)].join("\n") + "\n", { mode: 0o755 });
+    await writeFile(runScript, ["#!/bin/sh", "set -e", sq(`${out}/compile.sh`), ...subScripts.map(sq)].join("\n") + "\n", { mode: 0o755 });
     queue.push({ name, slow: Boolean(m["slow"]) });
   }
 
@@ -262,25 +264,25 @@ async function runAll() {
 
   const count = (p: (s: Status) => boolean) => Object.values(results).filter(p).length;
   console.log(`[${label}] ${queue.length} run, ${count((s) => s === "PASS")} pass, ${count((s) => s === "FAIL")} fail, ${count((s) => s === "TIMEOUT")} timeout, ${count((s) => s.startsWith("SKIP"))} skipped, ${Math.round((Date.now() - started) / 1000)} s`);
-  await Deno.writeTextFile(`results-${label}.json`, JSON.stringify(results, null, 1));
-  await Deno.remove(`filc/test-output-${label}`, { recursive: true }).catch(() => {});
-  await Deno.rename(outRoot, `filc/test-output-${label}`);
+  await writeFile(`results-${label}.json`, JSON.stringify(results, null, 1));
+  await rm(`filc/test-output-${label}`, { recursive: true, force: true });
+  await rename(outRoot, `filc/test-output-${label}`);
 }
 
 async function compare() {
   const [a, b] = [args[1], args[2]];
-  const ra = JSON.parse(await Deno.readTextFile(a)) as Record<string, Status>;
-  const rb = JSON.parse(await Deno.readTextFile(b)) as Record<string, Status>;
+  const ra = JSON.parse(await readFile(a, "utf8")) as Record<string, Status>;
+  const rb = JSON.parse(await readFile(b, "utf8")) as Record<string, Status>;
   const names = [...new Set([...Object.keys(ra), ...Object.keys(rb)])].sort();
   const diff = names.filter((n) => ra[n] !== rb[n]);
   console.log(`${names.length} tests; ${diff.length} with a different result (${a} vs ${b})`);
   for (const n of diff) console.log(`  ${n}: ${ra[n] ?? "absent"} -> ${rb[n] ?? "absent"}`);
-  Deno.exit(diff.length ? 1 : 0);
+  process.exit(diff.length ? 1 : 0);
 }
 
 if (mode === "run") await runAll();
 else if (mode === "compare") await compare();
 else {
   console.error("usage: run-filc-tests.ts run --pizfix P --label L [--jobs N] [--filter RE] [--timeout S] | compare A.json B.json");
-  Deno.exit(2);
+  process.exit(2);
 }

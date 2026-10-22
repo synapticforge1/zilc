@@ -13,7 +13,7 @@ the public headers. They never read the runtime's source. Findings: `cmem/filc-a
 Run from Windows (PowerShell mangles inline shell text, KI-1):
 
 ```powershell
-deno run -A tools/p3/abi-probe.ts
+bun tools/p3/abi-probe.ts
 ```
 
 They expect Fil-C at `~/zilc-work/tools/filc-0.685-linux-x86_64`, as set up in `roadmap.md` P1.

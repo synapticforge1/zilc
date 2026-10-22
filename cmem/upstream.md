@@ -138,7 +138,7 @@ its `publishing.md`).
   `CodeGen` (`IndirectBrExpandPass.cpp`, which KI-4's broken lowering was copied from), the runtime
   (`libpas`, and `filc` without its 15,603-file `tests/`), plus the top-level docs and build
   scripts. About 450 MB.
-- **Create:** `deno run -A tools/upstream/clone-upstream.ts` (any OS; normally Windows, where the clone lives). It sets, **in the clone only**:
+- **Create:** `bun tools/upstream/clone-upstream.ts` (any OS; normally Windows, where the clone lives). It sets, **in the clone only**:
   - `core.autocrlf=false`: upstream's exact LF bytes; the global `true` broke exact-text matching;
   - `core.protectNTFS=false`: Fil-C bundles files whose names Windows forbids (`aux.h`, `:`, `\`),
     all outside the sparse set, which Git for Windows otherwise refuses even to index;
@@ -147,7 +147,7 @@ its `publishing.md`).
   Once per machine, because D: is exFAT (no file ownership):
   `git config --global --add safe.directory …/zilc/upstream/fil-c`. That's the same as every other
   project's `upstream/` in your global config.
-- **Monitor:** `deno run -A tools/upstream/check-upstream.ts`. It fetches, then reports, relative to the last
+- **Monitor:** `bun tools/upstream/check-upstream.ts`. It fetches, then reports, relative to the last
   reviewed commit in `tools/upstream/REVIEWED` (committed):
   - new commits and new release tags;
   - commits touching **watched files** (the pass zilc patches, `IndirectBrExpandPass.cpp`,
@@ -174,7 +174,7 @@ its `publishing.md`).
   **All pass edits (five, with KI-22 lever (b)'s, re-checked later the same day) and all three
   `llvm-split` edits still apply.** Still not marked reviewed:
   the 9 pass commits (above all `097f7b7`) have not been read yet.
-- **Run of 2026-10-05** (now `deno run -A tools/upstream/check-upstream.ts`, any OS): upstream
+- **Run of 2026-10-05** (now `bun tools/upstream/check-upstream.ts`, any OS): upstream
   `deluge` at `163fae5` (2026-10-04), **123 commits ahead**, and a **NEW RELEASE TAG `v0.686`**.
   Watched-file hits: **10** to `FilPizlonator.cpp` (one more than before), 1 to `configure_llvm.sh`,
   2 to `libpas/common.sh`, 2 to `filc/include`, and 41 to `filc/tests` (newly watched: Fil-C's

@@ -1,11 +1,11 @@
-#!/usr/bin/env -S deno run --allow-read
+#!/usr/bin/env bun
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception OR MIT
 //
 // Pre-publish "output comparison": does each tests/basics program print the same thing under zilc
 // as natively (plain Zig 0.15.2, no Fil-C)? Exit codes alone were checked before; this compares
 // stdout+stderr.
 //
-//   deno run --allow-read compare-output.ts <native1> <native2> <zilc-work> [modes] [langs]
+//   bun compare-output.ts <native1> <native2> <zilc-work> [modes] [langs]
 //
 //   native1, native2  two runs of tools/basics/run-native.ts (its zig-out/basics-run folder):
 //                     <dir>/<lang>/<name>.out
@@ -24,6 +24,7 @@
 //                  Kept short and each entry explained: a new difference anywhere else fails.
 // The run is bounded (servers and signal waits time out after 15 s), so those outputs are
 // whatever was printed before the timeout, which is itself compared.
+import { readdir, readFile, stat } from "node:fs/promises";
 
 // Measured 2026-10-02 (cmem/testing.md "Output comparison"); the same in C and Zig unless noted.
 const EXPECTED: Record<string, string> = {
@@ -37,22 +38,22 @@ const EXPECTED: Record<string, string> = {
   "75_spawning-processes": "runs `date` and `ls -la` on its working directory",
 };
 
-const [n1, n2, work, modesArg, langsArg] = Deno.args;
+const [n1, n2, work, modesArg, langsArg] = process.argv.slice(2);
 if (!n1 || !n2 || !work) {
   console.error("usage: compare-output.ts <native1> <native2> <zilc-work> [modes] [langs]");
-  Deno.exit(2);
+  process.exit(2);
 }
 const modes = (modesArg ?? "Debug,ReleaseSafe,ReleaseFast,ReleaseSmall").split(",");
 const langs = (langsArg ?? "zig,c").split(",");
 
 const read = async (p: string): Promise<string | null> => {
   try {
-    return await Deno.readTextFile(p);
+    return await readFile(p, "utf8");
   } catch {
     return null;
   }
 };
-const exists = async (p: string) => (await Deno.stat(p).catch(() => null)) !== null;
+const exists = async (p: string) => (await stat(p).catch(() => null)) !== null;
 const lines = (s: string) => s.split("\n");
 // A `+` inside a number counts as part of it: 51_epoch prints nanoseconds zero-padded AND signed,
 // so its shape is `+#` with 9 digits but `#+#` with 8 (Zig pads before the sign). Seen 2026-10-05.
@@ -74,8 +75,8 @@ for (const lang of langs) {
   const nativeDir1 = `${n1}/${lang}`;
   if (!(await exists(nativeDir1))) continue;
   const names = [] as string[];
-  for await (const e of Deno.readDir(nativeDir1)) {
-    if (e.isFile && e.name.endsWith(".out")) names.push(e.name.slice(0, -4));
+  for (const e of await readdir(nativeDir1, { withFileTypes: true })) {
+    if (e.isFile() && e.name.endsWith(".out")) names.push(e.name.slice(0, -4));
   }
   names.sort();
   for (const mode of modes) {
@@ -122,4 +123,4 @@ for (const lang of langs) {
   }
 }
 console.log(`TOTAL: ${JSON.stringify(totals)}`);
-Deno.exit(totals.differs + totals.variesBad + totals.missing > 0 ? 1 : 0);
+process.exit(totals.differs + totals.variesBad + totals.missing > 0 ? 1 : 0);

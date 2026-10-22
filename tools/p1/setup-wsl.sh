@@ -77,12 +77,30 @@ else
   touch .setup-done
 fi
 
-echo "== 4/4 Deno"
-if [ -x "$HOME/.deno/bin/deno" ]; then
+echo "== 4/4 Bun"
+# Bun runs zilc's tools (Bun only since 2026-10-22). Taken from npm's @oven/bun-linux-x64 because
+# that is a .tgz: Bun's own installer needs `unzip`, which a fresh Ubuntu lacks and installing
+# needs root. BUN_SHA is the SHA-256 of the file as downloaded on 2026-10-22 (its SHA-1 matched
+# the registry's `dist.shasum`, 2f13abdede6651ab4c393e7754cbe64981dd325d).
+BUN_VERSION=1.4.3
+BUN_URL="https://registry.npmjs.org/@oven/bun-linux-x64/-/bun-linux-x64-$BUN_VERSION.tgz"
+BUN_SHA="efd069d474e6addceede0dc9c0981b4421cf35ceb3348e4b83462053a177281f"
+if [ -x "$HOME/.bun/bin/bun" ]; then
   echo "already installed"
 else
-  curl -fsSL https://deno.land/install.sh | DENO_INSTALL="$HOME/.deno" sh -s -- -y >/dev/null
+  T="$DL/bun-$BUN_VERSION.tgz"
+  [ -f "$T" ] || curl -fsSL "$BUN_URL" -o "$T"
+  got=$(sha256sum "$T" | cut -d' ' -f1)
+  if [ "$got" != "$BUN_SHA" ]; then
+    echo "SHA MISMATCH: got $got want $BUN_SHA" >&2
+    exit 1
+  fi
+  echo "sha256 OK"
+  mkdir -p "$DL/bun" "$HOME/.bun/bin"
+  tar -xzf "$T" -C "$DL/bun"
+  cp "$DL/bun/package/bin/bun" "$HOME/.bun/bin/bun"
+  chmod +x "$HOME/.bun/bin/bun"
 fi
-"$HOME/.deno/bin/deno" --version | head -1
+"$HOME/.bun/bin/bun" --version
 
 echo "== done"

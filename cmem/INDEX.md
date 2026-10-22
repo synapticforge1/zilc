@@ -67,8 +67,18 @@ for structure and policy.
 - ✅ **2026-10-05: `zilc --version` + `RELEASE-NOTES.md`** (pre-publish item; `releasing.md`).
 - ✅ **2026-10-05: Fil-C's own 7,003 tests** run against zilc's patched clang: identical to stock;
   found and fixed a broken kernel-header link on this machine (`testing.md`).
+- ✅ **2026-10-22: every tool is Bun** (owner: "Bun only", Deno is going away). All 38 `.ts` files (37 tools + `lib/tool.ts`)
+  ported from `Deno.*`/`jsr:` to `node:*` + `Bun.spawn`/`Bun.Glob`/`Bun.YAML`; run
+  `bun tools/<group>/<tool>.ts`. Bun 1.4.3 in WSL at `~/.bun/bin` (`setup-wsl.sh`, from npm's
+  tarball: no `unzip`/root). Checked against Deno runs: gate 8/8 identical (also started from
+  Windows through the WSL bridge), run-native identical (632 files; differences only in times,
+  random values, thread order, PIDs, paths), the p1–p3 experiments same exit codes and reports
+  (byte-identical or differing only in ASLR/PIDs/paths), patch-pass/patch-split outputs
+  byte-identical, Bun.YAML = @std/yaml on all 14,252 Fil-C manifests. Not re-run under Bun:
+  build/archive/restore-patched-clang, build-cosmo, run-filc-tests, os-surface, size-compare,
+  zilc-check, all-modes, check/clone-upstream.
 - ✅ **2026-10-05: every tool is Deno** (owner: cross-platform; all but `tools/p1/setup-wsl.sh`).
-  `deno run -A tools/<group>/<tool>.ts` works from Windows and Linux; Linux-only tools bridge into
+  `deno run -A tools/<group>/<tool>.ts` worked from Windows and Linux; Linux-only tools bridge into
   WSL by themselves (`tools/lib/tool.ts`, `tools/README.md`). Each of the 31 conversions was checked
   against its shell original; the end-to-end re-run: corpus 78/78 in four modes, output comparison
   0 unexplained (505 identical), gate 8/8, toolchain build/archive/restore OK.
@@ -398,7 +408,7 @@ Fil-C toolchain is missing.
 1. **Fil-C work happens in WSL2** (Ubuntu 26.04), under `~/zilc-work/`. ⚠️ **`sudo` needs an
    interactive password**, so install prebuilt binaries into `$HOME` rather than using `apt`. ⚠️
    **Pass shell text to WSL as a FILE** (`wsl.exe -e sh <file>`); PowerShell mangles it inline.
-   (zilc's own tools no longer need this: since 2026-10-05 they are Deno and bridge into WSL with an
+   (zilc's own tools no longer need this: since 2026-10-05 they are Deno, since 2026-10-22 Bun, and bridge into WSL with an
    argument list, `tools/README.md`. The rule stays for ad-hoc commands.)
    See `known-issues.md` KI-1.
 2. **D: is exFAT. Set `ZIG_LOCAL_CACHE_DIR=C:\zig-cache\zilc` before any `zig build`.** A
@@ -430,7 +440,7 @@ this for the project"), do all of the following:
 3. **If the work produced a transferable METHOD lesson, add it to
    [`best-practices.md`](best-practices.md)** as one bold rule plus a citation to the incident.
 4. **Keep the patched Fil-C clang archived in the project (owner, 2026-10-01).** Run
-   `deno run -A tools/filc/check-toolchain.ts`. If it reports STALE (a new patch
+   `bun tools/filc/check-toolchain.ts`. If it reports STALE (a new patch
    or workaround in Fil-C's source in WSL, a rebuilt compiler, or an archive from an older patch),
    do what it says before finishing. In order:
    1. Every change to Fil-C's source goes into an edit script, the source of truth:
@@ -444,7 +454,7 @@ this for the project"), do all of the following:
 
    `toolchain/` is gitignored, so the archive itself is never committed, but the patch, the
    scripts and the checksum line in the ledger are.
-5. **Check Fil-C upstream for changes (owner, 2026-10-01):** `deno run -A tools/upstream/check-upstream.ts`
+5. **Check Fil-C upstream for changes (owner, 2026-10-01):** `bun tools/upstream/check-upstream.ts`
    (any OS). Record in `upstream.md` anything that touches a watched file, above all whether
    zilc's pass patch still applies. After reviewing, `--mark-reviewed`, and commit
    `tools/upstream/REVIEWED`. The reference clone is `upstream/fil-c/` (gitignored, never built).
@@ -491,7 +501,7 @@ the runtime-linking rule checked.
 | [filc-abi.md](filc-abi.md) | 🆕 2026-09-30. **Fil-C 0.685's runtime ABI as OBSERVED** (post-pass IR, headers, binaries; no runtime source): flight pointers, the object-header word, function objects and getters, the fast and generic calling convention, the thread layout, linking and overriding. What P3 must match, and its scoping consequences. |
 | [zig-upstream-notes.md](zig-upstream-notes.md) | 🆕 2026-09-30. **Zig behaviours we may need to report** (owner asked): Z-1 `indexOfSentinel` over-read (fixed in 0.16.0; report draft and repro in `tools/zig-reports/`), Z-2 the `mmap` hint, Z-3 raw syscalls, Z-4 `getcontext`, Z-5 `DebugAllocator` integer arithmetic. Each with whether it is really a Zig bug. |
 | [ports/](ports/README.md) | 🆕 2026-09-30. **Port notes: one file per new Zig line, named by its first release** (`ports/0.16.2-1.md`): its basis, each API change and fix, the sites touched. `ports/README.md` holds the guide, the template, and, seeded with the 2026-09-18 0.16 → 0.15.2 move, whose API list is the 0.15.2 → 0.16 port in reverse. |
-| [best-practices.md](best-practices.md) | Method rules. Seeded from wazmrt, plus zilc's own: verify toolchain versions in the build files **and** the binary; a minimum-version field is not a pin; no heredocs; Deno/Bun for scripts; (2026-09-30) measure the contract before planning a port; reserve a switch by refusing, never by falling back. |
+| [best-practices.md](best-practices.md) | Method rules. Seeded from wazmrt, plus zilc's own: verify toolchain versions in the build files **and** the binary; a minimum-version field is not a pin; no heredocs; Bun only for scripts (2026-10-22: no Deno, no Python); (2026-09-30) measure the contract before planning a port; reserve a switch by refusing, never by falling back. |
 
 ## Related files outside cmem
 

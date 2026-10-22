@@ -1,4 +1,4 @@
-#!/usr/bin/env -S deno run --allow-read --allow-write
+#!/usr/bin/env bun
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception OR MIT
 //
 // Apply zilc's local fixes to Fil-C's compiler pass (FilPizlonator.cpp, which is
@@ -9,7 +9,7 @@
 // different Fil-C version fails loudly instead of being mis-patched (the same
 // rule as src/stdpatch.zig).
 //
-//   deno run --allow-read --allow-write patch-pass.ts path/to/FilPizlonator.cpp
+//   bun patch-pass.ts path/to/FilPizlonator.cpp
 //
 // KI-22 (cmem/workarounds.md): the frame-slot colouring tried FrameIndex = 0, 1,
 // 2, ... and rescanned every neighbour at each index, O(degree x colours) per
@@ -17,6 +17,8 @@
 // lookups. The replacement marks the indices the neighbours already hold, then
 // takes the lowest unmarked one. Same values visited in the same order, same
 // lowest-free-index choice: the SAME colouring, so the output is unchanged.
+
+import { readFile, writeFile } from "node:fs/promises";
 
 interface Edit {
   name: string;
@@ -588,10 +590,11 @@ static bool zilcVerifyInterference() {
 // `--check`: report, edit by edit, whether the patch would apply, WITHOUT writing. Used by
 // tools/upstream/check-upstream.ts against upstream's newest FilPizlonator.cpp. Exit 1 if any
 // edit's original text is gone (upstream changed the code we patch: re-derive that edit).
-const check = Deno.args[0] === "--check";
-const path = check ? Deno.args[1] : Deno.args[0];
+const args = process.argv.slice(2);
+const check = args[0] === "--check";
+const path = check ? args[1] : args[0];
 if (!path) throw new Error("usage: patch-pass.ts [--check] path/to/FilPizlonator.cpp");
-let text = await Deno.readTextFile(path);
+let text = await readFile(path, "utf8");
 const original = text;
 if (check) {
   let broken = 0;
@@ -601,7 +604,7 @@ if (check) {
     if (!text.includes(e.new) && n !== 1) broken++;
     console.log(`  ${state.padEnd(36)} ${e.name}`);
   }
-  Deno.exit(broken ? 1 : 0);
+  process.exit(broken ? 1 : 0);
 }
 // Each edit is applied on its own: skipped if its result is already there, applied if the exact
 // original is there once, and an error otherwise.
@@ -617,4 +620,4 @@ for (const e of edits) {
 }
 // Only on a change: rewriting an already-patched file bumps its timestamp, and ninja would then
 // recompile it and relink clang for nothing.
-if (text !== original) await Deno.writeTextFile(path, text);
+if (text !== original) await writeFile(path, text);

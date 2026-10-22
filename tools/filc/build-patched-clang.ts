@@ -4,10 +4,10 @@
 // (cmem/workarounds.md KI-22; ledger `filc-pass-fixes` in third_party/LICENSES.md). Linux; from
 // Windows it runs inside WSL.
 //
-//   deno run -A tools/filc/build-patched-clang.ts      env: JOBS (ninja jobs, default 12)
+//   bun tools/filc/build-patched-clang.ts      env: JOBS (ninja jobs, default 12)
 //
 // Needs: build-essential + cmake (apt, `main`), Ninja in ~/zilc-work/tools/ninja (official release
-// binary), Deno. The source is Fil-C's LLVM fork at the commit the current prebuilt names in
+// binary), Bun. The source is Fil-C's LLVM fork at the commit the current prebuilt names in
 // `clang --version`, so the only difference from the prebuilt is the patch.
 //
 // Configuration mirrors Fil-C's own configure_llvm.sh at that commit, except LLVM_ENABLE_LLD (lld
@@ -17,9 +17,12 @@
 // replaced and build/bin/llvm-split added. Point zilc at it with
 // ZILC_FILC=…/filc-<FILC_VERSION>-zilc/build/bin/clang. Then (cmem/INDEX.md policy): run Fil-C's own test
 // suite against it (run-filc-tests.ts) and re-archive (archive-patched-clang.ts).
+import { mkdtemp, readFile, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { fixOsInclude } from "./fix-os-include.ts";
 import {
-  env, exists, FILC_PATCHED_TREE, FILC_PREBUILT_TREE, FILC_SHA, FILC_SOURCE_URL, linuxOnly, mkdirp, must, REPO, rmrf, run, show, WORK,
+  basename, env, exists, FILC_PATCHED_TREE, FILC_PREBUILT_TREE, FILC_SHA, FILC_SOURCE_URL, linuxOnly, mkdirp, must, REPO, rmrf, run, show, WORK,
 } from "../lib/tool.ts";
 
 await linuxOnly(import.meta);
@@ -47,12 +50,13 @@ if ((await must(["git", "-C", src, "rev-parse", "HEAD"])).trim() !== sha) throw 
 // copy of the PRISTINE file at $sha, so changing an edit's replacement text just works, and the
 // tree's file is replaced only if the result differs (else ninja would rebuild clang for nothing).
 async function patchFile(script: string, file: string) {
-  const tmp = await Deno.makeTempFile();
-  await Deno.writeTextFile(tmp, await must(["git", "-C", src, "show", `${sha}:${file}`]));
-  await must([Deno.execPath(), "run", "--allow-read", "--allow-write", `${REPO}/tools/filc/${script}`, tmp], { inherit: true });
-  const patched = await Deno.readTextFile(tmp);
-  if (patched !== await Deno.readTextFile(`${src}/${file}`).catch(() => "")) await Deno.writeTextFile(`${src}/${file}`, patched);
-  await Deno.remove(tmp);
+  const dir = await mkdtemp(join(tmpdir(), "zilc-"));
+  const tmp = `${dir}/${basename(file)}`;
+  await writeFile(tmp, await must(["git", "-C", src, "show", `${sha}:${file}`]));
+  await must([process.execPath, `${REPO}/tools/filc/${script}`, tmp], { inherit: true });
+  const patched = await readFile(tmp, "utf8");
+  if (patched !== await readFile(`${src}/${file}`, "utf8").catch(() => "")) await writeFile(`${src}/${file}`, patched);
+  await rmrf(dir);
 }
 await patchFile("patch-pass.ts", "llvm/lib/Transforms/Instrumentation/FilPizlonator.cpp");
 await patchFile("patch-split.ts", "llvm/tools/llvm-split/llvm-split.cpp");

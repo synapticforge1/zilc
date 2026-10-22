@@ -1,4 +1,4 @@
-#!/usr/bin/env -S deno run --allow-read --allow-write --allow-run
+#!/usr/bin/env bun
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception OR MIT
 //
 // Delta-debug an LLVM IR module down to the smallest one that still crashes a
@@ -10,12 +10,15 @@
 // `external` declarations, so every reference stays valid and the module keeps
 // parsing. Globals were added for KI-18, whose trigger is a constant.
 //
-//   deno run --allow-read --allow-write --allow-run llreduce.ts \
-//     --input dbg-ni.ll --out reduced.ll --filc /path/to/filc/bin/clang
+//   bun llreduce.ts --input dbg-ni.ll --out reduced.ll --filc /path/to/filc/bin/clang
 //
 // "Interesting" means the compiler died on a signal (segfault or assert),
 // never an ordinary error exit — otherwise the reducer happily "reduces"
 // towards modules that merely fail to parse.
+
+import { mkdtemp, readFile, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 interface Args {
   input: string;
@@ -183,37 +186,36 @@ const crash_markers = [
 ];
 
 async function crashes(args: Args, path: string): Promise<boolean> {
-  const cmd = new Deno.Command(args.filc, {
-    args: [args.opt, "-c", "-o", "/dev/null", path],
-    stdout: "null",
-    stderr: "piped",
+  const child = Bun.spawn([args.filc, args.opt, "-c", "-o", "/dev/null", path], {
+    stdout: "ignore",
+    stderr: "pipe",
   });
-  const { code, signal, stderr } = await cmd.output();
-  if (signal !== null || code === 139 || code === 134) return true;
+  const text = await new Response(child.stderr).text();
+  const code = await child.exited;
+  if (child.signalCode !== null || code === 139 || code === 134) return true;
   if (code === 0) return false;
-  const text = new TextDecoder().decode(stderr);
   // An ordinary "error:" exit means the module was merely invalid, which is
   // not interesting — unless the crash markers are there too.
   return crash_markers.some((m) => text.includes(m));
 }
 
 async function main() {
-  const args = parseArgs(Deno.args.slice());
-  const lines = (await Deno.readTextFile(args.input)).split("\n");
+  const args = parseArgs(process.argv.slice(2));
+  const lines = (await readFile(args.input, "utf8")).split("\n");
   const funcs = findFunctions(lines);
   console.log(`input: ${lines.length} lines, ${funcs.length} units (function and global definitions)`);
 
-  const tmp = await Deno.makeTempFile({ suffix: ".ll" });
+  const tmp = join(await mkdtemp(join(tmpdir(), "zilc-")), "candidate.ll");
 
   const test = async (keep: Set<number>): Promise<boolean> => {
-    await Deno.writeTextFile(tmp, render(lines, funcs, keep));
+    await writeFile(tmp, render(lines, funcs, keep));
     return await crashes(args, tmp);
   };
 
   let keep = new Set(funcs.keys());
   if (!await test(keep)) {
     console.error("the unmodified input does not crash: nothing to reduce");
-    Deno.exit(1);
+    process.exit(1);
   }
 
   // ddmin: try ever-finer partitions, keeping any subset that still crashes.
@@ -247,7 +249,7 @@ async function main() {
   }
 
   const finalText = render(lines, funcs, keep);
-  await Deno.writeTextFile(args.out, finalText);
+  await writeFile(args.out, finalText);
   console.log(`\nreduced to ${finalText.split("\n").length} lines, ${keep.size} units, in ${runs} runs`);
   console.log(`wrote ${args.out}`);
   for (const idx of keep) {

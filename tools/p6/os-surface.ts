@@ -15,8 +15,9 @@
 // No Fil-C involved, nothing is linked: it measures Zig's std, not zilc. Linux; from Windows it runs
 // inside WSL.
 //
-//   deno run -A tools/p6/os-surface.ts        env: JOBS (default 12), TARGETS (space-separated)
+//   bun tools/p6/os-surface.ts       env: JOBS (default 12), TARGETS (space-separated)
 // Writes $WORK/p6/os-surface.json (per target: the symbol lists) and prints the summary table.
+import { readFile, writeFile } from "node:fs/promises";
 import { basename, env, envInt, glob, linuxOnly, mkdirp, pool, REPO, rmrf, run, WORK, ZIG } from "../lib/tool.ts";
 
 await linuxOnly(import.meta);
@@ -50,7 +51,7 @@ for (const { t, lc } of targets) {
       await rmrf(ll);
       return [name, { ok: false, err, ext: [], asm: 0, i2p: [] }];
     }
-    const ir = await Deno.readTextFile(ll);
+    const ir = await readFile(ll, "utf8");
     await rmrf(ll); // ~10 MB each
     const ext = new Set<string>();
     for (const m of ir.matchAll(/^declare [^@]*@("[^"]+"|[\w.$]+)\(/gm)) {
@@ -76,7 +77,7 @@ for (const { t, lc } of targets) {
   const ok = progs.filter(([, p]) => p.ok).length;
   console.error(`${t}: ${ok}/${files.length} compile`);
 }
-await Deno.writeTextFile(`${out}/os-surface.json`, JSON.stringify(results, null, 1));
+await writeFile(`${out}/os-surface.json`, JSON.stringify(results, null, 1));
 
 // The summary. "Std" names keep Zig's mangling (`posix.read`, `os.linux.x86_64.syscall3`, ...).
 const base = results["x86_64-linux-musl"];

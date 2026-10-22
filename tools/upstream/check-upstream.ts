@@ -3,20 +3,21 @@
 // Monitor Fil-C upstream for changes that matter to zilc (cmem/upstream.md "The upstream/ reference
 // folder"). Fetches upstream/fil-c, then reports, relative to the last REVIEWED commit: new commits,
 // new release tags, commits touching the files zilc patches or depends on, and whether zilc's patches
-// still apply to upstream's newest FilPizlonator.cpp and llvm-split.cpp. Needs git and Deno: runs on
+// still apply to upstream's newest FilPizlonator.cpp and llvm-split.cpp. Needs git and Bun: runs on
 // any OS (normally Windows, where the reference clone lives).
 //
-//   deno run -A tools/upstream/check-upstream.ts                  report only
-//   deno run -A tools/upstream/check-upstream.ts --mark-reviewed  after reviewing: record upstream HEAD
+//   bun tools/upstream/check-upstream.ts                  report only
+//   bun tools/upstream/check-upstream.ts --mark-reviewed  after reviewing: record upstream HEAD
 //
 // ⚠️ Every git command names its repo with -C and an absolute path (see clone-upstream.ts).
-import { exists, must, REPO, run } from "../lib/tool.ts";
+import { readFile, writeFile } from "node:fs/promises";
+import { ARGS, exists, must, REPO, run } from "../lib/tool.ts";
 
 const u = `${REPO}/upstream/fil-c`;
 const revFile = `${REPO}/tools/upstream/REVIEWED`;
 if (!(await exists(`${u}/.git`))) {
   console.log("no upstream clone; run tools/upstream/clone-upstream.ts");
-  Deno.exit(1);
+  process.exit(1);
 }
 const git = (...a: string[]) => must(["git", "-C", u, ...a]).then((s) => s.trim());
 
@@ -37,7 +38,7 @@ const watch: [string, string][] = [
 ];
 
 await must(["git", "-C", u, "fetch", "-q", "origin", "deluge", "--tags"]);
-const reviewedLine = (await Deno.readTextFile(revFile)).trim();
+const reviewedLine = (await readFile(revFile, "utf8")).trim();
 const reviewed = reviewedLine.split(" ")[0];
 const head = await git("rev-parse", "origin/deluge");
 await must(["git", "-C", u, "checkout", "-q", "--detach", head]);
@@ -67,12 +68,12 @@ for (const [script, file, what] of [
   ["patch-split.ts", "llvm/tools/llvm-split/llvm-split.cpp", "llvm-split patch"],
 ]) {
   console.log(`--- does zilc's ${what} still apply to upstream's newest ${file.split("/").pop()}?`);
-  const r = await run([Deno.execPath(), "run", "--allow-read", `${REPO}/tools/filc/${script}`, "--check", `${u}/${file}`], { inherit: true });
+  const r = await run([process.execPath, `${REPO}/tools/filc/${script}`, "--check", `${u}/${file}`], { inherit: true });
   console.log(r.code === 0 ? "  yes, every edit" : "  ⚠️ NO: re-derive the edits marked above before the next Fil-C upgrade");
 }
 
-if (Deno.args.includes("--mark-reviewed")) {
+if (ARGS.includes("--mark-reviewed")) {
   const name = (await run(["git", "-C", u, "describe", "--tags", "--always", head])).out.trim();
-  await Deno.writeTextFile(revFile, `${head} ${name} ${new Date().toISOString().slice(0, 10)} reviewed\n`);
+  await writeFile(revFile, `${head} ${name} ${new Date().toISOString().slice(0, 10)} reviewed\n`);
   console.log("recorded HEAD as reviewed in tools/upstream/REVIEWED (commit it)");
 }

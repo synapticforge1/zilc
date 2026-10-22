@@ -4,9 +4,10 @@
 // installed tree healthy? Run on every "update the project memory" (cmem/INDEX.md policy, owner
 // 2026-10-01). Linux; from Windows it runs inside WSL.
 //
-//   deno run -A tools/filc/check-toolchain.ts
+//   bun tools/filc/check-toolchain.ts
 //
 // Exit 0 = up to date. Exit 1 = stale or broken; the message names the step to run.
+import { readFile, readlink, stat } from "node:fs/promises";
 import { exists, FILC_PATCHED_TREE, FILC_VERSION, linuxOnly, REPO, run, WORK } from "../lib/tool.ts";
 
 await linuxOnly(import.meta);
@@ -20,7 +21,7 @@ let stale = false;
 // 1. Edits in the Linux Fil-C source that are not saved into the repo's patch file.
 if (await exists(`${src}/.git`)) {
   const diff = (await run(["git", "-C", src, "diff"])).out;
-  const saved = await Deno.readTextFile(patch).catch(() => "");
+  const saved = await readFile(patch, "utf8").catch(() => "");
   if (diff !== saved) {
     console.log(`STALE: the Linux Fil-C source differs from ${patch}.`);
     console.log("       Put the change in tools/filc/patch-pass.ts or patch-split.ts (the edit scripts are the");
@@ -34,11 +35,11 @@ if (await exists(`${src}/.git`)) {
 
 // 2. The repo's patch is not the one the archive was built from.
 const sha256 = async (p: string) => {
-  const digest = await crypto.subtle.digest("SHA-256", await Deno.readFile(p));
+  const digest = await crypto.subtle.digest("SHA-256", await readFile(p));
   return Array.from(new Uint8Array(digest), (b) => b.toString(16).padStart(2, "0")).join("");
 };
 const want = await sha256(patch);
-const have = (await Deno.readTextFile(sums).catch(() => "")).match(/zilc-filc-pass\.patch sha256 ([0-9a-f]+)/)?.[1];
+const have = (await readFile(sums, "utf8").catch(() => "")).match(/zilc-filc-pass\.patch sha256 ([0-9a-f]+)/)?.[1];
 if (want !== have) {
   console.log(`STALE: toolchain/ was archived from a different patch (${have ?? "none"} vs ${want}).`);
   console.log("       Run tools/filc/archive-patched-clang.ts.");
@@ -46,7 +47,7 @@ if (want !== have) {
 }
 
 // 3. The installed compiler was rebuilt after the archive was made.
-const [b, t] = await Promise.all([Deno.stat(bin).catch(() => null), Deno.stat(tar).catch(() => null)]);
+const [b, t] = await Promise.all([stat(bin).catch(() => null), stat(tar).catch(() => null)]);
 if (b?.mtime && t?.mtime && b.mtime > t.mtime) {
   console.log(`STALE: ${bin} is newer than the archive. Run tools/filc/archive-patched-clang.ts.`);
   stale = true;
@@ -58,12 +59,12 @@ const osi = `${FILC_PATCHED_TREE}/pizfix/os-include`;
 if (await exists(osi)) {
   for (const l of ["asm", "linux", "asm-generic"]) {
     if (!(await exists(`${osi}/${l}/.`))) {
-      console.log(`BROKEN: ${osi}/${l} -> ${await Deno.readLink(`${osi}/${l}`).catch(() => "?")} does not exist.`);
-      console.log(`        Run: deno run -A tools/filc/fix-os-include.ts ${FILC_PATCHED_TREE}`);
+      console.log(`BROKEN: ${osi}/${l} -> ${await readlink(`${osi}/${l}`).catch(() => "?")} does not exist.`);
+      console.log(`        Run: bun tools/filc/fix-os-include.ts ${FILC_PATCHED_TREE}`);
       stale = true;
     }
   }
 }
 
 if (!stale) console.log(`toolchain/ is up to date (patch sha256 ${want}).`);
-Deno.exit(stale ? 1 : 0);
+process.exit(stale ? 1 : 0);

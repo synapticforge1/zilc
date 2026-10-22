@@ -6,11 +6,14 @@
 // IR and the prebuilt libpizlo.so with nm/objdump. Findings: cmem/filc-abi.md (thread offsets,
 // "Observed entry points").
 //
-//   deno run -A tools/p3/gc-probe.ts             (Linux; from Windows it runs inside WSL)
+//   bun tools/p3/gc-probe.ts             (Linux; from Windows it runs inside WSL)
 //   env: WORK (default ~/zilc-work; Fil-C expected at $WORK/tools/filc-0.685-linux-x86_64)
 //
 // Same commands, flags and printed sections as gc-probe.sh; each Unix pipeline's filter
 // (awk/grep/sed/sort/head) is done in TypeScript on the program's output.
+import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { FILC_0685_PREBUILT_TREE, linuxOnly, REPO } from "../lib/tool.ts";
 
 await linuxOnly(import.meta);
@@ -19,7 +22,7 @@ const F = FILC_0685_PREBUILT_TREE;
 const CC = `${F}/build/bin/clang`;
 const L = `${F}/pizfix/lib`;
 const S = `${REPO}/tools/p3`;
-const T = await Deno.makeTempDir();
+const T = await mkdtemp(join(tmpdir(), "zilc-"));
 
 // ---- local helpers: the shell pipeline pieces, on lines of text ----
 /** A program's output as lines, as a pipe reads them (no extra empty line for the final newline). */
@@ -59,8 +62,9 @@ function say(ls: string[]): void {
 }
 /** A program's stdout; its stderr goes to this terminal, or nowhere with `quiet` (`2>/dev/null`). */
 async function out(argv: string[], quiet = false): Promise<{ code: number; text: string }> {
-  const r = await new Deno.Command(argv[0], { args: argv.slice(1), stdin: "null", stdout: "piped", stderr: quiet ? "null" : "inherit" }).output();
-  return { code: r.code, text: new TextDecoder().decode(r.stdout) };
+  const p = Bun.spawn(argv, { stdin: "ignore", stdout: "pipe", stderr: quiet ? "ignore" : "inherit" });
+  const text = await new Response(p.stdout).text();
+  return { code: await p.exited, text };
 }
 /** `nm -D --defined-only libpizlo.so | awk '{print $3}'`: the defined dynamic symbols' names. */
 async function exports(): Promise<string[]> {
@@ -70,11 +74,11 @@ async function exports(): Promise<string[]> {
 let code = 0;
 try {
   // The compile's messages go to the terminal; a failed compile ends the probe with exit 1.
-  const cc = await new Deno.Command(CC, { args: ["-O1", "-S", "-emit-llvm", "-o", `${T}/g.ll`, `${S}/gc-probe.c`], stdin: "null", stdout: "inherit", stderr: "inherit" }).output();
-  if (cc.code !== 0) {
+  const cc = await Bun.spawn([CC, "-O1", "-S", "-emit-llvm", "-o", `${T}/g.ll`, `${S}/gc-probe.c`], { stdin: "ignore", stdout: "inherit", stderr: "inherit" }).exited;
+  if (cc !== 0) {
     code = 1;
   } else {
-    const ll = lines(await Deno.readTextFile(`${T}/g.ll`));
+    const ll = lines(await readFile(`${T}/g.ll`, "utf8"));
 
     console.log("== 1. pollcheck in spin(): runtime calls and thread-relative loads inside the loop");
     // Line numbers are within spin()'s definition (grep -n on awk's output).
@@ -100,6 +104,6 @@ try {
     }
   }
 } finally {
-  await Deno.remove(T, { recursive: true }).catch(() => {});
+  await rm(T, { recursive: true, force: true });
 }
-Deno.exit(code);
+process.exit(code);

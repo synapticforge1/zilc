@@ -173,9 +173,11 @@ citation to the incident.
 - **Write source files with the file tools, not shell heredocs, when they contain backslashes.**
   A bash heredoc dropped one `\` from Zig's `\\` multiline-string prefix and broke `main.zig`.
   (zilc, 2026-09-18.)
-- **Script in Deno or Bun, never Python** (owner, 2026-09-18). Tooling in `tools/` is `.ts`/`.mjs`,
-  run with `deno run` or `bun`. This follows the project's memory-safety stance and matches
-  wazmrt's Deno tooling.
+- **Script in Bun only: never Deno, never Python** (owner, 2026-10-22; was "Deno or Bun",
+  2026-09-18). The owner says Deno is going away. Tooling in `tools/` is `.ts`/`.mjs`, run with
+  `bun tools/<group>/<tool>.ts`; all of it was ported from Deno on 2026-10-22. Use Node's APIs
+  (`node:fs/promises`, `process`) plus `Bun.spawn`/`Bun.Glob`/`Bun.YAML`, never `Deno.*` or
+  `jsr:` imports. Bun lives at `~/.bun/bin/bun` in WSL (`tools/p1/setup-wsl.sh`).
 - **Every generated input a recorded result depends on needs its exact recipe written down, next
   to the tool that reads it.** "Made during P1" is not a recipe. The commands for three P1 IR files
   had to be recovered by trial (one was `build-exe -lc`, readable only from the file's own
@@ -189,7 +191,7 @@ citation to the incident.
   more programs then matched native exactly.)
 - **A shell script whose usage line says `sh` must run under dash.** `export -f` (bash-only)
   makes dash exit 2 with no message. Test with `sh -x`. (zilc-check.sh, 2026-10-02; the tools
-  have been Deno since 2026-10-05, but the rule holds for any shell script that remains.)
+  have been Deno since 2026-10-05 and Bun since 2026-10-22, but the rule holds for any shell script that remains.)
 - 🛑 **Never execute anything built by Fil-C, cosmo or zilc on the Windows host** (owner,
   2026-10-08). The machine runs SentinelOne; on 2026-10-05 running cosmo APE files as `.exe` from
   Claude's Windows scratchpad got them quarantined and Claude Code killed. Run programs in WSL; the
