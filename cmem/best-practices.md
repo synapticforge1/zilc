@@ -19,6 +19,15 @@ citation to the incident.
   sessions running.)
 - **A single run that matches a recorded number to two decimals is a coincidence you can afford to
   check.** Performance claims need repeats and a stated noise floor. (wazmrt, 2026-08-19.)
+- **A flag copied from upstream's recipe means what it does to upstream's INPUTS; reproduce the
+  effect, not the spelling.** musl's `--exclude-libs=ALL` hides only libgcc, because musl links its
+  objects loose; zilc linked them as an archive, and the same flag hid all of libc (8 exports
+  instead of 1,653). The fix named upstream's effect exactly (`--exclude-libs=libyolort.a`), and
+  the oracle compared exports, not flags. (`workarounds.md` W-11, 2026-10-27.)
+- **A gate must report a broken input, not crash on it.** The output of a badly broken link
+  overflowed the gate's 50 KiB capture limit, and the gate died with `StderrStreamTooLong`
+  instead of printing FAIL. Capture generously and print a bounded excerpt. (`tools/gate.zig`,
+  2026-10-27.)
 
 ## 2. Investigating a defect
 

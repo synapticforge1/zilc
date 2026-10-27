@@ -198,6 +198,11 @@ its `publishing.md`).
   safepoints for alloca/memcpy, "Anthropic-reported"), `7d4ed7b` (symbol visibility). **All five
   pass edits and all three `llvm-split` edits still apply** to the newest source. (Then, the same
   day: reviewed below as "Review of Fil-C 0.687", and zilc MOVED to 0.687.)
+- **Run of 2026-10-27, later** (memory update, after the move): upstream still at `b8ffc50`, 25
+  commits past the reviewed `e7947f0`; no tag newer than `v0.687`. Watched-file hits: 3 to
+  `FilPizlonator.cpp` (`f565a56`, `7d4ed7b`, the merge `15ba022`), 5 to `filc/tests`. Every pass
+  and `llvm-split` edit still applies. Nothing new since the review: `f565a56` and `7d4ed7b` wait
+  for the next one.
 
 ### 📋 Review of Fil-C 0.686 (2026-10-05; owner: "do the upstream review and include it in the release")
 
