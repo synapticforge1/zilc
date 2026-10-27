@@ -4,7 +4,9 @@
 
 Pushed to `https://github.com/jrmarcum/zilc` (the repo has since moved to
 `https://github.com/synapticforge1/zilc`, where `origin` points since 2026-10-27; it serves the same
-`19e7172`): `main` + branch `v0.15.2` at `19e7172`, annotated tag `v0.15.2-0.686.1`. The local `v0.15.2-3` tag was deleted, never pushed. No GitHub Release page (no
+`19e7172`): `main` + branch `v0.15.2` at `19e7172`, annotated tag `v0.15.2-0.686.1`. Since the
+2026-10-27 history purge that commit is **`13ce96a`** and the tag object `7dbddf8` (was `fda2d43`);
+map: `history-map-2026-10-27.md`. The local `v0.15.2-3` tag was deleted, never pushed. No GitHub Release page (no
 `gh` CLI on this machine); add one from the tag if wanted, with `RELEASE-NOTES.md` as its text.
 From here on, every release follows "Per-release checklist" below and pushes only when the owner
 says.

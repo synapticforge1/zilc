@@ -13,7 +13,8 @@ the workspace floor (`../cmem/working-rules.md`); how it applies here: [working-
 **The state of the project and everything outstanding: [open-work.md](open-work.md)** — the one
 place for the status line. This file holds no status narrative (workspace `memory-conventions.md`;
 the dated log it carried until 2026-10-27 is summarized there, full text
-`git show 44e0b1a:cmem/INDEX.md`).
+`git show c2841dd:cmem/INDEX.md`). Commit ids written before 2026-10-27 are pre-purge ids:
+look them up in [history-map-2026-10-27.md](history-map-2026-10-27.md).
 
 ## 🔒 What bites in the first five minutes
 
@@ -137,6 +138,7 @@ the runtime-linking rule checked.
 | [filc-abi.md](filc-abi.md) | Fil-C 0.685's runtime ABI as observed: flight pointers, object header, function objects, calling convention. |
 | [zig-upstream-notes.md](zig-upstream-notes.md) | Zig behaviours we may need to report (Z-1…Z-5), each with whether it is really a Zig bug. |
 | [ports/](ports/README.md) | Port notes, one file per new Zig line: basis, API changes, sites touched. |
+| [history-map-2026-10-27.md](history-map-2026-10-27.md) | The 2026-10-27 history purge (drive paths): what was removed, how it was checked, every old → new commit id. |
 | [best-practices.md](best-practices.md) | Method rules: zilc's own (§§ 1–5) and the workspace ★ block copied verbatim (§ 6). |
 | `local/` | Gitignored, machine-only facts. Absent in a clone. |
 
