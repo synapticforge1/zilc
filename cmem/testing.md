@@ -273,6 +273,15 @@ Byte for byte against Fil-C's own build, for the release zilc is on (`roadmap.md
 | forwarder generator = Ruby's `generate_pizlonated_forwarders.rb` | `bun tools/gen/verify-forwarders.ts` | both files SAME (45,695 B, 983,629 B) |
 | musl header install = `make install-headers` | `bun tools/gen/verify-musl-headers.ts` | 219 files identical |
 | the same bytes, pinned | `zig build test` (`src/gen/forwarders.zig`) | SHA-256 + size; **unit tests 40/40** (29 + the generators' 11) |
+| libpas's stock half, `filc_crt.o`, `filc_mincrt.o`, `libyolounwind.a` = the release tarball's | `bun tools/runtime/verify-libpas.ts` | **178/178 objects define exactly upstream's global symbols**; 1 known undefined difference (W-4); 16 assert-presence differences (budget 16); source paths in upstream's form; the three small pieces SAME |
+| yolo musl's static half = the release's | `bun tools/runtime/verify-yolomusl.ts` | **1,343 members in upstream's order**, each defining upstream's symbols, binding included; 28 with compiler-only undefined differences (budget 28, W-8); 1,342 compile-unit names equal + 1 empty TU (budget 1); crt objects, `libyolom.a` |
+| compiler-rt = the release's | `bun tools/runtime/verify-compiler-rt.ts` | **167 members in upstream's order**, exactly upstream's symbols, **0 departures** (`_Float16` off, as the release: W-10); 14 objects with compiler-only undefined differences (W-8) |
+
+The three tables these build from are regenerated per release (`bun tools/runtime/import-libpas-sources.ts`,
+`import-yolomusl-sources.ts`, `import-compiler-rt-sources.ts`; the last needs `ninja` on `PATH`:
+`~/zilc-work/tools/ninja`). 0.687: libpas 174 C + 1 generated + 1 assembly; yolo musl 1,343 libc
+members, 5 crt, 2 ldso; compiler-rt 167 builtins (3 assembly). The libraries install under
+`~/zilc-work/pure-zig/filc-0.687/lib`.
 
 After a Fil-C move: `bun tools/gen/import-signatures.ts`, then the two oracles, then re-pin the
 SHA-256 values Ruby printed.
@@ -312,6 +321,14 @@ name). **Gate 8/8**, every case trapping at the same file:line. Still Fil-C's in
 shared runtime (`libc.so`, `libpizlo.so`, `libyoloc.so` and its loader `ld-fil1-x86_64.so`) and
 libc++. Refusals measured: no `-Dzig-modules` → exit 1; declared 0.687 on a 0.686 toolchain →
 exit 1; a directory with no Fil-C module names → exit 1.
+
+**On 0.687 with zilc's OWN pure-Zig modules, 2026-10-27** (`build/pure_zig.zig`, installed at
+`~/zilc-work/pure-zig/filc-0.687`; zilc's patched 0.687 clang as the base): the same 13 swapped and
+**9 linked**; **gate 8/8**. The checklist's corpus and output comparison against the same swapped
+toolchain (`ZILC_FILC` = the copy's clang; `zilc-check.ts` hands `filc()`, i.e. `ZILC_FILC`, to zilc
+— the logs do not print the path, so that is read from the code): **78/78 as designed in all four
+modes**, the designed 7 by name; output comparison **0 unexplained** (`{same 501, expected 55,
+varies 68, variesBad 0, differs 0}`). Unit tests 40/40, plain gate 8/8 on the same tree.
 
 ## Planned gates
 

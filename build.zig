@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception OR MIT
 const std = @import("std");
+const pure_zig = @import("build/pure_zig.zig");
 
 pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
@@ -63,6 +64,10 @@ pub fn build(b: *std.Build) void {
     const run_gen = b.addRunArtifact(gen);
     if (b.args) |args| run_gen.addArgs(args);
     b.step("gen", "Run zilc-gen with the arguments after -- (header | forwarders | musl-headers | musl-genh | --version)").dependOn(&run_gen.step);
+
+    // The runtime pieces built from Fil-C's sources (`zig build libpas | yolomusl | compiler-rt |
+    // pure-zig -Dfilc-src=…`): build/pure_zig.zig.
+    pure_zig.addSteps(b, gen);
 
     // ---- Runtime as a static C-ABI library (`include/zilc.h`) --------------
     const rt = b.addLibrary(.{

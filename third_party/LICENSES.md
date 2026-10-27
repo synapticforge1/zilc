@@ -264,6 +264,37 @@ Newest first. Copy the template for each adopted component.
 - **Obligations satisfied:** [x] licence present  [x] NOTICE updated  [x] SPDX header  [x] notice
   installed with the binary
 
+### libpas-recipe, yolomusl-recipe, compiler-rt-recipe (Fil-C's runtime build rules, as data; the pure-Zig track)
+- **Source:** Fil-C at `e7947f0` (0.687), the same checkout as above; first written in zailc for
+  v0.686 (2026-10-08/09), brought here 2026-10-27
+- **Upstream path(s) and license (SPDX):**
+  - `libpas/common.mk` (`PASSRCS`), `libpas/Makefile` (PASCC / PASCFLAGS / MAINCFLAGS),
+    `yolounwind/Makefile` — `BSD-2-Clause` (Fil-C runtime; `third_party/fil-c/PAS-LICENSE.txt`)
+  - `projects/yolomusl/Makefile` (the object rules) and the flags musl's `configure` chooses for
+    Zig's clang — `MIT` (musl; `third_party/fil-c/MUSL-LICENSE.txt`)
+  - `compiler-rt/` builtins' CMake (source selection and flags, read from the `build.ninja` it
+    generates) and `build_compiler_rt.sh`'s install layout — `Apache-2.0 WITH LLVM-exception`
+    (`third_party/fil-c/LLVM-LICENSE.txt`)
+- **What we reused:** the file lists and flags, as data, imported mechanically by
+  `tools/runtime/import-libpas-sources.ts`, `import-yolomusl-sources.ts`,
+  `import-compiler-rt-sources.ts`; the rules re-expressed as Zig build steps. **No source file of
+  libpas, musl or compiler-rt is copied into zilc**: they are compiled from the Fil-C checkout given
+  by `-Dfilc-src`
+- **Where it lives in zilc:** `src/runtime/libpas_sources.zig` (BSD-2-Clause),
+  `src/runtime/yolomusl_sources.zig` (MIT), `src/runtime/compiler_rt_sources.zig` (Apache-2.0 WITH
+  LLVM-exception) — each generated with its upstream's SPDX line; `build/pure_zig.zig` (the
+  recipes, zilc's own code)
+- **Artifact destination:** **toolchain-only today**: the built libraries install under
+  `~/zilc-work/pure-zig/filc-<release>/lib` and are used by `zig build gate-zig-modules`. They are
+  Fil-C's runtime, compiled by Zig: if they are ever DISTRIBUTED or linked into distributed
+  programs, the runtime-linking rule above applies (BSD-2-Clause and MIT notices with the binaries),
+  exactly as for Fil-C's own prebuilt runtime
+- **Modifications:** none in behaviour (faithful to the release; zailc's `_Float16` departure W-10
+  is not taken: `cmem/workarounds.md` W-10). Build-side adaptations only: W-3, W-6
+- **Obligations satisfied:** [x] licences present  [x] SPDX headers on the generated tables
+  [x] NOTICE (Fil-C runtime, musl, LLVM already listed)  [ ] binary-distribution notice: not
+  needed while the libraries are not distributed
+
 <!--
 ### <component-name>
 - **Source:** https://github.com/<org>/<repo>
