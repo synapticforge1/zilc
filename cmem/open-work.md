@@ -77,7 +77,7 @@ them, with their dates.
   passes on 0.687 with 9 pure-Zig modules linked (`roadmap.md` Z1, `testing.md`). Merged into
   `main` (672968a). **Yolo musl's shared half** (`libyoloc.so`, the loader) is done on branch
   `pure-zig/yolomusl-shared` (W-11): 10 linked, gate 8/8, corpus 78/78 as designed, comparison 0
-  unexplained; merge when the owner says. Next: the Fil-C-compiled pieces (`filc/src`, the user
+  unexplained; merged into `main` (676e04e, owner, 2026-10-27; not pushed). Next: the Fil-C-compiled pieces (`filc/src`, the user
   libc, libc++). `Fil-C.md` and `Zig.md` record the route to parity for zailc. Plan as first
   written: bring zailc's step-2 build
   into zilc (`roadmap.md` Z1) — read from `../zailc` (`src/gen`, `src/runtime`, `tests/link`,
