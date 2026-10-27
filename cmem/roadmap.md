@@ -21,6 +21,21 @@ zilc, and re-verified against zilc's Fil-C release (0.686 work moves to 0.687 on
   static half; compiler-rt — then what zailc has not done: yolo musl's shared half (`libyoloc.so`,
   `ld-fil1-x86_64.so`), the three Fil-C-compiled pieces (`filc/src`, the user libc, libc++), a
   program linked entirely from `zig build`'s outputs, Fil-C's suite against it.
+  - [x] **The generators, in zilc, on 0.687** (2026-10-27): `zilc-gen` (`src/gen/`, `zig build gen`)
+        — the forwarder generator's output is **byte-identical to Ruby's for 0.687** (456 native +
+        13 user signatures; `filc_native.h` 45,695 B, `filc_native_forwarders.c` 983,629 B;
+        SHA-256 pinned in `zig build test`, inverted: one changed hex digit fails exactly that
+        test) and musl's header install is **byte-identical to `make install-headers`** (219
+        files). Oracles: `tools/gen/verify-forwarders.ts`, `verify-musl-headers.ts`.
+  - [x] **libpas's stock half, `filc_crt.o`, `filc_mincrt.o`, `libyolounwind.a`; yolo musl's
+        static half; compiler-rt** (2026-10-27): `zig build libpas | yolomusl | compiler-rt |
+        pure-zig -Dfilc-src=…` (`build/pure_zig.zig`), tables regenerated for 0.687; every object
+        and member defines exactly the 0.687 release's symbols (`testing.md`), compiler-rt without
+        zailc's W-10 departure. Then `zig build gate-zig-modules` on them (`testing.md`).
+  - [ ] yolo musl's shared half (`libyoloc.so`, `ld-fil1-x86_64.so`) — the default (dynamic) link
+        uses it, so until it exists libc stays Fil-C's in `gate-zig-modules`.
+  - [ ] the three Fil-C-compiled pieces (`filc/src` → the rest of `libpizlo`, the user libc,
+        libc++).
 - **Z2 — the pass in Zig** (zailc step 3, not started there): an LLVM IR model in Zig, the pass
   (`FilPizlonator.cpp`), the analyses it needs, KillUB and DeleteRedundantPollchecks; oracle: the
   same module through Fil-C's pass and through zilc's, compared as IR and as behaviour.

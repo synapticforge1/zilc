@@ -19,3 +19,4 @@ pub fn main() void {
     _ = printf("a[3] = %d\n", a[3]);
     free(raw);
 }
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception OR MIT

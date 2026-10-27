@@ -37,6 +37,21 @@ own original license, and every such use is recorded in:
           Copyright (c) 2023-2025 Epic Games, Inc.
           Copyright (c) 2026 Filip Pizlo
           (licence text in the header of tools/filc/run-filc-tests.ts)
+      - Forwarder generator (libpas/src/libpas/generate_pizlonated_forwarders.rb),
+        ported to src/gen/forwarders.zig, src/gen/sig.zig and the generated
+        src/gen/signatures.zig (the zilc-gen build tool):
+          BSD-2-Clause
+          Copyright (c) 2024-2026 Epic Games, Inc.
+          Copyright (c) 2026 Filip Pizlo
+          (licence text in the header of each of those files)
+      - musl's header install (Makefile install-headers, tools/mkalltypes.sed),
+        ported to src/gen/musl_headers.zig (the zilc-gen build tool):
+          MIT, Copyright (c) 2005-2020 Rich Felker, et al.
+          (licence text in the header of that file)
+      - The edit scripts tools/filc/patch-pass.ts and patch-split.ts and the diff
+        third_party/filc-patches/zilc-filc-pass.patch hold text of Fil-C's
+        FilPizlonator.cpp and llvm-split.cpp, modified by zilc:
+          Apache-2.0 WITH LLVM-exception    third_party/fil-c/LLVM-LICENSE.txt
 
   * LLVM Project — https://github.com/llvm/llvm-project
           Apache-2.0 WITH LLVM-exception    third_party/llvm/LICENSE.TXT
@@ -44,6 +59,10 @@ own original license, and every such use is recorded in:
   * Zig — https://codeberg.org/ziglang/zig
           MIT, Copyright (c) Zig contributors
                                             third_party/zig/LICENSE
+      - src/stdpatch.zig holds text of Zig's standard library (0.15.2 originals,
+        a 0.16.0 backport) and is MIT as a whole; tools/p2/repro/*.ll are IR
+        compiled from Zig's std (MIT). zilc's binaries contain Zig's std, as
+        every Zig program does.
 
 Where a component is distributed under the Apache License, Version 2.0, this
 NOTICE file (together with the component's own NOTICE, if any) is preserved and
@@ -59,6 +78,9 @@ distribution inherits the obligation. See third_party/LICENSES.md,
 "The runtime-linking rule".
 
 Status: the Component Ledger in third_party/LICENSES.md is the record of what
-has actually been incorporated (as of 2026-10-05: test programs, a Zig std
-backport, local patches to Fil-C's compiler and llvm-split, and the ported test
-runner above; no third-party runtime code).
+has actually been incorporated (as of 2026-10-27: test programs, a Zig std
+backport, local patches to Fil-C's compiler and llvm-split, the ported test
+runner, and the ported forwarder generator and musl header install of the
+zilc-gen build tool above; no third-party code in zilc's driver or in
+zilc_runtime). `zig build` installs this NOTICE and the licence texts under
+share/licenses/zilc/ beside the binaries.

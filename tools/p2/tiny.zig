@@ -10,3 +10,4 @@ export fn zig_sum(p: [*]const i32, n: usize) i32 {
     while (i < n) : (i += 1) total +%= p[i];
     return total;
 }
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception OR MIT

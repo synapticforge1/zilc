@@ -24,3 +24,4 @@ pub fn main() void {
     const span = std.mem.span(s);
     std.debug.print("len = {d}\n", .{span.len});
 }
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception OR MIT

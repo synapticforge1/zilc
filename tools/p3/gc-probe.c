@@ -15,3 +15,4 @@ int main(void) {
     printf("%ld %ld\n", got, spin(1000000));
     return 0;
 }
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception OR MIT

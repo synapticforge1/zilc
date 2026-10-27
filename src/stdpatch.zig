@@ -1,4 +1,10 @@
-// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception OR MIT
+// SPDX-License-Identifier: MIT
+//
+// This file holds verbatim text of Zig's standard library (each patch's original, from Zig 0.15.2,
+// and its replacement, backported from Zig 0.16.0: ledger entry `zig-std-backports`), which is MIT,
+// Copyright (c) Zig contributors (third_party/zig/LICENSE), so the file carries that licence
+// (third_party/LICENSES.md, practical rule 4). zilc's own code here is offered under MIT as well.
+//
 //! Backports to Zig's standard library, applied to a cached overlay of the user's
 //! own Zig lib directory (cmem/known-issues.md KI-11, zig-upstream-notes.md).
 //!

@@ -17,3 +17,4 @@ int main(void) {
     free(a);
     return 0;
 }
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception OR MIT

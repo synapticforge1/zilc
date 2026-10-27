@@ -1,8 +1,12 @@
 #!/usr/bin/env bun
-// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception OR MIT
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
-// Apply zilc's local fixes to Fil-C's compiler pass (FilPizlonator.cpp, which is
-// Apache-2.0 WITH LLVM-exception; ledger entry `filc-pass-fixes` in
+// This file holds verbatim text of Fil-C's FilPizlonator.cpp (each edit's original and its
+// replacement), which is Apache-2.0 WITH LLVM-exception, so the file carries that licence alone
+// (third_party/LICENSES.md, practical rule 4). Modified by zilc: the replacements are zilc's changes
+// (Apache-2.0 §4(b)), described edit by edit below.
+//
+// Apply zilc's local fixes to Fil-C's compiler pass (ledger entry `filc-pass-fixes` in
 // third_party/LICENSES.md). Local use only: the patched clang is not distributed.
 //
 // Each edit names the exact original text and must match it exactly once, so a
