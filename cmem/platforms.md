@@ -1,5 +1,9 @@
 # Platforms: the P6 scope pass (pre-publish, ✅ 2026-10-05)
 
+> 🔒 **2026-10-27 (owner): zilc stays Fil-C on Linux only, worked in WSL or Linux; the
+> cross-platform part is zailc's** (`design-decisions.md`, top row). This file is now the
+> measured record that zailc's platform work starts from; for zilc, only its Linux rows apply.
+
 `roadmap.md` P6 asks, per platform, before publishing: confirm the processors; count the OS
 functions Zig's std references (the checked-wrapper workload); the libc story; the std code that
 builds pointers from integers (KI-5 family); and the host toolchain. This file holds the answers,

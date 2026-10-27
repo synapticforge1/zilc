@@ -99,7 +99,9 @@ until that runtime is ready for testing; `filc` (the default) links Fil-C's.
 
 Each has a reason recorded in [cmem/known-issues.md](cmem/known-issues.md):
 
-- **Linux x86_64 only** — that is what Fil-C supports.
+- **Linux x86_64 only, by design** — that is what Fil-C supports, and zilc stays there: on
+  Windows, use it inside WSL. Cross-platform work happens in the sibling project zailc, which
+  builds on zilc.
 - **`-O Debug` needs the patched Fil-C clang** (above). With the stock prebuilt, Fil-C's pass
   crashes on Zig's Debug code. ReleaseSafe keeps Zig's own safety checks on and is the better
   default anyway.

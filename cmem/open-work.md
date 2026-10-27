@@ -50,9 +50,9 @@ them, with their dates.
 - **Deferred past the publish** (with the port): `-Druntime=both`, the byte-identity check, the
   benchmark suite (upgrade stage C), the 0.16.0 examples under zilc (`testing.md`).
 - **Partly open defects:** KI-7 (`getcontext`) — `known-issues.md`.
-- **Cosmo leaves** (`platforms.md` "Cosmo evaluation"): `statx` missing from the cosmo runtime;
-  real Windows unverified (never retried on this host — the WSL-only rule); aarch64 Windows, iOS
-  and Android outside cosmo (P3 route).
+- ~~Cosmo leaves~~ — **not zilc work since 2026-10-27** (owner: zilc stays Fil-C on Linux only;
+  cross-platform is zailc's). The open points (`statx` missing from the cosmo runtime, real Windows
+  unverified, aarch64 Windows / iOS / Android) are in `platforms.md` for zailc.
 - **Not yet re-run under Bun** (see the Bun port below): build/archive/restore-patched-clang,
   build-cosmo, run-filc-tests, os-surface, size-compare, zilc-check, all-modes,
   check/clone-upstream. Run each once under Bun before relying on it.

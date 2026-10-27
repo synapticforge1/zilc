@@ -18,6 +18,9 @@ look them up in [history-map-2026-10-27.md](history-map-2026-10-27.md).
 
 ## 🔒 What bites in the first five minutes
 
+0. 🔒 **zilc is Fil-C on Linux only, worked in WSL or Linux — always** (owner, 2026-10-27). zailc
+   uses zilc as its base and develops the cross-platform part; no macOS, Windows, mobile or cosmo
+   work happens here (`design-decisions.md`, top row).
 1. 🛑 **Nothing built by Fil-C, cosmo or zilc is ever EXECUTED on the Windows host** (owner,
    2026-10-08): the machine's EDR quarantined cosmo programs run as `.exe` and cut Claude Code off.
    All Fil-C work runs in WSL; the Windows half of an APE only under `wine64` in WSL
@@ -128,8 +131,8 @@ the runtime-linking rule checked.
 | [licensing.md](licensing.md) | `Apache-2.0 WITH LLVM-exception OR MIT`: why, the runtime-linking rule, the copyleft exclusion. |
 | [reference-projects.md](reference-projects.md) | Fil-C, LLVM, Zig: verified licenses, what to mine each for, adoption status. |
 | [zig-filc-scope.md](zig-filc-scope.md) | Scope of a Zig version of Fil-C on 0.15.2 (2026-10-05) — the brief zailc started from. |
-| [platforms.md](platforms.md) | P6 scope pass per platform, and the cosmo evaluation (closed 2026-10-08). |
-| [roadmap.md](roadmap.md) | P0–P2 done; P3 Zig runtime, P4 Zig-language fidelity, P5 C++, P6 other platforms. |
+| [platforms.md](platforms.md) | The P6 scope pass and the cosmo evaluation (closed 2026-10-08) — since 2026-10-27 the record zailc's platform work starts from. |
+| [roadmap.md](roadmap.md) | P0–P2 done; P3 Zig runtime, P4 Zig-language fidelity, P5 C++; P6 other platforms moved to zailc 2026-10-27. |
 | [security-model.md](security-model.md) | The safety guarantees targeted, and what is out of scope. |
 | [testing.md](testing.md) | Every gate with its command and dated count; the output comparison; corpus results per mode; planned gates. |
 | [known-issues.md](known-issues.md) | The defect log, KI-1…KI-23: root cause, fix, status. |

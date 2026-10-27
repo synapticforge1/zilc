@@ -37,6 +37,14 @@ named below. Method lessons are in [best-practices.md](best-practices.md), not h
 - 🛑 Nothing built by Fil-C, cosmo or zilc is ever executed on the Windows host
   (`workarounds.md`).
 
+## Platform (🔒 owner, 2026-10-27)
+
+- **zilc is Fil-C on Linux only, worked in WSL or Linux — always.** Every Fil-C step, user-program
+  build, test and run of output is on Linux, natively or in WSL. No cross-platform work lands
+  here: macOS, Windows, iOS, Android and cosmo/APE belong to zailc, which uses zilc as its base.
+  A change that adds a non-Linux target to zilc is out of scope, not a feature
+  (`design-decisions.md`, top row).
+
 ## Tooling (owner, 2026-10-22; workspace rule 1)
 
 - **A committed script that stays for repeated use is TypeScript run by Bun** (Zig's `zig run`
