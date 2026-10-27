@@ -30,9 +30,12 @@ them, with their dates.
    placeholder line in 5 versions of `working-rules.md`; no commit message. Locally: reflogs
    expired, `gc --prune=now` → 1 pack / 840 KiB, `fsck` clean, the old commit and tag objects gone.
    zailc told (ledger C22, H19). The pre-purge bundle was deleted the same day (owner: "delete the
-   pre-purge backup also"); no copy of the old history is left on this machine. **Left for the
-   owner:** a GitHub Support request if old commits served by hash must go too (GitHub keeps them
-   until its own GC).
+   pre-purge backup also"); no copy of the old history is left on this machine. **Owner,
+   2026-10-27: the old commits must stop being served by hash too** — measured the same day: still
+   served (`19e7172`, `780625c64` resolve through the API; 0 forks, 0 pull requests ever). The
+   GitHub Support request (gc + purge cached views; first changed commit `780625c64`) is drafted
+   in the gitignored `cmem/local/github-support-purge.md`; the owner submits it at
+   support.github.com. Re-check after: both hashes must 404.
 2. ✅ **`setup-wsl.sh` → Bun, done 2026-10-27** (owner: "perform the open items"). Bun cannot
    install itself and runs inside Linux only, so the Bun install is a **documented one-time step**
    (`tools/README.md` "First-time setup", the same npm-tarball commands and SHA) and the rest is
