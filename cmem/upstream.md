@@ -99,7 +99,8 @@ go in, not std design choices (`zig-upstream-notes.md` "Zig bug?" column) or thi
 upstream. Keep `cmem/workarounds.md` as the full internal why.
 
 **Link** (works only after `main` is pushed):
-`https://github.com/jrmarcum/zilc/blob/main/UPSTREAM-ISSUES.md`
+`https://github.com/synapticforge1/zilc/blob/main/UPSTREAM-ISSUES.md` (the repo moved from
+`jrmarcum/` to `synapticforge1/`; GitHub redirects the old URL, but do not rely on it)
 
 **Email template** (fill in the project and the count):
 
@@ -111,7 +112,7 @@ upstream. Keep `cmem/workarounds.md` as the full internal why.
 > FilPizlonator pass: an assertion failure on globals with a 3-byte value type, and a segfault at
 > -O1. Each has a small reproduction file, and the details are here:
 >
-> https://github.com/jrmarcum/zilc/blob/main/UPSTREAM-ISSUES.md
+> https://github.com/synapticforge1/zilc/blob/main/UPSTREAM-ISSUES.md
 >
 > Neither is blocking me; I'm passing them on in case they're useful.
 >
@@ -124,7 +125,8 @@ but superseded.
 
 ## 📚 The `upstream/` reference folder (owner, 2026-10-01; settles open question 6)
 
-**Pattern taken from binaryen-ts** (`wasmExamples/binaryen-ts/upstream/`): a **plain git clone,
+**Pattern taken from binaryen-ts** (its `upstream/` folder; binaryen-ts is a retired sibling since
+2026-10-26, its memory kept in binaryang's `cmem/binaryen-ts.md`): a **plain git clone,
 gitignored, never built, a read-only reference**, kept up to date with upstream's branch and
 **monitored for changes**. It is used for comparisons with what zilc changed. Not a submodule:
 binaryen-ts learned that a submodule leaves a wedged nested repo in the IDE ("submodule remnant",

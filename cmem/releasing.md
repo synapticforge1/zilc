@@ -2,8 +2,9 @@
 
 ## ✅ PUBLISHED 2026-10-05: `v0.15.2-0.686.1`
 
-Pushed to `https://github.com/jrmarcum/zilc`: `main` + branch `v0.15.2` at `19e7172`, annotated tag
-`v0.15.2-0.686.1`. The local `v0.15.2-3` tag was deleted, never pushed. No GitHub Release page (no
+Pushed to `https://github.com/jrmarcum/zilc` (the repo has since moved to
+`https://github.com/synapticforge1/zilc`, where `origin` points since 2026-10-27; it serves the same
+`19e7172`): `main` + branch `v0.15.2` at `19e7172`, annotated tag `v0.15.2-0.686.1`. The local `v0.15.2-3` tag was deleted, never pushed. No GitHub Release page (no
 `gh` CLI on this machine); add one from the tag if wanted, with `RELEASE-NOTES.md` as its text.
 From here on, every release follows "Per-release checklist" below and pushes only when the owner
 says.
@@ -60,7 +61,8 @@ Verified at the change: tests 11/11, `zig build` accepts the zon, capi-smoke pri
 releases included** → change `zig_line` **and reset `release` to 1**, and record its **basis**
 (below). A new **Fil-C release** → change `filc_release` (and `tools/lib/tool.ts` `FILC_VERSION`,
 `FILC_SHA`) **and reset `release` to 1**. Every time, update `build.zig.zon`, the README status
-line, INDEX's STATE table and `RELEASE-NOTES.md` (the five places, below).
+line, `open-work.md`'s State table (INDEX's STATE table until 2026-10-27) and `RELEASE-NOTES.md`
+(the five places, below).
 
 ## 🔖 THE SCHEME (owner, 2026-09-30): the version NAMES THE ZIG LINE, then our release
 
@@ -198,7 +200,7 @@ the P2 exit criterion (C programs panic correctly under Zig's toolchain). Confir
 2. `src/root.zig` → `version` **and the test that asserts `version_string`** — that test is what
    makes a half-done bump fail loudly instead of shipping a lying `zilc --version`. Beside it:
    `user_zig`, `filc_release`, `basis`
-3. `cmem/INDEX.md` → the STATE table
+3. `cmem/open-work.md` → the State table (was `cmem/INDEX.md`'s STATE table until 2026-10-27)
 4. `README.md` → the status line
 5. `RELEASE-NOTES.md` → a new section per release, with its table (line, user Zig, Fil-C, basis)
 
@@ -226,4 +228,4 @@ changes**, patch releases included. There is no major/minor of our own and no 1.
       (`tools/filc/run-filc-tests.ts`; `testing.md`).
 - [ ] `third_party/LICENSES.md` ledger matches what is actually in the tree. Any license that must
       travel with `zig-out/` is installed by `build.zig`.
-- [ ] `cmem/INDEX.md` STATE updated.
+- [ ] `cmem/open-work.md` State updated.
