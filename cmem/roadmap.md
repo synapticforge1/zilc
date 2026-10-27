@@ -1,8 +1,8 @@
 # Roadmap
 
-> 🔒 **2026-10-27 (owner): zilc stays Fil-C on Linux only, worked in WSL or Linux; the
+> 🔒 **2026-10-27 (owner): zilc stays Fil-C on Linux x86_64 only, worked in WSL or Linux; the
 > cross-platform part is zailc's** (`design-decisions.md`, top row). **P6 below no longer applies
-> to zilc** beyond Linux; it is kept as the record zailc started from.
+> to zilc** beyond Linux x86_64 (Linux aarch64 included); it is kept as the record zailc started from.
 
 > **Updated 2026-09-30.** P3 has a plan (Linux first, the Zig runtime checked against Fil-C, the
 > `--runtime` switch already in the CLI), and a proposed **P6 — other platforms**. Next step: the
@@ -278,8 +278,8 @@ performance measurement against Fil-C.
 
 ## P6 — Platforms. ✅ ADOPTED 2026-09-30 (owner) · 🔁 **MOVED TO zailc 2026-10-27 (owner)**
 
-🔒 zilc is Linux only, worked in WSL or Linux (`design-decisions.md`, top row). The plan below is
-the record zailc inherits; no non-Linux row is zilc work.
+🔒 zilc is Linux x86_64 only, worked in WSL or Linux (`design-decisions.md`, top row). The plan
+below is the record zailc inherits; no row but Linux x86_64 is zilc work — not even Linux aarch64.
 
 **Goal: Linux, macOS and Windows, on every currently prevalent processor; then iOS; Android
 later.** ✅ Processors: **x86_64 + aarch64** per OS (owner). riscv64 is out of scope for now: a low-interest later candidate for the Linux row only, once the Zig runtime exists. Reasoning and limits

@@ -18,9 +18,9 @@ look them up in [history-map-2026-10-27.md](history-map-2026-10-27.md).
 
 ## 🔒 What bites in the first five minutes
 
-0. 🔒 **zilc is Fil-C on Linux only, worked in WSL or Linux — always** (owner, 2026-10-27). zailc
-   uses zilc as its base and develops the cross-platform part; no macOS, Windows, mobile or cosmo
-   work happens here (`design-decisions.md`, top row).
+0. 🔒 **zilc is Fil-C on Linux x86_64 only, worked in WSL or Linux — always** (owner,
+   2026-10-27). zailc uses zilc as its base and develops the cross-platform part; no aarch64,
+   macOS, Windows, mobile or cosmo work happens here (`design-decisions.md`, top row).
 1. 🛑 **Nothing built by Fil-C, cosmo or zilc is ever EXECUTED on the Windows host** (owner,
    2026-10-08): the machine's EDR quarantined cosmo programs run as `.exe` and cut Claude Code off.
    All Fil-C work runs in WSL; the Windows half of an APE only under `wine64` in WSL
