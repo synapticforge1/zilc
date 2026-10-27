@@ -348,7 +348,8 @@ modes**, C and Zig; output comparison **0 unexplained**, with the same totals as
    `roadmap.md` P3). Each case is built under Fil-C's runtime and zilc's (`zilc build --runtime`).
    Output, exit code, fault kind and file:line must match. This becomes the proof of P3, and it
    stays meaningless until `--runtime zig` is enabled.
-3. **Version comparison (2026-09-30).** Stage B of an upgrade (`upstream.md`): zilc built by the
+3. 🔁 **Not zilc's since 2026-10-27** (owner: zilc stays on the compatible Zig, always; kept as a
+   recommendation, `upstream.md`). Was: **Version comparison (2026-09-30).** Stage B of an upgrade (`upstream.md`): zilc built by the
    latest Zig must produce **identical gate results** to the stage-A reference built by the
    compatible Zig. The gate already takes `ZILC_ZIG`/`ZILC_FILC`, so this needs two zilc builds
    and a comparison of the two reports, not a new gate. Worth automating once it has been done by

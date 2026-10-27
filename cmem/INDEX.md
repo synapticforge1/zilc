@@ -28,7 +28,9 @@ log this file held until 2026-10-27: `git show c2841dd:cmem/INDEX.md`). Commit i
    into `$HOME` (`tools/README.md` "First-time setup"). 🔒 **Bun runs inside Linux only** (owner,
    2026-10-27): `~/.bun/bin/bun` from a WSL shell; the tools refuse Windows' Bun. Ad-hoc commands
    from Windows: **pass shell text to WSL as a FILE** (KI-1).
-3. **Toolchain: Zig 0.15.2** (owner, 2026-09-18), WSL's at `~/zilc-work/tools/zig-0.15.2/zig`
+3. **Toolchain: Zig 0.15.2** (owner, 2026-09-18). 🔒 **zilc stays on the Zig whose LLVM matches
+   Fil-C's, always** (owner, 2026-10-27): no newer-Zig line here, only recommendations for one
+   (`upstream.md`). WSL's at `~/zilc-work/tools/zig-0.15.2/zig`
    (`tools/p1/setup-wsl.ts`); bare `zig` may be a newer Zig that fails to build zilc (KI-3). The
    repo is on exFAT, so **keep the Zig cache in the Linux home** (KI-2), as `run-gate.ts` does:
 

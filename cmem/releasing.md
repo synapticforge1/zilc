@@ -90,6 +90,12 @@ code needs.** `zilc --version` and the release notes must state it, along with t
 
 ### Two kinds of line, and the BASIS (owner, 2026-09-30)
 
+> 🔒 **2026-10-27 (owner): zilc has the reference line only, always** — it stays on the Zig whose
+> LLVM matches Fil-C's. Latest lines, their branches (`v0.16.0`, …) and their bases are not made
+> in zilc; the scheme below is kept as the recommended shape for whoever makes one (zailc owns
+> the newer-Zig path; `design-decisions.md` top row). `main` and `v<compatible Zig>` are zilc's
+> branches.
+
 - **The reference line** is built with the Zig whose LLVM matches Fil-C's (upgrade stage A), e.g.
   `0.15.2-N` today. It is the one checked directly against Fil-C.
 - **A latest line** is built with a newer Zig (stage B), e.g. `0.16.2-N`. **Every release in it

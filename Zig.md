@@ -25,9 +25,10 @@ each workaround is in `cmem/workarounds.md` (by KI number); the defect log is
 | **How zilc finds it** | `--zig <path>` or `ZILC_ZIG`; `zilc --version` checks it and says `ok` or `MISMATCH` |
 | **Platform** | Linux x86_64 (on Windows, inside WSL) |
 
-There are **two Zigs** in principle. One builds zilc, and is limited only by zilc's own code. The
-other compiles user code, and must match Fil-C's LLVM. Today both are 0.15.2. A newer Zig for
-zilc itself would be a separate "latest" line (`cmem/releasing.md`, `cmem/upstream.md` stage B).
+**zilc stays on the Zig whose LLVM matches Fil-C's, always** (owner, 2026-10-27). It moves Zig
+only when Fil-C moves LLVM, and it builds no line on a newer Zig. The newer-Zig path is zailc's;
+zilc only writes recommendations for it, from what it has measured
+(`cmem/upstream.md` "Recommendations for a newer-Zig upgrade").
 `build.zig.zon`'s `minimum_zig_version` is not a pin: a newer Zig fails to build zilc with errors
 that look like code bugs.
 

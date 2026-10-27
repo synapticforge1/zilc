@@ -51,7 +51,13 @@ first passing on the Zig that matches Fil-C.
    — the same gate with Fil-C's modules swapped for them (`testing.md` "The gate with pure-Zig
    modules"). zilc is the corpus of truth for both.
 
-### Stage B: port to the LATEST Zig, if it is a different release
+> 🔒 **2026-10-27 (owner): zilc does stage A only, always.** It stays on the Zig whose LLVM
+> matches Fil-C's; stages B and C below are **not done in zilc** and are kept as the procedure
+> recommended to whoever ports to a newer Zig (zailc owns that path). Recommendations zilc can add
+> from what it measured go in "Recommendations for a newer-Zig upgrade" below
+> (`design-decisions.md`, top row).
+
+### Stage B: port to the LATEST Zig, if it is a different release (recommended, not done here)
 
 1. On **the new line's own branch, created from the latest reference release's tag** (the
    **basis**; one branch per Zig line, `releasing.md`), port zilc to the latest Zig, so the conversion is as small as possible. Start from the previous line's entry in
@@ -73,7 +79,9 @@ first passing on the Zig that matches Fil-C.
 
 ### Stage C: benchmark comparison between versions
 
-Compare **previous reference → new reference (A) → latest-Zig port (B)**, on the same machine:
+Compare **previous reference → new reference (A) → latest-Zig port (B)**, on the same machine.
+Since 2026-10-27 only the first comparison (one reference against the next, both on the
+compatible Zig) is zilc's; the latest-Zig column belongs to whoever does stage B.
 
 | metric | why |
 | --- | --- |
@@ -84,6 +92,31 @@ Compare **previous reference → new reference (A) → latest-Zig port (B)**, on
 
 ⚠️ Performance claims need **repeats and a stated noise floor** (`best-practices.md` §1). A benchmark
 suite does not exist yet (`testing.md`, planned gates).
+
+### Recommendations for a newer-Zig upgrade (0.17.0 and later; not done here)
+
+🔒 Owner, 2026-10-27: zilc *"can make some recommendations for the newest zig version upgrade
+procedures to 0.17.0 but not do them here"*. These are notes for whoever ports to a newer Zig
+(zailc owns that path), from what zilc measured; each is a claim with a date, to re-check on the
+target Zig.
+
+1. **Know first whether Fil-C can read the new Zig's IR.** Zig 0.16 emits LLVM 21 IR and Fil-C
+   0.687 is LLVM 20.1.8 (KI-3). Unless Fil-C has moved to that LLVM, a newer-Zig line can only
+   change the Zig that BUILDS the tool; the Zig that compiles user code must stay the compatible
+   one (stage B step 2) — or the pass must run as Zig first (the pure-Zig track, Z2).
+2. **Port from the latest reference release, on its own branch**, and write the port notes
+   (`ports/<version>.md`) as you go: stage B above, `releasing.md` "Two kinds of line".
+3. **Expect KI-22 to get worse, and measure it first.** On one test module (2026-10), Zig 0.16.0
+   emitted no lifetime markers and about 2× the allocas of 0.15.2 (Debug 18,241 vs 9,202;
+   ReleaseSafe 10,559 vs 4,755), which is what Fil-C's frame-slot colouring scales with
+   (`workarounds.md` KI-22).
+4. **Re-check every std-overlay patch against the new std** (`src/stdpatch.zig` refuses a text it
+   does not recognise): KI-11's backport becomes unnecessary from 0.16.0 (Z-1 fixed upstream); Z-2
+   (the `mmap` hint) and Z-5 (`DebugAllocator`) were still present in 0.16.0
+   (`zig-upstream-notes.md`).
+5. **Re-run the whole checklist against the reference**, not just the tests: gate results identical
+   case by case, the corpus as designed in all four modes, the output comparison, and
+   `gate-zig-modules`.
 
 ## ✉️ Reporting upstream (owner, 2026-10-01)
 

@@ -93,8 +93,10 @@ them, with their dates.
 - ~~Next phase (P3 or P4)~~ — **P3, P4 and P5 moved to zailc and are abandoned here**
   (owner, 2026-10-27; `design-decisions.md` top row). zilc's work is its four-part role: track
   Fil-C, follow the matching Zig, keep Zig and C correct on x86_64 Linux, be zailc's reference.
-- **Still zilc's, for the next Zig move** (upgrade procedure, `upstream.md`): the benchmark suite
-  (stage C) and the 0.16.0 examples under zilc (`testing.md`). Abandoned with P3:
+- 🔒 **zilc stays on the compatible Zig, always** (owner, 2026-10-27; `design-decisions.md` top
+  row): no newer-Zig line, so the 0.16.0 examples under zilc and stage B are not zilc's;
+  recommendations for a 0.17.0+ upgrade only (`upstream.md`). Still zilc's: the benchmark suite,
+  for comparing one reference release with the next (stage C's first column). Abandoned with P3:
   `-Druntime=both`, the byte-identity check.
 - ✅ **Code left from P3, removed 2026-10-27** (`5dc54c5`): `--runtime zig` is no longer a value
   (`--runtime filc` still accepted); the refusal test replaced by one pinning the values, inverted
