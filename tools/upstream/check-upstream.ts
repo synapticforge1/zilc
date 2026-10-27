@@ -8,6 +8,7 @@
 //
 //   bun tools/upstream/check-upstream.ts                  report only
 //   bun tools/upstream/check-upstream.ts --mark-reviewed  after reviewing: record upstream HEAD
+//   bun tools/upstream/check-upstream.ts --mark-reviewed=<rev>   or the commit actually reviewed
 //
 // ⚠️ Every git command names its repo with -C and an absolute path (see clone-upstream.ts).
 import { readFile, writeFile } from "node:fs/promises";
@@ -72,8 +73,15 @@ for (const [script, file, what] of [
   console.log(r.code === 0 ? "  yes, every edit" : "  ⚠️ NO: re-derive the edits marked above before the next Fil-C upgrade");
 }
 
-if (ARGS.includes("--mark-reviewed")) {
-  const name = (await run(["git", "-C", u, "describe", "--tags", "--always", head])).out.trim();
-  await writeFile(revFile, `${head} ${name} ${new Date().toISOString().slice(0, 10)} reviewed\n`);
-  console.log("recorded HEAD as reviewed in tools/upstream/REVIEWED (commit it)");
+// --mark-reviewed records upstream HEAD; --mark-reviewed=<rev> records the commit that was actually
+// reviewed (2026-10-27: 0.687's compiler e7947f0, 20 commits before HEAD — marking HEAD would have
+// marked unread commits, among them an ABI change, as reviewed).
+const mark = ARGS.find((a) => a === "--mark-reviewed" || a.startsWith("--mark-reviewed="));
+if (mark) {
+  const rev = mark.includes("=") ? await git("rev-parse", "--verify", `${mark.split("=")[1]}^{commit}`) : head;
+  if ((await run(["git", "-C", u, "merge-base", "--is-ancestor", reviewed, rev])).code !== 0)
+    throw new Error(`${rev} does not contain the last reviewed commit ${reviewed}: not recording it`);
+  const name = (await run(["git", "-C", u, "describe", "--tags", "--always", rev])).out.trim();
+  await writeFile(revFile, `${rev} ${name} ${new Date().toISOString().slice(0, 10)} reviewed\n`);
+  console.log(`recorded ${rev.slice(0, 12)} (${name}) as reviewed in tools/upstream/REVIEWED (commit it)`);
 }

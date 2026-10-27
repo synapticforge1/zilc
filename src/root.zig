@@ -22,15 +22,15 @@ pub const zig_line = std.SemanticVersion{ .major = 0, .minor = 15, .patch = 2 };
 
 /// The Fil-C release zilc is built against: its compiler pass, runtime ABI and checked libc. It is
 /// part of the version (below). Change it with tools/lib/tool.ts `FILC_VERSION`.
-pub const filc_release = "0.686";
+pub const filc_release = "0.687";
 
 /// zilc's own release number within `zig_line` AND `filc_release`. It restarts at 1 whenever
 /// either changes, patch releases included (owner, 2026-09-30 for Zig, 2026-10-05 for Fil-C;
 /// cmem/releasing.md).
 pub const release = 1;
 
-/// zilc's version, `<zig_line>-<filc_release>.<release>` (owner, 2026-10-05), e.g. 0.15.2-0.686.1:
-/// Zig 0.15.2, Fil-C 0.686, zilc release 1. Built from the constants above, so it cannot disagree
+/// zilc's version, `<zig_line>-<filc_release>.<release>` (owner, 2026-10-05), e.g. 0.15.2-0.687.1:
+/// Zig 0.15.2, Fil-C 0.687, zilc release 1. Built from the constants above, so it cannot disagree
 /// with them. Keep `build.zig.zon` in sync (a test below checks the string).
 pub const version = std.SemanticVersion{
     .major = zig_line.major,
@@ -39,7 +39,7 @@ pub const version = std.SemanticVersion{
     .pre = std.fmt.comptimePrint("{s}.{d}", .{ filc_release, release }),
 };
 
-/// Version string, e.g. "0.15.2-0.686.1".
+/// Version string, e.g. "0.15.2-0.687.1".
 pub const version_string = std.fmt.comptimePrint("{d}.{d}.{d}-{s}", .{ version.major, version.minor, version.patch, version.pre.? });
 
 // What the version number does NOT say (cmem/releasing.md): `zilc --version` and RELEASE-NOTES.md
@@ -59,11 +59,11 @@ pub const line_kind = if (basis == null) "reference" else "latest";
 test "the reference line compiles user code with its own Zig" {
     // On the reference line the two Zigs are the same; a latest line has a basis instead.
     if (basis == null) try std.testing.expectEqual(std.math.Order.eq, user_zig.order(zig_line));
-    try std.testing.expectEqualStrings("0.686", filc_release);
+    try std.testing.expectEqualStrings("0.687", filc_release);
 }
 
 test "version string matches version" {
-    try std.testing.expectEqualStrings("0.15.2-0.686.1", version_string);
+    try std.testing.expectEqualStrings("0.15.2-0.687.1", version_string);
 }
 
 test "a newer zilc, Fil-C or Zig release sorts above (the scheme's point)" {
@@ -72,7 +72,8 @@ test "a newer zilc, Fil-C or Zig release sorts above (the scheme's point)" {
             return (try std.SemanticVersion.parse(a)).order(try std.SemanticVersion.parse(b));
         }
     }.of;
-    try std.testing.expectEqual(.lt, try order(version_string, "0.15.2-0.686.2")); // next zilc release
+    try std.testing.expectEqual(.lt, try order("0.15.2-0.686.1", version_string)); // the release before
+    try std.testing.expectEqual(.lt, try order(version_string, "0.15.2-0.687.2")); // next zilc release
     try std.testing.expectEqual(.lt, try order("0.15.2-0.686.9", "0.15.2-0.686.10")); // as numbers
     try std.testing.expectEqual(.lt, try order("0.15.2-0.686.9", "0.15.2-0.687.1")); // newer Fil-C
     try std.testing.expectEqual(.lt, try order("0.15.2-0.999.9", "0.15.2-1.0.1")); // Fil-C 1.0

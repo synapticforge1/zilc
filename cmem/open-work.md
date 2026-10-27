@@ -68,6 +68,13 @@ them, with their dates.
   patched clang; Fil-C's suite stock vs patched at 0 differences; the gate, tests, corpus in four
   modes and the output comparison; re-archive; the five version places; `--mark-reviewed`. Needs
   the owner's go-ahead to release (and to push).
+- **The pure-Zig track (owner, 2026-10-27), after the 0.687 move:** bring zailc's step-2 build
+  into zilc (`roadmap.md` Z1) — read from `../zailc` (`src/gen`, `src/runtime`, `tests/link`,
+  `tools/gen`, `tools/runtime`, its `build.zig` steps `gen` / `libpas` / `yolomusl` /
+  `compiler-rt`, its `oracle.md`), keep only what is faithful to Fil-C (zailc's departures W-n stay
+  there), re-verify against 0.687, and run `zig build gate-zig-modules` on the result; then the
+  rest of Z1, then Z2 (the pass in Zig). Licence: the ported pieces carry Fil-C's notices; ledger
+  entries in `third_party/LICENSES.md` before the first file lands.
 - ~~Next phase (P3 or P4)~~ — **P3, P4 and P5 moved to zailc and are abandoned here**
   (owner, 2026-10-27; `design-decisions.md` top row). zilc's work is its four-part role: track
   Fil-C, follow the matching Zig, keep Zig and C correct on x86_64 Linux, be zailc's reference.

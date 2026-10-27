@@ -23,12 +23,17 @@ await mkdirp(TOOLS);
 const ZIG_URL = "https://ziglang.org/download/0.15.2/zig-x86_64-linux-0.15.2.tar.xz";
 const ZIG_SHA = "02aa270f183da276e5b5920b1dac44a63f1a49e55050ebde3aecc9eb82f93239";
 // Fil-C: the release zilc builds on (tools/lib/tool.ts FILC_VERSION). Upstream publishes no
-// checksum; this is the SHA-256 of the file as downloaded on 2026-10-05, recorded so a later
-// download can be checked against it. FILC_VERSION=0.685 still installs the release the phase
-// experiments (tools/p1–p3) record (its SHA was only printed then, so it is not checked).
+// checksum; these are the SHA-256s of the files as downloaded (0.686 on 2026-10-05, 0.687 on
+// 2026-10-27), recorded so a later download can be checked against them. FILC_VERSION=0.685 still
+// installs the release the phase experiments (tools/p1–p3) record (its SHA was only printed then,
+// so it is not checked).
 const FILC_VERSION = env("FILC_VERSION", ZILC_FILC_VERSION);
 const FILC_URL = `https://github.com/pizlonator/fil-c/releases/download/v${FILC_VERSION}/filc-${FILC_VERSION}-linux-x86_64.tar.xz`;
-const FILC_SHA = FILC_VERSION === "0.686" ? "60bfbe8ee63d7e462394aa8d5e44fee675de892bcf800d9cc80d86378cad6b07" : "";
+const FILC_SHAS: Record<string, string> = {
+  "0.686": "60bfbe8ee63d7e462394aa8d5e44fee675de892bcf800d9cc80d86378cad6b07",
+  "0.687": "aab538401f78a47ab261ee79afed8c6b99e1d4848e263ae159a75b03c1288da1",
+};
+const FILC_SHA = FILC_SHAS[FILC_VERSION] ?? "";
 const PATCHELF_URL = "https://github.com/NixOS/patchelf/releases/download/0.19.1/patchelf-0.19.1-x86_64.tar.gz";
 
 /** Runs a step with its output on this terminal; a failure ends the tool with that exit code, as `set -e` did. */

@@ -30,8 +30,10 @@ const sha = FILC_SHA;
 const src = `${WORK}/filc-src/repo`;
 // clang's version string prints the source's origin URL (LLVM's VersionFromVCS.cmake runs
 // `git remote get-url origin`); it must read as the prebuilt's, or the patched clang would not
-// report "the same compiler, patched". (0.686: Fil-C's LLVM fork moved from llvm-project-deluge.git
-// to fil-c.git, same history.) ⚠️ To FETCH without ssh keys, add a repo-local
+// report "the same compiler, patched". (0.686's clang named fil-c.git; 0.687's names
+// llvm-project-deluge.git again: same history, FILC_SOURCE_URL follows.) ⚠️ The source is a PARTIAL
+// clone (blob:none), so a CHECKOUT fetches file contents from origin too and needs the same
+// rewrite (2026-10-27: a checkout without it waited 18 minutes in ssh). To FETCH without ssh keys, add a repo-local
 // `url.https://github.com/.insteadOf git@github.com:` for the fetch and REMOVE it before building:
 // `get-url` applies the rewrite, so it would stamp the https URL into the version string (caught by
 // this very check on 2026-10-05).

@@ -51,12 +51,17 @@ export const ZIG = env("ZILC_ZIG", `${WORK}/tools/zig-0.15.2/zig`);
 /**
  * The Fil-C release zilc builds on, and the commit its clang names in `clang --version` (the
  * source zilc's patched clang is built from). Change both together with src/root.zig's
- * `filc_release`; every tree, archive and tag name below follows. (0.685 → 0.686 on 2026-10-05.)
+ * `filc_release`; every tree, archive and tag name below follows. (0.685 → 0.686 on 2026-10-05;
+ * 0.686 → 0.687 on 2026-10-27: 0.687's clang names e7947f0, five commits under the v0.687 tag,
+ * which change nothing under llvm/, clang/, libpas/ or filc/ but one test manifest.)
  */
-export const FILC_VERSION = "0.686";
-export const FILC_SHA = "163fae598eaf249b74065b0156f3a7e7ba8c0e5a";
-/** The URL the source's `origin` must have: clang's version string prints it (build-patched-clang.ts). */
-export const FILC_SOURCE_URL = "git@github.com:pizlonator/fil-c.git";
+export const FILC_VERSION = "0.687";
+export const FILC_SHA = "e7947f079c976fb167108f7407c20240bca0ca89";
+/**
+ * The URL the source's `origin` must have: clang's version string prints it (build-patched-clang.ts).
+ * 0.686's clang printed fil-c.git; 0.687's prints llvm-project-deluge.git again (the same history).
+ */
+export const FILC_SOURCE_URL = "git@github.com:pizlonator/llvm-project-deluge.git";
 
 /** A release's stock prebuilt, as p1/setup-wsl.ts unpacks it. */
 export function filcPrebuiltTree(version: string): string {

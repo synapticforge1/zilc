@@ -1,9 +1,31 @@
 # Roadmap
 
-> 🔒 **2026-10-27 (owner): the roadmap is CLOSED for zilc.** P0–P2 are done; **P3, P4, P5 and P6
-> moved to zailc and are abandoned here**. What zilc does from now on is its four-part role
-> (`design-decisions.md`, top row): track Fil-C, follow the matching Zig, keep Zig and C correct
-> on x86_64 Linux, be zailc's reference. The phase sections below are the record.
+> 🔒 **2026-10-27 (owner), as settled by the end of the day:** P0–P2 are done; P4, P5 and P6
+> moved to zailc and are abandoned here, and so is P3 *as a different runtime*. **Open in zilc:
+> the pure-Zig track below** — zailc's build up to a pure-Zig implementation running in Linux
+> (owner: *"all of zailc's build to the point of pure zig implemenation running in linux should be
+> in zilc"*). Alongside it, zilc's standing role (`design-decisions.md`, top rows): track Fil-C,
+> follow the matching Zig, keep Zig and C correct on x86_64 Linux, be the corpus of truth.
+
+## The pure-Zig track (owner, 2026-10-27) — Fil-C, built and then implemented in Zig, on Linux
+
+Faithful to each Fil-C release, no departures (zailc keeps those). Every item is checked against
+the release it is built from — same bytes where generated, same symbols and behaviour where
+compiled — and then by `zig build gate-zig-modules` (`testing.md`), the corpus and Fil-C's suite.
+Brought from zailc's step 2 / step 3 by reading zailc's code (nothing is written there), adapted to
+zilc, and re-verified against zilc's Fil-C release (0.686 work moves to 0.687 on the way).
+
+- **Z1 — the runtime from Fil-C's sources by `zig build`** (zailc step 2, mostly done there for
+  0.686): the forwarder generator (byte-identical to Ruby; 0.687 adds 3 signatures) and musl's
+  header install; libpas's stock half, `filc_crt.o`, `filc_mincrt.o`, `libyolounwind.a`; yolo musl's
+  static half; compiler-rt — then what zailc has not done: yolo musl's shared half (`libyoloc.so`,
+  `ld-fil1-x86_64.so`), the three Fil-C-compiled pieces (`filc/src`, the user libc, libc++), a
+  program linked entirely from `zig build`'s outputs, Fil-C's suite against it.
+- **Z2 — the pass in Zig** (zailc step 3, not started there): an LLVM IR model in Zig, the pass
+  (`FilPizlonator.cpp`), the analyses it needs, KillUB and DeleteRedundantPollchecks; oracle: the
+  same module through Fil-C's pass and through zilc's, compared as IR and as behaviour.
+- 🗓️ Owner calls on the way: the order (Z1 first, as zailc did); whether zailc's tooling layout
+  (`tools/package.json`, `tsconfig.json`, its typecheck tool) comes too.
 
 > 🔒 **2026-10-27 (owner): zilc stays Fil-C on Linux x86_64 only, worked in WSL or Linux; the
 > cross-platform part is zailc's** (`design-decisions.md`, top row). **P6 below no longer applies
