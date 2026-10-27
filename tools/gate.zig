@@ -135,7 +135,7 @@ pub fn main() !void {
             \\    export ZILC_ZIG=/path/to/zig-0.15.2/zig
             \\    zig build gate
             \\
-            \\  Setup: tools/p1/setup-wsl.sh. Background: cmem/known-issues.md KI-1.
+            \\  Setup: tools/README.md "First-time setup". Background: cmem/known-issues.md KI-1.
             \\
         , .{});
         return; // exit 0: not a failure, an absence

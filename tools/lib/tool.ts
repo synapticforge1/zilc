@@ -58,7 +58,7 @@ export const FILC_SHA = "163fae598eaf249b74065b0156f3a7e7ba8c0e5a";
 /** The URL the source's `origin` must have: clang's version string prints it (build-patched-clang.ts). */
 export const FILC_SOURCE_URL = "git@github.com:pizlonator/fil-c.git";
 
-/** A release's stock prebuilt, as setup-wsl.sh unpacks it. */
+/** A release's stock prebuilt, as p1/setup-wsl.ts unpacks it. */
 export function filcPrebuiltTree(version: string): string {
   return `${WORK}/tools/filc-${version}-linux-x86_64`;
 }

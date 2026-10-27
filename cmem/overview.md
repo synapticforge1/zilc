@@ -55,8 +55,10 @@ zilc/
 | `zig build baseline` | Builds `examples/*.c` with plain `zig cc`, the unsafe reference behavior |
 | `zig build run -- …` | Runs the CLI |
 
-⚠️ Use **Zig 0.15.2** (`C:\zig\0.15.2\zig.exe`), not the `zig` on PATH (0.16), and always set
-`ZIG_LOCAL_CACHE_DIR=C:\zig-cache\zilc` first (see `known-issues.md` KI-2, KI-3).
+⚠️ Use **Zig 0.15.2** inside Linux (WSL's `~/zilc-work/tools/zig-0.15.2/zig`; owner,
+2026-10-27), not a `zig` on PATH, and keep the cache in the Linux home
+(`ZIG_LOCAL_CACHE_DIR=~/.cache/zilc-zig`; the repo is on exFAT, `known-issues.md` KI-2, KI-3).
+Building with Windows' Zig was retired 2026-10-27.
 
 ## Mental model
 

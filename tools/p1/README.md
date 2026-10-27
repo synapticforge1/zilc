@@ -4,23 +4,16 @@ What was actually run to produce the P1 findings in `cmem/roadmap.md` and `cmem/
 KI-4. Kept so the result is reproducible and so the next attempt starts from evidence.
 
 The experiments were converted from shell to **Deno** tools on 2026-10-05 (checked to reproduce the
-same results; `../README.md`) and are **Bun** tools since 2026-10-22. Run them from Windows or Linux:
+same results; `../README.md`) and are **Bun** tools since 2026-10-22. Run them inside Linux (a WSL
+shell on a Windows host; owner, 2026-10-27):
 
 ```
-bun tools/p1/<tool>.ts
-```
-
-The one exception is **`setup-wsl.sh`**, which stays shell: it prepares a fresh Ubuntu before Bun
-is installed there (it installs Bun itself). Run it from Windows pointing at the file (never inline: PowerShell mangles shell
-text passed to `wsl.exe`, KI-1):
-
-```powershell
-wsl.exe -e sh /mnt/c/<path>/setup-wsl.sh
+~/.bun/bin/bun tools/p1/<tool>.ts
 ```
 
 | file | what it does |
 | --- | --- |
-| `setup-wsl.sh` | Installs Fil-C (0.686 by default; `FILC_VERSION=0.685` for the phase experiments), Zig 0.15.2 and Bun 1.4.3 (SHA-256 verified), and patchelf, into `~/zilc-work/` (Bun into `~/.bun/bin`). No root. Idempotent |
+| `setup-wsl.ts` | Installs Fil-C (0.686 by default; `FILC_VERSION=0.685` for the phase experiments), Zig 0.15.2 and patchelf (SHA-256 verified), and runs Fil-C's `setup.sh`, into `~/zilc-work/`. No root. Idempotent. Bun itself is installed first by the documented step in `../README.md` "First-time setup". Ported from `setup-wsl.sh` on 2026-10-27, proved equivalent on a fresh home (`cmem/open-work.md`) |
 | `reference-behavior.ts` | Compiles `examples/*.c` with Fil-C and prints the panics. **This is where `cmem/testing.md`'s expected output came from** |
 | `stock-llvm-validity.ts` | Which of Fil-C's IR features a stock LLVM rejects (the table in `cmem/known-issues.md` KI-4) |
 | `zig-ir-spike.ts` | The experiment that settled the integration route: patches Fil-C's two data layouts into Zig-emitted IR and feeds it to the pass. Still fails (KI-4) — kept because re-running it is how we would notice upstream making it work |

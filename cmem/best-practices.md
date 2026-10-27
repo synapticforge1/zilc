@@ -178,7 +178,7 @@ citation to the incident.
   2026-09-18). The owner says Deno is going away. Tooling in `tools/` is `.ts`/`.mjs`, run with
   `bun tools/<group>/<tool>.ts`; all of it was ported from Deno on 2026-10-22. Use Node's APIs
   (`node:fs/promises`, `process`) plus `Bun.spawn`/`Bun.Glob`/`Bun.YAML`, never `Deno.*` or
-  `jsr:` imports. Bun lives at `~/.bun/bin/bun` in WSL (`tools/p1/setup-wsl.sh`).
+  `jsr:` imports. Bun lives at `~/.bun/bin/bun` in WSL (the first-time step in `tools/README.md`).
 - **Every generated input a recorded result depends on needs its exact recipe written down, next
   to the tool that reads it.** "Made during P1" is not a recipe. The commands for three P1 IR files
   had to be recovered by trial (one was `build-exe -lc`, readable only from the file's own

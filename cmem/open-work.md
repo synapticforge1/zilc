@@ -25,33 +25,32 @@ them, with their dates.
    --expire=now --all`, `gc --prune=now`, delete the pre-purge bundle in `cmem/local/backups/` when
    the owner agrees, and tell zailc (its oracle notes quote zilc ids). GitHub keeps serving old
    commits by hash until its own GC; a full removal is a GitHub Support request (owner).
-2. **`tools/p1/setup-wsl.sh`** is zilc's one committed shell script (letters H15, H26). Owner,
-   2026-10-27: "we will merge all to bun tooling" — so it goes to Bun too. It INSTALLS Bun, and
-   Bun now runs inside Linux only (owner, same day), so a Windows-side Bun driver is ruled out and
-   Bun cannot install itself. Proposed: **the Bun install becomes a documented one-time step**
-   (the npm-tarball commands and SHA in `tools/README.md`, not a committed script), and **the rest
-   — Zig, Fil-C, patchelf, Fil-C's `setup.sh` — becomes a Bun tool run in WSL**. The proof rule
-   needs both run on a fresh WSL `$HOME` (~1 GB of downloads + `setup.sh`) with the trees diffed,
-   plus a must-fail input (a wrong SHA). Kept in use until the port is proved. Owner to confirm the
-   split.
-3. **Retire the Windows-side tool path in code** (owner rule, 2026-10-27: Bun inside Linux only).
-   Proposed, the zilc way ("reserve a switch by refusing it", `best-practices.md` § 3):
-   `tools/lib/tool.ts` refuses on any OS but Linux, saying "run this from a WSL shell with
-   `~/.bun/bin/bun`", instead of `linuxOnly()` re-launching into WSL; `compile-check.ts` loses its
-   Windows Zig default; `tools/README.md` rewritten to match. A `tools/` change, so the gate runs
-   in WSL after it, and the refusal is inverted (started from Windows → refused; from WSL → runs).
-   Until then, `tools/README.md` describes code that the rule forbids using.
-4. **The exFAT `.git` recipe (divergence P7).** zilc's is `maintenance.geometric-repack.enabled=false`
-   + `maintenance.gc.enabled=true` (2026-10-01), answering **KI-23** (`known-issues.md`).
-   **Measured 2026-10-27 (git 2.54, traced `maintenance run` in scratch clones): it runs the SAME
-   `gc` as `maintenance.strategy gc` (pack-refs, reflog expire, repack `--cruft`, prune, worktree
-   prune, rerere gc), plus one task more: `commit-graph write --split`** — because git 2.54's
-   default strategy (`geometric`) also enables commit-graph and only the repack was switched off.
-   The stock default runs `repack --geometric=2 --write-midx` + `multi-pack-index write`, the KI-23
-   failure. So the two recipes differ only in the commit-graph task; switching to the workspace
-   standard is a one-line change (`git config --local maintenance.strategy gc`, then unset the two
-   task keys). Owner's pick.
-5. A GitHub Release page for `v0.15.2-0.686.1` (optional; `RELEASE-NOTES.md` is its text).
+2. ✅ **`setup-wsl.sh` → Bun, done 2026-10-27** (owner: "perform the open items"). Bun cannot
+   install itself and runs inside Linux only, so the Bun install is a **documented one-time step**
+   (`tools/README.md` "First-time setup", the same npm-tarball commands and SHA) and the rest is
+   **`tools/p1/setup-wsl.ts`**. **Proved** on a fresh WSL home at one fixed path (so Fil-C's
+   `setup.sh` writes the same absolute paths): (a) fresh install — `.sh` vs the Bun step + `.ts`:
+   22,159 entries identical by type, size, mode and SHA-256; the `.ts` home has 5 more, Bun's own
+   transpiler cache (`~/.bun/install/cache/@t@/*.pile`, written whenever Bun runs a `.ts`); output
+   identical but step 4 (`sha256 OK` → `already installed`, the declared difference); (b) a second
+   run on the installed tree: output identical; (c) must-fail, a corrupt Zig download: identical
+   `SHA MISMATCH` line, exit 1 both. Then `setup-wsl.sh` was deleted; zilc commits no shell script.
+3. ✅ **Windows-side tool path retired in code, done 2026-10-27** (`bac5a85`): `tools/lib/tool.ts`
+   refuses any platform but Linux at import (exit 2, with the WSL command); `linuxOnly()` only
+   asserts; the five tools that did not import it now do; `compile-check.ts` has no Windows Zig
+   default. **Checked:** gate before/after in WSL identical line for line (8/8), tests 29/29,
+   capi-smoke and baseline exit 0, `check-toolchain` identical; the five tools reach their own
+   usage; `compile-check` 78/78 C + 78/78 Zig; inverted from Windows' Bun: `run-gate`,
+   `patch-pass`, `compile-check`, `check-upstream`, `llreduce` all exit 2 with the refusal, nothing
+   built. Building zilc with Windows' Zig retired too (INDEX item 3, `testing.md`, `overview.md`,
+   README).
+4. ✅ **The exFAT `.git` recipe (divergence P7): switched to the workspace standard 2026-10-27**,
+   `maintenance.strategy gc` (the two task keys unset). Measured the same day (git 2.54, traced
+   `maintenance run`): the old recipe (`geometric-repack.enabled=false` + `gc.enabled=true`, for
+   KI-23) ran the SAME `gc` plus one more task, `commit-graph write --split`; the stock default
+   runs `repack --geometric=2 --write-midx` + `multi-pack-index write`, the KI-23 failure.
+5. A GitHub Release page for `v0.15.2-0.686.1` (optional; `RELEASE-NOTES.md` is its text; needs
+   `gh` or the web UI — the owner's).
 
 ## Open work
 
@@ -61,26 +60,24 @@ them, with their dates.
 - **Still zilc's, for the next Zig move** (upgrade procedure, `upstream.md`): the benchmark suite
   (stage C) and the 0.16.0 examples under zilc (`testing.md`). Abandoned with P3:
   `-Druntime=both`, the byte-identity check.
-- **Code left from P3** (proposed, needs the owner and the gate): `--runtime zig` is still
-  reserved and refused in the CLI "until that runtime is ready (roadmap P3)" —
-  `src/main.zig:28-30`, `src/driver.zig:30-33,873-874`, the unit test at `src/driver.zig:1092`,
-  `README.md:95`. With P3 abandoned it will never be ready. Proposed: drop the `zig` value
-  (`--runtime filc` keeps working; `--runtime zig` then fails as an unknown value) and the stub
-  `zilc_runtime` notes (`src/root.zig:7`, `architecture.md`), then the full gate in WSL.
+- ✅ **Code left from P3, removed 2026-10-27** (`5dc54c5`): `--runtime zig` is no longer a value
+  (`--runtime filc` still accepted); the refusal test replaced by one pinning the values, inverted
+  (with `zig` put back: exactly that test fails, 28/29); tests 29/29.
 - **Partly open defects:** KI-7 (`getcontext`) — `known-issues.md`.
 - ~~Cosmo leaves~~ — **not zilc work since 2026-10-27** (owner: zilc stays Fil-C on Linux x86_64 only;
   cross-platform is zailc's). The open points (`statx` missing from the cosmo runtime, real Windows
   unverified, aarch64 Windows / iOS / Android) are in `platforms.md` for zailc.
 - **Not yet re-run under Bun** (see the Bun port below): build/archive/restore-patched-clang,
-  build-cosmo, run-filc-tests, os-surface, size-compare, zilc-check, all-modes,
-  check/clone-upstream. Run each once under Bun before relying on it.
+  build-cosmo, run-filc-tests (2026-10-27: only its usage line), os-surface, size-compare,
+  zilc-check, all-modes, check/clone-upstream. Run each once under Bun before relying on it.
+  (`compile-check` and `check-toolchain` ran fully on 2026-10-27.)
 
 ## Workspace letters (`../cmem/workspace-correspondence.md`)
 
 | letter | asks zilc | state (2026-10-27) |
 | --- | --- | --- |
 | H26 | pull line; ★ block; path test; drive paths at HEAD; exFAT recipe; `origin` + stale links; per-repo items | answered in the 2026-10-27 compliance commit: pull line atop `INDEX.md`; ★ block = `best-practices.md` § 6 (28 = 28 text check, inverted); path test in `working-rules.md`; `INDEX.md:11` fixed; recipe recorded (owner call 4); `origin` and the four stale links moved; `tests/basics` BasicsOfCoding links measured still live at `jrmarcum/` (200; 404 at `synapticforge1/`), so they stay; INDEX 45 → under 10 KB. Version scheme is DESIGN (P8), stays. Open: owner calls 1–3 |
-| H15 | committed scripts in Bun | tools are Bun since 2026-10-22 (`c2841dd`, merged to `main` 2026-10-27); `setup-wsl.sh` to Bun, owner call 2 |
+| H15 | committed scripts in Bun | ✅ done 2026-10-27: tools Bun since 2026-10-22 (`c2841dd`); `setup-wsl.sh` → documented Bun step + `setup-wsl.ts`, proved (owner call 2); `git ls-files '*.sh' '*.ps1' '*.bat' '*.py' '*.nu'` empty |
 | H19 | purge drive paths from history | **purged locally 2026-10-27** (`history-map-2026-10-27.md`); force-push is owner call 1 |
 | H22 | record the path test | `working-rules.md` § Privacy |
 | H27 | old-folder prose (`upstream.md:127`) | sibling-relative now; `git grep -i` for the old folder name is empty |
@@ -91,7 +88,7 @@ them, with their dates.
 Moved verbatim from `INDEX.md` (2026-10-27). **Every tool is Bun** (owner: "Bun only", Deno is
 going away). All 38 `.ts` files (37 tools + `lib/tool.ts`) ported from `Deno.*`/`jsr:` to
 `node:*` + `Bun.spawn`/`Bun.Glob`/`Bun.YAML`; run `bun tools/<group>/<tool>.ts`. Bun 1.4.3 in WSL
-at `~/.bun/bin` (`setup-wsl.sh`, from npm's tarball: no `unzip`/root). Checked against Deno runs:
+at `~/.bun/bin` (then `setup-wsl.sh`; since 2026-10-27 the documented step in `tools/README.md`; from npm's tarball: no `unzip`/root). Checked against Deno runs:
 gate 8/8 identical (also started from Windows through the WSL bridge), run-native identical (632
 files; differences only in times, random values, thread order, PIDs, paths), the p1–p3 experiments
 same exit codes and reports (byte-identical or differing only in ASLR/PIDs/paths),

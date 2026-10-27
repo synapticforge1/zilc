@@ -39,7 +39,7 @@ Everything lives in the WSL home, **nothing installed system-wide, no root used*
 | Zig **0.15.2** | `~/zilc-work/tools/zig-0.15.2` | official tarball, SHA-256 verified; `zig cc` = clang 20.1.2 |
 | patchelf 0.19.1 | `~/zilc-work/tools/bin` | `setup.sh` needs it; `sudo` needs a password, so it was installed from the upstream prebuilt tarball instead |
 | Deno 2.9.7 | `~/.deno/bin` | pre-existing; ran zilc's tools 2026-10-05 → 2026-10-22, no longer used |
-| Bun 1.4.3 | `~/.bun/bin` | 2026-10-22, from npm's `@oven/bun-linux-x64` tarball (no `unzip`/root needed), SHA-256 checked by `tools/p1/setup-wsl.sh`; runs zilc's tools |
+| Bun 1.4.3 | `~/.bun/bin` | 2026-10-22, from npm's `@oven/bun-linux-x64` tarball (no `unzip`/root needed), SHA-256 checked (by `tools/p1/setup-wsl.sh` until 2026-10-27; since then the documented step in `tools/README.md` "First-time setup"); runs zilc's tools |
 
 ⚠️ `sudo` on this WSL requires an interactive password, so **an agent cannot apt-install anything.**
 Prefer no-root prebuilt binaries.

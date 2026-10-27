@@ -6,8 +6,34 @@ Developer tooling for zilc. Build logic stays in `build.zig`; everything else is
 (2026-09-18: Deno or Bun, never Python; 2026-10-05: the shell scripts became Deno; 2026-10-22: Bun
 only, Deno is going away, and every tool was ported to Bun). The tools use Node's APIs
 (`node:fs/promises`, `process`) and Bun's own (`Bun.spawn`, `Bun.Glob`), never `Deno.*` or `jsr:`
-imports. The one exception is `p1/setup-wsl.sh`, which prepares a fresh Ubuntu (and installs Bun to
-`~/.bun/bin`) before Bun is there.
+imports. No shell scripts are committed: the one that installed Bun (`p1/setup-wsl.sh`) became the
+documented step below plus `p1/setup-wsl.ts` (2026-10-27), since Bun cannot install itself.
+
+## First-time setup (a fresh WSL or Linux home)
+
+Run in a WSL or Linux shell (x86_64). No root is needed; everything goes under `~`.
+
+1. **Install Bun** (once). Taken from npm's `@oven/bun-linux-x64` because that is a `.tgz`: Bun's
+   own installer needs `unzip`, which a fresh Ubuntu lacks and installing needs root. The SHA-256 is
+   the file's as downloaded on 2026-10-22 (its SHA-1 matched the registry's `dist.shasum`,
+   `2f13abdede6651ab4c393e7754cbe64981dd325d`); `sha256sum -c` must print `OK`.
+
+   ```sh
+   mkdir -p ~/zilc-work/dl/bun ~/.bun/bin
+   curl -fsSL https://registry.npmjs.org/@oven/bun-linux-x64/-/bun-linux-x64-1.4.3.tgz -o ~/zilc-work/dl/bun-1.4.3.tgz
+   echo "efd069d474e6addceede0dc9c0981b4421cf35ceb3348e4b83462053a177281f  $HOME/zilc-work/dl/bun-1.4.3.tgz" | sha256sum -c
+   tar -xzf ~/zilc-work/dl/bun-1.4.3.tgz -C ~/zilc-work/dl/bun
+   cp ~/zilc-work/dl/bun/package/bin/bun ~/.bun/bin/bun
+   chmod +x ~/.bun/bin/bun
+   ~/.bun/bin/bun --version
+   ```
+
+2. **Install the rest** — Zig 0.15.2, Fil-C's release, patchelf, and Fil-C's own `setup.sh`; each
+   download is checked against a recorded SHA-256 and the tool is idempotent:
+
+   ```sh
+   ~/.bun/bin/bun tools/p1/setup-wsl.ts
+   ```
 
 ## How to run a tool
 

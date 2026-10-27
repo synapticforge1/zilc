@@ -32,16 +32,17 @@ look them up in [history-map-2026-10-27.md](history-map-2026-10-27.md).
    password, so install into `$HOME`. 🔒 **Bun runs inside Linux only** (owner, 2026-10-27): run
    the tools from a WSL shell with `~/.bun/bin/bun`, never with Windows' Bun (the old Windows-side
    bridge is retired). For ad-hoc commands from Windows, **pass shell text to WSL as a FILE** (KI-1).
-3. **Toolchain: Zig 0.15.2** (owner, 2026-09-18), at `C:\zig\0.15.2\zig.exe`, not on PATH; bare
-   `zig` may be a newer Zig that fails to build zilc (KI-3). **D: is exFAT: set
-   `ZIG_LOCAL_CACHE_DIR=C:\zig-cache\zilc` before any `zig build`** (KI-2).
+3. **Toolchain: Zig 0.15.2** (owner, 2026-09-18), WSL's at `~/zilc-work/tools/zig-0.15.2/zig`
+   (`tools/p1/setup-wsl.ts`); bare `zig` may be a newer Zig that fails to build zilc (KI-3). The
+   repo is on exFAT, so **keep the Zig cache in the Linux home** (KI-2), as `run-gate.ts` does:
 
-   ```powershell
-   $env:ZIG_LOCAL_CACHE_DIR = 'C:\zig-cache\zilc'
-   & C:\zig\0.15.2\zig.exe build test
+   ```sh
+   ZIG_LOCAL_CACHE_DIR=~/.cache/zilc-zig ~/zilc-work/tools/zig-0.15.2/zig build test
    ```
+   (Building zilc with Windows' Zig, `C:\zig\0.15.2\zig.exe`, was retired 2026-10-27 with the
+   Linux-only rule.)
 4. **`zig build gate` must be green before anything is believed**, and it prints `SKIPPED` (exit
-   0) when the Fil-C toolchain is missing — read its first line. `bun tools/run-gate.ts`;
+   0) when the Fil-C toolchain is missing — read its first line. `~/.bun/bin/bun tools/run-gate.ts`;
    everything else in `testing.md`.
 5. **LF everywhere** (owner): `.gitattributes` is `* text=auto eol=lf`; reference clones use
    `core.autocrlf=false`.

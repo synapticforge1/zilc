@@ -137,15 +137,17 @@ zig build capi-smoke     # C client linked against the runtime through zilc.h
 zig build baseline       # bug examples built with PLAIN zig cc (unsafe, for comparison)
 zig build run -- --help
 
-# the driver runs on Linux, where Fil-C is; cross-compile it from anywhere:
 zig build -Dtarget=x86_64-linux-musl -Doptimize=ReleaseSafe
 ```
 
-**On an exFAT drive, put the Zig cache on an NTFS path.** A `.zig-cache` on exFAT works for one
-build and fails with `error: Unexpected` on every build after that:
+Build and run everything on Linux x86_64 (on Windows, inside WSL). First-time setup of Zig, Fil-C
+and Bun: [tools/README.md](tools/README.md) "First-time setup".
 
-```powershell
-$env:ZIG_LOCAL_CACHE_DIR = 'C:\zig-cache\zilc'
+**If the checkout is on an exFAT drive, keep the Zig cache off it.** A `.zig-cache` on exFAT works
+for one build and fails with `error: Unexpected` on every build after that:
+
+```sh
+export ZIG_LOCAL_CACHE_DIR=~/.cache/zilc-zig
 ```
 
 ## Layout

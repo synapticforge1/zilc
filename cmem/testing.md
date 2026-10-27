@@ -200,14 +200,21 @@ and so do `argv`, files, stdin, child processes and threads.
 | `zig build baseline` | Builds `examples/*.c` with plain `zig cc` | builds. `baseline_oob_write` prints `a[3] = 3`, exit 0: **the undetected bug** |
 
 All gates were re-verified on **Zig 0.15.2** after the toolchain move (2026-09-18). Run them with
-that Zig, not the `zig` on PATH, and with the NTFS cache (KI-2, KI-3):
+that Zig, not the `zig` on PATH, **inside Linux** (a WSL shell here; owner, 2026-10-27), with the
+cache in the Linux home because the repo is on exFAT (KI-2, KI-3):
 
-```powershell
-$env:ZIG_LOCAL_CACHE_DIR = 'C:\zig-cache\zilc'
-& C:\zig\0.15.2\zig.exe build test --summary all
-& C:\zig\0.15.2\zig.exe build capi-smoke
-& C:\zig\0.15.2\zig.exe build baseline
+```sh
+export ZIG_LOCAL_CACHE_DIR=~/.cache/zilc-zig
+Z=~/zilc-work/tools/zig-0.15.2/zig
+~/.bun/bin/bun tools/run-gate.ts
+$Z build test --summary all
+$Z build capi-smoke
+$Z build baseline
 ```
+
+Re-run 2026-10-27 this way, before and after the Linux-only tools change: gate 8/8, tests 29/29,
+capi-smoke and baseline exit 0, every line of the gate's output identical. (Until 2026-10-27 the
+commands ran with Windows' Zig, `C:\zig\0.15.2\zig.exe`, and the cache `C:\zig-cache\zilc`.)
 
 ## 🎯 THE EXPECTED OUTPUT IS RECORDED (2026-09-23) — Fil-C 0.685 on our two examples
 

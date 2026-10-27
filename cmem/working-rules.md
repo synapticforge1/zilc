@@ -55,8 +55,8 @@ named below. Method lessons are in [best-practices.md](best-practices.md), not h
   Linux only** (owner, 2026-10-27): WSL's Bun (`~/.bun/bin/bun`) on a Windows host, the machine's
   own Bun on a Linux machine. Never start a zilc tool with Windows' Bun. Node APIs + `Bun.*`, never
   `Deno.*` or `jsr:`. `build.zig` and the Zig sources it builds and runs are the build, not
-  scripts. **No committed shell scripts** — the one exception in force is `tools/p1/setup-wsl.sh`,
-  pending the owner (`open-work.md` owner call 2). A one-time probe deleted after use may be
+  scripts. **No committed shell scripts** — none since 2026-10-27, when `tools/p1/setup-wsl.sh` became
+  the documented Bun step (`tools/README.md` "First-time setup") plus `tools/p1/setup-wsl.ts`. A one-time probe deleted after use may be
   any language, still written with the file tools.
 - **No heredocs, ever**, in any language (`bun -e`, `@'…'@`, `-F -` included). No host Python.
 - After any scripted edit, read back the changed lines; an edit script asserts each match exactly
