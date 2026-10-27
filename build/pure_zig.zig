@@ -36,8 +36,10 @@ pub fn addSteps(b: *std.Build, gen: *std.Build.Step.Compile) void {
 
     if (filc_src) |src| {
         buildStockRuntime(b, libpas_step, gen, src, pizfix_opt orelse b.pathJoin(&.{ src, "pizfix" }));
-        buildYoloMusl(b, yolomusl_step, gen, src);
-        buildCompilerRt(b, crt_step, src);
+        // yolo musl's shared half links compiler-rt's builtins as its LIBCC, as upstream's
+        // build_yolomusl.sh does (`LIBCC=…/pizfix/lib/libyolort.a`).
+        const yolort = buildCompilerRt(b, crt_step, src);
+        buildYoloMusl(b, yolomusl_step, gen, src, yolort);
     } else {
         for ([_]*std.Build.Step{ libpas_step, yolomusl_step, crt_step }) |s|
             s.dependOn(&b.addFail(b.fmt("zig build {s} {s}", .{ s.name, need })).step);
@@ -47,7 +49,7 @@ pub fn addSteps(b: *std.Build, gen: *std.Build.Step.Compile) void {
 /// compiler-rt's builtins and crt objects, as its CMake build compiles them for Zig's clang.
 /// Upstream's release built them with GCC 11.4. CMake configured them for x86_64-linux-gnu with
 /// the host's libc headers; here Zig's glibc headers stand in.
-fn buildCompilerRt(b: *std.Build, step: *std.Build.Step, filc_src: []const u8) void {
+fn buildCompilerRt(b: *std.Build, step: *std.Build.Step, filc_src: []const u8) *std.Build.Step.Compile {
     const cs = compiler_rt_sources;
     const dir: std.Build.LazyPath = .{ .cwd_relative = b.pathJoin(&.{ filc_src, "compiler-rt", "lib", "builtins" }) };
     const module = struct {
@@ -79,12 +81,13 @@ fn buildCompilerRt(b: *std.Build, step: *std.Build.Step, filc_src: []const u8) v
         const obj = b.addObject(.{ .name = o.name, .root_module = m });
         step.dependOn(&b.addInstallFile(obj.getEmittedBin(), b.fmt("lib/{s}.o", .{o.name})).step);
     }
+    return lib;
 }
 
 /// Fil-C's yolo musl, compiled as its Makefile compiles it (yolomusl_sources.zig has the rules'
 /// result). Upstream's release built it with GCC 12.3; here Zig's clang with the flags musl's
 /// configure picks for clang (cmem/workarounds.md W-8).
-fn buildYoloMusl(b: *std.Build, step: *std.Build.Step, gen: *std.Build.Step.Compile, filc_src: []const u8) void {
+fn buildYoloMusl(b: *std.Build, step: *std.Build.Step, gen: *std.Build.Step.Compile, filc_src: []const u8, yolort: *std.Build.Step.Compile) void {
     const ys = yolomusl_sources;
     const tree = b.pathJoin(&.{ filc_src, "projects", "yolomusl" });
 
@@ -155,6 +158,44 @@ fn buildYoloMusl(b: *std.Build, step: *std.Build.Step, gen: *std.Build.Step.Comp
     // libyolom.a: upstream's `ar cr libyolom.a` with no members.
     const empty = b.addWriteFiles();
     step.dependOn(&b.addInstallFile(empty.add("libyolom.a", "!<arch>\n"), "lib/libyolom.a").step);
+
+    // libyoloc.so, which is also the dynamic loader (build_yolomusl.sh: `ln -fs libyoloc.so
+    // ld-fil1-x86_64.so`): the Makefile's
+    //   $(CC) $(CFLAGS_ALL) $(LDFLAGS_ALL) -nostdlib -shared -Wl,-e,_dlstart -o $@ \
+    //       $(LOBJS) $(LDSO_OBJS) $(LIBCC)
+    // LOBJS are exactly libyoloc.a's members, in order (upstream's archive holds the .lo objects,
+    // measured: 1,343 of 1,343), so the archive goes in whole. Linked by Zig's own LLD (`zig
+    // ld.lld`) because `zig cc` refuses two of upstream's LDFLAGS_AUTO (--exclude-libs,
+    // --dynamic-list: "unsupported linker arg"), which change what binds inside libc.
+    const ldso_objs = b.allocator.alloc(std.Build.LazyPath, ys.ldso.len) catch @panic("OOM");
+    for (ys.ldso, 0..) |s, i| {
+        const m = runtimeModule(b, .baseline, s.pic);
+        includes(m, b, tree, obj_include, version_dir.getDirectory());
+        m.addCSourceFile(.{ .file = root.path(b, s.path), .flags = flagsFor(b, s, false, prefix_map) });
+        ldso_objs[i] = b.addObject(.{ .name = std.fs.path.stem(s.path), .root_module = m }).getEmittedBin();
+    }
+    const link = b.addSystemCommand(&.{ b.graph.zig_exe, "ld.lld", "-m", "elf_x86_64", "-shared", "-e", "_dlstart" });
+    // What the release's GCC driver added around the Makefile's flags, as its libyoloc.so shows
+    // (readelf, 0.687, 2026-10-27): a GNU build-id note (20 bytes: SHA-1), .eh_frame_hdr
+    // (GNU_EH_FRAME), RELRO (GNU_RELRO); no BIND_NOW, no SONAME, no NEEDED.
+    link.addArgs(&.{ "--build-id=sha1", "--eh-frame-hdr", "-z", "relro" });
+    // `--exclude-libs=ALL` hides the symbols of every ARCHIVE on the line. Upstream's line has one
+    // archive, LIBCC (libyolort.a): its LOBJS are loose objects. Here LOBJS arrive as libyoloc.a,
+    // so ALL would hide libc's own exports too (measured 2026-10-27: 8 exports instead of 1,653).
+    // Naming the one archive upstream's flag reaches gives exactly upstream's effect.
+    for (ys.ld_args) |a| {
+        const arg = if (std.mem.eql(u8, a, "--exclude-libs=ALL")) "--exclude-libs=libyolort.a" else a;
+        link.addArg(std.mem.replaceOwned(u8, b.allocator, arg, "$srcdir", tree) catch @panic("OOM"));
+    }
+    link.addFileInput(.{ .cwd_relative = b.pathJoin(&.{ tree, "dynamic.list" }) });
+    link.addArg("--whole-archive");
+    link.addArtifactArg(libc);
+    link.addArg("--no-whole-archive");
+    for (ldso_objs) |o| link.addFileArg(o);
+    link.addArtifactArg(yolort);
+    link.addArg("-o");
+    const so = link.addOutputFileArg("libyoloc.so");
+    step.dependOn(&b.addInstallFile(so, "lib/libyoloc.so").step);
 }
 
 /// The settings every stock-compiled runtime object shares: upstream compiles them with its

@@ -330,6 +330,14 @@ toolchain (`ZILC_FILC` = the copy's clang; `zilc-check.ts` hands `filc()`, i.e. 
 modes**, the designed 7 by name; output comparison **0 unexplained** (`{same 501, expected 55,
 varies 68, variesBad 0, differs 0}`). Unit tests 40/40, plain gate 8/8 on the same tree.
 
+**With yolo musl's shared half, 2026-10-27** (`libyoloc.so`, which is also the loader
+`ld-fil1-x86_64.so`; `cmem/workarounds.md` W-11): `verify-yolomusl.ts` OK, with 1,653 exports
+equal by name and type, 0 undefined, dynamic tags equal, segment kinds equal but for the allowed
+`PHDR` / `GNU_PROPERTY`, and the entry at `_dlstart`. Then **14 of 32 swapped, 10 linked**
+(`libyoloc.so` added); **gate 8/8**; corpus with the swapped clang **78/78 as designed in all four
+modes**, C and Zig; output comparison **0 unexplained**, with the same totals as above. Unit tests
+40/40, plain gate 8/8. Fil-C's still in the default link: `libc.so`, `libpizlo.so`.
+
 ## Planned gates
 
 1. **Bug-example gate** (invariant 2 in `design-decisions.md`): every `examples/*.c` built with the

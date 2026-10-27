@@ -32,8 +32,10 @@ zilc, and re-verified against zilc's Fil-C release (0.686 work moves to 0.687 on
         pure-zig -Dfilc-src=…` (`build/pure_zig.zig`), tables regenerated for 0.687; every object
         and member defines exactly the 0.687 release's symbols (`testing.md`), compiler-rt without
         zailc's W-10 departure. Then `zig build gate-zig-modules` on them (`testing.md`).
-  - [ ] yolo musl's shared half (`libyoloc.so`, `ld-fil1-x86_64.so`) — the default (dynamic) link
-        uses it, so until it exists libc stays Fil-C's in `gate-zig-modules`.
+  - [x] **yolo musl's shared half** (`libyoloc.so`, which is also the loader `ld-fil1-x86_64.so`;
+        2026-10-27): `zig build yolomusl` links it with `zig ld.lld` (W-11). It exports the
+        release's 1,653 symbols, with dynamic tags equal; then `gate-zig-modules` ran with 10 linked,
+        gate 8/8, corpus 78/78 as designed and comparison 0 unexplained (`testing.md`).
   - [ ] the three Fil-C-compiled pieces (`filc/src` → the rest of `libpizlo`, the user libc,
         libc++).
 - **Z2 — the pass in Zig** (zailc step 3, not started there): an LLVM IR model in Zig, the pass

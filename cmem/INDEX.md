@@ -140,3 +140,7 @@ the runtime-linking rule checked.
 
 - `README.md` (public), `third_party/LICENSES.md` (the compliance ledger), `LICENSE-*` / `NOTICE`.
 - `tools/README.md`: first-time setup, and how the Bun tools run (inside Linux only).
+- `Fil-C.md`, `Zig.md` (owner, 2026-10-27): **the notes on how zilc got from base (stock Fil-C and
+  Zig) to pure-Zig parity, for zailc to build on** — the base and its workarounds (KI records),
+  then the route piece by piece (recipe, Zig build, oracle, allowed differences, status); upstream
+  defects stay in `UPSTREAM-ISSUES.md`. Update them with every Fil-C or Zig move and every track step.
