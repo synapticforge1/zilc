@@ -75,6 +75,14 @@ them, with their dates.
   unexplained, re-archived, marked reviewed at `e7947f0`. **Release = owner call 0.**
 - ✅ **`gate-zig-modules` on 0.687**: runs on zilc's own 0.687 pure-Zig modules since 2026-10-27
   (`testing.md`).
+- 🔒 **Duplicate the build inputs into the project folder** (owner, 2026-10-27, `design-decisions.md`
+  top row) — NOT YET DONE. Today: the patched-clang archives are in `toolchain/` (with
+  `SHA256SUMS`); `upstream/fil-c/` is the monitor's clone at upstream's head (`b8ffc50`), not the
+  build commit, and lacks yolo musl, compiler-rt, yolounwind, the user libc, libc++ and `runtimes`.
+  Missing: Fil-C's sources at `e7947f0` (the WSL build tree's sparse set, 14,432 files in the dirs
+  added 2026-10-27 alone), the Zig 0.15.2 and Fil-C 0.687 downloads, ninja. Plan: a Bun tool that
+  copies them under a gitignored folder and proves the copy (blob ids against the tree, SHA-256 for
+  downloads, an inversion), run on every Fil-C or Zig move.
 - **The pure-Zig track — in progress on `main`** (2026-10-27): the generators
   (byte-identical to 0.687's) and the stock runtime pieces (libpas's stock half, yolo musl's static
   half, compiler-rt; every object = the 0.687 release's symbols) are in, and `gate-zig-modules`

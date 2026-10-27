@@ -40,7 +40,10 @@ log this file held until 2026-10-27: `git show c2841dd:cmem/INDEX.md`). Commit i
 4. **`zig build gate` must be green before anything is believed**, and it prints `SKIPPED` (exit
    0) when the Fil-C toolchain is missing — read its first line. `~/.bun/bin/bun tools/run-gate.ts`;
    everything else in `testing.md`.
-5. **LF everywhere** (owner): `.gitattributes` is `* text=auto eol=lf`; reference clones use
+5. 🔒 **What zilc builds from in WSL is duplicated in the project folder** (owner, 2026-10-27): an
+   exact, hash-checked copy of the build files for both the Fil-C way and the Zig way, gitignored,
+   re-synced on every Fil-C or Zig move; outputs and caches are not (`design-decisions.md` top row).
+6. **LF everywhere** (owner): `.gitattributes` is `* text=auto eol=lf`; reference clones use
    `core.autocrlf=false`.
 
 ## Policy (durable — adopted from wazmrt 2026-09-18)

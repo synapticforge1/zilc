@@ -254,3 +254,6 @@ changes**, patch releases included. There is no major/minor of our own and no 1.
       Record which modules were pure Zig AND linked (the step prints it and writes
       `ZIG-MODULES.txt`); the corpus and the output comparison run against the same copy with
       `ZILC_FILC` set to the clang it prints.
+- [ ] **Re-sync the project folder's duplicate of the build inputs** (owner, 2026-10-27;
+      `design-decisions.md` top row): the Fil-C sources at the new build commit, the Zig and Fil-C
+      downloads, the patched-clang archive; prove the copy by hash before calling the move done.
