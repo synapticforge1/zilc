@@ -256,7 +256,8 @@ ReleaseSafe by default and Debug only where the size is acceptable.
 1. **Bug-example gate** (invariant 2 in `design-decisions.md`): every `examples/*.c` built with the
    zilc target must reproduce the table above — same fault kind, same line. Checking the exit code
    alone would pass a crash for the wrong reason.
-2. **Fil-C differential → `zig build gate -Druntime=filc|zig|both`** (shape set 2026-09-30,
+2. 🔁 **ABANDONED in zilc 2026-10-27** (P3 moved to zailc, `design-decisions.md` top row; zilc
+   has no runtime of its own to compare). Was: **Fil-C differential → `zig build gate -Druntime=filc|zig|both`** (shape set 2026-09-30,
    `roadmap.md` P3). Each case is built under Fil-C's runtime and zilc's (`zilc build --runtime`).
    Output, exit code, fault kind and file:line must match. This becomes the proof of P3, and it
    stays meaningless until `--runtime zig` is enabled.

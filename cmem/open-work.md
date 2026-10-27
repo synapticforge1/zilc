@@ -55,10 +55,18 @@ them, with their dates.
 
 ## Open work
 
-- **Next phase, the owner picks** (2026-09-30): the **`zsys_write` spike** (`roadmap.md` P3) or
-  **P4, Zig language fidelity** (`roadmap.md` P4; `@ptrFromInt` is the likely source of surprises).
-- **Deferred past the publish** (with the port): `-Druntime=both`, the byte-identity check, the
-  benchmark suite (upgrade stage C), the 0.16.0 examples under zilc (`testing.md`).
+- ~~Next phase (P3 or P4)~~ — **P3, P4 and P5 moved to zailc and are abandoned here**
+  (owner, 2026-10-27; `design-decisions.md` top row). zilc's work is its four-part role: track
+  Fil-C, follow the matching Zig, keep Zig and C correct on x86_64 Linux, be zailc's reference.
+- **Still zilc's, for the next Zig move** (upgrade procedure, `upstream.md`): the benchmark suite
+  (stage C) and the 0.16.0 examples under zilc (`testing.md`). Abandoned with P3:
+  `-Druntime=both`, the byte-identity check.
+- **Code left from P3** (proposed, needs the owner and the gate): `--runtime zig` is still
+  reserved and refused in the CLI "until that runtime is ready (roadmap P3)" —
+  `src/main.zig:28-30`, `src/driver.zig:30-33,873-874`, the unit test at `src/driver.zig:1092`,
+  `README.md:95`. With P3 abandoned it will never be ready. Proposed: drop the `zig` value
+  (`--runtime filc` keeps working; `--runtime zig` then fails as an unknown value) and the stub
+  `zilc_runtime` notes (`src/root.zig:7`, `architecture.md`), then the full gate in WSL.
 - **Partly open defects:** KI-7 (`getcontext`) — `known-issues.md`.
 - ~~Cosmo leaves~~ — **not zilc work since 2026-10-27** (owner: zilc stays Fil-C on Linux x86_64 only;
   cross-platform is zailc's). The open points (`statx` missing from the cosmo runtime, real Windows

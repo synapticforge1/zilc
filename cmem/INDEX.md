@@ -20,7 +20,10 @@ look them up in [history-map-2026-10-27.md](history-map-2026-10-27.md).
 
 0. 🔒 **zilc is Fil-C on Linux x86_64 only, worked in WSL or Linux — always** (owner,
    2026-10-27). zailc uses zilc as its base and develops the cross-platform part; no aarch64,
-   macOS, Windows, mobile or cosmo work happens here (`design-decisions.md`, top row).
+   macOS, Windows, mobile or cosmo work happens here (`design-decisions.md`). 🔒 **zilc's whole
+   role** (owner, 2026-10-27): track Fil-C releases, follow the Zig whose LLVM matches Fil-C's,
+   keep Zig and C correct under Fil-C on x86_64 Linux, be zailc's reference. **P3, P4 and P5
+   moved to zailc and are abandoned here.**
 1. 🛑 **Nothing built by Fil-C, cosmo or zilc is ever EXECUTED on the Windows host** (owner,
    2026-10-08): the machine's EDR quarantined cosmo programs run as `.exe` and cut Claude Code off.
    All Fil-C work runs in WSL; the Windows half of an APE only under `wine64` in WSL
@@ -133,13 +136,13 @@ the runtime-linking rule checked.
 | [reference-projects.md](reference-projects.md) | Fil-C, LLVM, Zig: verified licenses, what to mine each for, adoption status. |
 | [zig-filc-scope.md](zig-filc-scope.md) | Scope of a Zig version of Fil-C on 0.15.2 (2026-10-05) — the brief zailc started from. |
 | [platforms.md](platforms.md) | The P6 scope pass and the cosmo evaluation (closed 2026-10-08) — since 2026-10-27 the record zailc's platform work starts from. |
-| [roadmap.md](roadmap.md) | P0–P2 done; P3 Zig runtime, P4 Zig-language fidelity, P5 C++; P6 other platforms moved to zailc 2026-10-27. |
+| [roadmap.md](roadmap.md) | Closed for zilc 2026-10-27: P0–P2 done; P3–P6 moved to zailc (abandoned here), kept as the record. |
 | [security-model.md](security-model.md) | The safety guarantees targeted, and what is out of scope. |
 | [testing.md](testing.md) | Every gate with its command and dated count; the output comparison; corpus results per mode; planned gates. |
 | [known-issues.md](known-issues.md) | The defect log, KI-1…KI-23: root cause, fix, status. |
 | [workarounds.md](workarounds.md) | The WHY of every workaround (owner rule): symptom index, failure families. **Look up new failures here first.** |
 | [releasing.md](releasing.md) | The version scheme `<Zig>-<Fil-C>.<zilc release>` (DESIGN, workspace P8), where the number lives, the release checklist. |
-| [filc-abi.md](filc-abi.md) | Fil-C 0.685's runtime ABI as observed: flight pointers, object header, function objects, calling convention. |
+| [filc-abi.md](filc-abi.md) | Fil-C 0.685's runtime ABI as observed (P3 scoping; P3 moved to zailc 2026-10-27, kept as its record). |
 | [zig-upstream-notes.md](zig-upstream-notes.md) | Zig behaviours we may need to report (Z-1…Z-5), each with whether it is really a Zig bug. |
 | [ports/](ports/README.md) | Port notes, one file per new Zig line: basis, API changes, sites touched. |
 | [history-map-2026-10-27.md](history-map-2026-10-27.md) | The 2026-10-27 history purge (drive paths): what was removed, how it was checked, every old → new commit id. |

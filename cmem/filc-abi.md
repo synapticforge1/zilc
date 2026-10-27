@@ -1,5 +1,8 @@
 # Fil-C's runtime ABI, as OBSERVED (Fil-C 0.685, x86_64) — P3 scoping, 2026-09-30
 
+> 🔁 **2026-10-27 (owner): P3 moved to zailc and is abandoned in zilc** (`design-decisions.md`, top
+> row). This file is now part of the record zailc inherits; zilc builds no runtime of its own.
+
 **What a Zig runtime has to match, byte for byte.** Everything here was read from **post-pass IR**
 (`filc clang -O1 -S -emit-llvm` on a one-line `write()` program), from `objdump`/`readelf` of the
 prebuilt libraries, and from the public headers in `pizfix/stdfil-include/`. **Nothing was read from

@@ -1,5 +1,10 @@
 # Roadmap
 
+> 🔒 **2026-10-27 (owner): the roadmap is CLOSED for zilc.** P0–P2 are done; **P3, P4, P5 and P6
+> moved to zailc and are abandoned here**. What zilc does from now on is its four-part role
+> (`design-decisions.md`, top row): track Fil-C, follow the matching Zig, keep Zig and C correct
+> on x86_64 Linux, be zailc's reference. The phase sections below are the record.
+
 > 🔒 **2026-10-27 (owner): zilc stays Fil-C on Linux x86_64 only, worked in WSL or Linux; the
 > cross-platform part is zailc's** (`design-decisions.md`, top row). **P6 below no longer applies
 > to zilc** beyond Linux x86_64 (Linux aarch64 included); it is kept as the record zailc started from.
@@ -172,7 +177,9 @@ semantic origin:  bounds.zig:13:6: zig_add   ←  c_caller.c:26:5: main      exi
 - ~~`std.os.environ` is unset by the entry shim (KI-5)~~ ✅ set since 2026-10-02 (gate case 5).
 - Then **P4**: Zig language fidelity, where `@ptrFromInt` across `std` is the interesting problem.
 
-## P3 — `zilc_runtime` in Zig. **Plan set 2026-09-30: Linux first, checked against Fil-C**
+## P3 — `zilc_runtime` in Zig. Plan set 2026-09-30 · 🔁 **MOVED TO zailc, ABANDONED IN zilc 2026-10-27 (owner)**
+
+🔒 Not zilc work (`design-decisions.md`, top row). Kept as the record zailc inherits.
 
 Replace the C runtime with Zig, piece by piece, behind the same ABI the pass emits calls to.
 **Exit criterion:** P2's gate still passes with no Fil-C C code linked.
@@ -264,14 +271,19 @@ libc as a shared library, so a replacement in a static archive may not get pulle
 ⚠️ **Prerequisites:** open question #3 (✅ settled 2026-10-01: comply, do not avoid) had to be settled before runtime
 code, and the Zig runtime must match Fil-C 0.685's object layout exactly (`design-decisions.md`).
 
-## P4 — Zig language fidelity
+## P4 — Zig language fidelity · 🔁 **MOVED TO zailc, ABANDONED IN zilc 2026-10-27 (owner)**
+
+🔒 Not zilc work. zilc still keeps Zig compiling and running correctly under Fil-C on x86_64 Linux
+(its role, item 3), but the mapping of Zig's pointer kinds onto capabilities is zailc's.
 
 P1 tests whether Zig IR survives the pass at all. P4 makes it *right*. Define how Zig's pointer
 kinds (slices, many-pointers, optionals, `allowzero`, `@ptrCast`, `@intFromPtr`/`@ptrFromInt`) map
 onto capabilities, and how Zig's own safety checks interact with GIMSO. **Exit criterion:** a
 Zig ⇄ C program where C overflows a Zig-owned slice and panics, across the full Zig test corpus.
 
-## P5 — C++ and polish
+## P5 — C++ and polish · 🔁 **MOVED TO zailc, ABANDONED IN zilc 2026-10-27 (owner)**
+
+🔒 Not zilc work (`design-decisions.md`, top row).
 
 libc++/libc++abi under the target, exceptions/unwinding, threads with atomic capability updates,
 performance measurement against Fil-C.

@@ -19,7 +19,7 @@
 | The CLI | `src/main.zig` | ✅ `zilc build`, with KI-4/5/6 encoded as behavior, not just documented. `--runtime filc\|zig` (2026-09-30; `zig` reserved and refused) |
 | Entry shim for whole Zig programs | generated `zilc_entry.zig` | ✅ done (KI-5) |
 | The safety gate | `tools/gate.zig` | ✅ 4/4, inversion-tested |
-| `zilc_runtime` (the Zig runtime) | `src/root.zig`, `src/capi.zig` | ◻️ **still a stub** — binaries link **Fil-C's** C runtime. That is P3 |
+| `zilc_runtime` (the Zig runtime) | `src/root.zig`, `src/capi.zig` | ◻️ **a stub, and will stay one** — binaries link **Fil-C's** C runtime. P3 (the Zig runtime) moved to zailc and is abandoned here (owner, 2026-10-27) |
 
 ⚠️ **So zilc today is a DRIVER, not a runtime.** The safety comes entirely from Fil-C; zilc's
 contribution is making Zig's output acceptable to it, and making that one command.
