@@ -231,3 +231,10 @@ changes**, patch releases included. There is no major/minor of our own and no 1.
 - [ ] `third_party/LICENSES.md` ledger matches what is actually in the tree. Any license that must
       travel with `zig-out/` is installed by `build.zig`.
 - [ ] `cmem/open-work.md` State updated.
+- [ ] **After a Fil-C update has passed every item above** (owner, 2026-10-27): once pure-Zig
+      builds of the changed modules exist for that release, run the same gate with Fil-C's modules
+      swapped for them — `zig build gate-zig-modules -Dzig-modules=<dir> -Dzig-modules-filc=<release>`
+      (with `ZILC_FILC` at the release's toolchain; `testing.md` "The gate with pure-Zig modules").
+      Record which modules were pure Zig AND linked (the step prints it and writes
+      `ZIG-MODULES.txt`); the corpus and the output comparison run against the same copy with
+      `ZILC_FILC` set to the clang it prints.

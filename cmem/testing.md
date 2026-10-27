@@ -256,6 +256,42 @@ ReleaseSafe by default and Debug only where the size is acceptable.
 *sed's* status, and the exit code is half of what these tests assert. (Cost us one confusing
 "run exit=0" on a run that had clearly trapped.)
 
+## The gate with pure-Zig modules (`zig build gate-zig-modules`, 2026-10-27)
+
+**Owner, 2026-10-27:** after a Fil-C update has passed every checklist item, the same build runs
+again "by just swapping out the fil-c specific modules with the pure zig modules", as a `build.zig`
+step (`design-decisions.md`, top row). Run in WSL:
+
+```sh
+ZILC_FILC=~/zilc-work/tools/filc-<release>-zilc/build/bin/clang ZILC_ZIG=~/zilc-work/tools/zig-0.15.2/zig \
+  zig build gate-zig-modules -Dzig-modules=<dir with lib/> -Dzig-modules-filc=<release>
+```
+
+`tools/swap-modules.zig` (built and run by `build.zig`) copies the `ZILC_FILC` toolchain to
+`-Dzig-modules-out` (default `~/zilc-work/zig-modules/filc-<release>-zig-modules`; the repo is on
+exFAT), replaces every file of `pizfix/lib/` that `<dir>/lib/` has under the same name, then asks
+the copy's clang for its default link line (`clang -###`) and marks each module **PURE ZIG,
+linked** / **pure Zig, but NOT in the default link** / Fil-C's. The gate (`tools/gate.zig`,
+unchanged) then runs against the copy. The table is written to the copy's `ZIG-MODULES.txt`. For
+the corpus and the output comparison, run those tools with `ZILC_FILC` set to the clang it prints.
+
+⚠️ **Swapped is not used:** Fil-C's clang links dynamically, so `-lc`, `-lpizlo`, `-lyoloc` resolve
+to the `.so` files; a swapped `libyoloc.a` changes nothing. Only what the link line names counts.
+
+**Refuses (exit 1):** without `-Dzig-modules`; when `-Dzig-modules-filc` is not the release the
+toolchain's own `clang --version` names; when no file would be swapped; when no swapped module is
+linked.
+
+**First run, 2026-10-27** (Fil-C 0.686, zilc's patched clang; the pure-Zig modules read from
+zailc's step-2 build at `~/zailc-work/out`, as a test input — nothing written there): 13 of 32
+modules swapped, **9 linked** (`Scrt1.o`, `crti.o`, `crtn.o`, `crtbegin.o`, `crtend.o`,
+`filc_crt.o`, `libyolom.a`, `libyolort.a`, `libyolounwind.a`); not linked: `libyoloc.a`, `crt1.o`,
+`rcrt1.o`, `filc_mincrt.o`; `libpizlo-stock.a` ignored (half of `libpizlo`, no module of that
+name). **Gate 8/8**, every case trapping at the same file:line. Still Fil-C's in that run: the
+shared runtime (`libc.so`, `libpizlo.so`, `libyoloc.so` and its loader `ld-fil1-x86_64.so`) and
+libc++. Refusals measured: no `-Dzig-modules` → exit 1; declared 0.687 on a 0.686 toolchain →
+exit 1; a directory with no Fil-C module names → exit 1.
+
 ## Planned gates
 
 1. **Bug-example gate** (invariant 2 in `design-decisions.md`): every `examples/*.c` built with the

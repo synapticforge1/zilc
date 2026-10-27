@@ -18,8 +18,10 @@ log this file held until 2026-10-27: `git show c2841dd:cmem/INDEX.md`). Commit i
    2026-10-27). zailc uses zilc as its base and develops the cross-platform part; no aarch64,
    macOS, Windows, mobile or cosmo work happens here (`design-decisions.md`). 🔒 **zilc's whole
    role** (owner, 2026-10-27): track Fil-C releases, follow the Zig whose LLVM matches Fil-C's,
-   keep Zig and C correct under Fil-C on x86_64 Linux, be zailc's reference. **P3, P4 and P5
-   moved to zailc and are abandoned here.**
+   keep Zig and C correct under Fil-C on x86_64 Linux, be zailc's reference — and keep the
+   **pure-Zig builds of Fil-C's own modules** current, checked by `zig build gate-zig-modules`:
+   zilc is the corpus of truth (owner, later the same day). P3–P5 (a different runtime, Zig
+   fidelity, C++) moved to zailc.
 1. 🛑 **Nothing built by Fil-C, cosmo or zilc is ever EXECUTED on the Windows host** (owner,
    2026-10-08; the machine's EDR, `workarounds.md`). Everything runs in WSL.
 2. **Work happens in WSL2** (Ubuntu), under `~/zilc-work/`; `sudo` needs a password, so install

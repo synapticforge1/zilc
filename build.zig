@@ -107,6 +107,50 @@ pub fn build(b: *std.Build) void {
 
         const gate_step = b.step("gate", "Build every example with zilc: bugs must trap, library mode must run (needs Fil-C)");
         gate_step.dependOn(&run_gate.step);
+
+        // ---- The same gate with Fil-C's modules swapped for pure-Zig ones ----
+        // `zig build gate-zig-modules -Dzig-modules=<dir> -Dzig-modules-filc=<release>` (owner,
+        // 2026-10-27): after a Fil-C update has passed every checklist item, the pure-Zig builds
+        // of the changed modules replace Fil-C's (tools/swap-modules.zig: a copy of the ZILC_FILC
+        // toolchain with each same-named file of <dir>/lib/ swapped into pizfix/lib/), and the
+        // gate above runs unchanged against the copy. It refuses when the declared release is not
+        // the toolchain's, or when nothing would be swapped. The copy goes under
+        // -Dzig-modules-out (default ~/zilc-work/zig-modules): the repo is on exFAT.
+        const zig_modules = b.option([]const u8, "zig-modules", "Directory whose lib/ holds pure-Zig builds of Fil-C's runtime modules, named as in pizfix/lib/");
+        const zig_modules_filc = b.option([]const u8, "zig-modules-filc", "The Fil-C release those modules were built from (must equal the ZILC_FILC toolchain's)");
+        const zig_modules_out = b.option([]const u8, "zig-modules-out", "Where the swapped toolchain copy is made (default: ~/zilc-work/zig-modules)");
+        const swap_step = b.step("gate-zig-modules", "The gate again, with Fil-C's modules swapped for pure-Zig ones (-Dzig-modules=<dir> -Dzig-modules-filc=<release>; needs Fil-C)");
+        if (zig_modules) |dir| {
+            const filc_clang = b.graph.env_map.get("ZILC_FILC") orelse "clang";
+            const home = b.graph.env_map.get("HOME") orelse ".";
+            const out = zig_modules_out orelse b.pathJoin(&.{ home, "zilc-work", "zig-modules" });
+            const release = zig_modules_filc orelse "";
+            const swap = b.addExecutable(.{
+                .name = "swap-modules",
+                .root_module = b.createModule(.{
+                    .root_source_file = b.path("tools/swap-modules.zig"),
+                    .target = target,
+                    .optimize = optimize,
+                }),
+            });
+            const run_swap = b.addRunArtifact(swap);
+            run_swap.addArgs(&.{ filc_clang, dir, release, out });
+            run_swap.has_side_effects = true;
+
+            // The same gate executable, aimed at the copy. tools/swap-modules.zig names the copy
+            // filc-<release>-zig-modules; it has already refused if <release> is not the tree's.
+            const swapped_clang = b.pathJoin(&.{ out, b.fmt("filc-{s}-zig-modules", .{release}), "build", "bin", "clang" });
+            const run_gate_zm = b.addRunArtifact(gate);
+            run_gate_zm.addFileArg(exe.getEmittedBin());
+            run_gate_zm.addArg(b.build_root.path orelse ".");
+            run_gate_zm.setEnvironmentVariable("ZILC_FILC", swapped_clang);
+            run_gate_zm.has_side_effects = true;
+            run_gate_zm.step.dependOn(&run_swap.step);
+            swap_step.dependOn(&run_gate_zm.step);
+        } else {
+            const no_dir = b.addFail("gate-zig-modules needs -Dzig-modules=<dir with lib/> and -Dzig-modules-filc=<release>, e.g. -Dzig-modules-filc=0.687");
+            swap_step.dependOn(&no_dir.step);
+        }
     }
 
     // ---- Tests -------------------------------------------------------------

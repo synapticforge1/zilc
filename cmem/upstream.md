@@ -46,6 +46,10 @@ first passing on the Zig that matches Fil-C.
    until they pass.
 5. **Freeze the reference:** record the gate output, test count and stage-C numbers for this
    pair (Fil-C version + compatible Zig).
+6. **The pure-Zig modules** (owner, 2026-10-27): bring the pure-Zig builds of Fil-C's modules to the
+   same release, then run `zig build gate-zig-modules -Dzig-modules=<dir> -Dzig-modules-filc=<release>`
+   — the same gate with Fil-C's modules swapped for them (`testing.md` "The gate with pure-Zig
+   modules"). zilc is the corpus of truth for both.
 
 ### Stage B: port to the LATEST Zig, if it is a different release
 
