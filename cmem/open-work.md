@@ -68,16 +68,15 @@ them, with their dates.
   recorded, constants moved (`b33b6eb`), patched clang rebuilt, Fil-C's suite 0 differences on
   7,269, gate 8/8, tests 29/29, corpus 78/78 as designed ×4 modes, output comparison 0
   unexplained, re-archived, marked reviewed at `e7947f0`. **Release = owner call 0.**
-- **`gate-zig-modules` on 0.687**: no pure-Zig modules exist for 0.687 yet (zailc's are 0.686,
-  and the step refuses a release mismatch, as designed); its first 0.687 run comes with the
-  pure-Zig track below.
-- **The pure-Zig track — in progress on branch `pure-zig/z1`** (2026-10-27): the generators
+- ✅ **`gate-zig-modules` on 0.687**: runs on zilc's own 0.687 pure-Zig modules since 2026-10-27
+  (`testing.md`).
+- **The pure-Zig track — in progress on `main`** (2026-10-27): the generators
   (byte-identical to 0.687's) and the stock runtime pieces (libpas's stock half, yolo musl's static
   half, compiler-rt; every object = the 0.687 release's symbols) are in, and `gate-zig-modules`
   passes on 0.687 with 9 pure-Zig modules linked (`roadmap.md` Z1, `testing.md`). Merged into
   `main` (672968a). **Yolo musl's shared half** (`libyoloc.so`, the loader) is done on branch
   `pure-zig/yolomusl-shared` (W-11): 10 linked, gate 8/8, corpus 78/78 as designed, comparison 0
-  unexplained; merged into `main` (676e04e, owner, 2026-10-27; not pushed). Next: the Fil-C-compiled pieces (`filc/src`, the user
+  unexplained; merged into `main` (676e04e, owner, 2026-10-27), pushed, branch deleted. Next: the Fil-C-compiled pieces (`filc/src`, the user
   libc, libc++). `Fil-C.md` and `Zig.md` record the route to parity for zailc. Plan as first
   written: bring zailc's step-2 build
   into zilc (`roadmap.md` Z1) — read from `../zailc` (`src/gen`, `src/runtime`, `tests/link`,
