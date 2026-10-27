@@ -2,8 +2,8 @@
 //
 // Compile-check every tests/basics example for zilc's target (x86_64-linux-musl) with PLAIN Zig
 // 0.15.2 and -lc (libc linked, as zilc builds): no Fil-C involved. It tells "does this example build
-// at all" apart from "does it survive zilc", which is a later question. Runs on ANY OS (Zig cross-
-// compiles): on Windows it uses C:\zig\0.15.2\zig.exe, elsewhere the WSL toolchain's Zig.
+// at all" apart from "does it survive zilc", which is a later question. Runs inside Linux, like
+// every tool (owner, 2026-10-27), with the WSL toolchain's Zig unless ZIG is set.
 //
 //   bun tools/basics/compile-check.ts     env: ZIG (the Zig to use), ZIGDIR
 // Writes one line per example to zig-out/basics-compile.txt and prints a summary.
@@ -11,9 +11,9 @@
 // C examples are compiled AND linked, as their own repo builds them (`zig cc -lc`), in the default
 // C dialect: -std=c99 hides POSIX declarations under musl and fails for the wrong reason.
 import { writeFile } from "node:fs/promises";
-import { basename, env, glob, isWindows, mkdirp, REPO, rmrf, run, ZIG } from "../lib/tool.ts";
+import { basename, env, glob, mkdirp, REPO, rmrf, run, ZIG } from "../lib/tool.ts";
 
-const zig = env("ZIG", isWindows ? "C:\\zig\\0.15.2\\zig.exe" : ZIG);
+const zig = env("ZIG", ZIG);
 const tests = `${REPO}/tests/basics`;
 await mkdirp(`${REPO}/zig-out`);
 const bin = `${REPO}/zig-out/basics-check`;

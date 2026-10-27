@@ -58,6 +58,7 @@
 // projects/openssl-3.6.4/crypto/aes/asm: test `sarcasm-mb-pl-sink-att` (since v0.686) reads
 // aesni-mb-x86_64.pl from there and fails "BAD cannot open" without it (cmem/testing.md).
 
+import "../lib/tool.ts"; // refuses to run anywhere but Linux (cmem/working-rules.md § Tooling)
 import { mkdir, readdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
 
 type Manifest = Record<string, unknown>;

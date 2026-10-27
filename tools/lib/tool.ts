@@ -1,31 +1,35 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception OR MIT
 //
 // Shared helpers for zilc's tools (Bun). They replaced the shell scripts on 2026-10-05 as Deno
-// tools, so the tools run the same way on every OS (owner: "Can we make the bash scripts deno
-// scripts so that are cross platform?"), and moved to Bun on 2026-10-22 (owner: Bun only, Deno is
-// going away). They use Node's APIs (`node:*`, `process`) plus `Bun.spawn`/`Bun.Glob`.
+// tools and moved to Bun on 2026-10-22 (owner: Bun only, Deno is going away). They use Node's APIs
+// (`node:*`, `process`) plus `Bun.spawn`/`Bun.Glob`.
 //
-// The one idea: a tool is written ONCE, as code for the platform its work needs.
-//   * Tools whose work needs Linux (Fil-C exists only there) call `linuxOnly()` first. On Linux it
-//     returns; on Windows it re-runs the same tool inside WSL, with the same arguments and zilc's
-//     environment variables, and exits with its status. This replaces typing
-//     `wsl.exe -e sh /mnt/d/…/tool.sh`, and the "pass shell text to WSL as a file" rule (KI-1):
-//     arguments go to wsl.exe as an argument list, never through a shell's quoting.
-//   * Tools that need no Linux (git, Windows' own Zig) just run, on any OS.
+// 🔒 The tools run inside Linux only (owner, 2026-10-27: zilc is Fil-C on Linux x86_64, and "bun
+// will need to be used from wsl on this machine in a linux environment on another machine"). Every
+// tool imports this file, so the check below covers them all: started anywhere but Linux, a tool
+// refuses before doing anything. Until 2026-10-27, a tool started with Windows' Bun re-launched
+// itself inside WSL (`linuxOnly()`); that bridge is retired — refusing, not bridging, so no run
+// can look like a Linux run while starting elsewhere.
 //
-// Run a tool:   bun tools/<group>/<tool>.ts [args]      (from Windows or from Linux)
+// Run a tool, from a WSL or Linux shell:   bun tools/<group>/<tool>.ts [args]
 
 import { statSync } from "node:fs";
 import { cp, mkdir, open, rm, stat } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-export const isWindows = process.platform === "win32";
+if (process.platform !== "linux") {
+  console.error(
+    `zilc's tools run inside Linux only (got ${process.platform}). From Windows, open a WSL shell and run\n` +
+      `  ~/.bun/bin/bun tools/<group>/<tool>.ts   (cmem/working-rules.md § Tooling)`,
+  );
+  process.exit(2);
+}
 
 /** The tool's arguments (what follows the script on the command line). */
 export const ARGS = process.argv.slice(2);
 
-/** Forward slashes on every OS (Windows accepts them), so tools can split paths on "/". */
+/** Forward slashes, so tools can split paths on "/". */
 export function slashes(p: string): string {
   return p.replaceAll("\\", "/");
 }
@@ -38,7 +42,7 @@ export function env(name: string, fallback = ""): string {
   return process.env[name] ?? fallback;
 }
 
-export const HOME = env("HOME", env("USERPROFILE"));
+export const HOME = env("HOME");
 /** zilc's Linux work area: tools, builds and results outside the repo (the repo is on exFAT). */
 export const WORK = env("WORK", `${HOME}/zilc-work`);
 
@@ -74,32 +78,13 @@ export function filc(): string {
   return existsSync(patched) ? patched : `${FILC_PREBUILT_TREE}/build/bin/clang`;
 }
 
-/** D:\a\b -> /mnt/d/a/b, the path WSL sees. */
-export function wslPath(p: string): string {
-  const m = p.replaceAll("\\", "/").match(/^([A-Za-z]):\/(.*)$/);
-  return m ? `/mnt/${m[1].toLowerCase()}/${m[2]}` : p.replaceAll("\\", "/");
-}
-
-/** Variables a tool forwards into WSL (wsl.exe passes none by itself). */
-const FORWARD = /^(ZILC_|ZIG_|FILC_|FUGC_)|^(JOBS|MODE|MODES|LANGS|OUTROOT|WORK|TBUILD|ZIGDIR|NS|N|RR|A|B|IN|SRC|DEST|VERBOSE)$/;
-
 /**
- * For tools whose work needs Linux. Call it first in the tool's body, and, in a file other tools
- * IMPORT, only under `if (import.meta.main)`: imports run before the importer's body, so a
- * top-level call there would re-launch the imported file instead of the tool.
- * On Linux: returns. On Windows: runs this same tool inside WSL
- * (Bun at ~/.bun/bin/bun there, installed by tools/p1/setup-wsl.sh) and exits with its status;
- * the caller never continues.
+ * Marks a tool whose work needs Fil-C. Since 2026-10-27 every tool runs inside Linux and the
+ * check at the top of this file has already refused anywhere else, so this only asserts it again
+ * (it used to re-launch a Windows-started tool inside WSL; see the header).
  */
 export async function linuxOnly(meta: ImportMeta): Promise<void> {
-  if (process.platform === "linux") return;
-  if (!isWindows) throw new Error(`${meta.url}: needs Linux (Fil-C), or Windows with WSL`);
-  const script = wslPath(slashes(fileURLToPath(meta.url)));
-  const fwd = Object.entries(process.env).filter(([k]) => FORWARD.test(k)).map(([k, v]) => `${k}=${v}`);
-  const child = Bun.spawn(["wsl.exe", "-e", "env", ...fwd, "sh", "-c", 'exec "$HOME/.bun/bin/bun" "$0" "$@"', script, ...ARGS], {
-    stdin: "inherit", stdout: "inherit", stderr: "inherit",
-  });
-  process.exit(await child.exited);
+  if (process.platform !== "linux") throw new Error(`${meta.url}: zilc's tools run inside Linux only`);
 }
 
 export interface RunOptions {
@@ -132,13 +117,12 @@ export interface RunResult {
  *
  * ⚠️ Captured and `outFile` output is stdout and stderr MERGED IN ORDER, like `> file 2>&1`. Read
  * through two pipes, a program that writes to both (39_logging) came out with its lines in a
- * different order every run (found 2026-10-05 by the output comparison). So on Linux the child's
- * stderr is pointed at its stdout before it starts (`sh -c 'exec "$@" 2>&1'`: one stream, one
- * order). Windows has no `sh`; there the two pipes remain.
+ * different order every run (found 2026-10-05 by the output comparison). So the child's stderr is
+ * pointed at its stdout before it starts (`sh -c 'exec "$@" 2>&1'`: one stream, one order).
  */
 export async function run(argv: string[], o: RunOptions = {}): Promise<RunResult> {
   const capture = !o.inherit && !o.outFile;
-  const merge = !o.inherit && !isWindows;
+  const merge = !o.inherit;
   if (merge) argv = ["sh", "-c", 'exec "$@" 2>&1', "sh", ...argv];
   const file = o.outFile ? await open(o.outFile, o.append ? "a" : "w") : undefined;
   let child: Bun.Subprocess<"ignore" | Uint8Array, "inherit" | "pipe", "inherit" | "pipe">;

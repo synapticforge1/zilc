@@ -33,6 +33,7 @@
 //
 //   bun patch-split.ts [--check] path/to/llvm-split.cpp
 
+import "../lib/tool.ts"; // refuses to run anywhere but Linux (cmem/working-rules.md § Tooling)
 import { readFile, writeFile } from "node:fs/promises";
 
 interface Edit {

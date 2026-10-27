@@ -16,6 +16,7 @@
 // never an ordinary error exit — otherwise the reducer happily "reduces"
 // towards modules that merely fail to parse.
 
+import "../lib/tool.ts"; // refuses to run anywhere but Linux (cmem/working-rules.md § Tooling)
 import { mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";

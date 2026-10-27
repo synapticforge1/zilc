@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception OR MIT
 //
-// Run `zig build gate` where Fil-C lives (Linux; from Windows, inside WSL automatically).
+// Run `zig build gate` where Fil-C lives (Linux; on a Windows host, from a WSL shell).
 //
 //   bun tools/run-gate.ts [extra zig build args]
 //

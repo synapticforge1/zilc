@@ -24,6 +24,7 @@
 //                  Kept short and each entry explained: a new difference anywhere else fails.
 // The run is bounded (servers and signal waits time out after 15 s), so those outputs are
 // whatever was printed before the timeout, which is itself compared.
+import "../lib/tool.ts"; // refuses to run anywhere but Linux (cmem/working-rules.md § Tooling)
 import { readdir, readFile, stat } from "node:fs/promises";
 
 // Measured 2026-10-02 (cmem/testing.md "Output comparison"); the same in C and Zig unless noted.

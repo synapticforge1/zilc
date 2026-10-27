@@ -18,6 +18,7 @@
 // takes the lowest unmarked one. Same values visited in the same order, same
 // lowest-free-index choice: the SAME colouring, so the output is unchanged.
 
+import "../lib/tool.ts"; // refuses to run anywhere but Linux (cmem/working-rules.md § Tooling)
 import { readFile, writeFile } from "node:fs/promises";
 
 interface Edit {
