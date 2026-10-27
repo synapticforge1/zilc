@@ -9,14 +9,20 @@ them, with their dates.
 
 | what | value |
 | --- | --- |
-| version | **`0.15.2-0.686.1`** — `<Zig>-<Fil-C>.<zilc release>`, published 2026-10-05 (`releasing.md`); one of the five places the number lives |
-| toolchain | Zig **0.15.2** (user code and build), Fil-C **0.686** with zilc's patched clang (`workarounds.md` KI-22, KI-4) |
-| gates | `zig build gate`, `zig build test`, the corpus in four modes, the output comparison: counts and dates in `testing.md` (gate + tests last run 2026-10-27 in WSL; the corpus 2026-10-05, Fil-C 0.686) |
+| version | **`0.15.2-0.687.1`** — `<Zig>-<Fil-C>.<zilc release>`, verified 2026-10-27, **not yet tagged or pushed** (owner call 0); one of the five places the number lives. Published before it: `0.15.2-0.686.1` (2026-10-05) |
+| toolchain | Zig **0.15.2** (user code and build), Fil-C **0.687** with zilc's patched clang (`workarounds.md` KI-22, KI-4); 0.686's kept installed and archived (`toolchain/filc-0.686/`) |
+| gates | `zig build gate`, `zig build test`, Fil-C's suite, the corpus in four modes, the output comparison: all re-run 2026-10-27 on Fil-C 0.687, counts in `testing.md` |
 | remote | `origin` = `github.com/synapticforge1/zilc` (since 2026-10-27; was `jrmarcum/zilc`, which GitHub redirects). **Purged history pushed 2026-10-27**: `main` = `origin/main`, `v0.15.2` = tag `v0.15.2-0.686.1` = `13ce96a` (was `19e7172`; map `history-map-2026-10-27.md`) |
 | branches | `main` carries the Bun port (`c2841dd`, was `44e0b1a`), merged `--no-ff` 2026-10-27 (owner: "we will merge all to bun tooling since deno is going away"), and the 2026-10-27 work since; `bun-port` (merged, never pushed) deleted 2026-10-27 (owner). Branches: `main`, `v0.15.2` |
 | sibling | **zailc** (`../zailc`, started 2026-10-08) translates Fil-C into Zig; zilc is its stable reference and test oracle and changes nothing for it (`design-decisions.md`) |
 
 ## 🗓️ Owner calls (evidence gathered; nothing done without the owner)
+
+0. **Release `0.15.2-0.687.1`: tag and push** (owner's checklist run, 2026-10-27; `releasing.md`).
+   Every per-release checklist item is done on the committed tree (`testing.md`, `upstream.md`
+   "Review of Fil-C 0.687"). To publish: annotated tag `v0.15.2-0.687.1` on the release commit,
+   move branch `v0.15.2` to it, push `main`, the branch and the tag (no CI workflow here, so a push
+   triggers nothing); a GitHub Release page is optional (`RELEASE-NOTES.md`).
 
 1. ✅ **Purged history force-pushed 2026-10-27** (owner: "perform the open items"): `main`
    `19e7172` → `2c7faf0`, `v0.15.2` `19e7172` → `13ce96a`, tag `v0.15.2-0.686.1` `fda2d43` →
@@ -58,16 +64,15 @@ them, with their dates.
 
 ## Open work
 
-- 🔴 **Fil-C 0.687 is released (2026-10-23) — zilc's role, item 1** (found 2026-10-27 by the
-  memory update's upstream check, `upstream.md` "Run of 2026-10-27"). Same LLVM 20.1.8, so Zig
-  stays 0.15.2; the release would be `0.15.2-0.687.1`. zilc's patches still apply. To do, as for
-  0.686 (`upstream.md` "Review of Fil-C 0.686" is the template): review the 7 pass commits — two are
-  ABI changes (`f565a56` callee roots the arguments, `43d345a` setjmp) — and re-check KI-4 / KI-18
-  against the stock 0.687; install the prebuilt (record its SHA-256 in `setup-wsl.ts`); move
-  `tools/lib/tool.ts` `FILC_VERSION`/`FILC_SHA` and `src/root.zig`'s `filc_release`; rebuild the
-  patched clang; Fil-C's suite stock vs patched at 0 differences; the gate, tests, corpus in four
-  modes and the output comparison; re-archive; the five version places; `--mark-reviewed`. Needs
-  the owner's go-ahead to release (and to push).
+- ✅ **Moved to Fil-C 0.687, 2026-10-27** (owner: "run through the check list now"): reviewed
+  (`upstream.md` "Review of Fil-C 0.687"; 4 pass commits in the release — `f565a56` and `7d4ed7b`
+  came after the tag and wait for the next review), KI-4 / KI-18 still upstream, prebuilt SHA-256
+  recorded, constants moved (`b33b6eb`), patched clang rebuilt, Fil-C's suite 0 differences on
+  7,269, gate 8/8, tests 29/29, corpus 78/78 as designed ×4 modes, output comparison 0
+  unexplained, re-archived, marked reviewed at `e7947f0`. **Release = owner call 0.**
+- **`gate-zig-modules` on 0.687**: no pure-Zig modules exist for 0.687 yet (zailc's are 0.686,
+  and the step refuses a release mismatch, as designed); its first 0.687 run comes with the
+  pure-Zig track below.
 - **The pure-Zig track (owner, 2026-10-27), after the 0.687 move:** bring zailc's step-2 build
   into zilc (`roadmap.md` Z1) — read from `../zailc` (`src/gen`, `src/runtime`, `tests/link`,
   `tools/gen`, `tools/runtime`, its `build.zig` steps `gen` / `libpas` / `yolomusl` /

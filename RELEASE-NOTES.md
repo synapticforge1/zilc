@@ -4,9 +4,54 @@ Each release states what its version number does not: the Zig your code is compi
 Fil-C release it is built on, and, for a release on a newer Zig line, the release it was ported
 from (its basis). `zilc --version` prints the same facts and checks them against your machine.
 
-How versions read: `<Zig line>-<Fil-C release>.<zilc release>`. `0.15.2-0.686.1` is zilc release 1
-for Zig 0.15.2 and Fil-C 0.686. The last number restarts at 1 for every new Zig release and every
+How versions read: `<Zig line>-<Fil-C release>.<zilc release>`. `0.15.2-0.687.1` is zilc release 1
+for Zig 0.15.2 and Fil-C 0.687. The last number restarts at 1 for every new Zig release and every
 new Fil-C release. There is no 1.0: breaking changes are announced here, not in the number.
+
+---
+
+## 0.15.2-0.687.1
+
+| | |
+| --- | --- |
+| **Line** | reference (built with Zig 0.15.2 and checked directly against Fil-C) |
+| **Your Zig code is compiled with** | Zig 0.15.2 |
+| **Built on** | Fil-C 0.687 (compiler pass, runtime and its checked musl libc), released 2026-10-23 |
+| **Basis** | none: this is the reference line |
+| **Platform** | Linux x86_64 only, by design (on Windows, inside WSL) |
+
+zilc moves to Fil-C 0.687. Fil-C stays on LLVM 20.1.8, so your code is still compiled with Zig
+0.15.2.
+
+### What changed
+
+- **Fil-C 0.687's fixes** now apply to zilc programs. Among them: arguments passed by value are
+  checked over their whole size (tail padding included); the compiler's model of where the
+  garbage collector may run is corrected for stack allocations and memory copies; and `setjmp`
+  inside loops is handled soundly.
+- **Fil-C 0.687 defines what was undefined**: an oversized shift amount is taken modulo the width,
+  an out-of-range vector lane index is brought into range, and division or remainder by zero
+  (and the most negative number divided by −1) gives a defined result instead of undefined
+  behaviour. Zig's ReleaseSafe still reports these as Zig safety panics before they happen; in
+  ReleaseFast and ReleaseSmall you get Fil-C's defined result.
+- **Rebuild everything.** Fil-C 0.687 changes its runtime ABI (`setjmp`), so objects built for
+  0.686 must not be linked with 0.687's runtime. zilc's object cache keys on the compiler, so it
+  rebuilds by itself.
+- **`--runtime zig` is gone.** It was reserved and always refused; `--runtime filc` (the default,
+  and the only value) still works.
+
+### Checked for this release
+
+Fil-C's own test suite gives the same result with the stock and zilc's patched clang on all 7,269
+tests. zilc's safety gate passes 8 of 8, its 156-program corpus runs as designed in all four
+optimize modes, and its output matches plain Zig's with no unexplained difference.
+
+### Requirements
+
+- Fil-C 0.687's clang (`--filc` or `ZILC_FILC`) and Zig 0.15.2 (`--zig` or `ZILC_ZIG`), on Linux
+  x86_64 (on Windows, inside WSL). First-time setup: `tools/README.md`.
+- Recommended, as before: zilc's patched build of Fil-C's clang (`tools/filc/build-patched-clang.ts`);
+  stock 0.687 still crashes on Zig's Debug code, as 0.686 did.
 
 ---
 

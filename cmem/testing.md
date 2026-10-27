@@ -43,6 +43,7 @@ programs don't**, and gives size numbers against plain Zig. Tools in `tools/basi
 | **builds with zilc** | **78/78** | ReleaseSafe ~~50/78~~ → **77/78** after the KI-8 fix (only KI-9 left) · ReleaseSmall **77/78** (KI-9) |
 | **runs as designed under zilc** (ReleaseSafe) | **78/78** (`42_panic` traps via Fil-C, as designed) | ~~24~~ → 26 (KI-8) → 45 (KI-7) → 50 (panic handler + KI-9) → **71/78** (KI-13 overflow fold + `fromPage` patch, KI-14 `-fno-valgrind`). 65 clean exits plus 6 intentional (`42` panic, `66` exit 1 without a subcommand, `77` exit 3, three servers). Then the **unoptimized-IR route** (KI-17, the default since 2026-09-30) → **76/78**: the 5 thread joins pass, and `76_signals` now runs (it waits, as designed). **Left, 2:** the KI-18 Fil-C assertion (`22_strings-and-runes`, `69_http-client`) |
 | **every mode** (KI-16, default route) | same in every mode (C ignores `-O`) | ~~ReleaseSafe 76 · ReleaseFast 76 · ReleaseSmall 76 · Debug 63~~ → 2026-10-01: 78 · 78 · 78 · 65 (KI-18, KI-20) → **2026-10-01 (evening): 78/78 as designed in ALL FOUR MODES**, with the patched Fil-C clang (KI-22 colouring, KI-4 `indirectbr`) and Debug at `filc -O1` (fixes KI-19). Gate 4/4 with it. Tool: `tools/basics/all-modes.ts` (defaults to the patched clang) |
+| **on Fil-C 0.687** (2026-10-27; patched 0.687 clang, in WSL, on commit `b33b6eb`) | — | **Still 78/78 as designed in all four modes**: 71 OK + the designed 7 in every mode and both languages, by name (`42_panic` traps, `66` exit 1, `77_exit` exit 3, `70`–`72` and `76_signals` time out; `tests/basics/README.md`); KillUB's new defined results changed no output. Gate 8/8, tests 29/29. Output comparison: **0 unexplained** (`{same 500, expected 56, varies 68, variesBad 0, differs 0}`; 3 fewer "same" than 0.686 and 3 more "varies", the native side varying by itself) |
 | **on Fil-C 0.686** (2026-10-05; patched 0.686 clang, `ZILC_VERIFY_INTERFERENCE=1` + `ZILC_VERIFY_COLOURING=1`) | — | **Still 78/78 as designed in all four modes** (71 OK + the designed 7, C and Zig alike), **0 builds with a verification difference**, gate 8/8, tests **29/29**. `69` ReleaseSafe alone **38.0 s** cold (35.9 on 0.685). Output comparison re-run: 0 unexplained |
 | **+ dense interference graph, object cache** (KI-22 levers (b), (c); 2026-10-02, same load, `ZILC_JOBS=4`, `ZILC_CACHE=0`) | — | **Still 78/78 as designed in all four modes**, gate 4/4, tests **25/25** (26/26 with `--clean-cache`, same day). **Verified run:** the whole corpus in all four modes with `ZILC_VERIFY_INTERFERENCE=1` and `ZILC_VERIFY_COLOURING=1`: 78/78 as designed, **no graph or colouring difference** (verified `69` builds 154–431 s, so the original code really ran). `69` under load: Debug **56 s** (was 68), ReleaseSafe **58 s** (70), ReleaseFast **82 s** (97), ReleaseSmall **52 s** (61). Alone, through the driver: `69` ReleaseSafe **35.9 s** split (43.9 before (b)), 49.9 s at `-j 1`; rebuild unchanged, same output path: **2.3 s** (cache hit; `62` 0.5 s). Byte-identical to the prebuilt on every deterministic input (`compare-clangs.ts`) |
 | **build time, + parallel code generation** (KI-22 lever (a); 2026-10-02, same load, `ZILC_JOBS=4` per build) | — | **Still 78/78 as designed in all four modes** (71 OK + the designed 7: `42` panic, `66` exit 1, `77` exit 3, `70`/`71`/`72` servers, `76_signals`), gate 4/4, tests 24/24. Medians unchanged (Debug 4 s, ReleaseSafe 4 s, ReleaseFast 4 s, ReleaseSmall 3 s). `69`: Debug **68 s** (was 79), ReleaseSafe **70 s** (81), ReleaseFast **97 s** (107), ReleaseSmall **61 s** (70). Alone, through the driver: `69` ReleaseSafe **60.6 s → 43.9 s** (`-j 1` vs default 16 parts), `62` 7.0 → 5.0 s, same program output. Code identity: 2,840/2,840 functions of `69` identical to the unsplit compile of the same bitcode (`workarounds.md` KI-22) |
@@ -102,6 +103,11 @@ patched.** Run 5,968, skipped 1,237. Both fail the same 2 on the first pass:
   lacked it (`BAD cannot open aesni-mb-x86_64.pl`). With that folder added to the checkout, it
   **passes with both compilers** (`mb pl sink ok`). It is the only test that reads `projects/`.
 
+**On 0.687 (2026-10-27): 0 differences on all 7,269 tests** (`compare results-stock.json
+results-patched.json`, tests cloned at the `v0.687` tag). Stock and patched alike: **6,027 run,
+6,026 pass, 1 fail (`inlineasm_rdpkru`, as always), 0 timeouts, 1,242 skipped**; 799 s at 12 jobs
+(stock, beside the clang build), 405 s at 24 (patched).
+
 **So on 0.686 every runnable test passes with zilc's patched clang except `inlineasm_rdpkru`**
 (hardware). `compare-clangs.ts` against stock 0.686: the usual pattern (identical on the small
 inputs and the stress test, both assert on the KI-18 repro, `62` different: two binaries).
@@ -141,8 +147,10 @@ projects/openssl-3.6.4/crypto/aes/asm`, `checkout`; the second path is the input
 `sarcasm-mb-pl-sink-att`, see above), then from that folder:
 `bun …/run-filc-tests.ts run --pizfix <tree>/pizfix --label stock` (and `--label patched`
 with zilc's tree), then `… compare results-stock.json results-patched.json` (exit 0 = same).
-`--filter REGEX` runs a subset. ⚠️ Use the tests of the COMPILER's commit (`v0.686`: 7,205;
-`v0.685`: 7,003), not upstream's newest, which test features the release lacks.
+`--filter REGEX` runs a subset. ⚠️ Use the tests of the COMPILER's release (`v0.687`: 7,269 —
+cloned at the tag, whose tests differ from the compiler's commit `e7947f0` only by `spawnmt2`'s
+skip; `v0.686`: 7,205; `v0.685`: 7,003), not upstream's newest, which test features the release
+lacks.
 
 ## 🔍 Output comparison: zilc vs native, not just exit codes (pre-publish item, ✅ 2026-10-02)
 
@@ -188,7 +196,7 @@ and so do `argv`, files, stdin, child processes and threads.
 - `zilc-check.ts` clears its WHOLE mode folder, so a C-only run deletes that mode's Zig results:
   run both languages together (`LANGS="c zig"` in `all-modes.ts`).
 
-## Current gates (re-run 2026-10-27 in WSL, on Fil-C 0.686: gate 8/8, tests 29/29, capi-smoke and baseline exit 0; the counts below unchanged since 2026-10-05)
+## Current gates (re-run 2026-10-27 in WSL on Fil-C 0.687, commit `b33b6eb`: gate 8/8, tests 29/29, capi-smoke and baseline exit 0, `zilc --version` ok/ok; the same on 0.686 that morning)
 
 | Step | Checks | State |
 | --- | --- | --- |

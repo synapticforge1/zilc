@@ -196,8 +196,8 @@ its `publishing.md`).
   calls in C++ coroutines) and `43d345a` (the setjmp-in-a-loop fix, "this fix is an ABI break!");
   also `995fb4c` (values live across a setjmp in a loop), `e714461` (the pass's model of
   safepoints for alloca/memcpy, "Anthropic-reported"), `7d4ed7b` (symbol visibility). **All five
-  pass edits and all three `llvm-split` edits still apply** to the newest source. **NOT reviewed
-  yet; not marked reviewed** — the move to 0.687 is `open-work.md`'s first open item.
+  pass edits and all three `llvm-split` edits still apply** to the newest source. (Then, the same
+  day: reviewed below as "Review of Fil-C 0.687", and zilc MOVED to 0.687.)
 
 ### 📋 Review of Fil-C 0.686 (2026-10-05; owner: "do the upstream review and include it in the release")
 
@@ -230,5 +230,45 @@ assertion on 3-byte globals); both repros fail on the 0.686 prebuilt exactly as 
 **Decision (owner): move the release to 0.686.** Done the same day: prebuilt installed (sha256
 `60bfbe8e…`), source moved to `163fae5`, the patched clang rebuilt with zilc's 8 edits unchanged
 (its version string equals the prebuilt's), and zilc re-verified (`testing.md`). Marked reviewed.
+
+### 📋 Review of Fil-C 0.687 (2026-10-27; owner: "run through the check list now")
+
+`v0.687` = `2db72c6` (2026-10-23); **0.687's clang names `e7947f0`**, 5 commits under the tag, and
+between the two nothing changes under `llvm/`, `clang/`, `libpas/` or `filc/` but one test manifest
+(`spawnmt2` skipped), so `e7947f0` is the released compiler and zilc builds from it. **Same LLVM:
+20.1.8**, so Zig stays 0.15.2. Its version string names **`llvm-project-deluge.git`** again (0.686:
+`fil-c.git`; same history): `FILC_SOURCE_URL` and the source's origin follow. 65 commits from
+`v0.686`; 13 files under `llvm/` and `clang/`.
+
+The 4 commits to `FilPizlonator.cpp`, oldest first:
+
+| commit | what | for zilc |
+| --- | --- | --- |
+| `3485bcd` | byval arguments checked over their full allocation (tail padding), not the type's store size; "Anthropic" report | **relevant**: Zig passes large structs by value through the C ABI; a correctness fix |
+| `995fb4c` | values live across a setjmp in a loop always spilled, lowers restored | C inputs with `setjmp` only (Zig has none); superseded by the next |
+| `43d345a` | setjmp-in-a-loop, the hammer: one `zjmp_buf` per setjmp site per frame; reverts most of `995fb4c`; **"an ABI break"** (`filc_runtime.h`) | the pass and the runtime must come from the same release: true for zilc (pass and prebuilt runtime both 0.687); the reason `gate-zig-modules` checks the release |
+| `e714461` | the pass's model of safepoints: alloca, memcpy and friends; `filc_test_support.h` | relevant to all code, Zig's included (GC rooting); a correctness fix |
+
+Also read: **KillUB** (`2de1327`, "Kill UB harder"): shift amounts masked to the width, vector
+lane indices clamped, division / remainder by zero (and signed `MIN / -1`) made defined. It runs on
+every module, Zig's too; Zig's ReleaseSafe checks these itself, ReleaseFast/Small now get Fil-C's
+defined result — the corpus in four modes is unchanged (`testing.md`). **The clang driver**
+(`Gnu.cpp`, `Clang.cpp`, `CommonArgs`): one commit, `b2dd07b`, APE linking for Peregrine/cosmo;
+zilc's musl link line is unchanged (the gate; `gate-zig-modules`' `clang -###`). **`filc/run-tests`**:
+one change, inside `if $hasCOSMO` (fat-APE archives): not ported, cosmo is zailc's.
+**`generate_pizlonated_forwarders.rb`**: +3 signatures (`zsys_raise_without_exit`,
+`zsys_listmount`, `zsys_statmount`) — the pure-Zig forwarder generator (`roadmap.md` Z1) must
+produce them for 0.687. Not in 0.687 (after the tag): `f565a56` (the callee roots its arguments, an
+ABI change) and `7d4ed7b` (symbol visibility) — for the next review.
+
+**Still in stock 0.687** (zilc's fixes stay): KI-4 (`-O1` crash on the reduced Debug IR) and KI-18
+(the 3-byte global assertion), both failing exactly as on 0.686. zilc's pass edits apply to
+`e7947f0` unchanged (the saved patch: the same 513 added lines; only upstream's context moved).
+
+**Moved 2026-10-27** (owner's checklist): prebuilt installed (sha256 `aab53840…`), source at
+`e7947f0`, the patched clang rebuilt (version string equal to the prebuilt's), zilc re-verified
+(`testing.md`), toolchain re-archived, **marked reviewed at `e7947f0`** (not upstream's head:
+`check-upstream.ts --mark-reviewed=<rev>`). Release `0.15.2-0.687.1`: tagging and pushing are the
+owner's.
 - **When to run it:** at every "update the project memory" (`INDEX.md` policy, step 5), and before
   any Fil-C upgrade (stage A above).

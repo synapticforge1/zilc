@@ -1,5 +1,5 @@
 diff --git a/llvm/lib/Transforms/Instrumentation/FilPizlonator.cpp b/llvm/lib/Transforms/Instrumentation/FilPizlonator.cpp
-index 5f0463f16..660e6b96f 100644
+index c4dcd0faa..3a2de55de 100644
 --- a/llvm/lib/Transforms/Instrumentation/FilPizlonator.cpp
 +++ b/llvm/lib/Transforms/Instrumentation/FilPizlonator.cpp
 @@ -345,6 +345,28 @@ namespace {
@@ -31,7 +31,7 @@ index 5f0463f16..660e6b96f 100644
  enum class MATokenKind {
    None,
    Error,
-@@ -2998,35 +3020,101 @@ class Pizlonator {
+@@ -3011,35 +3033,101 @@ class Pizlonator {
        }
      }
  
@@ -144,7 +144,7 @@ index 5f0463f16..660e6b96f 100644
                  }
                }
              }
-@@ -3035,11 +3123,11 @@ class Pizlonator {
+@@ -3048,11 +3136,11 @@ class Pizlonator {
  
          if (LifetimeMarker LM = analyzeLifetimeMarker(I)) {
            if (LM.LMK == LifetimeMarkerKind::End)
@@ -158,7 +158,7 @@ index 5f0463f16..660e6b96f 100644
            }
          }
        }
-@@ -3050,29 +3138,121 @@ class Pizlonator {
+@@ -3063,31 +3151,123 @@ class Pizlonator {
        size_t NumA1Ptrs = countPtrs(A1.getType());
        if (!NumA1Ptrs)
          continue;
@@ -190,10 +190,10 @@ index 5f0463f16..660e6b96f 100644
            for (size_t APtrIndex = countPtrsForValue(&I); APtrIndex--;)
 -            Interference[ValuePtr(&I, PtrIndex)].insert(ValuePtr(&I, APtrIndex));
 +            ZilcAdj[Base + PtrIndex].push_back(Base + APtrIndex);
-+        }
-+      }
-+    }
-+
+         }
+       }
+     }
+ 
 +    if (zilcVerifyInterference()) {
 +      // The original construction, verbatim, then the two graphs compared as sets.
 +      std::unordered_map<ValuePtr, std::unordered_set<ValuePtr>> Interference;
@@ -253,8 +253,8 @@ index 5f0463f16..660e6b96f 100644
 +        for (size_t PtrIndex = countPtrs(A.getType()); PtrIndex--;) {
 +          for (size_t APtrIndex = countPtrs(A.getType()); APtrIndex--;)
 +            Interference[ValuePtr(&A, PtrIndex)].insert(ValuePtr(&A, APtrIndex));
-         }
-       }
++        }
++      }
 +      for (BasicBlock* BB : Blocks) {
 +        for (Instruction& I : *BB) {
 +          for (size_t PtrIndex = countPtrsForValue(&I); PtrIndex--;) {
@@ -280,10 +280,12 @@ index 5f0463f16..660e6b96f 100644
 +            || !(ZilcPtrOf[ZilcValBase[Found->second] + Entry.first.PtrIndex] == Entry.first))
 +          report_fatal_error("zilc (KI-22): original interference has a value the dense graph lacks");
 +      }
-     }
- 
++    }
++
      // Make this deterministic by having a known order in which we process stuff.
-@@ -3094,16 +3274,56 @@ class Pizlonator {
+     std::vector<ValuePtr> Order;
+     for (Argument& A : OldF->args()) {
+@@ -3107,16 +3287,56 @@ class Pizlonator {
        }
      }
  
@@ -347,7 +349,7 @@ index 5f0463f16..660e6b96f 100644
          if (Ok) {
            FrameEntryKind FEK;
            PointerKind PK = pointerKindDirect(IP.V);
-@@ -3113,6 +3333,7 @@ class Pizlonator {
+@@ -3126,6 +3346,7 @@ class Pizlonator {
            else
              FEK = FrameEntryKind::Lower;
            FrameIndexMap[IP] = FrameEntry(FEK, FrameIndex);
@@ -355,7 +357,7 @@ index 5f0463f16..660e6b96f 100644
            FrameSize = std::max(FrameSize, FrameIndex + 1);
            break;
          }
-@@ -3202,15 +3423,36 @@ class Pizlonator {
+@@ -3215,15 +3436,36 @@ class Pizlonator {
  
      for (AllocaInst* AI : StackAuxOrder) {
        const std::unordered_set<AllocaInst*>& Adjacency = StackAuxInterference[AI];
@@ -399,7 +401,7 @@ index 5f0463f16..660e6b96f 100644
          if (Ok) {
            if (verbose) {
              errs() << "For explicit local " << AI->getName() << " using lowers index " << FrameIndex
-@@ -14607,6 +14849,60 @@ class Pizlonator {
+@@ -14615,6 +14857,60 @@ class Pizlonator {
          Twine(IBr->getAddress()->getName()) + ".switch_cast", IBr);
      };
  

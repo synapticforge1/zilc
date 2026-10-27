@@ -1,1 +1,1 @@
-163fae598eaf249b74065b0156f3a7e7ba8c0e5a v0.686 2026-10-05 the commit zilc's patched clang is built from; its 10 FilPizlonator.cpp commits reviewed (cmem/upstream.md "Review of Fil-C 0.686")
+e7947f079c976fb167108f7407c20240bca0ca89 v0.687's-compiler 2026-10-27 the commit Fil-C 0.687's clang names and zilc's patched clang is built from (5 commits under the v0.687 tag, no compiler change); its 4 FilPizlonator.cpp commits and KillUB reviewed (cmem/upstream.md "Review of Fil-C 0.687")

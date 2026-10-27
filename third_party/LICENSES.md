@@ -92,9 +92,10 @@ Newest first. Copy the template for each adopted component.
 ### filc-pass-fixes (local patches to Fil-C's compiler pass; LOCAL USE ONLY)
 - **Source:** https://github.com/pizlonator/fil-c (Fil-C's LLVM fork; named `llvm-project-deluge`
   until 0.685, same history)
-- **Version / commit:** `163fae598eaf249b74065b0156f3a7e7ba8c0e5a`, the commit the Fil-C **0.686**
-  prebuilt names in `clang --version` (since 2026-10-05; before that `bb0d0a64`, Fil-C 0.685). The
-  same edits applied to both unchanged
+- **Version / commit:** `e7947f079c976fb167108f7407c20240bca0ca89`, the commit the Fil-C **0.687**
+  prebuilt names in `clang --version` (since 2026-10-27, as `llvm-project-deluge.git`; before that
+  `163fae59`, Fil-C 0.686, from 2026-10-05; `bb0d0a64`, Fil-C 0.685). The same edits applied to
+  all three unchanged (the saved patch's added lines are identical; only upstream's context moved)
 - **Upstream path(s):** `llvm/lib/Transforms/Instrumentation/FilPizlonator.cpp`: the two frame-slot
   colouring loops (about lines 3054–3076 and 3146–3160 at `bb0d0a64`), and
   `lowerIndirectBrForFunction` (Fil-C's copy of LLVM's `IndirectBrExpandPass`). **Added
@@ -127,7 +128,7 @@ Newest first. Copy the template for each adopted component.
   `restore-patched-clang.ts`. **It is gitignored, so pushing it is impossible by default, and it
   must stay that way:** pushing it would be a distribution of Fil-C
 - **Artifact destination:** **toolchain-only, and local only.** The patched clang lives in
-  `~/zilc-work/tools/filc-0.686-zilc/` and is **not distributed**. It is the default for zilc's
+  `~/zilc-work/tools/filc-0.687-zilc/` (0.686's kept at `filc-0.686-zilc/`) and is **not distributed**. It is the default for zilc's
   scripts (owner, 2026-10-01); the prebuilt stays for comparison. The colouring fix emits the same
   code; the KI-4 fix only changes functions that crashed before. User binaries carry no new code
 - **Modifications:** each changed block is marked `// zilc (KI-22): …` or `// zilc (KI-4): …` in the
