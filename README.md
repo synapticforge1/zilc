@@ -92,8 +92,8 @@ then checks that the Zig and Fil-C clang it finds match them. What changed in ea
 what to know about it, is in [RELEASE-NOTES.md](RELEASE-NOTES.md).
 
 `.zig` inputs go through Zig and the Fil-C pass; `.c`, `.cpp`, `.o` and `.a` go straight to Fil-C.
-`-v` prints every command it runs. `--runtime zig` is reserved for zilc's own runtime and is refused
-until that runtime is ready for testing; `filc` (the default) links Fil-C's.
+`-v` prints every command it runs. `--runtime filc` (the default, and the only value) links Fil-C's
+runtime; a Zig runtime is not part of zilc (that work lives in the sibling project zailc).
 
 ### Limits
 

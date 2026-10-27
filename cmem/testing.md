@@ -195,7 +195,7 @@ and so do `argv`, files, stdin, child processes and threads.
 | Step | Checks | State |
 | --- | --- | --- |
 | `zig build gate` | Every bug example traps at the right line; the library-mode example runs (needs Fil-C) | **8/8** (2026-10-05 on Fil-C 0.686; 2026-10-02, KI-5 environ and library mode added; earlier 4/4 with the parallel code generation of KI-22 lever (a)) |
-| `zig build test` | Runtime module + CLI module + the IR rewrites (incl. the KI-18 three-byte-global wrap) + the std-overlay patches (incl. the KI-21 guards) + the `--runtime zig` refusal + the version round-trip + the object cache key and `--clean-cache` (KI-22 lever c) | **29/29** pass (2026-10-05, incl. `--clean-cache`, the KI-20 note, the version facts and the `0.15.2-0.686.1` scheme) |
+| `zig build test` | Runtime module + CLI module + the IR rewrites (incl. the KI-18 three-byte-global wrap) + the std-overlay patches (incl. the KI-21 guards) + the runtime values (`filc` only; `zig` refused 2026-09-30, removed 2026-10-27) + the version round-trip + the object cache key and `--clean-cache` (KI-22 lever c) | **29/29** pass (2026-10-05, incl. `--clean-cache`, the KI-20 note, the version facts and the `0.15.2-0.686.1` scheme) |
 | `zig build capi-smoke` | `tests/capi_smoke.c` links `zilc_runtime` via `zilc.h` and calls it | pass |
 | `zig build baseline` | Builds `examples/*.c` with plain `zig cc` | builds. `baseline_oob_write` prints `a[3] = 3`, exit 0: **the undetected bug** |
 

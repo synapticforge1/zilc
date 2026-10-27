@@ -24,14 +24,11 @@ const ir_std = @import("zilc").stdpatch;
 /// `main` directly, and Zig's `start.zig` never enters the build.
 pub const Entry = enum { auto, c, zig };
 
-/// Which runtime the program links.
-///
-///  * `.filc` — Fil-C's `libpizlo`, the runtime every gate run uses today.
-///  * `.zig`  — zilc's own Zig runtime (P3), linked ahead of `libpizlo` so each
-///    entry point it defines overrides Fil-C's and the rest fall through.
-///    ⚠️ Reserved: it is refused until the runtime is ready for testing, so a
-///    build can never claim the Zig runtime while silently linking Fil-C's.
-pub const Runtime = enum { filc, zig };
+/// Which runtime the program links: Fil-C's `libpizlo`, the only one. zilc's own
+/// Zig runtime (P3, reserved as `.zig` from 2026-09-30) moved to zailc on
+/// 2026-10-27 and is abandoned here (cmem/design-decisions.md), so `zig` is not
+/// a value at all; `--runtime filc` stays accepted.
+pub const Runtime = enum { filc };
 
 pub const Options = struct {
     inputs: []const []const u8,
@@ -55,7 +52,7 @@ pub const Options = struct {
     cache: bool = true,
 };
 
-pub const Error = error{ ToolFailed, NoInputs, UnsupportedInput, RuntimeNotReady };
+pub const Error = error{ ToolFailed, NoInputs, UnsupportedInput };
 
 /// Debug's Fil-C step runs at `-O1` like every mode since 2026-10-01. From 2026-09-23 it ran at
 /// `-O0`, because Debug IR segfaulted Fil-C's pass at `-O1` (KI-4). The cause is Fil-C's
@@ -868,14 +865,6 @@ fn runParallel(gpa: std.mem.Allocator, cmds: []const []const []const u8, verbose
 
 pub fn build(gpa: std.mem.Allocator, opts: Options) !void {
     if (opts.inputs.len == 0) return Error.NoInputs;
-    if (opts.runtime == .zig) {
-        std.debug.print(
-            \\zilc: --runtime zig is reserved: the Zig runtime is not ready for testing
-            \\  yet (cmem/roadmap.md P3). Use --runtime filc, the default.
-            \\
-        , .{});
-        return Error.RuntimeNotReady;
-    }
 
     // Temps live beside the output so a failed build leaves them inspectable
     // with --keep-temps, which is how KI-4/KI-5 were diagnosed in the first place.
@@ -1089,14 +1078,8 @@ test "--clean-cache removes the cached objects, keeps the rest of the cache, and
     try std.testing.expectEqual(@as(usize, 0), again.files);
 }
 
-test "--runtime zig is refused before anything runs" {
-    // No tool is invoked and no temp dir is made: the refusal comes first,
-    // so the paths here never need to exist.
-    try std.testing.expectError(Error.RuntimeNotReady, build(std.testing.allocator, .{
-        .inputs = &.{"never-read.zig"},
-        .output = "never-written",
-        .runtime = .zig,
-        .zig = "zig",
-        .filc = "clang",
-    }));
+test "the only runtime is filc; zig is not a value" {
+    // The CLI parses --runtime with stringToEnum, so this is what it accepts.
+    try std.testing.expectEqual(@as(?Runtime, .filc), std.meta.stringToEnum(Runtime, "filc"));
+    try std.testing.expectEqual(@as(?Runtime, null), std.meta.stringToEnum(Runtime, "zig"));
 }

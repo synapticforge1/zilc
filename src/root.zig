@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception OR MIT
 //! zilc runtime — public library surface.
 //!
-//! This is the home of `zilc_runtime`: the Zig implementation of the Fil-C
-//! runtime model (InvisiCap capability bounds + a FUGC-style accurate,
-//! non-moving collector) that code compiled by the zilc pass links against.
-//! Nothing is implemented yet; see `cmem/architecture.md` and `cmem/roadmap.md`.
+//! This was planned as the home of `zilc_runtime`, a Zig implementation of the
+//! Fil-C runtime model (roadmap P3). P3 moved to the sibling project zailc on
+//! 2026-10-27 and is abandoned here (cmem/design-decisions.md): programs link
+//! Fil-C's runtime, and this library keeps the driver's pieces (the IR
+//! rewrites, the version facts) and the small C API stub behind `zilc.h`.
 
 const std = @import("std");
 

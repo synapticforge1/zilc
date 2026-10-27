@@ -25,9 +25,7 @@ const usage =
     \\  --entry <who>    who owns main: auto (default), zig, or c.
     \\                   `zig` wraps your `pub fn main` in a generated C-ABI entry,
     \\                   because Zig's own start code cannot run under Fil-C (KI-5).
-    \\  --runtime <rt>   runtime to link: filc (default), or zig.
-    \\                   `zig` is reserved for zilc's own runtime and is refused
-    \\                   until that runtime is ready for testing (roadmap P3).
+    \\  --runtime <rt>   runtime to link: filc, Fil-C's (the default, and the only one).
     \\  --zig <path>     zig binary    (env ZILC_ZIG)
     \\  --filc <path>    Fil-C's clang (env ZILC_FILC)
     \\  -j <n>           parallel code generation parts for big modules
@@ -63,7 +61,7 @@ pub fn main() !void {
     const args = try std.process.argsAlloc(arena);
     const code: u8 = run(arena, args) catch |e| blk: {
         // The driver already reported these; don't bury them under an error name.
-        if (e == driver.Error.ToolFailed or e == driver.Error.RuntimeNotReady) break :blk 1;
+        if (e == driver.Error.ToolFailed) break :blk 1;
         std.debug.print("zilc: {s}\n", .{@errorName(e)});
         break :blk 1;
     };
@@ -142,7 +140,7 @@ fn run(arena: std.mem.Allocator, args: []const []const u8) !u8 {
         } else if (std.mem.eql(u8, a, "--runtime")) {
             i += 1;
             runtime = std.meta.stringToEnum(driver.Runtime, args[i]) orelse {
-                std.debug.print("zilc: --runtime must be filc or zig (got '{s}')\n", .{args[i]});
+                std.debug.print("zilc: --runtime must be filc (got '{s}')\n", .{args[i]});
                 return exit_usage;
             };
         } else if (std.mem.eql(u8, a, "-j")) {

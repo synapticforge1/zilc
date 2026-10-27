@@ -16,7 +16,7 @@
 | --- | --- | --- |
 | The IR rewrite | `src/ir.zig` | ✅ done, unit-tested (idempotent; `ni:0` after the `m:` component) |
 | The pipeline | `src/driver.zig` | ✅ done — Zig→IR→rewrite→`filc clang`, C straight through, one link |
-| The CLI | `src/main.zig` | ✅ `zilc build`, with KI-4/5/6 encoded as behavior, not just documented. `--runtime filc\|zig` (2026-09-30; `zig` reserved and refused) |
+| The CLI | `src/main.zig` | ✅ `zilc build`, with KI-4/5/6 encoded as behavior, not just documented. `--runtime filc` (`zig` was reserved and refused 2026-09-30, removed 2026-10-27 with P3) |
 | Entry shim for whole Zig programs | generated `zilc_entry.zig` | ✅ done (KI-5) |
 | The safety gate | `tools/gate.zig` | ✅ 4/4, inversion-tested |
 | `zilc_runtime` (the Zig runtime) | `src/root.zig`, `src/capi.zig` | ◻️ **a stub, and will stay one** — binaries link **Fil-C's** C runtime. P3 (the Zig runtime) moved to zailc and is abandoned here (owner, 2026-10-27) |

@@ -139,8 +139,9 @@ citation to the incident.
 - **Read the IR before believing a mechanism.** "An integer parameter loses its capability" was
   true but not sufficient; the IR showed overflow intrinsics breaking the chain inside the
   function too. One look at the actual `define` beat two rounds of reasoning. (zilc KI-13.)
-- **Reserve a switch by refusing it, never by falling back.** `--runtime zig` exists but refuses
-  to run, so no build can claim the new path while quietly using the old one. The same rule applied
+- **Reserve a switch by refusing it, never by falling back.** `--runtime zig` existed but refused
+  to run (2026-09-30 → 2026-10-27, removed when P3 moved to zailc), so no build could claim the new
+  path while quietly using the old one. The same rule applied
   to Debug before it was supported. (zilc, 2026-09-30.)
 - **Verify licenses per file, not per badge.** (Fil-C = `NOASSERTION` on GitHub, three licenses in
   practice; wasmtime's badge omitted its LLVM exception.)
