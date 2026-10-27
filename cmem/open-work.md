@@ -75,14 +75,35 @@ them, with their dates.
   unexplained, re-archived, marked reviewed at `e7947f0`. **Release = owner call 0.**
 - ✅ **`gate-zig-modules` on 0.687**: runs on zilc's own 0.687 pure-Zig modules since 2026-10-27
   (`testing.md`).
-- 🔒 **Duplicate the build inputs into the project folder** (owner, 2026-10-27, `design-decisions.md`
-  top row) — NOT YET DONE. Today: the patched-clang archives are in `toolchain/` (with
-  `SHA256SUMS`); `upstream/fil-c/` is the monitor's clone at upstream's head (`b8ffc50`), not the
-  build commit, and lacks yolo musl, compiler-rt, yolounwind, the user libc, libc++ and `runtimes`.
-  Missing: Fil-C's sources at `e7947f0` (the WSL build tree's sparse set, 14,432 files in the dirs
-  added 2026-10-27 alone), the Zig 0.15.2 and Fil-C 0.687 downloads, ninja. Plan: a Bun tool that
-  copies them under a gitignored folder and proves the copy (blob ids against the tree, SHA-256 for
-  downloads, an inversion), run on every Fil-C or Zig move.
+- 🗓️ **NEXT SESSION, FIRST (owner, 2026-10-27: "next time scope it into the open items so I don't
+  forget"): clone-then-build — `zig build` fetches Fil-C's build files.** 🔒 The goal (owner):
+  *"the goal is to be able to clone this repository and build for the fil-c side or the pure zig
+  side once the user has the build tools installed"*; and, on how: *"when a user clones our
+  repository and performs the fil-c side build (first build) the build goes and gets all of the
+  files necessary to build, then builds it. And we just have our zig sources files in the repo"*.
+  **Proposed mechanism, owner's go-ahead pending** (`design-decisions.md` top row):
+  1. `build.zig.zon`: a **lazy** dependency `filc` = GitHub's archive of
+     `pizlonator/llvm-project-deluge` at `e7947f0`, with its Zig package hash (from `zig fetch`;
+     the hash covers the unpacked files, not the archive bytes). Fetched once into Zig's global
+     cache by the first step that needs it.
+  2. `build/pure_zig.zig` reads Fil-C's sources from that dependency; `-Dfilc-src` stays as the
+     offline override (a local checkout).
+  3. A Fil-C-side step (e.g. `zig build patched-clang`): apply
+     `third_party/filc-patches/zilc-filc-pass.patch` to the fetched LLVM/clang and run cmake +
+     ninja (installed build tools, like Zig and Fil-C's prebuilt).
+  4. **Check before relying on it:** the fork's `.gitattributes` for `export-ignore` (GitHub's
+     archive drops those files) and line-ending attributes; then the fetched tree against the
+     commit file by file (git blob id, mode, link target — the proof code parked on local branch
+     `wip/reference-duplicate`, `04aa53d`), with an inversion.
+  5. Costs to state to users: one download of the whole fork at that commit (~250 MB compressed,
+     ~2 GB unpacked; estimate, measure it), network on first build.
+  6. Then: rewrite the 2026-10-27 duplicate rule around this goal (`design-decisions.md`, INDEX
+     item 5, the release checklist's re-sync step), README "Building", Fil-C.md § 4; on every Fil-C
+     move the step becomes "bump the URL and hash".
+  The gitignored `reference/` duplicate (first attempt, 2026-10-27) is **parked**: a clone cannot
+  see a gitignored folder. Its last run failed honestly (5 CRLF fixtures converted at checkout; the
+  restore-from-blob fix is written, not run) and its output was deleted; the tool also wrote its
+  output despite failing — fix that if it is ever revived.
 - **The pure-Zig track — in progress on `main`** (2026-10-27): the generators
   (byte-identical to 0.687's) and the stock runtime pieces (libpas's stock half, yolo musl's static
   half, compiler-rt; every object = the 0.687 release's symbols) are in, and `gate-zig-modules`
