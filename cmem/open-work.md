@@ -50,7 +50,7 @@ them, with their dates.
 - **Deferred past the publish** (with the port): `-Druntime=both`, the byte-identity check, the
   benchmark suite (upgrade stage C), the 0.16.0 examples under zilc (`testing.md`).
 - **Partly open defects:** KI-7 (`getcontext`) — `known-issues.md`.
-- ~~Cosmo leaves~~ — **not zilc work since 2026-10-27** (owner: zilc stays Fil-C on Linux only;
+- ~~Cosmo leaves~~ — **not zilc work since 2026-10-27** (owner: zilc stays Fil-C on Linux x86_64 only;
   cross-platform is zailc's). The open points (`statx` missing from the cosmo runtime, real Windows
   unverified, aarch64 Windows / iOS / Android) are in `platforms.md` for zailc.
 - **Not yet re-run under Bun** (see the Bun port below): build/archive/restore-patched-clang,

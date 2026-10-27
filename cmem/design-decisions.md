@@ -129,7 +129,7 @@ These shape everything else. Listed roughly in order of how much they constrain 
    the Zig runtime must match Fil-C 0.685's object and capability layout **exactly**, because the
    pass inlines fast-path checks that read it directly. That makes the layout a version-pinned
    ABI, to re-check at every upstream sync.
-4. 🔁 **RE-SETTLED 2026-10-27 (owner): zilc is Linux only, worked in WSL or Linux; the
+4. 🔁 **RE-SETTLED 2026-10-27 (owner): zilc is Linux x86_64 only, worked in WSL or Linux; the
    cross-platform part is zailc's** (decision table, top row). The analysis below is kept as the
    record zailc inherits; for zilc only Linux x86_64 applies (aarch64 Linux included in "not zilc's"). Was: ✅ **SETTLED 2026-09-30 (owner):
    Linux, macOS and Windows, on every currently prevalent processor; then iOS; Android later.** The scope work comes before publishing (`roadmap.md` P6).
