@@ -21,11 +21,9 @@ completely unrelated reason (a missing stack probe).*
 ✅ **Inversion-tested 2026-09-23:** with one expected origin changed to a line that does not exist,
 the gate **failed** and printed the real panic. A gate that cannot fail proves nothing.
 
-```powershell
-bun tools/run-gate.ts            # from Windows
-```
 ```sh
-ZILC_FILC=…/build/bin/clang ZILC_ZIG=…/zig zig build gate    # from Linux
+bun tools/run-gate.ts            # from a WSL or Linux shell (the tools run inside Linux only)
+ZILC_FILC=…/build/bin/clang ZILC_ZIG=…/zig zig build gate    # the same, by hand
 ```
 
 ⚠️ **Where Fil-C is absent the gate SKIPS and exits 0**, printing what to set. A build that never had
@@ -190,7 +188,7 @@ and so do `argv`, files, stdin, child processes and threads.
 - `zilc-check.ts` clears its WHOLE mode folder, so a C-only run deletes that mode's Zig results:
   run both languages together (`LANGS="c zig"` in `all-modes.ts`).
 
-## Current gates (re-run 2026-10-05, on Fil-C 0.686)
+## Current gates (re-run 2026-10-27 in WSL, on Fil-C 0.686: gate 8/8, tests 29/29, capi-smoke and baseline exit 0; the counts below unchanged since 2026-10-05)
 
 | Step | Checks | State |
 | --- | --- | --- |

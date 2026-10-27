@@ -9,7 +9,7 @@
 > cross-platform part is zailc's** (`design-decisions.md`, top row). **P6 below no longer applies
 > to zilc** beyond Linux x86_64 (Linux aarch64 included); it is kept as the record zailc started from.
 
-> **Updated 2026-09-30.** P3 has a plan (Linux first, the Zig runtime checked against Fil-C, the
+> 🔁 *Superseded 2026-10-27 (the roadmap is closed for zilc, above).* **Updated 2026-09-30.** P3 has a plan (Linux first, the Zig runtime checked against Fil-C, the
 > `--runtime` switch already in the CLI), and a proposed **P6 — other platforms**. Next step: the
 > `zsys_write` spike, or P4, whichever the owner picks.
 

@@ -4,7 +4,7 @@ The scripts that established how zilc reaches Fil-C: **stock Zig emits IR → re
 `target datalayout` lines → Fil-C's clang runs the pass and links.** No Zig fork, no LLVM build.
 
 Same conventions as `../p1`: Deno tools since 2026-10-05, Bun tools since 2026-10-22,
-`bun tools/p2/<tool>.ts` from Windows or Linux. Four more tools beyond the table record later steps: `debug-mode.ts`,
+`bun tools/p2/<tool>.ts` from a WSL or Linux shell. Four more tools beyond the table record later steps: `debug-mode.ts`,
 `driver-milestone.ts`, `whole-program.ts` (the zilc driver and its entry shim, P2).
 
 | script | what it establishes |

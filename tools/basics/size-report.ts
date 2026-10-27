@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception OR MIT
 //
 // Summarise size-compare.ts's CSV: medians and totals per language and flavour, build failures, and
-// how zilc's runs compare with the plain ReleaseSafe runs. Pure data: runs on any OS (from Windows
-// give the CSV's path as WSL shares it, e.g. \\wsl.localhost\Ubuntu\home\…).
+// how zilc's runs compare with the plain ReleaseSafe runs. Pure data; runs inside Linux like every
+// tool (2026-10-27), so give the CSV's Linux path.
 //
 //   bun tools/basics/size-report.ts [sizes.csv]      (default: $WORK/basics-size/sizes.csv)
 import { readFile } from "node:fs/promises";

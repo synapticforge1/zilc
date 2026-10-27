@@ -116,7 +116,7 @@ the runtime-linking rule checked.
 | [vision.md](vision.md) | The goal: one `zig` binary compiling Zig, C and C++ to one memory-safe target; unverified claims marked. |
 | [architecture.md](architecture.md) | The pipeline, InvisiCap and FUGC, and the runtime contract measured 2026-09-30 (`libpizlo`'s four layers). |
 | [design-decisions.md](design-decisions.md) | Invariants, dated decisions with who decided, and the open questions for the owner. |
-| [upstream.md](upstream.md) | How zilc tracks Fil-C: pinned release, watched files, the `upstream/fil-c/` monitor, the 0.686 review, the upgrade procedure. |
+| [upstream.md](upstream.md) | How zilc tracks Fil-C: pinned release, watched files, the `upstream/fil-c/` monitor, the 0.686 review, the upgrade procedure; **0.687 released 2026-10-23, not yet reviewed**. |
 | [licensing.md](licensing.md) | `Apache-2.0 WITH LLVM-exception OR MIT`: why, the runtime-linking rule, the copyleft exclusion. |
 | [reference-projects.md](reference-projects.md) | Fil-C, LLVM, Zig: verified licenses, what to mine each for, adoption status. |
 | [zig-filc-scope.md](zig-filc-scope.md) | Scope of a Zig version of Fil-C on 0.15.2 (2026-10-05) — the brief zailc started from. |

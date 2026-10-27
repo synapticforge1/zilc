@@ -14,7 +14,7 @@ and bring the obligations listed in `third_party/LICENSES.md`, ledger entry `fil
 - **Restore into WSL:** `bun tools/filc/restore-patched-clang.ts [--with-debug-info]`, which installs
   to `~/zilc-work/tools/filc-0.686-zilc/`, where zilc's scripts look first.
 - **Re-create after changing the patch:** `bun tools/filc/build-patched-clang.ts`, then
-  `bun tools/filc/archive-patched-clang.ts` (from Windows or Linux; both run inside WSL).
+  `bun tools/filc/archive-patched-clang.ts` (from a WSL shell; the tools run inside Linux only).
 - **Is it current?** `bun tools/filc/check-toolchain.ts` (exit 0 = yes). It runs on every "update the
   project memory" (`cmem/INDEX.md` policy, step 4). It detects unsaved edits to the WSL source, a
   patch newer than this archive, and a compiler rebuilt after it.

@@ -2,7 +2,7 @@
 //
 // Group why zilc-built tests/basics programs fail (from size-compare.ts's folders): runtime traps by
 // the Fil-C fault and the source location it names, and build failures by their first error line.
-// Pure data: runs on any OS (from Windows, give the folder as WSL shares it).
+// Pure data; runs inside Linux like every tool (2026-10-27).
 //
 //   bun tools/basics/zilc-failures.ts [bin dir]      (default: $WORK/basics-size/bin)
 import { readFile } from "node:fs/promises";

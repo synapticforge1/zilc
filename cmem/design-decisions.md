@@ -183,6 +183,11 @@ These shape everything else. Listed roughly in order of how much they constrain 
 
 ## Windows build gotchas (dev machine: win32, D: = exFAT)
 
+> 🔁 **Retired 2026-10-27:** zilc is built and run inside Linux only (WSL here; `design-decisions.md`
+> top rows), so the first two bullets (Windows' Zig, the NTFS cache) are history; WSL's Zig is
+> `~/zilc-work/tools/zig-0.15.2/zig` with the cache in the Linux home. The git notes stay current:
+> the checkout is still on the exFAT `D:`.
+
 - **Zig 0.15.2 lives at `C:\zig\0.15.2\zig.exe`** (official zip, SHA-256 verified against
   ziglang.org's `index.json`, installed 2026-09-18). It is **not on PATH**. Bare `zig` is the scoop
   shim, which is **0.16.0**, and wazmrt still needs that. So invoke by full path, or put

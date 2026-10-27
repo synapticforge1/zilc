@@ -58,6 +58,16 @@ them, with their dates.
 
 ## Open work
 
+- 🔴 **Fil-C 0.687 is released (2026-10-23) — zilc's role, item 1** (found 2026-10-27 by the
+  memory update's upstream check, `upstream.md` "Run of 2026-10-27"). Same LLVM 20.1.8, so Zig
+  stays 0.15.2; the release would be `0.15.2-0.687.1`. zilc's patches still apply. To do, as for
+  0.686 (`upstream.md` "Review of Fil-C 0.686" is the template): review the 7 pass commits — two are
+  ABI changes (`f565a56` callee roots the arguments, `43d345a` setjmp) — and re-check KI-4 / KI-18
+  against the stock 0.687; install the prebuilt (record its SHA-256 in `setup-wsl.ts`); move
+  `tools/lib/tool.ts` `FILC_VERSION`/`FILC_SHA` and `src/root.zig`'s `filc_release`; rebuild the
+  patched clang; Fil-C's suite stock vs patched at 0 differences; the gate, tests, corpus in four
+  modes and the output comparison; re-archive; the five version places; `--mark-reviewed`. Needs
+  the owner's go-ahead to release (and to push).
 - ~~Next phase (P3 or P4)~~ — **P3, P4 and P5 moved to zailc and are abandoned here**
   (owner, 2026-10-27; `design-decisions.md` top row). zilc's work is its four-part role: track
   Fil-C, follow the matching Zig, keep Zig and C correct on x86_64 Linux, be zailc's reference.

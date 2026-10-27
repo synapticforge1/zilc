@@ -543,8 +543,11 @@ memory-mapped: Windows refuses ("Permission denied"); a plain `git multi-pack-in
 exFAT cannot rename over the existing read-only pack ("File exists"); on Linux the rename replaces
 it. A full `git repack -a -d` consolidated six packs to one, but the next repack hit (2) again.
 
-**Mitigation (repo-local config, not committed):** `maintenance.geometric-repack.enabled=false`,
-`maintenance.gc.enabled=true`. The automatic run after commits is now clean. `gc` only runs when
+**Mitigation (repo-local config, not committed):** since 2026-10-27 the workspace standard,
+**`maintenance.strategy gc`** (divergence P7). Until then `maintenance.geometric-repack.enabled=false`
++ `maintenance.gc.enabled=true`, which a traced run on git 2.54 showed to be the same `gc` plus one
+more task, `commit-graph write --split`; both keep the failing geometric repack and
+`multi-pack-index write` from running. The automatic run after commits is clean. `gc` only runs when
 loose objects pass `gc.auto` (~6,700), so the error is rare, and harmless when it occurs. This is
 the final answer (owner decision above). ~~Full fix: keep repos on NTFS~~: rejected, because the
 projects stay on D: for portability.

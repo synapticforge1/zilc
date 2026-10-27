@@ -10,9 +10,9 @@ the public headers. They never read the runtime's source. Findings: `cmem/filc-a
 | `cc-decode.ts` | the IR types, a full call through the fast and generic paths, `pizlonated_runtime.h`, and the capability vocabulary in `stdfil.h` |
 | `write1.c` | the probe program |
 
-Run from Windows (PowerShell mangles inline shell text, KI-1):
+Run from a WSL shell (the tools run inside Linux only, 2026-10-27):
 
-```powershell
+```sh
 bun tools/p3/abi-probe.ts
 ```
 

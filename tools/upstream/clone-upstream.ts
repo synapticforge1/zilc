@@ -3,8 +3,8 @@
 // Create upstream/fil-c: a gitignored, read-only reference clone of Fil-C's `deluge` branch
 // (cmem/upstream.md "The upstream/ reference folder"; the pattern of binaryen-ts's upstream/).
 // Partial (no file contents beyond the checked-out paths), shallow (history from v0.684 on) and
-// sparse (only what zilc references), so it stays small. Needs only git: runs on any OS (made on
-// Windows, where the repo lives).
+// sparse (only what zilc references), so it stays small. Needs only git; runs inside Linux like
+// every tool since 2026-10-27 (the existing clone was made on Windows).
 //
 //   bun tools/upstream/clone-upstream.ts
 //

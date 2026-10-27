@@ -3,8 +3,8 @@
 // Monitor Fil-C upstream for changes that matter to zilc (cmem/upstream.md "The upstream/ reference
 // folder"). Fetches upstream/fil-c, then reports, relative to the last REVIEWED commit: new commits,
 // new release tags, commits touching the files zilc patches or depends on, and whether zilc's patches
-// still apply to upstream's newest FilPizlonator.cpp and llvm-split.cpp. Needs git and Bun: runs on
-// any OS (normally Windows, where the reference clone lives).
+// still apply to upstream's newest FilPizlonator.cpp and llvm-split.cpp. Needs git and Bun; runs inside
+// Linux like every tool since 2026-10-27 (run in WSL on 2026-10-27: the clone on D: reads fine).
 //
 //   bun tools/upstream/check-upstream.ts                  report only
 //   bun tools/upstream/check-upstream.ts --mark-reviewed  after reviewing: record upstream HEAD

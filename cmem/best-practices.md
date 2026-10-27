@@ -168,6 +168,10 @@ citation to the incident.
   deterministic control. And keep LLVM use-list order (bitcode with use-lists, no text round
   trip, no cloning) wherever machine code must match: it changes register allocation.
   (KI-22 lever (a), 2026-10-02: 80+ functions "differed" until both were fixed; then 2,840/2,840.)
+- **Run both sides of an equivalence proof at the SAME absolute path when the thing under test
+  writes paths into its output.** Fil-C's `setup.sh` records absolute paths; two homes at two paths
+  would have "differed" in every patched file. One fixed path, run in turn, gave 22,159 identical
+  entries, and the 5 extra were explainable (Bun's own cache). (setup-wsl port, 2026-10-27.)
 
 ## 5. Tooling on this machine
 
@@ -205,6 +209,17 @@ citation to the incident.
   whitespace-only line, and an edit's "original" then matches 0 times. Check suspicious lines
   with `cat -A`; fix them with `sed`, and mark them in the edit script. (KI-22 lever (b),
   2026-10-02: a six-space line in `FilPizlonator.cpp`.)
+- **A scan that reports each commit's FIRST hit undercounts what a purge must remove; scan every
+  BLOB, then list the distinct tokens.** Per commit, `git grep -l` showed one drive path in 67 of 68
+  commits; the blob-level scan found 63 dirty blobs with three different tokens, one of them a
+  user-named scratchpad path in old shell tools. (History purge, 2026-10-27.)
+- **Never run a check and the action it guards in one command line.** A grep for leftover
+  wording printed its two hits and the `git commit` chained after it ran anyway; a follow-up commit
+  fixed the two lines. Read the check's output, then act. (`6eb950c` → `946035e`, 2026-10-27.)
+- **A configuration key's NAME is not what it does — trace a run.** zilc's two `maintenance.*`
+  task keys looked like "gc only"; a traced `git maintenance run` showed git 2.54's default
+  strategy also running `commit-graph write --split`, because only the repack had been switched
+  off. (exFAT recipe, 2026-10-27.)
 
 ## 6. The workspace ★ rules (copied verbatim)
 

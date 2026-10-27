@@ -140,7 +140,7 @@ its `publishing.md`).
   `CodeGen` (`IndirectBrExpandPass.cpp`, which KI-4's broken lowering was copied from), the runtime
   (`libpas`, and `filc` without its 15,603-file `tests/`), plus the top-level docs and build
   scripts. About 450 MB.
-- **Create:** `bun tools/upstream/clone-upstream.ts` (any OS; normally Windows, where the clone lives). It sets, **in the clone only**:
+- **Create:** `bun tools/upstream/clone-upstream.ts` (in WSL since 2026-10-27; until then it ran on Windows, where the clone was made). It sets, **in the clone only**:
   - `core.autocrlf=false`: upstream's exact LF bytes; the global `true` broke exact-text matching;
   - `core.protectNTFS=false`: Fil-C bundles files whose names Windows forbids (`aux.h`, `:`, `\`),
     all outside the sparse set, which Git for Windows otherwise refuses even to index;
@@ -176,12 +176,24 @@ its `publishing.md`).
   **All pass edits (five, with KI-22 lever (b)'s, re-checked later the same day) and all three
   `llvm-split` edits still apply.** Still not marked reviewed:
   the 9 pass commits (above all `097f7b7`) have not been read yet.
-- **Run of 2026-10-05** (now `bun tools/upstream/check-upstream.ts`, any OS): upstream
+- **Run of 2026-10-05** (now `bun tools/upstream/check-upstream.ts`, in WSL): upstream
   `deluge` at `163fae5` (2026-10-04), **123 commits ahead**, and a **NEW RELEASE TAG `v0.686`**.
   Watched-file hits: **10** to `FilPizlonator.cpp` (one more than before), 1 to `configure_llvm.sh`,
   2 to `libpas/common.sh`, 2 to `filc/include`, and 41 to `filc/tests` (newly watched: Fil-C's
   own suite, run against zilc's clang). **All five pass edits and all three `llvm-split` edits
   still apply.** (Then, the same day: reviewed below, and zilc MOVED to 0.686.)
+- **Run of 2026-10-27** (`bun tools/upstream/check-upstream.ts`, in WSL; a "update the project
+  memory" step 5): upstream `deluge` at `b8ffc50` (2026-10-25), **90 commits past the reviewed
+  `163fae5`**, and a **NEW RELEASE TAG `v0.687`** = `2db72c6` (2026-10-23, "Peregrine Fil-C").
+  **Same LLVM: 20.1.8** (`cmake/Modules/LLVMVersion.cmake` on `deluge`), so a move keeps Zig 0.15.2
+  and would be release `0.15.2-0.687.1`. Watched-file hits: **7** to `FilPizlonator.cpp`, 2 to the
+  pass's headers, 4 to `filc/include`, 25 to `filc/tests`. Among the pass commits, two the author
+  calls ABI changes: `f565a56` ("the callee is responsible for rooting the arguments", for tail
+  calls in C++ coroutines) and `43d345a` (the setjmp-in-a-loop fix, "this fix is an ABI break!");
+  also `995fb4c` (values live across a setjmp in a loop), `e714461` (the pass's model of
+  safepoints for alloca/memcpy, "Anthropic-reported"), `7d4ed7b` (symbol visibility). **All five
+  pass edits and all three `llvm-split` edits still apply** to the newest source. **NOT reviewed
+  yet; not marked reviewed** — the move to 0.687 is `open-work.md`'s first open item.
 
 ### 📋 Review of Fil-C 0.686 (2026-10-05; owner: "do the upstream review and include it in the release")
 
