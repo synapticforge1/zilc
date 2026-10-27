@@ -97,6 +97,19 @@ them, with their dates.
      `wip/reference-duplicate`, `04aa53d`), with an inversion.
   5. Costs to state to users: one download of the whole fork at that commit (~250 MB compressed,
      ~2 GB unpacked; estimate, measure it), network on first build.
+  5a. 🔒 **Zig is the only compiler a user installs** (owner, 2026-10-27: *"So we are back to the
+     user not needing an additional C compiler, just zig to start"*). Today the patched clang is
+     compiled by the system's GCC (`build-essential`, `build-patched-clang.ts`): build it with
+     `zig cc`/`zig c++` (and `zig ld.lld`) instead — zig-bootstrap's route; ⚠️ unmeasured here,
+     and the clang then links libc++, not libstdc++, so prove it: Fil-C's suite, stock vs this
+     clang, 0 differences on all 7,269 tests. Remaining user tools: Zig, cmake + ninja (LLVM's
+     build system, not compilers).
+  5b. **Fil-C's prebuilt release becomes optional** (the same exchange): today it is needed for the
+     runtime pieces zilc does not build yet (the Fil-C-compiled half: Z1 item 3), as the tree the
+     patched clang is installed into, and as the oracle. Once item 3 lands, install the whole
+     runtime from zilc's own builds (Fil-C's `build_base.sh` order: Zig builds the host half and
+     the patched clang; that clang builds `filc/src`, the user libc, libc++); the prebuilt stays
+     only as the parity oracle, for whoever verifies a release.
   6. Then: rewrite the 2026-10-27 duplicate rule around this goal (`design-decisions.md`, INDEX
      item 5, the release checklist's re-sync step), README "Building", Fil-C.md § 4; on every Fil-C
      move the step becomes "bump the URL and hash".
