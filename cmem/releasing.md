@@ -1,5 +1,15 @@
 # Releasing & Versioning
 
+## ✅ PUBLISHED 2026-10-27: `v0.15.2-0.687.1`
+
+Owner: "release", after the checklist run the same day ("run through the check list now"). Pushed
+to `https://github.com/synapticforge1/zilc`: `main` and branch `v0.15.2` at `be51808`, annotated tag
+`v0.15.2-0.687.1` (tag object `303b597`) on the same commit; all three fast-forwards / new, read
+back with `ls-remote`. Checked first: every per-release checklist item on the committed tree
+(`testing.md`, `upstream.md` "Review of Fil-C 0.687"), the five version places, the 3 pushed
+commits scanned (no personal path, none in a message). No CI workflow, so nothing ran on the push;
+no GitHub Release page (no `gh` here; `RELEASE-NOTES.md` is its text).
+
 ## ✅ PUBLISHED 2026-10-05: `v0.15.2-0.686.1`
 
 Pushed to `https://github.com/jrmarcum/zilc` (the repo has since moved to

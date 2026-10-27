@@ -9,7 +9,7 @@ them, with their dates.
 
 | what | value |
 | --- | --- |
-| version | **`0.15.2-0.687.1`** — `<Zig>-<Fil-C>.<zilc release>`, verified 2026-10-27, **not yet tagged or pushed** (owner call 0); one of the five places the number lives. Published before it: `0.15.2-0.686.1` (2026-10-05) |
+| version | **`0.15.2-0.687.1`** — `<Zig>-<Fil-C>.<zilc release>`, **published 2026-10-27** (tag `v0.15.2-0.687.1` on `be51808`; `releasing.md`); one of the five places the number lives. Before it: `0.15.2-0.686.1` (2026-10-05) |
 | toolchain | Zig **0.15.2** (user code and build), Fil-C **0.687** with zilc's patched clang (`workarounds.md` KI-22, KI-4); 0.686's kept installed and archived (`toolchain/filc-0.686/`) |
 | gates | `zig build gate`, `zig build test`, Fil-C's suite, the corpus in four modes, the output comparison: all re-run 2026-10-27 on Fil-C 0.687, counts in `testing.md` |
 | remote | `origin` = `github.com/synapticforge1/zilc` (since 2026-10-27; was `jrmarcum/zilc`, which GitHub redirects). **Purged history pushed 2026-10-27**: `main` = `origin/main`, `v0.15.2` = tag `v0.15.2-0.686.1` = `13ce96a` (was `19e7172`; map `history-map-2026-10-27.md`) |
@@ -18,11 +18,9 @@ them, with their dates.
 
 ## 🗓️ Owner calls (evidence gathered; nothing done without the owner)
 
-0. **Release `0.15.2-0.687.1`: tag and push** (owner's checklist run, 2026-10-27; `releasing.md`).
-   Every per-release checklist item is done on the committed tree (`testing.md`, `upstream.md`
-   "Review of Fil-C 0.687"). To publish: annotated tag `v0.15.2-0.687.1` on the release commit,
-   move branch `v0.15.2` to it, push `main`, the branch and the tag (no CI workflow here, so a push
-   triggers nothing); a GitHub Release page is optional (`RELEASE-NOTES.md`).
+0. ✅ **Released `0.15.2-0.687.1`, 2026-10-27** (owner: "release"): tag, branch `v0.15.2` and
+   `main` at `be51808`, pushed and read back (`releasing.md`). A GitHub Release page stays
+   optional (call 5).
 
 1. ✅ **Purged history force-pushed 2026-10-27** (owner: "perform the open items"): `main`
    `19e7172` → `2c7faf0`, `v0.15.2` `19e7172` → `13ce96a`, tag `v0.15.2-0.686.1` `fda2d43` →
