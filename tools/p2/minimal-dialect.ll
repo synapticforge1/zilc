@@ -10,3 +10,4 @@ entry:
   store i32 %v, ptr %addr, align 4
   ret void
 }
+; SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception OR MIT

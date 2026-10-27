@@ -31,6 +31,39 @@ pub fn build(b: *std.Build) void {
     const run_step = b.step("run", "Run the CLI (zig build run -- <args>)");
     run_step.dependOn(&run_cmd.step);
 
+    // ---- Licences beside the binaries (third_party/LICENSES.md) -----------
+    // zilc's own licence, the NOTICE, and the texts of what the installed binaries contain: Zig's
+    // std (every Zig program), and in zilc-gen Fil-C's forwarder generator (BSD-2-Clause) and musl's
+    // header rules (MIT).
+    for ([_][2][]const u8{
+        .{ "LICENSE-APACHE", "LICENSE-APACHE" },
+        .{ "LICENSE-MIT", "LICENSE-MIT" },
+        .{ "NOTICE", "NOTICE" },
+        .{ "third_party/zig/LICENSE", "zig-LICENSE" },
+        .{ "third_party/fil-c/PAS-LICENSE.txt", "fil-c-PAS-LICENSE.txt" },
+        .{ "third_party/fil-c/MUSL-LICENSE.txt", "fil-c-MUSL-LICENSE.txt" },
+    }) |f| b.installFile(f[0], b.fmt("share/licenses/zilc/{s}", .{f[1]}));
+
+    // ---- zilc-gen: the pure-Zig track's generators (cmem/roadmap.md, Z1) ---
+    // Fil-C's forwarder generator and musl's header install, in Zig (src/gen/; ported, see
+    // third_party/LICENSES.md `forwarder-generator`, `musl-header-install`). Brought from zailc on
+    // 2026-10-27, faithful to the Fil-C release in src/gen/signatures.zig.
+    const gen = b.addExecutable(.{
+        .name = "zilc-gen",
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/gen/main.zig"),
+            .target = target,
+            .optimize = optimize,
+        }),
+    });
+    const gen_options = b.addOptions();
+    gen_options.addOption([]const u8, "version", zonVersion(b));
+    gen.root_module.addOptions("build_options", gen_options);
+    b.installArtifact(gen);
+    const run_gen = b.addRunArtifact(gen);
+    if (b.args) |args| run_gen.addArgs(args);
+    b.step("gen", "Run zilc-gen with the arguments after -- (header | forwarders | musl-headers | musl-genh | --version)").dependOn(&run_gen.step);
+
     // ---- Runtime as a static C-ABI library (`include/zilc.h`) --------------
     const rt = b.addLibrary(.{
         .name = "zilc_runtime",
@@ -163,4 +196,30 @@ pub fn build(b: *std.Build) void {
     const test_step = b.step("test", "Run unit tests");
     test_step.dependOn(&b.addRunArtifact(mod_tests).step);
     test_step.dependOn(&b.addRunArtifact(exe_tests).step);
+    // The generators: byte-identity with Ruby's output (SHA-256 pinned per Fil-C release) and the
+    // musl header rules.
+    for ([_][]const u8{ "src/gen/forwarders.zig", "src/gen/musl_headers.zig" }) |root| {
+        const t = b.addTest(.{ .root_module = b.createModule(.{
+            .root_source_file = b.path(root),
+            .target = target,
+            .optimize = optimize,
+        }) });
+        test_step.dependOn(&b.addRunArtifact(t).step);
+    }
+}
+
+/// `.version` from build.zig.zon: exactly one line `    .version = "X.Y.Z",`, or the build fails.
+fn zonVersion(b: *std.Build) []const u8 {
+    const text = b.build_root.handle.readFileAlloc(b.allocator, "build.zig.zon", 1 << 20) catch |err|
+        std.debug.panic("cannot read build.zig.zon: {s}", .{@errorName(err)});
+    const prefix = "    .version = \"";
+    var found: ?[]const u8 = null;
+    var lines = std.mem.splitScalar(u8, text, '\n');
+    while (lines.next()) |raw| {
+        const line = std.mem.trimRight(u8, raw, "\r");
+        if (!std.mem.startsWith(u8, line, prefix) or !std.mem.endsWith(u8, line, "\",")) continue;
+        if (found != null) std.debug.panic("build.zig.zon: more than one .version line", .{});
+        found = line[prefix.len .. line.len - 2];
+    }
+    return found orelse std.debug.panic("build.zig.zon: no `    .version = \"X.Y.Z\",` line", .{});
 }

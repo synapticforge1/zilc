@@ -14,3 +14,6 @@ target triple = "x86_64-unknown-linux5.10.0-musl"
 define ptr @use() {
   ret ptr @g
 }
+; SPDX-License-Identifier: MIT
+; Derived from Zig 0.15.2's standard library (Copyright (c) Zig contributors; MIT,
+; third_party/zig/LICENSE): IR emitted by Zig for its std code, then reduced (README.md).

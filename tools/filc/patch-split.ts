@@ -1,5 +1,10 @@
 #!/usr/bin/env bun
-// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception OR MIT
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+//
+// This file holds verbatim text of LLVM's llvm-split.cpp (Fil-C's fork; each edit's original and
+// its replacement), which is Apache-2.0 WITH LLVM-exception, so the file carries that licence alone
+// (third_party/LICENSES.md, practical rule 4). Modified by zilc: the replacements are zilc's changes
+// (Apache-2.0 §4(b)).
 //
 // Add zilc's splitting mode to LLVM's `llvm-split` (from Fil-C's LLVM fork, Apache-2.0 WITH
 // LLVM-exception; ledger entry `filc-pass-fixes` in third_party/LICENSES.md), for build-speed

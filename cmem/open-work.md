@@ -71,7 +71,9 @@ them, with their dates.
 - **`gate-zig-modules` on 0.687**: no pure-Zig modules exist for 0.687 yet (zailc's are 0.686,
   and the step refuses a release mismatch, as designed); its first 0.687 run comes with the
   pure-Zig track below.
-- **The pure-Zig track (owner, 2026-10-27), after the 0.687 move:** bring zailc's step-2 build
+- **The pure-Zig track — in progress on branch `pure-zig/z1`** (2026-10-27): the generators are in
+  and byte-identical to Fil-C 0.687's (`roadmap.md` Z1); next, the runtime pieces. Plan as first
+  written: bring zailc's step-2 build
   into zilc (`roadmap.md` Z1) — read from `../zailc` (`src/gen`, `src/runtime`, `tests/link`,
   `tools/gen`, `tools/runtime`, its `build.zig` steps `gen` / `libpas` / `yolomusl` /
   `compiler-rt`, its `oracle.md`), keep only what is faithful to Fil-C (zailc's departures W-n stay

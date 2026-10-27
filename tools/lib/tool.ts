@@ -75,6 +75,28 @@ export const FILC_PREBUILT_TREE = filcPrebuiltTree(FILC_VERSION);
  */
 export const FILC_0685_PREBUILT_TREE = filcPrebuiltTree("0.685");
 
+/**
+ * The pure-Zig track (cmem/roadmap.md): zilc's Fil-C source checkout (a sparse, partial clone at
+ * FILC_SHA, ZILC_FILC_SRC to override) is the input; its outputs install under PURE_ZIG_OUT, off
+ * the exFAT repo. A checkout at any other commit is refused: the tables and the oracle are per
+ * release.
+ */
+export const FILC_SRC = env("ZILC_FILC_SRC", `${WORK}/filc-src/repo`);
+export const PURE_ZIG_OUT = env("ZILC_PURE_ZIG_OUT", `${WORK}/pure-zig/filc-${FILC_VERSION}`);
+export async function requireFilcSrc(): Promise<string> {
+  const head = (await must(["git", "-C", FILC_SRC, "rev-parse", "HEAD"])).trim();
+  if (head !== FILC_SHA) throw new Error(`${FILC_SRC} is at ${head}; zilc is on Fil-C ${FILC_VERSION} = ${FILC_SHA}`);
+  return FILC_SRC;
+}
+/** Zig's caches belong in the Linux home, not on the exFAT repo (KI-2). */
+export function zigCacheArgs(): string[] {
+  return ["--cache-dir", `${HOME}/.cache/zilc-zig`, "--global-cache-dir", `${HOME}/.cache/zig`];
+}
+export async function sha256(bytes: Uint8Array<ArrayBuffer>): Promise<string> {
+  const d = new Uint8Array(await crypto.subtle.digest("SHA-256", bytes));
+  return [...d].map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
 /** Fil-C's clang for zilc: ZILC_FILC, else the patched build (KI-22), else the prebuilt. */
 export function filc(): string {
   const set = process.env.ZILC_FILC;

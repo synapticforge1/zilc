@@ -264,6 +264,19 @@ ReleaseSafe by default and Debug only where the size is acceptable.
 *sed's* status, and the exit code is half of what these tests assert. (Cost us one confusing
 "run exit=0" on a run that had clearly trapped.)
 
+## The pure-Zig track's oracles (2026-10-27)
+
+Byte for byte against Fil-C's own build, for the release zilc is on (`roadmap.md` Z1), in WSL:
+
+| check | tool | 0.687 result |
+| --- | --- | --- |
+| forwarder generator = Ruby's `generate_pizlonated_forwarders.rb` | `bun tools/gen/verify-forwarders.ts` | both files SAME (45,695 B, 983,629 B) |
+| musl header install = `make install-headers` | `bun tools/gen/verify-musl-headers.ts` | 219 files identical |
+| the same bytes, pinned | `zig build test` (`src/gen/forwarders.zig`) | SHA-256 + size; **unit tests 40/40** (29 + the generators' 11) |
+
+After a Fil-C move: `bun tools/gen/import-signatures.ts`, then the two oracles, then re-pin the
+SHA-256 values Ruby printed.
+
 ## The gate with pure-Zig modules (`zig build gate-zig-modules`, 2026-10-27)
 
 **Owner, 2026-10-27:** after a Fil-C update has passed every checklist item, the same build runs
