@@ -3,8 +3,8 @@
 The scripts that established how zilc reaches Fil-C: **stock Zig emits IR → rewrite two
 `target datalayout` lines → Fil-C's clang runs the pass and links.** No Zig fork, no LLVM build.
 
-Same conventions as `../p1`: Deno tools since 2026-10-05, `deno run -A tools/p2/<tool>.ts` from
-Windows or Linux. Four more tools beyond the table record later steps: `debug-mode.ts`,
+Same conventions as `../p1`: Deno tools since 2026-10-05, Bun tools since 2026-10-22,
+`bun tools/p2/<tool>.ts` from Windows or Linux. Four more tools beyond the table record later steps: `debug-mode.ts`,
 `driver-milestone.ts`, `whole-program.ts` (the zilc driver and its entry shim, P2).
 
 | script | what it establishes |
@@ -32,8 +32,8 @@ other input of these experiments, it is not in the repo and no tool here makes i
 1. `tools/p1/tiny.zig` → Zig 0.15.2 → `$WORK/p1/tiny.ll`: the exact command is in
    `../p1/README.md` ("Inputs that live outside the repo"), recovered and verified 2026-10-05
    (same code; only 3 debug-info path lines differ);
-2. `deno run -A tools/p1/zig-ir-spike.ts` → `$WORK/p1/tiny-ni2.ll` (patches in the two layouts);
-3. `deno run -A tools/p2/dialect-probe.ts` copies it into `$WORK/p2`.
+2. `bun tools/p1/zig-ir-spike.ts` → `$WORK/p1/tiny-ni2.ll` (patches in the two layouts);
+3. `bun tools/p2/dialect-probe.ts` copies it into `$WORK/p2`.
 
 Copies on 2026-10-05: `tiny.ll` 11,669,818 bytes (sha256 `5db471c2…`), `tiny-ni2.ll` 11,669,936
 bytes (sha256 `3e81eb75…`). The other inputs of these tools are committed (`minimal-dialect.ll`,

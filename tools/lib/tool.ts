@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception OR MIT
 //
-// Shared helpers for zilc's tools (Deno), which replaced the shell scripts on 2026-10-05 so the
-// tools run the same way on every OS (owner: "Can we make the bash scripts deno scripts so that
-// are cross platform?").
+// Shared helpers for zilc's tools (Bun). They replaced the shell scripts on 2026-10-05 as Deno
+// tools, so the tools run the same way on every OS (owner: "Can we make the bash scripts deno
+// scripts so that are cross platform?"), and moved to Bun on 2026-10-22 (owner: Bun only, Deno is
+// going away). They use Node's APIs (`node:*`, `process`) plus `Bun.spawn`/`Bun.Glob`.
 //
 // The one idea: a tool is written ONCE, as code for the platform its work needs.
 //   * Tools whose work needs Linux (Fil-C exists only there) call `linuxOnly()` first. On Linux it
@@ -12,13 +13,17 @@
 //     arguments go to wsl.exe as an argument list, never through a shell's quoting.
 //   * Tools that need no Linux (git, Windows' own Zig) just run, on any OS.
 //
-// Run a tool:   deno run -A tools/<group>/<tool>.ts [args]      (from Windows or from Linux)
+// Run a tool:   bun tools/<group>/<tool>.ts [args]      (from Windows or from Linux)
 
-import { copy } from "jsr:@std/fs@1/copy";
-import { expandGlob } from "jsr:@std/fs@1/expand-glob";
-import { dirname, fromFileUrl, join } from "jsr:@std/path@1";
+import { statSync } from "node:fs";
+import { cp, mkdir, open, rm, stat } from "node:fs/promises";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 
-export const isWindows = Deno.build.os === "windows";
+export const isWindows = process.platform === "win32";
+
+/** The tool's arguments (what follows the script on the command line). */
+export const ARGS = process.argv.slice(2);
 
 /** Forward slashes on every OS (Windows accepts them), so tools can split paths on "/". */
 export function slashes(p: string): string {
@@ -26,11 +31,11 @@ export function slashes(p: string): string {
 }
 
 /** The repository root (this file is tools/lib/tool.ts). */
-export const REPO = slashes(join(dirname(fromFileUrl(import.meta.url)), "..", ".."));
+export const REPO = slashes(join(dirname(fileURLToPath(import.meta.url)), "..", ".."));
 
 /** An environment variable, or a default. */
 export function env(name: string, fallback = ""): string {
-  return Deno.env.get(name) ?? fallback;
+  return process.env[name] ?? fallback;
 }
 
 export const HOME = env("HOME", env("USERPROFILE"));
@@ -63,7 +68,7 @@ export const FILC_0685_PREBUILT_TREE = filcPrebuiltTree("0.685");
 
 /** Fil-C's clang for zilc: ZILC_FILC, else the patched build (KI-22), else the prebuilt. */
 export function filc(): string {
-  const set = Deno.env.get("ZILC_FILC");
+  const set = process.env.ZILC_FILC;
   if (set) return set;
   const patched = `${FILC_PATCHED_TREE}/build/bin/clang`;
   return existsSync(patched) ? patched : `${FILC_PREBUILT_TREE}/build/bin/clang`;
@@ -83,18 +88,18 @@ const FORWARD = /^(ZILC_|ZIG_|FILC_|FUGC_)|^(JOBS|MODE|MODES|LANGS|OUTROOT|WORK|
  * IMPORT, only under `if (import.meta.main)`: imports run before the importer's body, so a
  * top-level call there would re-launch the imported file instead of the tool.
  * On Linux: returns. On Windows: runs this same tool inside WSL
- * (Deno at ~/.deno/bin/deno there) and exits with its status; the caller never continues.
+ * (Bun at ~/.bun/bin/bun there, installed by tools/p1/setup-wsl.sh) and exits with its status;
+ * the caller never continues.
  */
 export async function linuxOnly(meta: ImportMeta): Promise<void> {
-  if (Deno.build.os === "linux") return;
+  if (process.platform === "linux") return;
   if (!isWindows) throw new Error(`${meta.url}: needs Linux (Fil-C), or Windows with WSL`);
-  const script = wslPath(slashes(fromFileUrl(meta.url)));
-  const fwd = Object.entries(Deno.env.toObject()).filter(([k]) => FORWARD.test(k)).map(([k, v]) => `${k}=${v}`);
-  const { code } = await new Deno.Command("wsl.exe", {
-    args: ["-e", "env", ...fwd, "sh", "-c", 'exec "$HOME/.deno/bin/deno" run -A "$0" "$@"', script, ...Deno.args],
+  const script = wslPath(slashes(fileURLToPath(meta.url)));
+  const fwd = Object.entries(process.env).filter(([k]) => FORWARD.test(k)).map(([k, v]) => `${k}=${v}`);
+  const child = Bun.spawn(["wsl.exe", "-e", "env", ...fwd, "sh", "-c", 'exec "$HOME/.bun/bin/bun" "$0" "$@"', script, ...ARGS], {
     stdin: "inherit", stdout: "inherit", stderr: "inherit",
-  }).output();
-  Deno.exit(code);
+  });
+  process.exit(await child.exited);
 }
 
 export interface RunOptions {
@@ -135,46 +140,41 @@ export async function run(argv: string[], o: RunOptions = {}): Promise<RunResult
   const capture = !o.inherit && !o.outFile;
   const merge = !o.inherit && !isWindows;
   if (merge) argv = ["sh", "-c", 'exec "$@" 2>&1', "sh", ...argv];
-  let file: Deno.FsFile | undefined;
-  if (o.outFile) file = await Deno.open(o.outFile, { write: true, create: true, append: !!o.append, truncate: !o.append });
-  let child: Deno.ChildProcess;
+  const file = o.outFile ? await open(o.outFile, o.append ? "a" : "w") : undefined;
+  let child: Bun.Subprocess<"ignore" | Uint8Array, "inherit" | "pipe", "inherit" | "pipe">;
   try {
-    child = new Deno.Command(argv[0], {
-      args: argv.slice(1),
+    child = Bun.spawn(argv, {
       cwd: o.cwd,
-      env: o.env,
-      clearEnv: !!o.cleanEnv,
-      stdin: o.stdin !== undefined ? "piped" : "null",
-      stdout: o.inherit ? "inherit" : "piped",
-      stderr: o.inherit ? "inherit" : "piped",
-    }).spawn();
+      // Bun.spawn's `env` replaces the environment; Deno's added to it, and the tools expect that.
+      env: o.cleanEnv ? (o.env ?? {}) : { ...process.env, ...o.env },
+      stdin: o.stdin !== undefined ? new TextEncoder().encode(o.stdin) : "ignore",
+      stdout: o.inherit ? "inherit" : "pipe",
+      stderr: o.inherit ? "inherit" : "pipe",
+    });
   } catch (e) {
-    file?.close();
-    if (e instanceof Deno.errors.NotFound) return { code: 127, out: `${argv[0]}: not found\n`, timedOut: false };
+    await file?.close();
+    // Bun throws (code ENOENT) when the program does not exist, before anything runs.
+    if ((e as NodeJS.ErrnoException).code === "ENOENT") return { code: 127, out: `${argv[0]}: not found\n`, timedOut: false };
     throw e;
   }
   let timedOut = false;
   const timer = o.timeout ? setTimeout(() => { timedOut = true; try { child.kill("SIGKILL"); } catch { /* gone */ } }, o.timeout * 1000) : undefined;
-  if (o.stdin !== undefined) {
-    const w = child.stdin.getWriter();
-    await w.write(new TextEncoder().encode(o.stdin)).catch(() => {});
-    await w.close().catch(() => {});
-  }
   const chunks: Uint8Array[] = [];
-  const sink = async (s: ReadableStream<Uint8Array> | null) => {
-    if (!s) return;
+  const sink = async (s: ReadableStream<Uint8Array> | number | undefined) => {
+    if (!s || typeof s === "number") return;
     for await (const c of s) {
       if (file) await file.write(c);
       else chunks.push(c);
     }
   };
   if (!o.inherit) await Promise.all([sink(child.stdout), sink(child.stderr)]);
-  const status = await child.status;
+  // A signal reads as 128 + its number (SIGSEGV 139), as Deno reported it and as a shell does.
+  const code = await child.exited;
   if (timer) clearTimeout(timer);
-  file?.close();
+  await file?.close();
   const out = capture ? new TextDecoder().decode(concat(chunks)) : "";
   // `exec` replaced the sh, so a missing program is sh's 127, as before.
-  return { code: timedOut ? 124 : status.code, out, timedOut };
+  return { code: timedOut ? 124 : code, out, timedOut };
 }
 
 /** Like `run`, but throws unless the program exits 0; returns its output. */
@@ -211,36 +211,46 @@ export async function pool<T, R>(items: T[], jobs: number, fn: (item: T, index: 
   return out;
 }
 
-/** Paths matching a glob, sorted (like the shell's expansion). */
+/**
+ * Paths matching a glob, sorted (like the shell's expansion). The pattern is absolute; Bun.Glob
+ * scans from a directory, so the literal leading directories become that directory.
+ */
 export async function glob(pattern: string): Promise<string[]> {
+  const parts = slashes(pattern).split("/");
+  const wild = parts.findIndex((s) => /[*?[{]/.test(s));
+  if (wild < 0) return existsSync(pattern) ? [slashes(pattern)] : [];
+  const base = parts.slice(0, wild).join("/") || "/";
+  if (!existsSync(base)) return [];
   const found: string[] = [];
-  for await (const e of expandGlob(pattern)) found.push(slashes(e.path));
+  for await (const p of new Bun.Glob(parts.slice(wild).join("/")).scan({ cwd: base, onlyFiles: false })) {
+    found.push(`${base}/${slashes(p)}`);
+  }
   return found.sort();
 }
 
 export function existsSync(p: string): boolean {
   try {
-    Deno.statSync(p);
+    statSync(p);
     return true;
   } catch {
     return false;
   }
 }
 export async function exists(p: string): Promise<boolean> {
-  return (await Deno.stat(p).catch(() => null)) !== null;
+  return (await stat(p).catch(() => null)) !== null;
 }
 export async function rmrf(p: string): Promise<void> {
-  await Deno.remove(p, { recursive: true }).catch(() => {});
+  await rm(p, { recursive: true, force: true });
 }
 export async function mkdirp(p: string): Promise<void> {
-  await Deno.mkdir(p, { recursive: true });
+  await mkdir(p, { recursive: true });
 }
-/** `cp -r src dest` (dest must not exist). */
+/** `cp -r src dest` (dest must not exist). Symlinks are copied as links, as @std/fs's copy did. */
 export async function copyTree(src: string, dest: string): Promise<void> {
-  await copy(src, dest, { overwrite: true, preserveTimestamps: true });
+  await cp(src, dest, { recursive: true, force: true, preserveTimestamps: true, verbatimSymlinks: true });
 }
 export async function size(p: string): Promise<number | null> {
-  return (await Deno.stat(p).catch(() => null))?.size ?? null;
+  return (await stat(p).catch(() => null))?.size ?? null;
 }
 export function basename(p: string): string {
   return p.replace(/\/+$/, "").split("/").pop() ?? p;
@@ -251,7 +261,7 @@ export function since(t0: number): string {
 }
 /** Integer from an environment variable, or a default. */
 export function envInt(name: string, fallback: number): number {
-  const v = Deno.env.get(name);
+  const v = process.env[name];
   return v ? Number(v) : fallback;
 }
 /** The program's first line matching `re`, or "". */

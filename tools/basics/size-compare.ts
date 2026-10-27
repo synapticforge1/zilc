@@ -4,13 +4,14 @@
 // examples and the Zig 0.15.2 examples. Also records whether each zilc binary runs with the same exit
 // code as the plain ReleaseSafe build. Linux; from Windows it runs inside WSL.
 //
-//   deno run -A tools/basics/size-compare.ts      env: JOBS (default 12), ZIGDIR, WORK, ZILC_ZIG, ZILC_FILC
+//   bun tools/basics/size-compare.ts     env: JOBS (default 12), ZIGDIR, WORK, ZILC_ZIG, ZILC_FILC
 // Output: $WORK/basics-size/sizes.csv (and the binaries, under $WORK/basics-size/bin), runtime.txt.
 // Summarise with size-report.ts; group failures with zilc-failures.ts.
 //
 // ⚠️ Fairness: Zig's musl binaries are STATIC. zilc's are DYNAMIC and load Fil-C's libc.so,
 // libpizlo.so and libyoloc.so at run time, so the shared runtime is reported separately. zilc also
 // passes -g, so stripped sizes are reported alongside raw ones.
+import { writeFile } from "node:fs/promises";
 import {
   basename, copyTree, env, envInt, exists, filc, FILC_PREBUILT_TREE, glob, HOME, linuxOnly, mkdirp, must, pool, REPO, rmrf, run, size, WORK, ZIG,
 } from "../lib/tool.ts";
@@ -43,7 +44,7 @@ const rows = await pool(work, envInt("JOBS", 12), async ({ lang, file }) => {
   const runrc = async (p: string) => {
     if (!(await exists(p))) return "NA";
     await mkdirp(`${b}/cwd/tmp`);
-    await Deno.writeTextFile(`${b}/cwd/tmp/dat.txt`, "hello\nzig\n");
+    await writeFile(`${b}/cwd/tmp/dat.txt`, "hello\nzig\n");
     const r = await run([p], { cwd: `${b}/cwd`, stdin: "hello\nfilter\n", timeout: 15, outFile: `${p}.out` });
     return r.timedOut ? "TIMEOUT" : String(r.code);
   };
@@ -65,10 +66,10 @@ const rows = await pool(work, envInt("JOBS", 12), async ({ lang, file }) => {
 });
 
 const header = "lang,example,zig_small,zig_safe,zilc_safe,zilc_small,zig_small_stripped,zig_safe_stripped,zilc_safe_stripped,zilc_small_stripped,run_zig_safe,run_zilc";
-await Deno.writeTextFile(`${out}/sizes.csv`, [header, ...rows].join("\n") + "\n");
+await writeFile(`${out}/sizes.csv`, [header, ...rows].join("\n") + "\n");
 
 const lib = `${FILC_PREBUILT_TREE}/pizfix/lib`;
 const rt = `shared runtime every zilc binary loads (bytes): libc.so=${await size(`${lib}/libc.so`)} libpizlo.so=${await size(`${lib}/libpizlo.so`)} libyoloc.so=${await size(`${lib}/libyoloc.so`)} ld-fil1=${await size(`${lib}/ld-fil1-x86_64.so`)}`;
 console.log(rt);
-await Deno.writeTextFile(`${out}/runtime.txt`, rt + "\n");
+await writeFile(`${out}/runtime.txt`, rt + "\n");
 console.log(`done: ${rows.length} rows in ${out}/sizes.csv`);

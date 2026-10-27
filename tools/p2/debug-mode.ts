@@ -4,7 +4,7 @@
 // and still trap correctly (cmem/known-issues.md KI-4). (2026-09-23)
 // Linux (Fil-C); from Windows it runs inside WSL. Needs the Linux zilc built (zig-out/bin/zilc).
 //
-//   deno run -A tools/p2/debug-mode.ts
+//   bun tools/p2/debug-mode.ts
 //   env: WORK (default ~/zilc-work)
 //
 // Builds examples/interop (c_caller.c + bounds.zig) with -O Debug and -O ReleaseSafe, runs each
@@ -14,6 +14,7 @@
 // Work in $WORK/drive-debug: interop-<mode>, run-<mode>.log.
 //
 // Converted from debug-mode.sh (2026-10-05).
+import { copyFile, readFile } from "node:fs/promises";
 import { FILC_0685_PREBUILT_TREE, linuxOnly, mkdirp, REPO, run, show, size, WORK } from "../lib/tool.ts";
 
 await linuxOnly(import.meta);
@@ -22,8 +23,8 @@ const env = { ZILC_ZIG: `${WORK}/tools/zig-0.15.2/zig`, ZILC_FILC: `${FILC_0685_
 
 const cwd = `${WORK}/drive-debug`;
 await mkdirp(cwd);
-await Deno.copyFile(`${REPO}/examples/interop/c_caller.c`, `${cwd}/c_caller.c`);
-await Deno.copyFile(`${REPO}/examples/interop/bounds.zig`, `${cwd}/bounds.zig`);
+await copyFile(`${REPO}/examples/interop/c_caller.c`, `${cwd}/c_caller.c`);
+await copyFile(`${REPO}/examples/interop/bounds.zig`, `${cwd}/bounds.zig`);
 
 const bar = "==================================================================";
 for (const mode of ["Debug", "ReleaseSafe"]) {
@@ -36,7 +37,7 @@ for (const mode of ["Debug", "ReleaseSafe"]) {
   const log = `${cwd}/run-${mode}.log`;
   const r = await run([`${cwd}/interop-${mode}`], { cwd, env, outFile: log });
   console.log(`   run exit=${r.code}  (expect 133)`);
-  for (const l of lines(await Deno.readTextFile(log))) console.log(`   ${l}`);
+  for (const l of lines(await readFile(log, "utf8"))) console.log(`   ${l}`);
   const n = await size(`${cwd}/interop-${mode}`);
   if (n === null) console.error(`ls: cannot access 'interop-${mode}': No such file or directory`);
   else console.log(`   binary: ${n} bytes`);

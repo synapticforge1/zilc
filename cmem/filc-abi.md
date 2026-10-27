@@ -6,7 +6,7 @@ prebuilt libraries, and from the public headers in `pizfix/stdfil-include/`. **N
 the runtime's source** (`libpas/`, `filc_runtime.c`). That matters for open question #3: a
 clean-room runtime needs a spec like this one (`design-decisions.md`).
 
-Scripts: `tools/p3/abi-probe.ts` and `tools/p3/cc-decode.ts` (`deno run -A …`; from Windows they run inside WSL by themselves).
+Scripts: `tools/p3/abi-probe.ts` and `tools/p3/cc-decode.ts` (`bun …`; from Windows they run inside WSL by themselves).
 Legend: ✅ observed directly · 🔸 inferred, **verify before building on it**.
 
 ## 1. Pointers in flight

@@ -7,13 +7,14 @@
 // ("address space 0 cannot be non-integral"); `ni:1` is accepted. Linux; from Windows it runs
 // inside WSL.
 //
-//   deno run -A tools/p1/stock-llvm-validity.ts
+//   bun tools/p1/stock-llvm-validity.ts
 //   env: WORK (default ~/zilc-work), ZILC_ZIG
 // Inputs, in $WORK/p1 (made by hand during P1, 2026-09-23; not regenerated here): dl.ll (Fil-C's
 // `-emit-llvm` output of dl.c), dl-stripped.ll (the same minus the datalayout_after_filc line),
 // ni0.ll, plain.ll, ni1.ll (one small module with three datalayouts).
 // Output: <input>.stock.log per input (the compiler's messages), the object in /tmp/t.o, and the
 // same verdict table as the shell version (tools/p1/stock-llvm-validity.sh).
+import { readFile } from "node:fs/promises";
 import { linuxOnly, run, WORK, ZIG } from "../lib/tool.ts";
 
 await linuxOnly(import.meta);
@@ -24,7 +25,7 @@ const cwd = OUT;
 const lines = (text: string) => text.split("\n").filter((_, i, a) => i < a.length - 1 || a[i] !== "");
 
 async function tryOne(label: string, file: string): Promise<void> {
-  await Deno.stdout.write(new TextEncoder().encode(label.padEnd(58)));
+  process.stdout.write(label.padEnd(58));
   // The log was `zig cc`'s stderr only (`2>`); `zig cc -c` writes nothing to stdout, so capturing
   // both is the same file.
   const r = await run([ZIG, "cc", "-c", file, "-o", "/tmp/t.o"], { cwd, outFile: `${OUT}/${file}.stock.log` });
@@ -33,7 +34,7 @@ async function tryOne(label: string, file: string): Promise<void> {
   } else {
     console.log("REJECTED");
     // `grep -m2 -E "error" log | sed 's/^/      /'`
-    const log = await Deno.readTextFile(`${OUT}/${file}.stock.log`);
+    const log = await readFile(`${OUT}/${file}.stock.log`, "utf8");
     for (const l of lines(log).filter((l) => /error/.test(l)).slice(0, 2)) console.log(`      ${l}`);
   }
 }
@@ -46,6 +47,6 @@ await tryOne("5. ni on a NON-zero address space (ni:1)", "ni1.ll");
 
 console.log();
 console.log("== does the stripped Fil-C module still behave like normal IR? (symbols)");
-const stripped = lines(await Deno.readTextFile(`${OUT}/dl-stripped.ll`));
+const stripped = lines(await readFile(`${OUT}/dl-stripped.ll`, "utf8"));
 console.log(stripped.slice(0, 3).join("\n")); // `head -3`
 console.log(stripped.filter((l) => l.includes("pizlonated_")).length); // `grep -c pizlonated_`

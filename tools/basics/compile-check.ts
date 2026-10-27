@@ -5,11 +5,12 @@
 // at all" apart from "does it survive zilc", which is a later question. Runs on ANY OS (Zig cross-
 // compiles): on Windows it uses C:\zig\0.15.2\zig.exe, elsewhere the WSL toolchain's Zig.
 //
-//   deno run -A tools/basics/compile-check.ts      env: ZIG (the Zig to use), ZIGDIR
+//   bun tools/basics/compile-check.ts     env: ZIG (the Zig to use), ZIGDIR
 // Writes one line per example to zig-out/basics-compile.txt and prints a summary.
 //
 // C examples are compiled AND linked, as their own repo builds them (`zig cc -lc`), in the default
 // C dialect: -std=c99 hides POSIX declarations under musl and fails for the wrong reason.
+import { writeFile } from "node:fs/promises";
 import { basename, env, glob, isWindows, mkdirp, REPO, rmrf, run, ZIG } from "../lib/tool.ts";
 
 const zig = env("ZIG", isWindows ? "C:\\zig\\0.15.2\\zig.exe" : ZIG);
@@ -29,7 +30,7 @@ for (const f of await glob(`${tests}/c/*/*.c`)) {
 }
 await rmrf(bin);
 await rmrf(`${bin}.exe`);
-await Deno.writeTextFile(`${REPO}/zig-out/basics-compile.txt`, lines.join("\n") + "\n");
+await writeFile(`${REPO}/zig-out/basics-compile.txt`, lines.join("\n") + "\n");
 
 for (const lang of ["zig", "c"]) {
   const mine = lines.filter((l) => l.startsWith(`${lang} `));

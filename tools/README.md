@@ -2,15 +2,17 @@
 
 Developer tooling for zilc. Build logic stays in `build.zig`; everything else is here.
 
-**Every tool is a Deno script** (`.ts`), not shell or Python: the owner's preference (2026-09-18:
-Deno or Bun, never Python; 2026-10-05: the shell scripts became Deno "so that they are cross
-platform"). The one exception is `p1/setup-wsl.sh`, which prepares a fresh Ubuntu before Deno is
-installed there.
+**Every tool is a Bun script** (`.ts`), not shell, Deno or Python: the owner's preference
+(2026-09-18: Deno or Bun, never Python; 2026-10-05: the shell scripts became Deno "so that they are
+cross platform"; 2026-10-22: Bun only, Deno is going away, and every tool was ported to Bun). The
+tools use Node's APIs (`node:fs/promises`, `process`) and Bun's own (`Bun.spawn`, `Bun.Glob`),
+never `Deno.*` or `jsr:` imports. The one exception is `p1/setup-wsl.sh`, which prepares a fresh
+Ubuntu (and installs Bun to `~/.bun/bin`) before Bun is there.
 
 ## How to run a tool
 
 ```
-deno run -A tools/<group>/<tool>.ts [args]
+bun tools/<group>/<tool>.ts [args]
 ```
 
 The same command works **from Windows and from Linux**:
@@ -37,8 +39,9 @@ The same command works **from Windows and from Linux**:
 
 ## Writing a tool
 
-- Import from `lib/tool.ts`: `linuxOnly`, `run` / `must` / `show` (programs with argument arrays,
-  no shell), `pool` (parallel), `glob`, paths (`REPO`, `WORK`, `ZIG`, `filc()`), small file helpers.
+- Import from `lib/tool.ts`: `linuxOnly`, `ARGS` (the tool's arguments), `run` / `must` / `show`
+  (programs with argument arrays, no shell), `pool` (parallel), `glob`, paths (`REPO`, `WORK`,
+  `ZIG`, `filc()`), small file helpers. Read and write files with `node:fs/promises`.
 - Call `linuxOnly(import.meta)` first if the work needs Linux. In a file other tools IMPORT, call it
   only under `if (import.meta.main)`: imports run before the importer, so a top-level call would
   re-launch the wrong script (see `filc/fix-os-include.ts`).

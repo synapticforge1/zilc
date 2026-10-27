@@ -6,12 +6,13 @@
 // BSD-2-Clause runtime, MIT musl); see the ledger entry `filc-pass-fixes`. Linux; from Windows it
 // runs inside WSL.
 //
-//   deno run -A tools/filc/archive-patched-clang.ts
+//   bun tools/filc/archive-patched-clang.ts
 //
 // Why two files: D: is exFAT (no symlinks, no Unix permissions), so the tree goes in a tarball.
 // And clang-20 built RelWithDebInfo is 3.6 GB, almost all debug info. The tree gets a STRIPPED
 // clang-20 (debug info does not change what it compiles); the debug info goes to its own file,
 // linked by .gnu_debuglink, for profiling with gdb (as KI-22 was diagnosed).
+import { readFile, writeFile } from "node:fs/promises";
 import { FILC_PATCHED_TREE, FILC_SHA, FILC_VERSION, linuxOnly, mkdirp, must, REPO, rmrf, run, show, WORK } from "../lib/tool.ts";
 
 await linuxOnly(import.meta);
@@ -45,7 +46,7 @@ await must(["sh", "-c", 'xz -T0 -6 -c "$0" > "$1"', `${tmp}/clang-20.debug`, `${
 const patchSum = (await must(["sha256sum", `${REPO}/third_party/filc-patches/zilc-filc-pass.patch`])).split(" ")[0];
 const fileSums = await must(["sha256sum", `${name}-linux-x86_64.tar.xz`, `${name}-clang-20.debug.xz`], { cwd: out });
 const stamp = new Date().toISOString().slice(0, 16) + "Z";
-await Deno.writeTextFile(`${out}/SHA256SUMS`, [
+await writeFile(`${out}/SHA256SUMS`, [
   `# ${name}: Fil-C ${FILC_VERSION} clang built from fil-c.git ${FILC_SHA.slice(0, 8)} with zilc's pass fixes`,
   `# patch: third_party/filc-patches/zilc-filc-pass.patch sha256 ${patchSum}`,
   `# archived ${stamp} by tools/filc/archive-patched-clang.ts`,
@@ -53,4 +54,4 @@ await Deno.writeTextFile(`${out}/SHA256SUMS`, [
 ].join("\n") + "\n");
 await rmrf(tmp);
 await show(["ls", "-la", out]);
-console.log(await Deno.readTextFile(`${out}/SHA256SUMS`));
+console.log(await readFile(`${out}/SHA256SUMS`, "utf8"));

@@ -5,7 +5,7 @@
 // symbol or error), TRAP (with Fil-C's fault), TIMEOUT, BUILD-TIMEOUT (a build over TBUILD s,
 // default 1800), or a plain exit code. The quick loop for fixing std-under-zilc problems.
 //
-//   deno run -A tools/basics/zilc-check.ts [c|zig|"c zig"]      (default: both)
+//   bun tools/basics/zilc-check.ts[c|zig|"c zig"]      (default: both)
 //   env: MODE, JOBS (parallel builds, default 12), TBUILD, ZIGDIR (default zig-0.15.2),
 //        ZILC_JOBS (default 4), ZILC_CACHE (default 0), WORK, ZILC_ZIG, ZILC_FILC
 // Output: $WORK/basics-zilc-<MODE>/results.txt, and per program bin/<lang>/<name>/{build.log,run.out}.
@@ -18,14 +18,15 @@
 //  * Programs run in a FIXED environment (the same as run-native.ts), so outputs compare with
 //    native (compare-output.ts): this tool's own ZILC_* variables used to show up in 67's output.
 //  * The output folder is cleared for the mode, so run both languages together when both matter.
+import { appendFile, readFile, writeFile } from "node:fs/promises";
 import {
-  basename, copyTree, env, envInt, filc, firstMatch, glob, HOME, linuxOnly, mkdirp, must, pool, REPO, rmrf, run, WORK, ZIG,
+  ARGS, basename, copyTree, env, envInt, filc, firstMatch, glob, HOME, linuxOnly, mkdirp, must, pool, REPO, rmrf, run, WORK, ZIG,
 } from "../lib/tool.ts";
 
 await linuxOnly(import.meta);
 
 const mode = env("MODE", "ReleaseSafe");
-const langs = (Deno.args[0] ?? "c zig").split(/\s+/).filter(Boolean);
+const langs = (ARGS[0] ?? "c zig").split(/\s+/).filter(Boolean);
 const out = `${WORK}/basics-zilc-${mode}`;
 const toolEnv = {
   ZILC_ZIG: ZIG,
@@ -51,13 +52,13 @@ const lines = await pool(work, envInt("JOBS", 12), async ({ lang, file }) => {
   const name = basename(file.slice(0, file.lastIndexOf("/")));
   const b = `${out}/bin/${lang}/${name}`;
   await mkdirp(`${b}/cwd/tmp`);
-  await Deno.writeTextFile(`${b}/cwd/tmp/dat.txt`, "hello\nzig\n");
+  await writeFile(`${b}/cwd/tmp/dat.txt`, "hello\nzig\n");
   const t0 = Date.now();
   const built = await run([zilc, "build", "-O", mode, "-o", `${b}/prog`, file], { env: toolEnv, outFile: `${b}/build.log`, timeout: envInt("TBUILD", 1800) });
-  await Deno.writeTextFile(`${b}/build.log`, `build seconds: ${Math.floor((Date.now() - t0) / 1000)}\n`, { append: true });
+  await appendFile(`${b}/build.log`, `build seconds: ${Math.floor((Date.now() - t0) / 1000)}\n`);
   if (built.timedOut) return `${lang} ${name} BUILD-TIMEOUT`;
   if (built.code !== 0) {
-    const log = await Deno.readTextFile(`${b}/build.log`);
+    const log = await readFile(`${b}/build.log`, "utf8");
     const why = log.match(/undefined reference to `[^']*'/)?.[0] ?? firstMatch(log, /error/i).slice(0, 100);
     return `${lang} ${name} BUILD-FAIL ${why}`;
   }
@@ -65,7 +66,7 @@ const lines = await pool(work, envInt("JOBS", 12), async ({ lang, file }) => {
     cwd: `${b}/cwd`, stdin: "hello\nfilter\n", timeout: 15, outFile: `${b}/run.out`, cleanEnv: true,
     env: { HOME, PATH: env("PATH"), USER: env("USER"), LANG: "C.UTF-8", TERM: "dumb" },
   });
-  const output = await Deno.readTextFile(`${b}/run.out`);
+  const output = await readFile(`${b}/run.out`, "utf8");
   const trap = firstMatch(output, /filc safety error|filc panic/);
   if (trap) return `${lang} ${name} TRAP ${trap.replace(/.*filc safety error: /, "").slice(0, 110)}`;
   if (ran.timedOut) return `${lang} ${name} TIMEOUT`;
@@ -73,7 +74,7 @@ const lines = await pool(work, envInt("JOBS", 12), async ({ lang, file }) => {
   return `${lang} ${name} exit=${ran.code}`;
 });
 lines.sort();
-await Deno.writeTextFile(`${out}/results.txt`, lines.join("\n") + "\n");
+await writeFile(`${out}/results.txt`, lines.join("\n") + "\n");
 
 for (const lang of langs) {
   const mine = lines.filter((l) => l.startsWith(`${lang} `));

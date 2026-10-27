@@ -8,3 +8,8 @@ toolchain/*
 
 # Read-only reference clone of Fil-C upstream (tools/upstream/clone-upstream.ts; cmem/upstream.md).
 /upstream/
+
+# Machine-only facts and per-machine tool settings: never public (cmem/working-rules.md § Privacy).
+/cmem/local/
+/.claude/settings.local.json
+/CLAUDE.md

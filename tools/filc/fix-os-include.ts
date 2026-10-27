@@ -4,7 +4,7 @@
 // same rule as Fil-C's own setup.sh (asm: /usr/include/x86_64-linux-gnu/asm if it exists, else
 // /usr/include/asm; plus linux and asm-generic). Linux; from Windows it runs inside WSL.
 //
-//   deno run -A tools/filc/fix-os-include.ts <fil-c tree>      (the folder holding pizfix/)
+//   bun tools/filc/fix-os-include.ts <fil-c tree>      (the folder holding pizfix/)
 //
 // Why (found 2026-10-05 by Fil-C's own test suite, tools/filc/run-filc-tests.ts): setup.sh makes
 // these links ONCE, when the prebuilt is unpacked. Here it ran before build-essential (and with it
@@ -13,7 +13,8 @@
 // <asm/types.h> failed to compile ("'asm/types.h' file not found"): 9 of Fil-C's tests, and any
 // Zig or C program through zilc that uses those headers. zilc's patched tree is a copy of the
 // prebuilt, so it carried the same broken link, and so does the archive in toolchain/.
-import { exists, existsSync, linuxOnly, mkdirp } from "../lib/tool.ts";
+import { rm, symlink } from "node:fs/promises";
+import { ARGS, exists, existsSync, linuxOnly, mkdirp } from "../lib/tool.ts";
 
 /** Exported for build-patched-clang.ts and restore-patched-clang.ts. */
 export async function fixOsInclude(tree: string): Promise<void> {
@@ -21,8 +22,8 @@ export async function fixOsInclude(tree: string): Promise<void> {
   await mkdirp(dir);
   const asm = existsSync("/usr/include/x86_64-linux-gnu/asm") ? "/usr/include/x86_64-linux-gnu/asm" : "/usr/include/asm";
   for (const [name, target] of [["asm", asm], ["linux", "/usr/include/linux"], ["asm-generic", "/usr/include/asm-generic"]]) {
-    await Deno.remove(`${dir}/${name}`).catch(() => {}); // ln -sfn
-    await Deno.symlink(target, `${dir}/${name}`);
+    await rm(`${dir}/${name}`).catch(() => {}); // ln -sfn
+    await symlink(target, `${dir}/${name}`);
     const ok = await exists(`${dir}/${name}/.`);
     console.log(`  os-include/${name} -> ${target}${ok ? "" : "  MISSING on this machine (install linux-libc-dev)"}`);
   }
@@ -32,10 +33,10 @@ export async function fixOsInclude(tree: string): Promise<void> {
 // here would run during the import, before the importer, and re-launch the wrong script.
 if (import.meta.main) {
   await linuxOnly(import.meta);
-  const tree = Deno.args[0];
+  const tree = ARGS[0];
   if (!tree) {
     console.error("usage: fix-os-include.ts <fil-c tree>");
-    Deno.exit(2);
+    process.exit(2);
   }
   await fixOsInclude(tree);
 }

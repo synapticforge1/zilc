@@ -1,4 +1,4 @@
-#!/usr/bin/env -S deno run --allow-read --allow-write
+#!/usr/bin/env bun
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception OR MIT
 //
 // Add zilc's splitting mode to LLVM's `llvm-split` (from Fil-C's LLVM fork, Apache-2.0 WITH
@@ -31,7 +31,9 @@
 //
 // Same rules as patch-pass.ts: each edit names its exact original and must match once.
 //
-//   deno run --allow-read --allow-write patch-split.ts [--check] path/to/llvm-split.cpp
+//   bun patch-split.ts [--check] path/to/llvm-split.cpp
+
+import { readFile, writeFile } from "node:fs/promises";
 
 interface Edit {
   name: string;
@@ -250,10 +252,11 @@ int main(int argc, char **argv) {
   },
 ];
 
-const check = Deno.args[0] === "--check";
-const path = check ? Deno.args[1] : Deno.args[0];
+const args = process.argv.slice(2);
+const check = args[0] === "--check";
+const path = check ? args[1] : args[0];
 if (!path) throw new Error("usage: patch-split.ts [--check] path/to/llvm-split.cpp");
-let text = await Deno.readTextFile(path);
+let text = await readFile(path, "utf8");
 const original = text;
 if (check) {
   let broken = 0;
@@ -263,7 +266,7 @@ if (check) {
     if (!text.includes(e.new) && n !== 1) broken++;
     console.log(`  ${state.padEnd(36)} ${e.name}`);
   }
-  Deno.exit(broken ? 1 : 0);
+  process.exit(broken ? 1 : 0);
 }
 for (const e of edits) {
   if (text.includes(e.new)) {
@@ -276,4 +279,4 @@ for (const e of edits) {
   console.log(`patched: ${e.name}`);
 }
 // Only on a change (a rewrite would make ninja rebuild for nothing; see patch-pass.ts).
-if (text !== original) await Deno.writeTextFile(path, text);
+if (text !== original) await writeFile(path, text);

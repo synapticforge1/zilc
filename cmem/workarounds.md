@@ -725,7 +725,7 @@ upstream's Ruby test runner is replaced by zilc's Deno port (`run-filc-tests.ts`
 2026-10-05: Ruby IS a build dependency.** The runtime's Makefile (`libpas`) runs
 `generate_pizlonated_forwarders.rb` and `` `./find_clang_include_dir.rb` `` while compiling; the
 build stopped there (`env: 'ruby': No such file or directory`, plus clang errors that were only a
-side effect of the empty include-dir result). Only the TEST runner is replaced by the Deno port.
+side effect of the empty include-dir result). Only the TEST runner is replaced by the Deno port (a Bun port since 2026-10-22).
 This matters for the all-Zig goal: Fil-C's runtime build needs Ruby, so building it from
 `zig build` means porting those two generators too.
 

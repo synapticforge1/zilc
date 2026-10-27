@@ -4,7 +4,7 @@
 // (KI-22, cmem/workarounds.md). Every input is compiled by both; objects are compared byte for byte.
 // Linux; from Windows it runs inside WSL.
 //
-//   deno run -A tools/filc/compare-clangs.ts [extra .ll/.c files…]      env: A, B (the two clangs)
+//   bun tools/filc/compare-clangs.ts [extra .ll/.c files…]      env: A, B (the two clangs)
 //
 // Default inputs: whatever IR is lying around from earlier measurements (KEEP the list explicit, so a
 // reader can rerun it; a missing one is skipped), the gate's C examples, and zilc's syscall helper.
@@ -15,7 +15,8 @@
 //  2. Both binaries run from the SAME directory. Clang finds its headers relative to itself, and the
 //     include paths land in the debug info. (Hence the prebuilt's clang-20 is copied next to ours.)
 // For whole-suite equivalence, see run-filc-tests.ts (Fil-C's own tests: 7,205 at v0.686).
-import { basename, env, exists, FILC_PATCHED_TREE, FILC_PREBUILT_TREE, glob, linuxOnly, mkdirp, must, pool, REPO, rmrf, run, WORK } from "../lib/tool.ts";
+import { readFile } from "node:fs/promises";
+import { ARGS, basename, env, exists, FILC_PATCHED_TREE, FILC_PREBUILT_TREE, glob, linuxOnly, mkdirp, must, pool, REPO, rmrf, run, WORK } from "../lib/tool.ts";
 
 await linuxOnly(import.meta);
 const t = `${FILC_PATCHED_TREE}/build/bin`;
@@ -35,7 +36,7 @@ const inputs: [string, string, string][] = [
   ["62-O1", `${p62}/directories.filc.ll`, "-O1"],
   ["62-O0", `${p62}/directories.filc.ll`, "-O0"],
   ["69-O1", `${WORK}/perf/v2-69_http-client-ReleaseSafe/prog.zilc-tmp/http-client.filc.ll`, "-O1"],
-  ...Deno.args.map((f): [string, string, string] => [`x-${basename(f)}`, f, "-O1"]),
+  ...ARGS.map((f): [string, string, string] => [`x-${basename(f)}`, f, "-O1"]),
 ];
 
 await pool(inputs, inputs.length, async ([name, file, opt]) => {
@@ -45,13 +46,13 @@ await pool(inputs, inputs.length, async ([name, file, opt]) => {
   for (const [side, cl] of Object.entries(sides)) {
     const t0 = performance.now();
     const res = await run(["setarch", "-R", cl, opt, "-g", ...extra, "-c", "-o", `${d}/${name}.${side}.o`, file], { outFile: `${d}/${name}.${side}.log` });
-    r[side] = { code: res.code, secs: (performance.now() - t0) / 1000, log: await Deno.readTextFile(`${d}/${name}.${side}.log`) };
+    r[side] = { code: res.code, secs: (performance.now() - t0) / 1000, log: await readFile(`${d}/${name}.${side}.log`, "utf8") };
   }
   let verdict: string;
   if (r.A.code !== 0 || r.B.code !== 0) {
     verdict = r.A.code === r.B.code && r.A.log.includes("Assertion") && r.B.log.includes("Assertion") ? "both assert (same)" : `EXIT DIFFERS (${r.A.code} vs ${r.B.code})`;
   } else {
-    const [a, b] = await Promise.all([Deno.readFile(`${d}/${name}.A.o`), Deno.readFile(`${d}/${name}.B.o`)]);
+    const [a, b] = await Promise.all([readFile(`${d}/${name}.A.o`), readFile(`${d}/${name}.B.o`)]);
     verdict = a.length === b.length && a.every((x, i) => x === b[i]) ? `IDENTICAL (${a.length} bytes)` : "DIFFERENT";
   }
   console.log(`${name.padEnd(30)} ${opt.padEnd(4)} prebuilt ${r.A.secs.toFixed(1).padStart(7)}s  patched ${r.B.secs.toFixed(1).padStart(7)}s  ${verdict}`);

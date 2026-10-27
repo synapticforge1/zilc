@@ -3,7 +3,7 @@
 // Run the milestone through the zilc DRIVER instead of hand-run commands. (2026-09-23)
 // Linux (Fil-C); from Windows it runs inside WSL. Needs the Linux zilc built (zig-out/bin/zilc).
 //
-//   deno run -A tools/p2/driver-milestone.ts
+//   bun tools/p2/driver-milestone.ts
 //   env: WORK (default ~/zilc-work)
 //
 // zilc --version; `zilc build c_caller.c bounds.zig -v` (the whole pipeline in one command) and
@@ -14,6 +14,7 @@
 // Work in $WORK/drive: interop, interop-debug, dbg-run.log.
 //
 // Converted from driver-milestone.sh (2026-10-05).
+import { copyFile, readFile } from "node:fs/promises";
 import { FILC_0685_PREBUILT_TREE, linuxOnly, mkdirp, REPO, run, show, size, WORK } from "../lib/tool.ts";
 
 await linuxOnly(import.meta);
@@ -22,8 +23,8 @@ const env = { ZILC_ZIG: `${WORK}/tools/zig-0.15.2/zig`, ZILC_FILC: `${FILC_0685_
 
 const cwd = `${WORK}/drive`;
 await mkdirp(cwd);
-await Deno.copyFile(`${REPO}/examples/interop/c_caller.c`, `${cwd}/c_caller.c`);
-await Deno.copyFile(`${REPO}/examples/interop/bounds.zig`, `${cwd}/bounds.zig`);
+await copyFile(`${REPO}/examples/interop/c_caller.c`, `${cwd}/c_caller.c`);
+await copyFile(`${REPO}/examples/interop/bounds.zig`, `${cwd}/bounds.zig`);
 
 console.log("== zilc --version");
 await show([ZILC, "--version"], { cwd, env });
@@ -44,7 +45,7 @@ for (const l of lines(dbg.out).slice(0, 4)) console.log(l);
 const r = await run([`${cwd}/interop-debug`], { cwd, env, outFile: `${cwd}/dbg-run.log` });
 console.log(`   run exit=${r.code}  (expect 133)`);
 // grep -m1 "semantic origin" -A1: the first match and the line after it.
-const log = lines(await Deno.readTextFile(`${cwd}/dbg-run.log`));
+const log = lines(await readFile(`${cwd}/dbg-run.log`, "utf8"));
 const at = log.findIndex((l) => l.includes("semantic origin"));
 if (at >= 0) for (const l of log.slice(at, at + 2)) console.log(`   ${l}`);
 // ls -l interop interop-debug | awk '{print "   " $NF ":", $5, "bytes"}'

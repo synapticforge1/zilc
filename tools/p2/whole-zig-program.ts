@@ -3,7 +3,7 @@
 // Test 2 retry: Fil-C's libc IS musl, so Zig must target musl symbol names. (2026-09-23)
 // Linux (Fil-C); from Windows it runs inside WSL.
 //
-//   deno run -A tools/p2/whole-zig-program.ts
+//   bun tools/p2/whole-zig-program.ts
 //   env: WORK (default ~/zilc-work)
 //
 // zig_oob.zig (a whole Zig program, libc malloc + printf) emitted as IR by stock Zig per release
@@ -14,6 +14,8 @@
 // zig_oob.zig is NOT copied here, as in the shell version: milestone.ts puts it in $WORK/p2.
 //
 // Converted from whole-zig-program.sh (2026-10-05).
+import { closeSync, openSync } from "node:fs";
+import { readFile, writeFile } from "node:fs/promises";
 import { FILC_0685_PREBUILT_TREE, linuxOnly, mkdirp, WORK } from "../lib/tool.ts";
 
 await linuxOnly(import.meta);
@@ -26,7 +28,7 @@ const OUT = `${WORK}/p2`;
 const BEFORE = "e-m:e-ni:0-p270:32:32-p271:32:32-p272:64:64-i64:64-i128:128-f80:128-n8:16:32:64-S128";
 const AFTER = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-i128:128-f80:128-n8:16:32:64-S128";
 await mkdirp(OUT);
-Deno.chdir(OUT);
+process.chdir(OUT);
 
 for (const mode of ["ReleaseSmall", "ReleaseFast", "ReleaseSafe"]) {
   console.log(`-- ${mode}, target x86_64-linux-musl`);
@@ -69,7 +71,7 @@ async function patchDl(ir: string, dest: string): Promise<void> {
       done = true;
     } else if (!l.startsWith("target datalayout_after_filc = ")) out.push(l);
   }
-  await Deno.writeTextFile(dest, out.map((l) => l + "\n").join(""));
+  await writeFile(dest, out.map((l) => l + "\n").join(""));
 }
 /** `wc -l`, `grep -c '^define'`, `grep -c 'asm '` of the IR. */
 function counts(ir: string): { nl: number; defs: number; asm: number } {
@@ -87,42 +89,28 @@ type Dest = "inherit" | "null" | string;
  * `2>&1` (both streams into the stdout file, interleaved as produced). Returns the exit code.
  */
 async function redirect(argv: string[], stdout: Dest, stderr: Dest | "&1"): Promise<number> {
-  if (stderr === "&1") stderr = stdout === "inherit" || stdout === "null" ? stdout : "&1";
-  const piped = (d: Dest) => d !== "inherit" && d !== "null";
-  const open = (d: Dest) => piped(d) ? Deno.open(d, { write: true, create: true, truncate: true }) : Promise.resolve(undefined);
-  const both = stderr === "&1"; // now only when stdout is a file
-  const fo = await open(stdout);
-  const fe = both ? undefined : await open(stderr);
-  let child: Deno.ChildProcess;
+  // A file is opened as the shell's `>` opens it (create, truncate) and handed to the program as
+  // its descriptor; "&1" hands it the SAME descriptor, so both streams land in the program's own
+  // order, exactly as with the shell's `2>&1`.
+  const fd = (d: Dest) => d === "inherit" ? "inherit" : d === "null" ? "ignore" : openSync(d, "w");
+  const fo = fd(stdout);
+  const fe = stderr === "&1" ? fo : fd(stderr);
   try {
-    child = new Deno.Command(argv[0], {
-      args: argv.slice(1), stdin: "null",
-      stdout: piped(stdout) ? "piped" : stdout as "inherit" | "null",
-      stderr: piped(stderr) ? "piped" : stderr as "inherit" | "null",
-    }).spawn();
+    return await Bun.spawn(argv, { stdin: "ignore", stdout: fo, stderr: fe }).exited;
   } catch (e) {
-    fo?.close();
-    fe?.close();
-    if (e instanceof Deno.errors.NotFound) return 127;
+    // Bun throws (code ENOENT) when the program does not exist.
+    if ((e as NodeJS.ErrnoException).code === "ENOENT") return 127;
     throw e;
+  } finally {
+    for (const f of new Set([fo, fe])) if (typeof f === "number") closeSync(f);
   }
-  if (both) {
-    const sink = async (s: ReadableStream<Uint8Array>) => {
-      for await (const c of s) await fo!.write(c);
-    };
-    await Promise.all([sink(child.stdout), sink(child.stderr)]);
-    fo!.close();
-  } else {
-    await Promise.all([fo && child.stdout.pipeTo(fo.writable), fe && child.stderr.pipeTo(fe.writable)]);
-  }
-  return (await child.status).code;
 }
 async function read(p: string): Promise<string> {
-  return await Deno.readTextFile(p).catch(() => "");
+  return await readFile(p, "utf8").catch(() => "");
 }
 /** `printf '%s'`: text with no newline. */
 async function write(s: string): Promise<void> {
-  await Deno.stdout.write(new TextEncoder().encode(s));
+  process.stdout.write(s);
 }
 /** The text's lines (no trailing empty one), as awk/grep/sed see them. */
 function lines(text: string): string[] {

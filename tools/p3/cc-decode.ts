@@ -6,12 +6,15 @@
 // capability vocabulary in `stdfil.h`. It never reads the runtime's source. Findings:
 // cmem/filc-abi.md.
 //
-//   deno run -A tools/p3/cc-decode.ts            (Linux; from Windows it runs inside WSL)
+//   bun tools/p3/cc-decode.ts            (Linux; from Windows it runs inside WSL)
 //   env: WORK (default ~/zilc-work; Fil-C expected at $WORK/tools/filc-0.685-linux-x86_64, as
 //        set up in roadmap.md P1)
 //
 // Same commands, flags and printed sections as cc-decode.sh; each Unix pipeline's filter
 // (grep/sed/head) is done in TypeScript on the file's text.
+import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { FILC_0685_PREBUILT_TREE, linuxOnly, REPO } from "../lib/tool.ts";
 
 await linuxOnly(import.meta);
@@ -20,7 +23,7 @@ const F = FILC_0685_PREBUILT_TREE;
 const CC = `${F}/build/bin/clang`;
 const I = `${F}/pizfix/stdfil-include`;
 const S = `${REPO}/tools/p3`;
-const T = await Deno.makeTempDir();
+const T = await mkdtemp(join(tmpdir(), "zilc-"));
 
 // ---- local helpers: the shell pipeline pieces, on lines of text ----
 /** A file's text as lines, as a pipe reads them (no extra empty line for the final newline). */
@@ -43,8 +46,8 @@ function say(ls: string[]): void {
 
 try {
   // The compile's messages are dropped (`2>/dev/null` in the shell version).
-  await new Deno.Command(CC, { args: ["-O1", "-S", "-emit-llvm", "-o", `${T}/w.ll`, `${S}/write1.c`], stdin: "null", stdout: "inherit", stderr: "null" }).output();
-  const ll = lines(await Deno.readTextFile(`${T}/w.ll`).catch(() => ""));
+  await Bun.spawn([CC, "-O1", "-S", "-emit-llvm", "-o", `${T}/w.ll`, `${S}/write1.c`], { stdin: "ignore", stdout: "inherit", stderr: "ignore" }).exited;
+  const ll = lines(await readFile(`${T}/w.ll`, "utf8").catch(() => ""));
   console.log("== types");
   say(grep(ll, /^%(filc|pizlonated)/, { n: true }));
   console.log("== IR, main through the write wrapper");
@@ -52,9 +55,9 @@ try {
   // (`!…`) and blank lines are dropped.
   say(grep(grep(ll.slice(35, 200), /^!/, { v: true }), /^$/, { v: true }).slice(0, 150));
   console.log("== runtime header");
-  say(grep(lines(await Deno.readTextFile(`${I}/pizlonated_runtime.h`)), /^ *$/, { v: true }).slice(0, 100));
+  say(grep(lines(await readFile(`${I}/pizlonated_runtime.h`, "utf8")), /^ *$/, { v: true }).slice(0, 100));
   console.log("== stdfil.h: object / capability / function-object vocabulary");
-  say(grep(lines(await Deno.readTextFile(`${I}/stdfil.h`)), /struct filc_|filc_object|flight|lower|upper|aux|function.?object|zgetlower|zgetupper/i, { n: true }).slice(0, 40));
+  say(grep(lines(await readFile(`${I}/stdfil.h`, "utf8")), /struct filc_|filc_object|flight|lower|upper|aux|function.?object|zgetlower|zgetupper/i, { n: true }).slice(0, 40));
 } finally {
-  await Deno.remove(T, { recursive: true }).catch(() => {});
+  await rm(T, { recursive: true, force: true });
 }

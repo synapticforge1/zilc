@@ -3,7 +3,7 @@
 // P2 experiment 1: what does the pass need beyond the two datalayout lines? (2026-09-23)
 // Linux (Fil-C); from Windows it runs inside WSL.
 //
-//   deno run -A tools/p2/dialect-probe.ts
+//   bun tools/p2/dialect-probe.ts
 //   env: WORK (default ~/zilc-work)
 //
 // A. A HAND-WRITTEN module carrying Fil-C's two layout lines (tools/p2/minimal-dialect.ll) through
@@ -27,6 +27,8 @@
 // code, only 3 debug-info path lines differ), then run zig-ir-spike.ts, then this tool. Copies on
 // 2026-10-05: tiny.ll 11,669,818 bytes (sha256 5db471c2…), tiny-ni2.ll 11,669,936 bytes (sha256
 // 3e81eb75…), in $WORK/p1 and $WORK/p2.
+import { closeSync, openSync } from "node:fs";
+import { copyFile, readFile } from "node:fs/promises";
 import { existsSync, FILC_0685_PREBUILT_TREE, linuxOnly, mkdirp, REPO, WORK } from "../lib/tool.ts";
 
 await linuxOnly(import.meta);
@@ -34,8 +36,8 @@ await linuxOnly(import.meta);
 const FILC = `${FILC_0685_PREBUILT_TREE}/build/bin/clang`;
 const OUT = `${WORK}/p2`;
 await mkdirp(OUT);
-Deno.chdir(OUT);
-await Deno.copyFile(`${REPO}/tools/p2/minimal-dialect.ll`, "p2-minimal.ll");
+process.chdir(OUT);
+await copyFile(`${REPO}/tools/p2/minimal-dialect.ll`, "p2-minimal.ll");
 
 const bar = "==================================================================";
 console.log(bar);
@@ -59,7 +61,7 @@ console.log();
 console.log(bar);
 console.log("C. Zig's tiny module, patched layout, with the pass being verbose");
 console.log(bar);
-if (existsSync(`${WORK}/p1/tiny-ni2.ll`)) await Deno.copyFile(`${WORK}/p1/tiny-ni2.ll`, "tiny-ni2.ll");
+if (existsSync(`${WORK}/p1/tiny-ni2.ll`)) await copyFile(`${WORK}/p1/tiny-ni2.ll`, "tiny-ni2.ll");
 const code = await redirect([FILC, "-O1", "-c", "-o", "tiny.o", "tiny-ni2.ll", "-mllvm", "-filc-light-verbose"], "c.stdout", "c.log");
 console.log(`exit=${code}`);
 console.log("-- last verbose lines before the crash:");
@@ -72,27 +74,22 @@ printIndented(grepM(await read("c.log"), /Assertion|Segmentation|error:/, 3), " 
 type Dest = "inherit" | "null" | string;
 /** `cmd >stdout 2>stderr`, each a file path, "inherit" (this terminal) or "null"; the exit code. */
 async function redirect(argv: string[], stdout: Dest, stderr: Dest): Promise<number> {
-  const piped = (d: Dest) => d !== "inherit" && d !== "null";
-  const open = (d: Dest) => piped(d) ? Deno.open(d, { write: true, create: true, truncate: true }) : Promise.resolve(undefined);
-  const [fo, fe] = [await open(stdout), await open(stderr)];
-  let child: Deno.ChildProcess;
+  // A file is opened as the shell's `>` opens it (create, truncate) and handed to the program as
+  // its descriptor, so the program writes it directly.
+  const fd = (d: Dest) => d === "inherit" ? "inherit" : d === "null" ? "ignore" : openSync(d, "w");
+  const [fo, fe] = [fd(stdout), fd(stderr)];
   try {
-    child = new Deno.Command(argv[0], {
-      args: argv.slice(1), stdin: "null",
-      stdout: piped(stdout) ? "piped" : stdout as "inherit" | "null",
-      stderr: piped(stderr) ? "piped" : stderr as "inherit" | "null",
-    }).spawn();
+    return await Bun.spawn(argv, { stdin: "ignore", stdout: fo, stderr: fe }).exited;
   } catch (e) {
-    fo?.close();
-    fe?.close();
-    if (e instanceof Deno.errors.NotFound) return 127;
+    // Bun throws (code ENOENT) when the program does not exist.
+    if ((e as NodeJS.ErrnoException).code === "ENOENT") return 127;
     throw e;
+  } finally {
+    for (const f of [fo, fe]) if (typeof f === "number") closeSync(f);
   }
-  await Promise.all([fo && child.stdout.pipeTo(fo.writable), fe && child.stderr.pipeTo(fe.writable)]);
-  return (await child.status).code;
 }
 async function read(p: string): Promise<string> {
-  return await Deno.readTextFile(p).catch(() => "");
+  return await readFile(p, "utf8").catch(() => "");
 }
 /** The text's lines (no trailing empty one), like `head`/`tail` see them. */
 function lines(text: string): string[] {

@@ -22,7 +22,7 @@ completely unrelated reason (a missing stack probe).*
 the gate **failed** and printed the real panic. A gate that cannot fail proves nothing.
 
 ```powershell
-deno run -A tools/run-gate.ts            # from Windows
+bun tools/run-gate.ts            # from Windows
 ```
 ```sh
 ZILC_FILC=…/build/bin/clang ZILC_ZIG=…/zig zig build gate    # from Linux
@@ -86,7 +86,7 @@ for `builtin.zig`):
 | --- | --- | --- |
 | `$WORK/p1/tiny.ll` | `tools/p1/tiny.zig` | `zig build-obj -target x86_64-linux-gnu -femit-llvm-ir=tiny.ll -fno-emit-bin tiny.zig` (in `$WORK/p1`) |
 | `$WORK/p1/zig_oob-x86_64-linux-gnu.ll` | `tools/p1/zig_oob.zig` | `zig build-exe -target x86_64-linux-gnu -lc -femit-llvm-ir=zig_oob-x86_64-linux-gnu.ll -fno-emit-bin zig_oob.zig` |
-| **`tiny-ni2.ll`** (`$WORK/p1`, copied to `$WORK/p2`) | `tiny.ll` | `deno run -A tools/p1/zig-ir-spike.ts`; read by `tools/p2/dialect-probe.ts` part C. **The one input with no committed source of its own** |
+| **`tiny-ni2.ll`** (`$WORK/p1`, copied to `$WORK/p2`) | `tiny.ll` | `bun tools/p1/zig-ir-spike.ts`; read by `tools/p2/dialect-probe.ts` part C. **The one input with no committed source of its own** |
 
 The full notes are in `tools/p1/README.md` and `tools/p2/README.md` ("Record: tiny-ni2.ll") and in
 both tools' headers. Found during the Deno conversion: two experiment scripts used to copy inputs
@@ -134,14 +134,14 @@ dense interference graph) change nothing Fil-C's own suite checks.
   `build-patched-clang.ts` and `restore-patched-clang.ts`, and checked by `check-toolchain.ts`.
   `workarounds.md` has the entry.
 
-**How to run it** (WSL): `tools/filc/run-filc-tests.ts`, a Deno port of Fil-C's Ruby
+**How to run it** (WSL): `tools/filc/run-filc-tests.ts`, a Bun port (Deno until 2026-10-22) of Fil-C's Ruby
 `filc/run-tests` (same build, run and check rules; ledger `filc-test-runner-port`). The tests are
 NOT in zilc: clone them at the compiler's commit into `~/zilc-work/filc-tests-<release>`
 (`git clone --depth 1 --branch v0.686 --filter=blob:none --no-checkout
 https://github.com/pizlonator/fil-c.git`, then `sparse-checkout set filc/tests
 projects/openssl-3.6.4/crypto/aes/asm`, `checkout`; the second path is the input of
 `sarcasm-mb-pl-sink-att`, see above), then from that folder:
-`deno run -A …/run-filc-tests.ts run --pizfix <tree>/pizfix --label stock` (and `--label patched`
+`bun …/run-filc-tests.ts run --pizfix <tree>/pizfix --label stock` (and `--label patched`
 with zilc's tree), then `… compare results-stock.json results-patched.json` (exit 0 = same).
 `--filter REGEX` runs a subset. ⚠️ Use the tests of the COMPILER's commit (`v0.686`: 7,205;
 `v0.685`: 7,003), not upstream's newest, which test features the release lacks.
@@ -172,10 +172,10 @@ Also learned: the program's **environment** works under zilc (67 lists it and re
 and so do `argv`, files, stdin, child processes and threads.
 
 **How to run it** (WSL; ~40 s per native pass, the corpus as usual):
-1. `OUTROOT=~/zilc-work/outcmp/native1 deno run -A tools/basics/run-native.ts`, then the same with
+1. `OUTROOT=~/zilc-work/outcmp/native1 bun tools/basics/run-native.ts`, then the same with
    `native2` (two runs, to tell programs whose own output varies).
-2. `LANGS="c zig" deno run -A tools/basics/all-modes.ts`.
-3. `deno run --allow-read tools/basics/compare-output.ts ~/zilc-work/outcmp/native1
+2. `LANGS="c zig" bun tools/basics/all-modes.ts`.
+3. `bun tools/basics/compare-output.ts ~/zilc-work/outcmp/native1
    ~/zilc-work/outcmp/native2 ~/zilc-work` (exit 0 = no unexplained difference).
 
 **Harness fixes it needed (2026-10-02):**
@@ -268,7 +268,7 @@ ReleaseSafe by default and Debug only where the size is acceptable.
 4. **Benchmark suite (2026-09-30), for upgrade stage C.** Does not exist yet. Needed: a small set of
    programs (Zig, C, and Zig ⇄ C) that run long enough to time, run under zilc and plain `zig`, with
    repeats and a stated noise floor. Output: run time, build time and binary size per version pair.
-   Its first run also produces zilc's **own** slowdown figure (`vision.md`). Scripts in Deno/Bun.
+   Its first run also produces zilc's **own** slowdown figure (`vision.md`). Scripts in Bun.
 5. **Upstream test corpus.** `filc/tests` from Fil-C, adopted under the ledger.
 6. **ABI completeness.** As in wazmrt, a C file that takes the address of every function declared in
    `zilc.h`, so a declared-but-undefined symbol breaks the build.

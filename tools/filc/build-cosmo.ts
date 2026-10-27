@@ -7,11 +7,12 @@
 // the two alternate slots). STOCK Fil-C: zilc's pass patches are not applied here, so the result
 // is upstream's cosmo mode as shipped in v0.686. Linux; from Windows it runs inside WSL.
 //
-//   deno run -A tools/filc/build-cosmo.ts        env: JOBS (default 12)
+//   bun tools/filc/build-cosmo.ts        env: JOBS (default 12)
 //
 // Tree: $WORK/filc-cosmo (a depth-1 clone of v0.686; the build writes `build/` and `pizfix/` into
 // it). Log: $WORK/filc-cosmo/zilc-build.log. Tests are NOT run here (upstream's `build_all_fast_cosmo`
 // runs Ruby's filc/run-tests); run tools/filc/run-filc-tests.ts against `pizfix/` afterwards.
+import { readFile, writeFile } from "node:fs/promises";
 import { exists, FILC_SHA, FILC_VERSION, env, linuxOnly, must, run, WORK } from "../lib/tool.ts";
 
 await linuxOnly(import.meta);
@@ -50,7 +51,7 @@ if ((await run(["sh", "-c", "command -v wine"])).code !== 0) missing.push("wine6
 if (missing.length) {
   console.log("Missing host packages. Run this yourself in WSL (it needs your sudo password):\n");
   console.log(`  sudo apt-get update && sudo apt-get install -y ${[...new Set(missing)].join(" ")}\n`);
-  Deno.exit(1);
+  process.exit(1);
 }
 
 // 1b. WSL only: cosmo's build tools (cocmd, tlscc, compile.ape, …) are APE binaries, which start
@@ -64,7 +65,7 @@ if (missing.length) {
 //     ten minutes later). So the check is functional: an APE must actually run, and while
 //     WSLInterop is enabled, it must be taken out of the way (workarounds.md, item 5).
 const binfmt = "/proc/sys/fs/binfmt_misc";
-const interop = (await Deno.readTextFile(`${binfmt}/WSLInterop`).catch(() => "")).startsWith("enabled");
+const interop = (await readFile(`${binfmt}/WSLInterop`, "utf8").catch(() => "")).startsWith("enabled");
 if (interop || !(await exists(`${binfmt}/APE`))) {
   console.log("WSL hands cosmo's APE build tools to Windows (binfmt WSLInterop). Run this yourself in");
   console.log("WSL (sudo), then re-run this tool. The loader is the one in Fil-C's own cosmo tree:\n");
@@ -78,7 +79,7 @@ if (interop || !(await exists(`${binfmt}/APE`))) {
     console.log("\nOr permanently: add `[interop]` / `enabled=false` to /etc/wsl.conf and run `wsl --shutdown` from");
     console.log("Windows. That also stops running Windows .exe files from inside WSL.");
   }
-  Deno.exit(1);
+  process.exit(1);
 }
 
 // 2. Source: Fil-C at the release zilc is built on, checked by commit.
@@ -95,7 +96,7 @@ if (head !== FILC_SHA) throw new Error(`${src} is at ${head}, not v${FILC_VERSIO
 //    Two upstream-supported knobs cap it without editing a script: GNU nproc honours
 //    OMP_NUM_THREADS, and build_clang.sh / build_compiler_rt.sh source an optional
 //    clang-build-overrides.sh for NINJAFLAGS. The job count changes build speed only.
-await Deno.writeTextFile(`${src}/clang-build-overrides.sh`,
+await writeFile(`${src}/clang-build-overrides.sh`,
   `# Written by zilc's tools/filc/build-cosmo.ts: cap ninja's parallelism (see that file).\nNINJAFLAGS="-j ${jobs}"\n`);
 
 // 4. Build. The first run downloads cosmo's toolchain (~1.2 GB, into projects/yolocosmo/.cosmocc).
@@ -105,8 +106,8 @@ const r = await run(["sh", "-c", `./build_base_cosmo.sh > zilc-build.log 2>&1`],
 const mins = ((Date.now() - t0) / 60000).toFixed(1);
 if (r.code !== 0) {
   console.log(`build_base_cosmo.sh FAILED (exit ${r.code}) after ${mins} min; the end of ${src}/zilc-build.log:`);
-  console.log((await must(["tail", "-40", `${src}/zilc-build.log`])));
-  Deno.exit(1);
+  console.log((await must(["tail", "-n", "40", `${src}/zilc-build.log`])));
+  process.exit(1);
 }
 console.log(`built in ${mins} min`);
 for (const f of ["build/bin/clang", "pizfix/lib/libyolocosmo.a", "pizfix/lib-aarch64/libyolocosmo.a", "pizfix/libexec/apelink", "pizfix/libexec/pecheck"]) {

@@ -84,7 +84,7 @@ Run this **before** incorporating code from any project.
 
 ~~EMPTY as of 2026-09-18.~~ **First entries 2026-09-30:** test programs, and a 4-line Zig std backport (MIT).
 **2026-10-01:** a local patch to Fil-C's compiler pass (toolchain-only, not distributed).
-**2026-10-05:** Fil-C's test runner, ported to Deno (BSD-2-Clause, test tool). **Still no
+**2026-10-05:** Fil-C's test runner, ported to Deno (BSD-2-Clause, test tool); moved to Bun 2026-10-22. **Still no
 third-party runtime code in zilc.**
 
 Newest first. Copy the template for each adopted component.
@@ -167,7 +167,7 @@ Newest first. Copy the template for each adopted component.
   rejects (`getenv`, every C-string span), by adopting **upstream's own fix**, not an invention.
   Drawback: each Zig version needs its patch set re-checked (`cmem/ports/`).
 
-### filc-test-runner-port (Fil-C's test runner, ported from Ruby to Deno; a TEST TOOL)
+### filc-test-runner-port (Fil-C's test runner, ported from Ruby to Deno 2026-10-05, moved to Bun 2026-10-22; a TEST TOOL)
 - **Source:** https://github.com/pizlonator/fil-c (`deluge` branch)
 - **Version / commit:** `163fae598eaf249b74065b0156f3a7e7ba8c0e5a` (tag `v0.686`), the commit zilc's
   patched Fil-C clang is built from since 2026-10-05. (First recorded as `bb0d0a64`/0.685 by
@@ -185,7 +185,7 @@ Newest first. Copy the template for each adopted component.
 - **Artifact destination:** **test-only, toolchain side.** Never linked into zilc or user programs.
   The TESTS themselves are NOT in zilc: they are cloned into the WSL home (`~/zilc-work/filc-tests`)
   and only read there, so nothing of them is redistributed
-- **Modifications:** a Deno worker pool with a per-test timeout instead of `make -k -j`; CPU
+- **Modifications:** a worker pool (Deno, then Bun from 2026-10-22) with a per-test timeout instead of `make -k -j`; CPU
   features read from `/proc/cpuinfo` instead of compiled probes; duplicate YAML keys accepted (last
   wins) as Ruby's parser does. Listed in the file's header
 - **Obligations satisfied:** [x] licence and copyright notice retained (file header)  [x] change-notes

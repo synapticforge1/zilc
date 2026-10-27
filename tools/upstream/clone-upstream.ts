@@ -6,7 +6,7 @@
 // sparse (only what zilc references), so it stays small. Needs only git: runs on any OS (made on
 // Windows, where the repo lives).
 //
-//   deno run -A tools/upstream/clone-upstream.ts
+//   bun tools/upstream/clone-upstream.ts
 //
 // ⚠️ Every git command names its repo with -C and an absolute path. A partial-clone fetch run in the
 // wrong directory once rewrote zilc's own .git/config (2026-10-01).
@@ -24,7 +24,7 @@ const paths = [
 
 if (await exists(u)) {
   console.log(`${u} exists; delete it first to re-clone`);
-  Deno.exit(1);
+  process.exit(1);
 }
 await mkdirp(`${REPO}/upstream`);
 // core.autocrlf=false: keep upstream's exact bytes (LF). The global Windows setting (true) checked
