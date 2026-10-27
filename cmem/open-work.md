@@ -57,8 +57,10 @@ them, with their dates.
    `maintenance run`): the old recipe (`geometric-repack.enabled=false` + `gc.enabled=true`, for
    KI-23) ran the SAME `gc` plus one more task, `commit-graph write --split`; the stock default
    runs `repack --geometric=2 --write-midx` + `multi-pack-index write`, the KI-23 failure.
-5. A GitHub Release page for `v0.15.2-0.686.1` (optional; `RELEASE-NOTES.md` is its text; needs
-   `gh` or the web UI — the owner's).
+5. **A GitHub Release page for `v0.15.2-0.687.1`** — owner, 2026-10-27: "we should create a
+   tagged release", with the push of `main` at the same time. Its text is `RELEASE-NOTES.md`'s
+   0.687.1 section plus the licence line; it waits on `gh auth login` (no `gh` login on this
+   machine; WSL has no `gh`). `v0.15.2-0.686.1` has none and needs none.
 
 ## Open work
 
