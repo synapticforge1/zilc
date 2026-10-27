@@ -11,20 +11,23 @@ them, with their dates.
 | --- | --- |
 | version | **`0.15.2-0.686.1`** — `<Zig>-<Fil-C>.<zilc release>`, published 2026-10-05 (`releasing.md`); one of the five places the number lives |
 | toolchain | Zig **0.15.2** (user code and build), Fil-C **0.686** with zilc's patched clang (`workarounds.md` KI-22, KI-4) |
-| gates | `zig build gate`, `zig build test`, the corpus in four modes, the output comparison: counts and dates in `testing.md` (last full run 2026-10-05, Fil-C 0.686) |
-| remote | `origin` = `github.com/synapticforge1/zilc` (since 2026-10-27; was `jrmarcum/zilc`, which GitHub redirects). `origin` still serves the PRE-purge history (`main` = `v0.15.2` = `19e7172`, tag object `fda2d43`) until the force-push (owner call 1) |
-| branches | **History purged locally 2026-10-27** (`history-map-2026-10-27.md`). `main` = the Bun port (`c2841dd`, was `44e0b1a`) + the compliance commit, merged `--no-ff` 2026-10-27 (owner: "we will merge all to bun tooling since deno is going away"), + the purge record; `v0.15.2` = tag `v0.15.2-0.686.1` = `13ce96a` (was `19e7172`); `bun-port` is merged (deletable) |
+| gates | `zig build gate`, `zig build test`, the corpus in four modes, the output comparison: counts and dates in `testing.md` (gate + tests last run 2026-10-27 in WSL; the corpus 2026-10-05, Fil-C 0.686) |
+| remote | `origin` = `github.com/synapticforge1/zilc` (since 2026-10-27; was `jrmarcum/zilc`, which GitHub redirects). **Purged history pushed 2026-10-27**: `main` = `origin/main`, `v0.15.2` = tag `v0.15.2-0.686.1` = `13ce96a` (was `19e7172`; map `history-map-2026-10-27.md`) |
+| branches | `main` carries the Bun port (`c2841dd`, was `44e0b1a`), merged `--no-ff` 2026-10-27 (owner: "we will merge all to bun tooling since deno is going away"), and the 2026-10-27 work since; `bun-port` is merged and was never pushed (deletable) |
 | sibling | **zailc** (`../zailc`, started 2026-10-08) translates Fil-C into Zig; zilc is its stable reference and test oracle and changes nothing for it (`design-decisions.md`) |
 
 ## 🗓️ Owner calls (evidence gathered; nothing done without the owner)
 
-1. **Force-push the purged history** (owner said "perform the history purge", 2026-10-27; the push
-   is asked separately). It moves `main`, `v0.15.2` and the published tag `v0.15.2-0.686.1`, each
-   with `--force-with-lease` on its old value (`19e7172` / tag `fda2d43`). zilc has no CI workflow,
-   so a tag move re-runs nothing. Then: read back with `ls-remote`, `git reflog expire
-   --expire=now --all`, `gc --prune=now`, delete the pre-purge bundle in `cmem/local/backups/` when
-   the owner agrees, and tell zailc (its oracle notes quote zilc ids). GitHub keeps serving old
-   commits by hash until its own GC; a full removal is a GitHub Support request (owner).
+1. ✅ **Purged history force-pushed 2026-10-27** (owner: "perform the open items"): `main`
+   `19e7172` → `2c7faf0`, `v0.15.2` `19e7172` → `13ce96a`, tag `v0.15.2-0.686.1` `fda2d43` →
+   `7dbddf8`, each `--force-with-lease` on its old value; `ls-remote` = local. zilc has no CI
+   workflow, so the tag move re-ran nothing. A fresh mirror clone from GitHub (80 commits, 959
+   blobs, every ref, `grep -a`): no personal path; the only candidates are the privacy rule's own
+   placeholder line in 5 versions of `working-rules.md`; no commit message. Locally: reflogs
+   expired, `gc --prune=now` → 1 pack / 840 KiB, `fsck` clean, the old commit and tag objects gone.
+   zailc told (ledger C22, H19). **Left for the owner:** the pre-purge bundle in the gitignored
+   `cmem/local/backups/` (delete when you agree), and a GitHub Support request if old commits
+   served by hash must go too (GitHub keeps them until its own GC).
 2. ✅ **`setup-wsl.sh` → Bun, done 2026-10-27** (owner: "perform the open items"). Bun cannot
    install itself and runs inside Linux only, so the Bun install is a **documented one-time step**
    (`tools/README.md` "First-time setup", the same npm-tarball commands and SHA) and the rest is
@@ -78,7 +81,7 @@ them, with their dates.
 | --- | --- | --- |
 | H26 | pull line; ★ block; path test; drive paths at HEAD; exFAT recipe; `origin` + stale links; per-repo items | answered in the 2026-10-27 compliance commit: pull line atop `INDEX.md`; ★ block = `best-practices.md` § 6 (28 = 28 text check, inverted); path test in `working-rules.md`; `INDEX.md:11` fixed; recipe recorded (owner call 4); `origin` and the four stale links moved; `tests/basics` BasicsOfCoding links measured still live at `jrmarcum/` (200; 404 at `synapticforge1/`), so they stay; INDEX 45 → under 10 KB. Version scheme is DESIGN (P8), stays. Open: owner calls 1–3 |
 | H15 | committed scripts in Bun | ✅ done 2026-10-27: tools Bun since 2026-10-22 (`c2841dd`); `setup-wsl.sh` → documented Bun step + `setup-wsl.ts`, proved (owner call 2); `git ls-files '*.sh' '*.ps1' '*.bat' '*.py' '*.nu'` empty |
-| H19 | purge drive paths from history | **purged locally 2026-10-27** (`history-map-2026-10-27.md`); force-push is owner call 1 |
+| H19 | purge drive paths from history | ✅ **purged and force-pushed 2026-10-27** (`history-map-2026-10-27.md`; owner call 1); a fresh GitHub clone scans clean |
 | H22 | record the path test | `working-rules.md` § Privacy |
 | H27 | old-folder prose (`upstream.md:127`) | sibling-relative now; `git grep -i` for the old folder name is empty |
 | H28 | record-only: maintainer address; wabt-ts/binaryen-ts retired | recorded in `working-rules.md`; zilc carries the address in no tracked file; binaryen-ts is cited only as history |

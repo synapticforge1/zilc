@@ -33,6 +33,18 @@ message carried a path.
 - The rewritten refs were fetched back into the working repo (tree unchanged, status clean). A
   pre-purge bundle of every branch and tag is in the gitignored `cmem/local/backups/`.
 
+## Pushed (2026-10-27, owner: "perform the open items")
+
+Force-pushed with `--force-with-lease` on each old value: `main` `19e7172` → `2c7faf0` (the
+rewritten history plus the day's later commits), `v0.15.2` `19e7172` → `13ce96a`, tag
+`v0.15.2-0.686.1` `fda2d43` → `7dbddf8`; `ls-remote` read back equal to local. Checked after: a
+fresh mirror clone from GitHub — 80 commits, 959 blobs over every ref, scanned with `grep -a` — has
+no personal path (the only candidates are the privacy rule's own placeholder line, in 5 versions of
+`working-rules.md`) and none in any commit message. Locally the reflogs were expired and
+`gc --prune=now` left 1 pack (840 KiB); `fsck` clean; `19e7172` and `fda2d43` are gone. GitHub may
+serve the old commits by hash until its own GC; removing them sooner is a GitHub Support request
+(owner). `bun-port` was never pushed.
+
 ## Refs
 
 | ref | old | new |
