@@ -74,9 +74,11 @@ them, with their dates.
 - **The pure-Zig track — in progress on branch `pure-zig/z1`** (2026-10-27): the generators
   (byte-identical to 0.687's) and the stock runtime pieces (libpas's stock half, yolo musl's static
   half, compiler-rt; every object = the 0.687 release's symbols) are in, and `gate-zig-modules`
-  passes on 0.687 with 9 pure-Zig modules linked (`roadmap.md` Z1, `testing.md`). Next: yolo
-  musl's shared half, then the Fil-C-compiled pieces; merge `pure-zig/z1` into `main` when the
-  owner says. Plan as first
+  passes on 0.687 with 9 pure-Zig modules linked (`roadmap.md` Z1, `testing.md`). Merged into
+  `main` (672968a). **Yolo musl's shared half** (`libyoloc.so`, the loader) is done on branch
+  `pure-zig/yolomusl-shared` (W-11): 10 linked, gate 8/8, corpus 78/78 as designed, comparison 0
+  unexplained; merge when the owner says. Next: the Fil-C-compiled pieces (`filc/src`, the user
+  libc, libc++). `Fil-C.md` and `Zig.md` record the route to parity for zailc. Plan as first
   written: bring zailc's step-2 build
   into zilc (`roadmap.md` Z1) — read from `../zailc` (`src/gen`, `src/runtime`, `tests/link`,
   `tools/gen`, `tools/runtime`, its `build.zig` steps `gen` / `libpas` / `yolomusl` /

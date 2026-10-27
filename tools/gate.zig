@@ -98,6 +98,9 @@ const cases = [_]Case{
 /// Fil-C panics kill the process with SIGTRAP; a shell reports that as 133.
 const sigtrap = 5;
 
+/// How much of a build's or a program's output the gate captures (see the build below).
+const max_output = 64 << 20;
+
 fn isFilC(gpa: std.mem.Allocator, clang: []const u8) bool {
     const res = std.process.Child.run(.{
         .allocator = gpa,
@@ -156,17 +159,22 @@ pub fn main() !void {
             try argv.append(gpa, try std.fmt.allocPrint(gpa, "{s}/{s}", .{ root, in }));
         }
 
+        // A broken toolchain can make a build print megabytes (2026-10-27: a libc exporting 8
+        // symbols, so every link listed every undefined symbol); Child.run's 50 KiB default then
+        // crashed the gate with StderrStreamTooLong instead of letting it report the case.
         const built = try std.process.Child.run(.{
             .allocator = gpa,
             .argv = argv.items,
             .env_map = null,
+            .max_output_bytes = max_output,
         });
         const build_ok = switch (built.term) {
             .Exited => |c| c == 0,
             else => false,
         };
         if (!build_ok) {
-            std.debug.print("      FAIL: zilc build did not succeed\n{s}\n", .{built.stderr});
+            const shown = built.stderr[0..@min(built.stderr.len, 4096)];
+            std.debug.print("      FAIL: zilc build did not succeed\n{s}{s}\n", .{ shown, if (shown.len < built.stderr.len) "\n      … (output cut at 4 KiB)" else "" });
             failures += 1;
             continue;
         }
@@ -174,7 +182,7 @@ pub fn main() !void {
         var run_argv: std.ArrayListUnmanaged([]const u8) = .{};
         try run_argv.append(gpa, out_path);
         try run_argv.appendSlice(gpa, case.args);
-        const ran = try std.process.Child.run(.{ .allocator = gpa, .argv = run_argv.items });
+        const ran = try std.process.Child.run(.{ .allocator = gpa, .argv = run_argv.items, .max_output_bytes = max_output });
         const trapped = switch (ran.term) {
             .Signal => |sig| sig == sigtrap,
             .Exited => |c| c == 128 + sigtrap,

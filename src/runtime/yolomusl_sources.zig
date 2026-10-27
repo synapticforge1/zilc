@@ -1394,3 +1394,6 @@ pub const ldso = [_]Src{
     .{ .path = "ldso/dlstart.c", .nossp = true },
     .{ .path = "ldso/dynlink.c", .nossp = true },
 };
+
+/// LDFLAGS_AUTO as linker arguments, from configure's tryldflag probes (upstream's set; `$srcdir` is the tree). config.mak under Zig's clang kept only: -Wl,--sort-section,alignment -Wl,--sort-common -Wl,--gc-sections -Wl,--hash-style=both -Wl,--no-undefined.
+pub const ld_args = [_][]const u8{ "--sort-section", "alignment", "--sort-common", "--gc-sections", "--hash-style=both", "--no-undefined", "--exclude-libs=ALL", "--dynamic-list=$srcdir/dynamic.list" };

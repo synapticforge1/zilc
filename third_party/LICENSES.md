@@ -270,8 +270,10 @@ Newest first. Copy the template for each adopted component.
 - **Upstream path(s) and license (SPDX):**
   - `libpas/common.mk` (`PASSRCS`), `libpas/Makefile` (PASCC / PASCFLAGS / MAINCFLAGS),
     `yolounwind/Makefile` — `BSD-2-Clause` (Fil-C runtime; `third_party/fil-c/PAS-LICENSE.txt`)
-  - `projects/yolomusl/Makefile` (the object rules) and the flags musl's `configure` chooses for
-    Zig's clang — `MIT` (musl; `third_party/fil-c/MUSL-LICENSE.txt`)
+  - `projects/yolomusl/Makefile` (the object rules and, since 2026-10-27, the `lib/libyoloc.so`
+    link rule), the flags musl's `configure` chooses for Zig's clang, and its `LDFLAGS_AUTO` link
+    flags — `MIT` (musl; `third_party/fil-c/MUSL-LICENSE.txt`). `dynamic.list` is passed to the
+    linker from the checkout, not copied
   - `compiler-rt/` builtins' CMake (source selection and flags, read from the `build.ninja` it
     generates) and `build_compiler_rt.sh`'s install layout — `Apache-2.0 WITH LLVM-exception`
     (`third_party/fil-c/LLVM-LICENSE.txt`)

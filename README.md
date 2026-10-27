@@ -97,7 +97,11 @@ runtime; a Zig runtime is not part of zilc (that work lives in the sibling proje
 
 ### Limits
 
-Each has a reason recorded in [cmem/known-issues.md](cmem/known-issues.md):
+What zilc takes from Fil-C and from Zig, which releases, every workaround it applies for each, and
+the route from Fil-C's stock release to a pure-Zig build of it: [Fil-C.md](Fil-C.md) and
+[Zig.md](Zig.md). Defects found in them: [UPSTREAM-ISSUES.md](UPSTREAM-ISSUES.md).
+
+Each limit below has a reason recorded in [cmem/known-issues.md](cmem/known-issues.md):
 
 - **Linux x86_64 only, by design** — that is what Fil-C supports, and zilc stays there: on
   Windows, use it inside WSL. Cross-platform work happens in the sibling project zailc, which

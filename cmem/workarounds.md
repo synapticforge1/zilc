@@ -831,7 +831,7 @@ machine-local memory `no-windows-host-execution`.
 
 ---
 
-## The pure-Zig track: W-1 … W-10 (first written in zailc, 2026-10-08/09; brought here 2026-10-27)
+## The pure-Zig track: W-1 … W-11 (W-1…W-10 first written in zailc, 2026-10-08/09, brought here 2026-10-27; W-11 zilc's own)
 
 The track (`roadmap.md` Z1) came from zailc with its workaround notes; the code cites them by these
 numbers, so they live here too, condensed. zailc's `cmem/workarounds.md` keeps the long forms.
@@ -885,3 +885,26 @@ numbers, so they live here too, condensed. zailc's `cmem/workarounds.md` keeps t
   `-DCOMPILER_RT_HAS_FLOAT16` to the flags; the members test that macro). A first try with the
   unsuffixed `COMPILER_RT_HAS_FLOAT16=OFF` changed nothing, and `verify-compiler-rt.ts` failed on
   exactly the two definitions — the oracle catching the departure it exists to catch.
+- **W-11. Linking `libyoloc.so` (the loader) with Zig's LLD instead of GCC's driver and GNU ld**
+  (zilc's own, 2026-10-27; zailc never built the shared half). Three parts:
+  1. *`zig cc` refuses two of musl's link flags.* Symptom: `unsupported linker arg:
+     --exclude-libs` / `--dynamic-list`. These are two of configure's seven `LDFLAGS_AUTO`, which
+     `import-yolomusl-sources.ts` reads into `ld_args`. Fix: `build/pure_zig.zig` runs `zig ld.lld`
+     (Zig's LLD) directly with upstream's link rule spelled out (`-shared -e _dlstart`, plus
+     `--build-id=sha1 --eh-frame-hdr -z relro`, which GCC's driver adds). Ruled out: dropping the
+     flags, which would change the export set.
+  2. *`--exclude-libs=ALL` means something else here.* Symptom (measured): the first link exported
+     **8** symbols where the release exports 1,653, and so every program's link listed every libc
+     symbol as undefined (that output then crashed the gate with `StderrStreamTooLong`, fixed by
+     raising its capture limit). Root cause (measured): upstream links the `.lo` objects loose, so
+     its only archive is `$(LIBCC)` and `ALL` hides only the compiler runtime; zilc links yolo musl
+     as `--whole-archive libyoloc.a`, so `ALL` hid libc too. Fix: `--exclude-libs=libyolort.a`,
+     upstream's effect named exactly. Proof: 1,653 exports equal by name and type, 0 undefined.
+  3. *Two segment kinds differ, allowed by name in `verify-yolomusl.ts`.* Measured: zilc's has a
+     `PHDR` segment, which LLD gives a shared object and GNU ld does not; the release has
+     `GNU_PROPERTY`, which GNU ld makes from `.note.gnu.property`, carried by all 1,343 of the
+     release archive's GCC-built members (x86 ISA-used notes) and by none of Zig's clang's. The
+     dynamic tags are equal. Neither difference changes what the loader does: gate 8/8, corpus
+     78/78 as designed and output comparison 0 unexplained with it linked (`testing.md`). Lasts as
+     long as the oracle is a GCC/GNU-ld-built release. A relative: any other set that differs
+     between GCC/GNU ld and clang/LLD output (W-8 is the symbol-level family).

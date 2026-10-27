@@ -16,7 +16,7 @@
 //   bun tools/runtime/verify-yolomusl.ts     
 
 import { readFileSync } from "node:fs";
-import { FILC_PREBUILT_TREE, PURE_ZIG_OUT, REPO, existsSync, linuxOnly, requireFilcSrc, run, ZIG, zigCacheArgs } from "../lib/tool.ts";
+import { FILC_PREBUILT_TREE, PURE_ZIG_OUT, REPO, existsSync, linuxOnly, must, requireFilcSrc, run, ZIG, zigCacheArgs } from "../lib/tool.ts";
 import { Oracle } from "./lib/objects.ts";
 
 await linuxOnly(import.meta);
@@ -60,7 +60,43 @@ const yolom = [`${prefix}/lib/libyolom.a`, `${theirLib}/libyolom.a`].map((p) => 
 if (yolom[0] !== "!<arch>\n" || yolom[1] !== "!<arch>\n") oracle.fail(`libyolom.a: not both empty archives`);
 else console.log("libyolom.a: both empty archives");
 
+// libyoloc.so, which is also the dynamic loader (ld-fil1-x86_64.so links to it): what it exports
+// (name + type), that it needs nothing, its dynamic-section entries and segment kinds, and that it
+// starts at _dlstart — against the release's (added 2026-10-27).
+{
+  const ourSo = `${PURE_ZIG_OUT}/lib/libyoloc.so`, theirSo = `${theirLib}/libyoloc.so`;
+  const nmD = async (p: string, f: string[]) =>
+    new Set((await must(["nm", "-D", ...f, p])).split("\n").filter((l) => l.trim() && !l.startsWith("nm: ")).map((l) => l.trim().split(/\s+/).slice(-2).reverse().join(" ")));
+  const [dO, dT, uO, uT] = await Promise.all([nmD(ourSo, ["--defined-only"]), nmD(theirSo, ["--defined-only"]), nmD(ourSo, ["--undefined-only"]), nmD(theirSo, ["--undefined-only"])]);
+  const plus = [...dO].filter((s) => !dT.has(s)), minus = [...dT].filter((s) => !dO.has(s));
+  if (plus.length || minus.length) oracle.fail(`libyoloc.so EXPORTS DIFFER: +${plus.slice(0, 12).join(",")}${plus.length > 12 ? "…" : ""} -${minus.slice(0, 12).join(",")}${minus.length > 12 ? "…" : ""} (${plus.length}/${minus.length})`);
+  if (uO.size || uT.size) oracle.fail(`libyoloc.so UNDEFINED: ours ${[...uO].join(",") || "none"}, upstream's ${[...uT].join(",") || "none"}`);
+  const tags = async (p: string) => new Set([...(await must(["readelf", "-d", p])).matchAll(/^\s*0x[0-9a-f]+ \((\w+)\)/gm)].map((m) => m[1]));
+  const segs = async (p: string) => new Set([...(await must(["readelf", "-lW", p])).matchAll(/^\s+([A-Z_]+)\s+0x/gm)].map((m) => m[1]));
+  // Linker and compiler differences, allowed by name (cmem/workarounds.md W-11, measured
+  // 2026-10-27): LLD gives a shared object a PHDR segment and GNU ld does not; and every member of
+  // the release's GCC-built archive carries .note.gnu.property (x86 ISA-used notes), from which GNU
+  // ld makes GNU_PROPERTY, while Zig's clang emits no such note.
+  const allowed = { "segment kinds": { ours: ["PHDR"], theirs: ["GNU_PROPERTY"] }, "dynamic tags": { ours: [], theirs: [] } } as const;
+  for (const [what, f] of [["dynamic tags", tags], ["segment kinds", segs]] as const) {
+    const [a, t] = await Promise.all([f(ourSo), f(theirSo)]);
+    const ok = allowed[what];
+    const ap = [...a].filter((x) => !t.has(x)), tp = [...t].filter((x) => !a.has(x));
+    const same = (xs: string[], ys: readonly string[]) => xs.length === ys.length && xs.every((x) => ys.includes(x));
+    if (!same(ap, ok.ours) || !same(tp, ok.theirs)) oracle.fail(`libyoloc.so ${what.toUpperCase()} DIFFER: ours only ${ap.join(",") || "-"}, upstream's only ${tp.join(",") || "-"} (allowed: ${ok.ours.join(",") || "-"} / ${ok.theirs.join(",") || "-"})`);
+    else console.log(`libyoloc.so ${what}: the same${ap.length + tp.length ? ` but for the allowed ours ${ap.join(",")} / upstream's ${tp.join(",")}` : ""} (${[...a].filter((x) => t.has(x)).sort().join(" ")})`);
+  }
+  const entryAtDlstart = async (p: string) => {
+    const entry = BigInt((await must(["readelf", "-h", p])).match(/Entry point address:\s+(0x[0-9a-f]+)/)![1]);
+    const sym = (await must(["nm", p])).split("\n").find((l) => / _dlstart$/.test(l));
+    return sym ? BigInt(`0x${sym.split(" ")[0]}`) === entry : null;
+  };
+  const [eO, eT] = await Promise.all([entryAtDlstart(ourSo), entryAtDlstart(theirSo)]);
+  if (eO !== true) oracle.fail(`libyoloc.so ENTRY: ours does not start at _dlstart (${eO})`);
+  console.log(`libyoloc.so: ${dO.size} exports (upstream's ${dT.size}), ${uO.size} undefined; entry at _dlstart: ours ${eO}, upstream's ${eT ?? "(stripped)"}`);
+}
+
 oracle.ratchet("EMPTY-TU", oracle.emptyTu, EMPTY_TU_BUDGET);
 console.log(`compile unit names: ${oracle.cuCompared} equal to upstream's; ${oracle.emptyTu} empty translation unit(s) where only GCC emits one (budget ${EMPTY_TU_BUDGET})`);
-console.log(oracle.failures ? `FAILED: ${oracle.failures}` : "OK: libyoloc.a and the crt objects define exactly upstream's symbols, in upstream's member order, with upstream's compile unit names");
+console.log(oracle.failures ? `FAILED: ${oracle.failures}` : "OK: libyoloc.a and the crt objects define exactly upstream's symbols, in upstream's member order, with upstream's compile unit names; libyoloc.so exports exactly upstream's symbols and needs none");
 process.exit(oracle.failures ? 1 : 0);

@@ -45,6 +45,9 @@ for (const rule of [
   "MEMOPS_OBJS = $(filter %/memcpy.o %/memmove.o %/memcmp.o %/memset.o, $(LIBC_OBJS))",
   "$(CRT_OBJS): CFLAGS_ALL += -DCRT",
   "obj/crt/Scrt1.o obj/crt/rcrt1.o: CFLAGS_ALL += -fPIC",
+  // The shared half (2026-10-27): build/pure_zig.zig reproduces exactly this link.
+  "lib/libyoloc.so: $(LOBJS) $(LDSO_OBJS)",
+  "-Wl,-e,_dlstart -o $@ $(LOBJS) $(LDSO_OBJS) $(LIBCC)",
 ]) {
   if (!mk.includes(rule)) throw new Error(`yolomusl's Makefile no longer contains: ${rule}`);
 }
@@ -70,6 +73,19 @@ const cfg = (name: string): string[] => {
 };
 const c99fse = cfg("CFLAGS_C99FSE"), auto = cfg("CFLAGS_AUTO"), nossp = cfg("CFLAGS_NOSSP"), memops = cfg("CFLAGS_MEMOPS");
 const mallocDir = cfg("MALLOC_DIR")[0];
+// LDFLAGS_AUTO as upstream gets it: configure's `tryldflag LDFLAGS_AUTO` probes, in order. Under
+// Zig's clang two of them fail (`zig cc` refuses --exclude-libs and --dynamic-list: "unsupported
+// linker arg"), so config.mak is NOT the source here; GNU ld, which upstream's release was linked
+// with, accepts all of them, and so does Zig's own `zig ld.lld`, which links the shared half. Each
+// `-Wl,a,b` becomes the linker arguments `a` `b`; `$srcdir` stays a token for the build to resolve.
+const configureText = await readFile(`${tree}/configure`, "utf8");
+const ldflagsUpstream = [...configureText.matchAll(/^tryldflag LDFLAGS_AUTO (.+)$/gm)].map((m) => m[1].trim().replace(/^"|"$/g, "").replace(/"/g, ""));
+if (ldflagsUpstream.length !== 7) throw new Error(`configure has ${ldflagsUpstream.length} LDFLAGS_AUTO probes (expected 7): extend this tool`);
+const ldArgs = ldflagsUpstream.flatMap((f) => {
+  if (!f.startsWith("-Wl,")) throw new Error(`LDFLAGS_AUTO probe is not a -Wl, flag: ${f}`);
+  return f.slice(4).split(",");
+});
+const zigAccepted = cfg("LDFLAGS_AUTO");
 const optimizeGlobs = cfg("OPTIMIZE_GLOBS");
 if (optimizeGlobs.join(" ") !== "internal/*.c malloc/*.c string/*.c") throw new Error(`OPTIMIZE_GLOBS changed: ${optimizeGlobs}`);
 if (cfg("ADD_CFI")[0] !== "no") throw new Error("ADD_CFI is not `no`: the assembler path would differ");
@@ -162,6 +178,11 @@ const out = [
   rows("libc", `LIBC_OBJS, in the Makefile's order: the members of libyoloc.a (${libc.length}).`, libc),
   rows("crt", `CRT_OBJS (${crt.length}), each also gets -DCRT.`, crt),
   rows("ldso", `LDSO_OBJS (${ldso.length}), only in libyoloc.so.`, ldso),
+  flags(
+    "ld_args",
+    `LDFLAGS_AUTO as linker arguments, from configure's tryldflag probes (upstream's set; \`$srcdir\` is the tree). config.mak under Zig's clang kept only: ${zigAccepted.join(" ")}.`,
+    ldArgs,
+  ),
 ].join("\n");
 
 const dest = `${REPO}/src/runtime/yolomusl_sources.zig`;

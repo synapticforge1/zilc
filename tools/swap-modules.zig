@@ -98,6 +98,16 @@ fn linked(line: []const u8, name: []const u8, fil_names: []const []const u8) boo
         const static = std.mem.indexOf(u8, line, "\"-static\"") != null;
         return static or !contains(fil_names, so);
     }
+    // `lib<x>.so` through `-l<x>` in a dynamic link (the `.so` wins over the `.a`). libyoloc.so is
+    // also the dynamic loader (ld-fil1-x86_64.so links to it), so it is used even without `-lyoloc`.
+    if (std.mem.startsWith(u8, name, "lib") and std.mem.endsWith(u8, name, ".so")) {
+        if (std.mem.indexOf(u8, line, "\"-static\"") != null) return false;
+        if (std.mem.eql(u8, name, "libyoloc.so") and std.mem.indexOf(u8, line, "ld-fil1-") != null) return true;
+        const stem = name[3 .. name.len - 3];
+        var fbuf: [256]u8 = undefined;
+        const flag = std.fmt.bufPrint(&fbuf, "\"-l{s}\"", .{stem}) catch return false;
+        return std.mem.indexOf(u8, line, flag) != null;
+    }
     return false;
 }
 
