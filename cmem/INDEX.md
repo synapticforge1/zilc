@@ -4,17 +4,13 @@
 items addressed to this repo** — the workspace pull line (letter H26). zilc has no `CLAUDE.md`, so
 the line lives here.
 
-This folder is the **authoritative, portable project memory** for `zilc`. It lives inside the
-project tree, so it travels with the project (USB drive, clones) and is **committed to git**.
-Plain Markdown, one focused topic file per domain. Modeled on the `cmem/` of the sibling project
-wazmrt (`../wazmrt/cmem`), the template for structure and policy. Since 2026-10-26 zilc is under
-the workspace floor (`../cmem/working-rules.md`); how it applies here: [working-rules.md](working-rules.md).
+The **authoritative, portable project memory** for `zilc`, committed with the project; one
+topic file per domain, modeled on wazmrt's (`../wazmrt/cmem`). The workspace floor
+(`../cmem/working-rules.md`) as it applies here: [working-rules.md](working-rules.md).
 
-**The state of the project and everything outstanding: [open-work.md](open-work.md)** — the one
-place for the status line. This file holds no status narrative (workspace `memory-conventions.md`;
-the dated log it carried until 2026-10-27 is summarized there, full text
-`git show c2841dd:cmem/INDEX.md`). Commit ids written before 2026-10-27 are pre-purge ids:
-look them up in [history-map-2026-10-27.md](history-map-2026-10-27.md).
+**State and everything outstanding: [open-work.md](open-work.md)**, the one status line (the dated
+log this file held until 2026-10-27: `git show c2841dd:cmem/INDEX.md`). Commit ids written before
+2026-10-27 are pre-purge: [history-map-2026-10-27.md](history-map-2026-10-27.md).
 
 ## 🔒 What bites in the first five minutes
 
@@ -25,13 +21,11 @@ look them up in [history-map-2026-10-27.md](history-map-2026-10-27.md).
    keep Zig and C correct under Fil-C on x86_64 Linux, be zailc's reference. **P3, P4 and P5
    moved to zailc and are abandoned here.**
 1. 🛑 **Nothing built by Fil-C, cosmo or zilc is ever EXECUTED on the Windows host** (owner,
-   2026-10-08): the machine's EDR quarantined cosmo programs run as `.exe` and cut Claude Code off.
-   All Fil-C work runs in WSL; the Windows half of an APE only under `wine64` in WSL
-   (`workarounds.md` "Nothing built by Fil-C or cosmo is ever EXECUTED on the Windows host").
-2. **Fil-C work happens in WSL2** (Ubuntu), under `~/zilc-work/`. `sudo` needs an interactive
-   password, so install into `$HOME`. 🔒 **Bun runs inside Linux only** (owner, 2026-10-27): run
-   the tools from a WSL shell with `~/.bun/bin/bun`, never with Windows' Bun (the old Windows-side
-   bridge is retired). For ad-hoc commands from Windows, **pass shell text to WSL as a FILE** (KI-1).
+   2026-10-08; the machine's EDR, `workarounds.md`). Everything runs in WSL.
+2. **Work happens in WSL2** (Ubuntu), under `~/zilc-work/`; `sudo` needs a password, so install
+   into `$HOME` (`tools/README.md` "First-time setup"). 🔒 **Bun runs inside Linux only** (owner,
+   2026-10-27): `~/.bun/bin/bun` from a WSL shell; the tools refuse Windows' Bun. Ad-hoc commands
+   from Windows: **pass shell text to WSL as a FILE** (KI-1).
 3. **Toolchain: Zig 0.15.2** (owner, 2026-09-18), WSL's at `~/zilc-work/tools/zig-0.15.2/zig`
    (`tools/p1/setup-wsl.ts`); bare `zig` may be a newer Zig that fails to build zilc (KI-3). The
    repo is on exFAT, so **keep the Zig cache in the Linux home** (KI-2), as `run-gate.ts` does:
@@ -39,8 +33,6 @@ look them up in [history-map-2026-10-27.md](history-map-2026-10-27.md).
    ```sh
    ZIG_LOCAL_CACHE_DIR=~/.cache/zilc-zig ~/zilc-work/tools/zig-0.15.2/zig build test
    ```
-   (Building zilc with Windows' Zig, `C:\zig\0.15.2\zig.exe`, was retired 2026-10-27 with the
-   Linux-only rule.)
 4. **`zig build gate` must be green before anything is believed**, and it prints `SKIPPED` (exit
    0) when the Fil-C toolchain is missing — read its first line. `~/.bun/bin/bun tools/run-gate.ts`;
    everything else in `testing.md`.
@@ -49,16 +41,10 @@ look them up in [history-map-2026-10-27.md](history-map-2026-10-27.md).
 
 ## Policy (durable — adopted from wazmrt 2026-09-18)
 
-- **`cmem/` is the single home for ALL project memory.** When the owner says "**update the project
-  memory**", fold the latest decisions, found bugs, design changes and current state into the
-  matching `cmem/` topic file(s), then refresh its one-line pointer in the Files table below.
-  Convert relative dates to absolute. Update existing entries rather than duplicating them.
-- **This index stays one line per file**, and with the pointer under about 10 KB. State goes in
-  `open-work.md`, once.
-- **`README.md` is NOT project memory.** It is the public, user-facing document. Keep internal
-  decision logs and post-mortems out of it.
-- **`third_party/LICENSES.md` is the compliance source of truth.** `licensing.md` records the *why*;
-  the ledger of actually-reused code lives in `third_party/LICENSES.md`. Keep them consistent.
+- **`cmem/` is the single home for ALL project memory**; this index stays one line per file and
+  under about 10 KB; state goes in `open-work.md`, once.
+- **`README.md` is NOT project memory**: it is the public document; no decision logs in it.
+- **`third_party/LICENSES.md` is the compliance source of truth**; `licensing.md` records the *why*.
 - **Nothing private in a committed file**: the path test and the scan are in
   [working-rules.md](working-rules.md) § Privacy; private facts go in the gitignored `cmem/local/`.
 - **Never run a formatter on `cmem/`.**
@@ -91,7 +77,7 @@ this for the project"), do all of the following:
    `toolchain/` is gitignored, so the archive itself is never committed, but the patch, the
    scripts and the checksum line in the ledger are.
 5. **Check Fil-C upstream for changes (owner, 2026-10-01):** `bun tools/upstream/check-upstream.ts`
-   (any OS). Record in `upstream.md` anything that touches a watched file, above all whether
+   (in WSL). Record in `upstream.md` anything that touches a watched file, above all whether
    zilc's pass patch still applies. After reviewing, `--mark-reviewed`, and commit
    `tools/upstream/REVIEWED`. The reference clone is `upstream/fil-c/` (gitignored, never built).
 6. **Scan the diff for personal information before committing** ([working-rules.md](working-rules.md)
@@ -102,10 +88,8 @@ this for the project"), do all of the following:
 **Every workaround gets copious WHY notes in [`workarounds.md`](workarounds.md) when it is made**,
 whether the cause is an upstream defect or a system limitation: the exact symptom, the class, the
 root cause (measured vs. surmised, kept apart), why the fix is correct, what was ruled out, how it
-was found, how to recognise a relative, and the cost and exit condition. Owner: *"so that when we
-run into similar issues we can quickly identify those past problems and their resolutions, and
-investigate and surmise potential similar resolutions."* **A new failure is looked up in
-`workarounds.md`'s symptom index and families first.**
+was found, how to recognise a relative, and the cost and exit condition. **A new failure is looked
+up in `workarounds.md`'s symptom index and families first.**
 
 ### The "adopt upstream code" trigger (binding on every agent)
 
@@ -152,7 +136,5 @@ the runtime-linking rule checked.
 
 ## Related files outside cmem
 
-- `README.md`: the public, user-facing doc. NOT project memory.
-- `third_party/LICENSES.md`: the compliance ledger, adoption checklist and verified inventory.
-- `LICENSE-APACHE` / `LICENSE-MIT` / `NOTICE`: the dual license texts and attribution notice.
-- `tools/README.md`: how the Bun tools run, and how they bridge into WSL.
+- `README.md` (public), `third_party/LICENSES.md` (the compliance ledger), `LICENSE-*` / `NOTICE`.
+- `tools/README.md`: first-time setup, and how the Bun tools run (inside Linux only).
