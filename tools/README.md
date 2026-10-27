@@ -28,6 +28,19 @@ Run in a WSL or Linux shell (x86_64). No root is needed; everything goes under `
    ~/.bun/bin/bun --version
    ```
 
+   Then put it on `PATH`, so plain `bun` works: append this block to `~/.profile` (login shells)
+   and to `~/.bashrc` (interactive shells); the `case` keeps it from being added twice when
+   `~/.profile` sources `~/.bashrc`. Open a new shell, and `bun --version` prints `1.4.3`.
+
+   ```sh
+   if [ -d "$HOME/.bun/bin" ]; then
+       case ":$PATH:" in
+           *":$HOME/.bun/bin:"*) ;;
+           *) PATH="$HOME/.bun/bin:$PATH" ;;
+       esac
+   fi
+   ```
+
 2. **Install the rest** — Zig 0.15.2, Fil-C's release, patchelf, and Fil-C's own `setup.sh`; each
    download is checked against a recorded SHA-256 and the tool is idempotent:
 

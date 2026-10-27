@@ -13,7 +13,7 @@ them, with their dates.
 | toolchain | Zig **0.15.2** (user code and build), Fil-C **0.686** with zilc's patched clang (`workarounds.md` KI-22, KI-4) |
 | gates | `zig build gate`, `zig build test`, the corpus in four modes, the output comparison: counts and dates in `testing.md` (gate + tests last run 2026-10-27 in WSL; the corpus 2026-10-05, Fil-C 0.686) |
 | remote | `origin` = `github.com/synapticforge1/zilc` (since 2026-10-27; was `jrmarcum/zilc`, which GitHub redirects). **Purged history pushed 2026-10-27**: `main` = `origin/main`, `v0.15.2` = tag `v0.15.2-0.686.1` = `13ce96a` (was `19e7172`; map `history-map-2026-10-27.md`) |
-| branches | `main` carries the Bun port (`c2841dd`, was `44e0b1a`), merged `--no-ff` 2026-10-27 (owner: "we will merge all to bun tooling since deno is going away"), and the 2026-10-27 work since; `bun-port` is merged and was never pushed (deletable) |
+| branches | `main` carries the Bun port (`c2841dd`, was `44e0b1a`), merged `--no-ff` 2026-10-27 (owner: "we will merge all to bun tooling since deno is going away"), and the 2026-10-27 work since; `bun-port` (merged, never pushed) deleted 2026-10-27 (owner). Branches: `main`, `v0.15.2` |
 | sibling | **zailc** (`../zailc`, started 2026-10-08) translates Fil-C into Zig; zilc is its stable reference and test oracle and changes nothing for it (`design-decisions.md`) |
 
 ## 🗓️ Owner calls (evidence gathered; nothing done without the owner)
@@ -25,9 +25,10 @@ them, with their dates.
    blobs, every ref, `grep -a`): no personal path; the only candidates are the privacy rule's own
    placeholder line in 5 versions of `working-rules.md`; no commit message. Locally: reflogs
    expired, `gc --prune=now` → 1 pack / 840 KiB, `fsck` clean, the old commit and tag objects gone.
-   zailc told (ledger C22, H19). **Left for the owner:** the pre-purge bundle in the gitignored
-   `cmem/local/backups/` (delete when you agree), and a GitHub Support request if old commits
-   served by hash must go too (GitHub keeps them until its own GC).
+   zailc told (ledger C22, H19). The pre-purge bundle was deleted the same day (owner: "delete the
+   pre-purge backup also"); no copy of the old history is left on this machine. **Left for the
+   owner:** a GitHub Support request if old commits served by hash must go too (GitHub keeps them
+   until its own GC).
 2. ✅ **`setup-wsl.sh` → Bun, done 2026-10-27** (owner: "perform the open items"). Bun cannot
    install itself and runs inside Linux only, so the Bun install is a **documented one-time step**
    (`tools/README.md` "First-time setup", the same npm-tarball commands and SHA) and the rest is

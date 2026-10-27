@@ -31,7 +31,8 @@ message carried a path.
   Inverted: one swap dropped from the table → exactly 1 failure; control: the old refs → all 64
   dirty blobs found.
 - The rewritten refs were fetched back into the working repo (tree unchanged, status clean). A
-  pre-purge bundle of every branch and tag is in the gitignored `cmem/local/backups/`.
+  pre-purge bundle of every branch and tag was kept in the gitignored `cmem/local/backups/` until
+  the push was verified, then deleted the same day (owner: "delete the pre-purge backup also").
 
 ## Pushed (2026-10-27, owner: "perform the open items")
 
@@ -43,7 +44,7 @@ no personal path (the only candidates are the privacy rule's own placeholder lin
 `working-rules.md`) and none in any commit message. Locally the reflogs were expired and
 `gc --prune=now` left 1 pack (840 KiB); `fsck` clean; `19e7172` and `fda2d43` are gone. GitHub may
 serve the old commits by hash until its own GC; removing them sooner is a GitHub Support request
-(owner). `bun-port` was never pushed.
+(owner). `bun-port` was never pushed, and was deleted locally after the merge (owner, 2026-10-27).
 
 ## Refs
 

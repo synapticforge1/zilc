@@ -21,7 +21,7 @@ named below. Method lessons are in [best-practices.md](best-practices.md), not h
   Never a heredoc, never a double-quoted `-m`.
 - **Nothing is pushed, tagged or published unless the owner says so.**
 - Branches: one branch per Zig line, `main` the base (`releasing.md`); work branches such as
-  `bun-port` are merged by the owner's call.
+  `bun-port` (merged and deleted 2026-10-27) are merged by the owner's call.
 - Docs and memory land in the same commit as the code they describe.
 - Line endings are LF, pinned in `.gitattributes` wildcard-first (`* text=auto eol=lf`). Never
   "fix" a line-ending complaint with `git config`; check with `git check-attr`.
