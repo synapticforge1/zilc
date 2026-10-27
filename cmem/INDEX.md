@@ -26,8 +26,9 @@ look them up in [history-map-2026-10-27.md](history-map-2026-10-27.md).
    All Fil-C work runs in WSL; the Windows half of an APE only under `wine64` in WSL
    (`workarounds.md` "Nothing built by Fil-C or cosmo is ever EXECUTED on the Windows host").
 2. **Fil-C work happens in WSL2** (Ubuntu), under `~/zilc-work/`. `sudo` needs an interactive
-   password, so install into `$HOME`. zilc's tools are Bun and bridge into WSL with an argument list
-   (`tools/README.md`); for ad-hoc commands, **pass shell text to WSL as a FILE** (KI-1).
+   password, so install into `$HOME`. 🔒 **Bun runs inside Linux only** (owner, 2026-10-27): run
+   the tools from a WSL shell with `~/.bun/bin/bun`, never with Windows' Bun (the old Windows-side
+   bridge is retired). For ad-hoc commands from Windows, **pass shell text to WSL as a FILE** (KI-1).
 3. **Toolchain: Zig 0.15.2** (owner, 2026-09-18), at `C:\zig\0.15.2\zig.exe`, not on PATH; bare
    `zig` may be a newer Zig that fails to build zilc (KI-3). **D: is exFAT: set
    `ZIG_LOCAL_CACHE_DIR=C:\zig-cache\zilc` before any `zig build`** (KI-2).

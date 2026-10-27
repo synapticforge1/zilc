@@ -45,11 +45,15 @@ named below. Method lessons are in [best-practices.md](best-practices.md), not h
   cosmo/APE belong to zailc, which uses zilc as its base.
   A change that adds a non-Linux target to zilc is out of scope, not a feature
   (`design-decisions.md`, top row).
+- **The tools run in Linux too**: from a WSL shell on this machine, from a Linux shell elsewhere,
+  with that environment's Bun (§ Tooling).
 
 ## Tooling (owner, 2026-10-22; workspace rule 1)
 
 - **A committed script that stays for repeated use is TypeScript run by Bun** (Zig's `zig run`
-  builds an executable, so it does not count as a scripting mechanism). Node APIs + `Bun.*`, never
+  builds an executable, so it does not count as a scripting mechanism). 🔒 **Bun runs inside
+  Linux only** (owner, 2026-10-27): WSL's Bun (`~/.bun/bin/bun`) on a Windows host, the machine's
+  own Bun on a Linux machine. Never start a zilc tool with Windows' Bun. Node APIs + `Bun.*`, never
   `Deno.*` or `jsr:`. `build.zig` and the Zig sources it builds and runs are the build, not
   scripts. **No committed shell scripts** — the one exception in force is `tools/p1/setup-wsl.sh`,
   pending the owner (`open-work.md` owner call 2). A one-time probe deleted after use may be
@@ -96,7 +100,8 @@ git grep -a -l -i -E '[A-Za-z]:[\\/]+(Programs|Users|scoop|tools)[\\/]|/[a-z]/(P
 ```
 
 A secret that reached the remote is rotated, not just deleted. History is purged of personal
-information (letter H19) — for zilc, `open-work.md` owner call 3.
+information (letter H19) — for zilc, done locally 2026-10-27 (`history-map-2026-10-27.md`); the
+force-push is `open-work.md` owner call 1.
 
 ## Records
 

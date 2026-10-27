@@ -11,6 +11,12 @@ Ubuntu (and installs Bun to `~/.bun/bin`) before Bun is there.
 
 ## How to run a tool
 
+> 🔒 **Owner, 2026-10-27: Bun runs inside Linux only** — from a WSL shell with `~/.bun/bin/bun` on
+> a Windows host, with the machine's own Bun on Linux. **Do not start tools with Windows' Bun.** The
+> Windows-side behaviour described below (`linuxOnly()` re-launching into WSL, tools that run
+> natively on Windows) still exists in the code but is retired by that rule; removing it is
+> pending (`cmem/open-work.md` owner call 3).
+
 ```
 bun tools/<group>/<tool>.ts [args]
 ```

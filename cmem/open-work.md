@@ -26,12 +26,22 @@ them, with their dates.
    the owner agrees, and tell zailc (its oracle notes quote zilc ids). GitHub keeps serving old
    commits by hash until its own GC; a full removal is a GitHub Support request (owner).
 2. **`tools/p1/setup-wsl.sh`** is zilc's one committed shell script (letters H15, H26). Owner,
-   2026-10-27: "we will merge all to bun tooling" — so it goes to Bun too. It INSTALLS Bun in a
-   fresh Ubuntu, so the port is a Bun script that runs where Bun already is (Windows) and drives
-   WSL with argument lists, as `tools/lib/tool.ts` `linuxOnly()` does. The proof rule needs both run
-   on a fresh WSL `$HOME` (~1 GB of downloads + Fil-C's `setup.sh`) with the trees diffed, plus a
-   must-fail input (a wrong SHA). Kept in use until the port is proved.
-3. **The exFAT `.git` recipe (divergence P7).** zilc's is `maintenance.geometric-repack.enabled=false`
+   2026-10-27: "we will merge all to bun tooling" — so it goes to Bun too. It INSTALLS Bun, and
+   Bun now runs inside Linux only (owner, same day), so a Windows-side Bun driver is ruled out and
+   Bun cannot install itself. Proposed: **the Bun install becomes a documented one-time step**
+   (the npm-tarball commands and SHA in `tools/README.md`, not a committed script), and **the rest
+   — Zig, Fil-C, patchelf, Fil-C's `setup.sh` — becomes a Bun tool run in WSL**. The proof rule
+   needs both run on a fresh WSL `$HOME` (~1 GB of downloads + `setup.sh`) with the trees diffed,
+   plus a must-fail input (a wrong SHA). Kept in use until the port is proved. Owner to confirm the
+   split.
+3. **Retire the Windows-side tool path in code** (owner rule, 2026-10-27: Bun inside Linux only).
+   Proposed, the zilc way ("reserve a switch by refusing it", `best-practices.md` § 3):
+   `tools/lib/tool.ts` refuses on any OS but Linux, saying "run this from a WSL shell with
+   `~/.bun/bin/bun`", instead of `linuxOnly()` re-launching into WSL; `compile-check.ts` loses its
+   Windows Zig default; `tools/README.md` rewritten to match. A `tools/` change, so the gate runs
+   in WSL after it, and the refusal is inverted (started from Windows → refused; from WSL → runs).
+   Until then, `tools/README.md` describes code that the rule forbids using.
+4. **The exFAT `.git` recipe (divergence P7).** zilc's is `maintenance.geometric-repack.enabled=false`
    + `maintenance.gc.enabled=true` (2026-10-01), answering **KI-23** (`known-issues.md`).
    **Measured 2026-10-27 (git 2.54, traced `maintenance run` in scratch clones): it runs the SAME
    `gc` as `maintenance.strategy gc` (pack-refs, reflog expire, repack `--cruft`, prune, worktree
@@ -41,7 +51,7 @@ them, with their dates.
    failure. So the two recipes differ only in the commit-graph task; switching to the workspace
    standard is a one-line change (`git config --local maintenance.strategy gc`, then unset the two
    task keys). Owner's pick.
-4. A GitHub Release page for `v0.15.2-0.686.1` (optional; `RELEASE-NOTES.md` is its text).
+5. A GitHub Release page for `v0.15.2-0.686.1` (optional; `RELEASE-NOTES.md` is its text).
 
 ## Open work
 
