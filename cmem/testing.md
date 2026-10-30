@@ -103,6 +103,31 @@ patched.** Run 5,968, skipped 1,237. Both fail the same 2 on the first pass:
   lacked it (`BAD cannot open aesni-mb-x86_64.pl`). With that folder added to the checkout, it
   **passes with both compilers** (`mb pl sink ok`). It is the only test that reads `projects/`.
 
+**The clang `zig build patched-clang` builds from the FETCHED sources (2026-10-30, system cc/c++):
+0 differences on all 7,269 tests** against stock AND against the 2026-10-27 patched clang (built by
+`build-patched-clang.ts` from the git checkout): 6,027 run, 6,026 pass, 1 fail
+(`inlineasm_rdpkru`), 0 timeouts, 1,242 skipped, 446 s at 24 jobs. Its `clang --version` is the
+prebuilt's, letter for letter (LLVM_FORCE_VC_*). Tree assembled as `build-patched-clang.ts` does:
+the prebuilt copied, `clang-20` and `llvm-split` replaced, `fix-os-include.ts`.
+
+**The same clang compiled and linked by ZIG (2026-10-30, `-Dclang-cc=zig`, now the default):
+0 differences on all 7,269 tests** against stock and against the GCC-built patched clang (6,027
+run, 6,026 pass, 1 fail `inlineasm_rdpkru`, 439 s at 24 jobs), and **`zig build gate` 8/8** with it
+(`ZILC_FILC=<tree> bun tools/run-gate.ts`; run the gate through run-gate.ts — a bare `zig build gate`
+without `ZILC_ZIG` fails every Zig case on `zig env`, as one attempt did). Its `.comment` names Zig's
+clang and LLD 20.1.2; it needs only glibc (libc++ is static); 1.55 GB with debug info against
+GCC's 3.8 GB; ~20 min at 12 jobs. Unchanged incremental rerun: 9 s, `ninja: no work to do`.
+
+**The fetched Fil-C sources (2026-10-30)**, proved by `tools/upstream/verify-filc-package.ts`:
+650,987 entries equal the commit `e7947f0` as a checkout has them — every blob id; the 110 CRLF files
+are exactly those upstream's own `.gitattributes` mark `eol=crlf` (`git check-attr --source`, all 23
+attribute files made local first; controls `crlf` / `unspecified`); 7,477 executable bits differ
+from git's modes by Zig's content rule (shebang/ELF/Mach-O, ziglang/zig#17463), as expected;
+inversion caught. From that package, with no options: `zig build pure-zig` builds all 15 pieces,
+and `verify-libpas` (also with no `-Dpizfix`), `verify-yolomusl` and `verify-compiler-rt` pass
+(`ZILC_FILC_SRC=<package>`), as they do from the git checkout. `zig build test` 40/40 with
+`check-pins` 11/11, and it downloads nothing.
+
 **On 0.687 (2026-10-27): 0 differences on all 7,269 tests** (`compare results-stock.json
 results-patched.json`, tests cloned at the `v0.687` tag). Stock and patched alike: **6,027 run,
 6,026 pass, 1 fail (`inlineasm_rdpkru`, as always), 0 timeouts, 1,242 skipped**; 799 s at 12 jobs

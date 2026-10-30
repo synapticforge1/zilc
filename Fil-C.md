@@ -86,8 +86,11 @@ clangs on all 7,269 tests (0.687).
 | frame-slot colouring in linear time (+ a dense interference graph) | the stock colouring is cubic in function size, so large Zig programs took minutes | KI-22 levers (b) |
 | a `--zilc-part` mode for `llvm-split` | parallel code generation after the pass has run on the whole module, so the code stays the same | KI-22 lever (a) |
 
-`tools/filc/build-patched-clang.ts` builds it, and `toolchain/` keeps a local archive (gitignored;
-the clang is never distributed). `tools/filc/restore-patched-clang.ts` restores it.
+`zig build patched-clang` builds it from the Fil-C sources the build fetches (since 2026-10-30;
+`build/patched_clang.zig`, `tools/patched-clang.zig`: the patch is applied without git, each file
+checked against the patch's own blob ids). `tools/filc/build-patched-clang.ts` still builds it from
+the git checkout. `toolchain/` keeps a local archive (gitignored; the clang is never distributed),
+and `tools/filc/restore-patched-clang.ts` restores it.
 
 ### Workarounds zilc applies for Fil-C
 
@@ -189,7 +192,10 @@ because they are the Fil-C-compiled pieces.
    differences**.
 3. Move the source tree to the new compiler commit (`tools/lib/tool.ts` `FILC_SHA`), and re-run
    every importer (`tools/gen/import-signatures.ts`, `tools/runtime/import-*.ts`). An importer that
-   fails means upstream changed its recipe, and the failure says where.
+   fails means upstream changed its recipe, and the failure says where. Bump `build.zig.zon`'s
+   `filc` URL and hash (`zig fetch <url>`), prove the download with
+   `tools/upstream/verify-filc-package.ts`, and let `zig build check-pins` list every other
+   reference still naming the old release.
 4. Re-run every oracle in the table above against the new tarball. A changed count of allowed
    differences is a finding, not a number to update.
 5. `zig build gate-zig-modules`, the corpus and the output comparison with the swapped clang.

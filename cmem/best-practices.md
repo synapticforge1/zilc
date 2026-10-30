@@ -229,6 +229,22 @@ citation to the incident.
   task keys looked like "gc only"; a traced `git maintenance run` showed git 2.54's default
   strategy also running `commit-graph write --split`, because only the repack had been switched
   off. (exFAT recipe, 2026-10-27.)
+- **Measure a download before quoting its cost.** The written estimate for Fil-C's source archive
+  was ~250 MB / ~2 GB; measured, 2.2 GB / 11 GB unpacked (the archive is the whole fork, projects
+  included). (Clone-then-build, 2026-10-30.)
+- **A file mode in a Zig package is Zig's, not the archive's.** Zig's fetcher ignores tar modes and
+  marks a file executable only if it starts with `#!`, ELF or Mach-O (ziglang/zig#17463); the
+  hash records no executable bit. 7,477 of Fil-C's files came out different from git's modes.
+  Prove a package against THAT rule. (2026-10-30.)
+- **In a partial, sparse clone, `git check-attr --source` silently skips `.gitattributes` it has not
+  fetched.** The positive control passed (its attributes file happened to be local) while 105 of
+  110 files read "unspecified". Make every attributes blob local first and refuse if one is
+  missing; a control in one directory proves nothing about the others. `git hash-object` inside
+  zilc's repo applies zilc's `eol=lf` to its input: never use it to judge foreign bytes. Fetch a
+  missing blob with `git -c url.https://github.com/.insteadOf=git@github.com: cat-file -t <id>`
+  (git's lazy fetch; a plain `git fetch <blob id>` fails its connectivity check). (2026-10-30.)
+- **`zig objcopy --strip-debug` is "unimplemented" on a large LLVM ELF (Zig 0.15.2)**: build
+  `llvm-objcopy` in the same ninja run and strip with it. (2026-10-30.)
 
 ## 6. The workspace ★ rules (copied verbatim)
 

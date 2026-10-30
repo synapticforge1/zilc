@@ -254,8 +254,19 @@ changes**, patch releases included. There is no major/minor of our own and no 1.
       Record which modules were pure Zig AND linked (the step prints it and writes
       `ZIG-MODULES.txt`); the corpus and the output comparison run against the same copy with
       `ZILC_FILC` set to the clang it prints.
-- [ ] **Re-sync the project folder's duplicate of the build files** (owner, 2026-10-27;
-      `design-decisions.md` top rows): ⏳ the mechanism is being settled (`open-work.md` first
-      item: a hash-pinned `build.zig.zon` dependency, so this step becomes "bump the URL and
-      hash", then prove the fetched tree equal to the commit's); the patched-clang archive is the
-      step above.
+- [ ] **On a Fil-C move, every reference moves together** (owner, 2026-10-30: *"all of these
+      references should be updated each time Fil-C updates"*; `design-decisions.md` top row):
+      1. `build.zig.zon` `filc`: the archive URL at the new compiler commit, and its hash from
+         `zig fetch <url>` (it prints the hash and fills Zig's cache);
+      2. the other pins: `src/gen/signatures.zig` (re-run the importers), `src/root.zig`,
+         `tools/lib/tool.ts`, `tools/p1/setup-wsl.ts` (prebuilt SHA-256), the three
+         `src/runtime/*_sources.zig` tables, `third_party/filc-patches/README.md`, `Fil-C.md` § 1;
+         **`zig build check-pins`** (also in `zig build test`) lists any that disagree;
+      3. `bun tools/upstream/verify-filc-package.ts`: the fetched tree equals the commit as checked
+         out (blob ids; upstream's `eol=crlf` files by `git check-attr`; Zig's executable rule);
+      4. `zig build patched-clang` rebuilds the clang from the fetched tree, and
+         `zig build pure-zig` the runtime pieces (the `verify-*` tools with
+         `ZILC_FILC_SRC=<package>`);
+      5. if Zig ever fetches cmake/ninja (open, owner call), their pins are re-checked too.
+      Replaces the 2026-10-27 "re-sync the project folder's duplicate" step: a clone reaches the
+      pinned download, so there is no duplicate to keep.

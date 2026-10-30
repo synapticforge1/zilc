@@ -4,7 +4,17 @@
     .fingerprint = 0x7f337b02f7aa97ab, // Changing this has security and trust implications.
     // Pinned to the Zig whose bundled LLVM matches Fil-C's (0.15.2 = LLVM 20). See cmem/known-issues.md KI-3.
     .minimum_zig_version = "0.15.2",
-    .dependencies = .{},
+    .dependencies = .{
+        // Fil-C's sources at the compiler commit of the release zilc is on (src/gen/signatures.zig),
+        // fetched by the first step that reads them (build/filc_source.zig). Moves with every Fil-C
+        // release: `zig fetch <url>` for the hash, then tools/upstream/verify-filc-package.ts and
+        // `zig build check-pins` (cmem/releasing.md). 2.2 GB download, 11 GB unpacked (2026-10-30).
+        .filc = .{
+            .url = "https://github.com/pizlonator/llvm-project-deluge/archive/e7947f079c976fb167108f7407c20240bca0ca89.tar.gz",
+            .hash = "N-V-__8AAP____80boa7EOMLjvmp6wDDfdSz7GvZvZx_e-rl",
+            .lazy = true,
+        },
+    },
     .paths = .{
         "build.zig",
         "build.zig.zon",

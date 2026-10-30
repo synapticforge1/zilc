@@ -75,48 +75,31 @@ them, with their dates.
   unexplained, re-archived, marked reviewed at `e7947f0`. **Release = owner call 0.**
 - ✅ **`gate-zig-modules` on 0.687**: runs on zilc's own 0.687 pure-Zig modules since 2026-10-27
   (`testing.md`).
-- 🗓️ **NEXT SESSION, FIRST (owner, 2026-10-27: "next time scope it into the open items so I don't
-  forget"): clone-then-build — `zig build` fetches Fil-C's build files.** 🔒 The goal (owner):
-  *"the goal is to be able to clone this repository and build for the fil-c side or the pure zig
-  side once the user has the build tools installed"*; and, on how: *"when a user clones our
-  repository and performs the fil-c side build (first build) the build goes and gets all of the
-  files necessary to build, then builds it. And we just have our zig sources files in the repo"*.
-  **Proposed mechanism, owner's go-ahead pending** (`design-decisions.md` top row):
-  1. `build.zig.zon`: a **lazy** dependency `filc` = GitHub's archive of
-     `pizlonator/llvm-project-deluge` at `e7947f0`, with its Zig package hash (from `zig fetch`;
-     the hash covers the unpacked files, not the archive bytes). Fetched once into Zig's global
-     cache by the first step that needs it.
-  2. `build/pure_zig.zig` reads Fil-C's sources from that dependency; `-Dfilc-src` stays as the
-     offline override (a local checkout).
-  3. A Fil-C-side step (e.g. `zig build patched-clang`): apply
-     `third_party/filc-patches/zilc-filc-pass.patch` to the fetched LLVM/clang and run cmake +
-     ninja (installed build tools, like Zig and Fil-C's prebuilt).
-  4. **Check before relying on it:** the fork's `.gitattributes` for `export-ignore` (GitHub's
-     archive drops those files) and line-ending attributes; then the fetched tree against the
-     commit file by file (git blob id, mode, link target — the proof code parked on local branch
-     `wip/reference-duplicate`, `04aa53d`), with an inversion.
-  5. Costs to state to users: one download of the whole fork at that commit (~250 MB compressed,
-     ~2 GB unpacked; estimate, measure it), network on first build.
-  5a. 🔒 **Zig is the only compiler a user installs** (owner, 2026-10-27: *"So we are back to the
-     user not needing an additional C compiler, just zig to start"*). Today the patched clang is
-     compiled by the system's GCC (`build-essential`, `build-patched-clang.ts`): build it with
-     `zig cc`/`zig c++` (and `zig ld.lld`) instead — zig-bootstrap's route; ⚠️ unmeasured here,
-     and the clang then links libc++, not libstdc++, so prove it: Fil-C's suite, stock vs this
-     clang, 0 differences on all 7,269 tests. Remaining user tools: Zig, cmake + ninja (LLVM's
-     build system, not compilers).
-  5b. **Fil-C's prebuilt release becomes optional** (the same exchange): today it is needed for the
-     runtime pieces zilc does not build yet (the Fil-C-compiled half: Z1 item 3), as the tree the
-     patched clang is installed into, and as the oracle. Once item 3 lands, install the whole
-     runtime from zilc's own builds (Fil-C's `build_base.sh` order: Zig builds the host half and
-     the patched clang; that clang builds `filc/src`, the user libc, libc++); the prebuilt stays
-     only as the parity oracle, for whoever verifies a release.
-  6. Then: rewrite the 2026-10-27 duplicate rule around this goal (`design-decisions.md`, INDEX
-     item 5, the release checklist's re-sync step), README "Building", Fil-C.md § 4; on every Fil-C
-     move the step becomes "bump the URL and hash".
-  The gitignored `reference/` duplicate (first attempt, 2026-10-27) is **parked**: a clone cannot
-  see a gitignored folder. Its last run failed honestly (5 CRLF fixtures converted at checkout; the
-  restore-from-blob fix is written, not run) and its output was deleted; the tool also wrote its
-  output despite failing — fix that if it is ever revived.
+- ✅ **Clone-then-build, done 2026-10-30** (owner: *"proceed with the implimentation"*; *"Leave
+  the download of Fil-C and LLVM as is, no distributable in our repo"*; `design-decisions.md` top
+  row). A clone, with Zig, cmake, ninja and the kernel headers installed, builds both sides:
+  `zig build pure-zig` (no options; libpas, yolo musl, compiler-rt pass the release oracle) and
+  `zig build patched-clang` (**compiled by Zig alone**, 5a: Fil-C's suite 0 differences on 7,269
+  against stock, gate 8/8). Fil-C's sources: the lazy `filc` dependency, fetched only when a step
+  that reads them is named; measured 2.2 GB download, 11 GB unpacked. Proved equal to the commit as
+  checked out (`tools/upstream/verify-filc-package.ts`); every Fil-C reference is checked by
+  `zig build check-pins` (owner: *"all of these references should be updated each time Fil-C
+  updates"*). Numbers and method: `testing.md`; lessons: `best-practices.md` § 5.
+  **Still open from it:**
+  - 🗓️ **Owner call: may Zig fetch cmake and ninja?** Proposed: opt-in `-Dfetch-build-tools`,
+    lazy hash-pinned dependencies on Kitware's `cmake-<v>-linux-x86_64.tar.gz` and Ninja's
+    `ninja-linux.zip` (Zig needs no git or curl to fetch). Measure first whether Zig keeps
+    ninja's executable bit (its rule marks ELF files executable, so it should); their pins
+    would join the Fil-C move checklist.
+  - **5b. Fil-C's prebuilt becomes optional**: still needed for the Fil-C-compiled runtime pieces
+    (Z1 item 3), as the tree the patched clang is installed into (`patched-clang` installs only
+    `clang-20` and `llvm-split`; assembling the toolchain tree is still `build-patched-clang.ts`'s
+    copy-and-replace, done by hand for the 2026-10-30 proofs), and as the oracle.
+  - zilc's INSTALLED patched toolchain (`~/zilc-work/tools/filc-0.687-zilc`, and `toolchain/`'s
+    archive) is still the 2026-10-27 GCC build from the git checkout; switching it to the Zig-built
+    one is an owner call (both proven equal by the suite).
+  - The parked branch `wip/reference-duplicate` (`04aa53d`) is superseded; deleting it is the
+    owner's call. Its proof code lives on, corrected, in `verify-filc-package.ts`.
 - **The pure-Zig track — in progress on `main`** (2026-10-27): the generators
   (byte-identical to 0.687's) and the stock runtime pieces (libpas's stock half, yolo musl's static
   half, compiler-rt; every object = the 0.687 release's symbols) are in, and `gate-zig-modules`
@@ -157,7 +140,7 @@ them, with their dates.
 
 | letter | asks zilc | state (2026-10-27) |
 | --- | --- | --- |
-| H26 | pull line; ★ block; path test; drive paths at HEAD; exFAT recipe; `origin` + stale links; per-repo items | answered in the 2026-10-27 compliance commit: pull line atop `INDEX.md`; ★ block = `best-practices.md` § 6 (28 = 28 text check, inverted); path test in `working-rules.md`; `INDEX.md:11` fixed; recipe recorded (owner call 4); `origin` and the four stale links moved; `tests/basics` BasicsOfCoding links measured still live at `jrmarcum/` (200; 404 at `synapticforge1/`), so they stay; INDEX 45 → under 10 KB. Version scheme is DESIGN (P8), stays. Open: owner calls 1–3 |
+| H26 | pull line; ★ block; path test; drive paths at HEAD; exFAT recipe; `origin` + stale links; per-repo items | answered in the 2026-10-27 compliance commit: pull line atop `INDEX.md`; ★ block = `best-practices.md` § 6 (28 = 28 text check, inverted); path test in `working-rules.md`; `INDEX.md:11` fixed; recipe recorded (owner call 4); `origin` and the four stale links moved; `tests/basics` BasicsOfCoding links measured still live at `jrmarcum/` (200; 404 at `synapticforge1/`), so they stay; INDEX 45 → under 10 KB. Version scheme is DESIGN (P8), stays. Owner calls 1–3 done 2026-10-27 (above) |
 | H15 | committed scripts in Bun | ✅ done 2026-10-27: tools Bun since 2026-10-22 (`c2841dd`); `setup-wsl.sh` → documented Bun step + `setup-wsl.ts`, proved (owner call 2); `git ls-files '*.sh' '*.ps1' '*.bat' '*.py' '*.nu'` empty |
 | H19 | purge drive paths from history | ✅ **purged and force-pushed 2026-10-27** (`history-map-2026-10-27.md`; owner call 1); a fresh GitHub clone scans clean |
 | H22 | record the path test | `working-rules.md` § Privacy |

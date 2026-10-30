@@ -270,6 +270,10 @@ Newest first. Copy the template for each adopted component.
 - **Upstream path(s) and license (SPDX):**
   - `libpas/common.mk` (`PASSRCS`), `libpas/Makefile` (PASCC / PASCFLAGS / MAINCFLAGS),
     `yolounwind/Makefile` — `BSD-2-Clause` (Fil-C runtime; `third_party/fil-c/PAS-LICENSE.txt`)
+  - `build_os_include.sh` (pizfix/os-include: three links into the host's kernel headers) and
+    `libpas/build.sh`'s `pizfix/stdfil-include` (a copy of `filc/include`, here read in place),
+    re-expressed 2026-10-30 for builds without a pizfix (`tools/os-include.zig`, `build/pure_zig.zig`)
+    — `BSD-2-Clause`
   - `projects/yolomusl/Makefile` (the object rules and, since 2026-10-27, the `lib/libyoloc.so`
     link rule), the flags musl's `configure` chooses for Zig's clang, and its `LDFLAGS_AUTO` link
     flags — `MIT` (musl; `third_party/fil-c/MUSL-LICENSE.txt`). `dynamic.list` is passed to the
@@ -280,8 +284,9 @@ Newest first. Copy the template for each adopted component.
 - **What we reused:** the file lists and flags, as data, imported mechanically by
   `tools/runtime/import-libpas-sources.ts`, `import-yolomusl-sources.ts`,
   `import-compiler-rt-sources.ts`; the rules re-expressed as Zig build steps. **No source file of
-  libpas, musl or compiler-rt is copied into zilc**: they are compiled from the Fil-C checkout given
-  by `-Dfilc-src`
+  libpas, musl or compiler-rt is copied into zilc**: they are compiled from the Fil-C sources `zig
+  build` fetches (build.zig.zon `filc`, GitHub's archive of the commit; since 2026-10-30) or the
+  checkout given by `-Dfilc-src`
 - **Where it lives in zilc:** `src/runtime/libpas_sources.zig` (BSD-2-Clause),
   `src/runtime/yolomusl_sources.zig` (MIT), `src/runtime/compiler_rt_sources.zig` (Apache-2.0 WITH
   LLVM-exception) — each generated with its upstream's SPDX line; `build/pure_zig.zig` (the

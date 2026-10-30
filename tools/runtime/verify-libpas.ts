@@ -8,11 +8,12 @@
 // in KNOWN_UNDEF_DIFFS with its cmem/workarounds.md entry. A new difference fails, and so does a
 // listed one that has gone, so the list and the record cannot go stale.
 //
-//   bun tools/runtime/verify-libpas.ts       
+//   bun tools/runtime/verify-libpas.ts       env: ZILC_PIZFIX (default: the prebuilt's pizfix;
+//                                                 "none" = no -Dpizfix, the build makes them itself)
 
 import { readdirSync } from "node:fs";
 import { readdir, stat } from "node:fs/promises";
-import { FILC_PREBUILT_TREE, PURE_ZIG_OUT, REPO, WORK, existsSync, linuxOnly, mkdirp, must, requireFilcSrc, rmrf, run, ZIG, zigCacheArgs } from "../lib/tool.ts";
+import { FILC_PREBUILT_TREE, PURE_ZIG_OUT, REPO, WORK, env, existsSync, linuxOnly, mkdirp, must, requireFilcSrc, rmrf, run, ZIG, zigCacheArgs } from "../lib/tool.ts";
 import { diff, sourcePaths, symbols } from "./lib/objects.ts";
 
 await linuxOnly(import.meta);
@@ -22,7 +23,8 @@ const prebuilt = FILC_PREBUILT_TREE;
 const prefix = PURE_ZIG_OUT;
 
 // 1. Build ours.
-const r = await run([ZIG, "build", "libpas", `-Dfilc-src=${src}`, `-Dpizfix=${prebuilt}/pizfix`, "--prefix", prefix, ...zigCacheArgs()], { cwd: REPO, inherit: true });
+const pizfix = env("ZILC_PIZFIX", `${prebuilt}/pizfix`);
+const r = await run([ZIG, "build", "libpas", `-Dfilc-src=${src}`, ...(pizfix === "none" ? [] : [`-Dpizfix=${pizfix}`]), "--prefix", prefix, ...zigCacheArgs()], { cwd: REPO, inherit: true });
 if (r.code !== 0) {
   console.log("FAILED: zig build libpas");
   process.exit(1);

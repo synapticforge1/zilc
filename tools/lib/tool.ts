@@ -77,13 +77,25 @@ export const FILC_0685_PREBUILT_TREE = filcPrebuiltTree("0.685");
 
 /**
  * The pure-Zig track (cmem/roadmap.md): zilc's Fil-C source checkout (a sparse, partial clone at
- * FILC_SHA, ZILC_FILC_SRC to override) is the input; its outputs install under PURE_ZIG_OUT, off
+ * FILC_SHA, ZILC_FILC_SRC to override, e.g. with filcPackageDir()) is the input; its outputs install under PURE_ZIG_OUT, off
  * the exFAT repo. A checkout at any other commit is refused: the tables and the oracle are per
  * release.
  */
 export const FILC_SRC = env("ZILC_FILC_SRC", `${WORK}/filc-src/repo`);
 export const PURE_ZIG_OUT = env("ZILC_PURE_ZIG_OUT", `${WORK}/pure-zig/filc-${FILC_VERSION}`);
+/**
+ * Where `zig build` fetched Fil-C's sources: Zig's global cache entry for build.zig.zon's `filc`
+ * hash (build/filc_source.zig). tools/upstream/verify-filc-package.ts proves it is FILC_SHA.
+ */
+export async function filcPackageDir(): Promise<string> {
+  const zon = await Bun.file(`${REPO}/build.zig.zon`).text();
+  const hash = zon.match(/\.hash = "([^"]+)"/)?.[1];
+  if (!hash) throw new Error("build.zig.zon has no filc hash");
+  return `${env("ZIG_GLOBAL_CACHE_DIR", `${HOME}/.cache/zig`)}/p/${hash}`;
+}
 export async function requireFilcSrc(): Promise<string> {
+  // The fetched package has no .git: it is accepted as FILC_SHA by its pinned hash, not by HEAD.
+  if (FILC_SRC === await filcPackageDir()) return FILC_SRC;
   const head = (await must(["git", "-C", FILC_SRC, "rev-parse", "HEAD"])).trim();
   if (head !== FILC_SHA) throw new Error(`${FILC_SRC} is at ${head}; zilc is on Fil-C ${FILC_VERSION} = ${FILC_SHA}`);
   return FILC_SRC;

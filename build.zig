@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception OR MIT
 const std = @import("std");
 const pure_zig = @import("build/pure_zig.zig");
+const filc_source = @import("build/filc_source.zig");
+const patched_clang = @import("build/patched_clang.zig");
+const signatures = @import("src/gen/signatures.zig");
 
 pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
@@ -65,9 +68,25 @@ pub fn build(b: *std.Build) void {
     if (b.args) |args| run_gen.addArgs(args);
     b.step("gen", "Run zilc-gen with the arguments after -- (header | forwarders | musl-headers | musl-genh | --version)").dependOn(&run_gen.step);
 
+    // Fil-C's sources: fetched by zig build when a step that reads them is named (build.zig.zon
+    // `filc`), or -Dfilc-src (build/filc_source.zig).
+    const filc_src = filc_source.path(b);
     // The runtime pieces built from Fil-C's sources (`zig build libpas | yolomusl | compiler-rt |
-    // pure-zig -Dfilc-src=…`): build/pure_zig.zig.
-    pure_zig.addSteps(b, gen);
+    // pure-zig`): build/pure_zig.zig.
+    pure_zig.addSteps(b, gen, filc_src);
+    // The Fil-C side's compiler (`zig build patched-clang`): build/patched_clang.zig.
+    patched_clang.addStep(b, filc_src);
+
+    // ---- Every reference to the Fil-C release names the same one (`zig build check-pins`) ----
+    // Owner, 2026-10-30: they all move with each Fil-C update. Also part of `zig build test`.
+    const pins = b.addExecutable(.{
+        .name = "check-pins",
+        .root_module = b.createModule(.{ .root_source_file = b.path("tools/check-pins.zig"), .target = b.graph.host }),
+    });
+    const run_pins = b.addRunArtifact(pins);
+    run_pins.addArgs(&.{ b.build_root.path orelse ".", signatures.filc_version, signatures.filc_commit });
+    run_pins.has_side_effects = true; // reads files it does not declare
+    b.step("check-pins", "Check that every reference to the Fil-C release names the same release and commit").dependOn(&run_pins.step);
 
     // ---- Runtime as a static C-ABI library (`include/zilc.h`) --------------
     const rt = b.addLibrary(.{
@@ -199,6 +218,7 @@ pub fn build(b: *std.Build) void {
     }) });
     const exe_tests = b.addTest(.{ .root_module = exe.root_module });
     const test_step = b.step("test", "Run unit tests");
+    test_step.dependOn(&run_pins.step);
     test_step.dependOn(&b.addRunArtifact(mod_tests).step);
     test_step.dependOn(&b.addRunArtifact(exe_tests).step);
     // The generators: byte-identity with Ruby's output (SHA-256 pinned per Fil-C release) and the

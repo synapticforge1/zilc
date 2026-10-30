@@ -66,8 +66,8 @@ zilc build [-O ReleaseSafe] [--target x86_64-linux-musl] [--entry auto|zig|c] [-
 ```
 
 **Which Fil-C clang.** zilc works best with **Fil-C 0.687's clang rebuilt with two fixes** to its
-compiler pass (`tools/filc/build-patched-clang.ts`, about an hour; the diff is in
-`third_party/filc-patches/`). The fixes don't change what the compiler emits for code it already
+compiler pass (`zig build patched-clang`, see [Building](#building-fil-cs-side-from-a-clone); the
+diff is in `third_party/filc-patches/`). The fixes don't change what the compiler emits for code it already
 handled:
 
 - a crash on code with several computed jumps in one function, which Zig's Debug builds contain.
@@ -146,6 +146,29 @@ zig build -Dtarget=x86_64-linux-musl -Doptimize=ReleaseSafe
 
 Build and run everything on Linux x86_64 (on Windows, inside WSL). First-time setup of Zig, Fil-C
 and Bun: [tools/README.md](tools/README.md) "First-time setup".
+
+### Building Fil-C's side from a clone
+
+The repository holds zilc's own sources only. The steps that compile Fil-C's code fetch Fil-C's
+sources themselves, the first time one of them runs: GitHub's archive of Fil-C's repository at the
+commit zilc is built on, pinned by its hash in `build.zig.zon`, into Zig's cache. **That is a
+2.2 GB download that unpacks to 11 GB**, once per Fil-C release; nothing else in the build
+downloads it (`zig build`, `test` and `gate` never do).
+
+```sh
+zig build patched-clang   # Fil-C's clang with zilc's two pass fixes: needs cmake and ninja
+zig build pure-zig        # Fil-C's runtime pieces built by Zig: libpas, yolo musl, compiler-rt
+```
+
+- `patched-clang` is compiled by **Zig's own C and C++ compilers**, so no other compiler is
+  needed (`-Dclang-cc=system` uses the system's `cc`/`c++` instead). It builds in about 20
+  minutes at 12 jobs, into `~/zilc-work/patched-clang/` (`-Dclang-work`), and installs `clang-20`
+  and `llvm-split` under `zig-out/patched-clang/bin`. `-Dclang-jobs=<n>` sets ninja's jobs (one
+  per core can exhaust memory). Fil-C's own test suite gives the same result with it as with Fil-C's
+  release on all 7,269 tests.
+- `pure-zig` needs the Linux kernel headers (`/usr/include/linux`; Debian and Ubuntu:
+  `linux-libc-dev`), as Fil-C's own build does.
+- Offline, or with a checkout of your own: `-Dfilc-src=<Fil-C tree at the same commit>`.
 
 **If the checkout is on an exFAT drive, keep the Zig cache off it.** A `.zig-cache` on exFAT works
 for one build and fails with `error: Unexpected` on every build after that:
