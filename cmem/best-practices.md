@@ -243,6 +243,10 @@ citation to the incident.
   zilc's repo applies zilc's `eol=lf` to its input: never use it to judge foreign bytes. Fetch a
   missing blob with `git -c url.https://github.com/.insteadOf=git@github.com: cat-file -t <id>`
   (git's lazy fetch; a plain `git fetch <blob id>` fails its connectivity check). (2026-10-30.)
+- **A mismatch in a toolchain built from source has a SOURCE before it has a cause**: of 32
+  libraries, the one whose exports differed (`libyolort.a`) was the one the clang under test does
+  not compile (host GCC 15 vs the release's 11.4). Check who built a piece before blaming the
+  compiler being verified. (Fil-C from source, 2026-10-30.)
 - **`zig objcopy --strip-debug` is "unimplemented" on a large LLVM ELF (Zig 0.15.2)**: build
   `llvm-objcopy` in the same ninja run and strip with it. (2026-10-30.)
 

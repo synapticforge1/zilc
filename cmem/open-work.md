@@ -93,8 +93,14 @@ them, with their dates.
     PATH holding every system program but cmake and ninja: without the option the build stops
     naming it; with it, a full rebuild (2,991 steps, 20 min) gives a **byte-identical
     clang-20**. LLVM's CMake also takes the host's Python 3 (README lists it).
-  - **5b. Fil-C's prebuilt becomes optional**: still needed for the Fil-C-compiled runtime pieces
-    (Z1 item 3), as the tree the patched clang is installed into (`patched-clang` installs only
+  - ✅ **Fil-C compiles with the Zig-built clang, verified 2026-10-30** (owner):
+    `tools/filc/build-filc-from-source.ts` runs upstream's own build steps with it; the toolchain
+    that results, built entirely from source, passes Fil-C's suite with 0 differences on 7,269
+    (`testing.md`). This is upstream's route (its scripts, the host's cc for the stock pieces);
+    zilc's own pure-Zig route for the Fil-C-compiled pieces is still Z1 item 3.
+  - **5b. Fil-C's prebuilt becomes optional**: the from-source tree above shows it CAN be replaced
+    (every library but GCC-built `libyolort.a` exports the release's symbols). Still needed today
+    for the Fil-C-compiled runtime pieces in zilc's own build (Z1 item 3), as the tree the patched clang is installed into (`patched-clang` installs only
     `clang-20` and `llvm-split`; assembling the toolchain tree is still `build-patched-clang.ts`'s
     copy-and-replace, done by hand for the 2026-10-30 proofs), and as the oracle.
   - ✅ **zilc's installed patched toolchain is the Zig-built clang since 2026-10-30** (owner: "yes"):

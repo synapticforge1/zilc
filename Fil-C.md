@@ -88,8 +88,12 @@ clangs on all 7,269 tests (0.687).
 
 `zig build patched-clang` builds it from the Fil-C sources the build fetches (since 2026-10-30;
 `build/patched_clang.zig`, `tools/patched-clang.zig`: the patch is applied without git, each file
-checked against the patch's own blob ids). `tools/filc/build-patched-clang.ts` still builds it from
-the git checkout. `toolchain/` keeps a local archive (gitignored; the clang is never distributed),
+checked against the patch's own blob ids), with Zig's own C and C++ compilers by default; Fil-C's
+suite gives 0 differences against stock. Fil-C itself compiles with that clang: upstream's own
+build steps, run with it by `tools/filc/build-filc-from-source.ts`, produce a toolchain whose
+libraries export the release's symbols and which passes Fil-C's suite with 0 differences
+(`cmem/testing.md`). `tools/filc/build-patched-clang.ts` still builds the clang from the git
+checkout. `toolchain/` keeps a local archive (gitignored; the clang is never distributed),
 and `tools/filc/restore-patched-clang.ts` restores it.
 
 ### Workarounds zilc applies for Fil-C

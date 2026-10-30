@@ -118,6 +118,20 @@ without `ZILC_ZIG` fails every Zig case on `zig env`, as one attempt did). Its `
 clang and LLD 20.1.2; it needs only glibc (libc++ is static); 1.55 GB with debug info against
 GCC's 3.8 GB; ~20 min at 12 jobs. Unchanged incremental rerun: 9 s, `ninja: no work to do`.
 
+**Fil-C COMPILES with the Zig-built clang (2026-10-30; owner: "verify that Fil-C compiles with the
+zig-built clang")** — `bun tools/filc/build-filc-from-source.ts`: upstream's own `build_base.sh`
+steps after the LLVM build, unchanged, on the fetched sources, with `build/` holding only the
+Zig-built clang. All ten succeed (projeny, compiler-rt, yolounwind, os-include, yolo musl, the
+runtime, the user musl, libc++/libc++abi, minilute and sarcasm with their smoke runs; ~4 min).
+`pizfix/lib`: the release's 37 entries; **31 of 32 libraries define exactly the release's global
+symbols** — every one the clang compiles (`libpizlo`, `libc`, libc++, libc++abi, crt objects); the
+one difference is `libyolort.a`, compiled by the HOST's GCC as upstream does: 5 extra bf16/half
+conversions (`__extendbfsf2` …) because GCC 15 here supports those types and the release's GCC
+11.4 did not. **Fil-C's suite on that toolchain, built entirely from source: 0 differences on all
+7,269 tests** against stock (6,027 run, 6,026 pass, 1 fail `inlineasm_rdpkru`, 399 s at 24 jobs).
+The tree a copy needs (found by failing): `libc` (libc++'s charconv) and `projects/lute-1.0.0`
+(minilute's Luau) besides the obvious; `build/include` must exist.
+
 **The fetched Fil-C sources (2026-10-30)**, proved by `tools/upstream/verify-filc-package.ts`:
 650,987 entries equal the commit `e7947f0` as a checkout has them — every blob id; the 110 CRLF files
 are exactly those upstream's own `.gitattributes` mark `eol=crlf` (`git check-attr --source`, all 23
