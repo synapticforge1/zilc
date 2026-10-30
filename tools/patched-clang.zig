@@ -6,7 +6,7 @@
 //! `zig build`; cmem/open-work.md).
 //!
 //!   patched-clang <filc src> <patch> <work dir> <jobs> <vc repository> <vc revision> <out dir>
-//!                 [--cc <cc> --cxx <c++> --ar <ar> --ranlib <ranlib>]
+//!                 [--cc <cc> --cxx <c++> --ar <ar> --ranlib <ranlib>] [--cmake <cmake> --ninja <ninja>]
 //!
 //! 1. Stage: <work>/src mirrors what LLVM's CMake reads (the top-level files, llvm/, clang/,
 //!    cmake/, third-party/ — the sparse set of the git build) as HARD LINKS into the fetched
@@ -236,8 +236,8 @@ pub fn main() !void {
     const gpa = arena_state.allocator();
 
     const args = try std.process.argsAlloc(gpa);
-    if (args.len != 8 and args.len != 16)
-        fail("usage: patched-clang <filc src> <patch> <work dir> <jobs> <vc repository> <vc revision> <out dir> [--cc <cc> --cxx <c++> --ar <ar> --ranlib <ranlib>]", .{});
+    const usage = "usage: patched-clang <filc src> <patch> <work dir> <jobs> <vc repository> <vc revision> <out dir> [--cc <cc> --cxx <c++> --ar <ar> --ranlib <ranlib>] [--cmake <cmake> --ninja <ninja>]";
+    if (args.len < 8 or (args.len - 8) % 2 != 0) fail("{s}", .{usage});
     const filc_src = args[1];
     const patch_path = args[2];
     const work = args[3];
@@ -245,15 +245,28 @@ pub fn main() !void {
     const vc_repo = args[5];
     const vc_rev = args[6];
     const out = args[7];
-    var zig_tools: ?[4][]const u8 = null; // cc, c++, ar, ranlib
-    if (args.len == 16) {
-        var t: [4][]const u8 = undefined;
-        for ([_][]const u8{ "--cc", "--cxx", "--ar", "--ranlib" }, 0..) |flag, i| {
-            if (!std.mem.eql(u8, args[8 + 2 * i], flag)) fail("expected {s}, got {s}", .{ flag, args[8 + 2 * i] });
-            t[i] = args[9 + 2 * i];
-        }
-        zig_tools = t;
+    const flags = [_][]const u8{ "--cc", "--cxx", "--ar", "--ranlib", "--cmake", "--ninja" };
+    var given: [flags.len]?[]const u8 = @splat(null);
+    var i: usize = 8;
+    while (i < args.len) : (i += 2) {
+        const at = for (flags, 0..) |f, k| {
+            if (std.mem.eql(u8, args[i], f)) break k;
+        } else fail("unknown option {s}; {s}", .{ args[i], usage });
+        given[at] = args[i + 1];
     }
+    var zig_tools: ?[4][]const u8 = null; // cc, c++, ar, ranlib: all four or none
+    if (given[0] != null or given[1] != null or given[2] != null or given[3] != null) {
+        if (given[0] == null or given[1] == null or given[2] == null or given[3] == null) fail("--cc, --cxx, --ar and --ranlib go together", .{});
+        zig_tools = .{ given[0].?, given[1].?, given[2].?, given[3].? };
+    }
+    // cmake and ninja: the fetched ones (-Dfetch-build-tools), else PATH's.
+    if ((given[4] == null) != (given[5] == null)) fail("--cmake and --ninja go together", .{});
+    const cmake = given[4] orelse "cmake";
+    const ninja = given[5] orelse "ninja";
+    if (given[4] == null) for ([_][]const u8{ "cmake", "ninja" }) |t| {
+        _ = std.process.Child.run(.{ .allocator = gpa, .argv = &.{ t, "--version" } }) catch
+            fail("{s} is not on PATH: install it, or let zig build fetch the pinned cmake and ninja with -Dfetch-build-tools", .{t});
+    };
 
     const patch_text = try std.fs.cwd().readFileAlloc(gpa, patch_path, 16 << 20);
     const files = try parsePatch(gpa, patch_text);
@@ -269,7 +282,9 @@ pub fn main() !void {
     {
         var argv: std.ArrayListUnmanaged([]const u8) = .{};
         try argv.appendSlice(gpa, &.{
-            "cmake",                                                       "-S",                              try std.fs.path.join(gpa, &.{ src, "llvm" }),
+            cmake,
+            try std.fmt.allocPrint(gpa, "-DCMAKE_MAKE_PROGRAM={s}", .{ninja}),
+            "-S",                                                          try std.fs.path.join(gpa, &.{ src, "llvm" }),
             "-B",                                                          build_dir,                         "-G",
             "Ninja",                                                       "-DLLVM_ENABLE_PROJECTS=clang",    "-DCMAKE_BUILD_TYPE=RelWithDebInfo",
             "-DLLVM_ENABLE_ASSERTIONS=ON",                                 "-DLLVM_TARGETS_TO_BUILD=X86",     "-DLLVM_ENABLE_LIBXML2=OFF",
@@ -307,7 +322,7 @@ pub fn main() !void {
     }
     // llvm-objcopy strips llvm-split below: `zig objcopy --strip-debug` is "unimplemented" for it
     // (Zig 0.15.2, 2026-10-30), and binutils' strip would be one more tool to install.
-    try runIn(gpa, build_dir, &.{ "ninja", "-j", jobs, "clang", "llvm-split", "llvm-objcopy" });
+    try runIn(gpa, build_dir, &.{ ninja, "-j", jobs, "clang", "llvm-split", "llvm-objcopy" });
 
     const bin = try std.fs.path.join(gpa, &.{ out, "bin" });
     try std.fs.cwd().makePath(bin);

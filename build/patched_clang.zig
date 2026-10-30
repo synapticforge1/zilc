@@ -3,8 +3,11 @@
 //! built from the sources build/filc_source.zig provides (tools/patched-clang.zig says how).
 //!
 //!   zig build patched-clang [-Dclang-cc=zig|system] [-Dclang-jobs=12] [-Dclang-work=<dir>]
+//!                           [-Dfetch-build-tools]
 //!
-//! Needs cmake and ninja on PATH (LLVM's build system; not compilers). The compilers are Zig's own
+//! Needs cmake and ninja (LLVM's build system; not compilers): from PATH, or, when the user opts in
+//! with -Dfetch-build-tools (owner, 2026-10-30), the release binaries pinned in build.zig.zon,
+//! fetched once into Zig's cache — nothing is installed on the system. The compilers are Zig's own
 //! by default (owner, 2026-10-27: "just zig to start"): Fil-C's suite gave 0 differences on all
 //! 7,269 tests against stock, 2026-10-30 (cmem/testing.md). `system` uses the system's cc/c++, as
 //! tools/filc/build-patched-clang.ts does.
@@ -23,11 +26,21 @@ pub fn addStep(b: *std.Build, filc_src: ?[]const u8) void {
     const work = b.option([]const u8, "clang-work", "patched-clang's staging and build directory (default ~/zilc-work/patched-clang/filc-<release>)") orelse
         b.pathJoin(&.{ home, "zilc-work", "patched-clang", "filc-" ++ signatures.filc_version });
 
-    const step = b.step("patched-clang", "Build Fil-C's clang with zilc's pass fixes from Fil-C's sources (fetched on first use; needs cmake + ninja)");
+    const fetch_tools = b.option(bool, "fetch-build-tools", "patched-clang: fetch the pinned cmake and ninja into Zig's cache instead of using PATH's (opt-in)") orelse false;
+
+    const step = b.step("patched-clang", "Build Fil-C's clang with zilc's pass fixes from Fil-C's sources (fetched on first use; needs cmake + ninja, or -Dfetch-build-tools)");
     const src = filc_src orelse {
         step.dependOn(&b.addFail("patched-clang: Fil-C's sources are not available (-Dfilc-src, or the `filc` dependency)").step);
         return;
     };
+    // Asked for only past this point, so the tools are fetched only when patched-clang is named.
+    var tools: ?[2]std.Build.LazyPath = null; // cmake, ninja
+    if (fetch_tools) {
+        const cmake_dep = b.lazyDependency("cmake", .{});
+        const ninja_dep = b.lazyDependency("ninja", .{});
+        if (cmake_dep == null or ninja_dep == null) return; // fetched, then build.zig runs again
+        tools = .{ cmake_dep.?.path("bin/cmake"), ninja_dep.?.path("ninja") };
+    }
 
     const host = b.graph.host;
     const tool = b.addExecutable(.{
@@ -52,6 +65,12 @@ pub fn addStep(b: *std.Build, filc_src: ?[]const u8) void {
             run.addArg(t[0]);
             run.addFileArg(shim.getEmittedBin());
         }
+    }
+    if (tools) |t| {
+        run.addArg("--cmake");
+        run.addFileArg(t[0]);
+        run.addArg("--ninja");
+        run.addFileArg(t[1]);
     }
     // cmake and ninja keep their own state; the tool decides what is current.
     run.has_side_effects = true;

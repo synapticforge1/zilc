@@ -14,6 +14,21 @@
             .hash = "N-V-__8AAP____80boa7EOMLjvmp6wDDfdSz7GvZvZx_e-rl",
             .lazy = true,
         },
+        // LLVM's build system for `zig build patched-clang`, fetched only with the user's opt-in
+        // `-Dfetch-build-tools` (owner, 2026-10-30); else cmake and ninja come from PATH. Official
+        // release binaries, checked at pinning against their publishers' SHA-256 (Kitware's
+        // cmake-4.2.3-SHA-256.txt: 5bb505d5…0c23; GitHub's asset digest for ninja-linux.zip:
+        // 0830252d…0238). Re-checked on every Fil-C move (cmem/releasing.md).
+        .cmake = .{
+            .url = "https://github.com/Kitware/CMake/releases/download/v4.2.3/cmake-4.2.3-linux-x86_64.tar.gz",
+            .hash = "N-V-__8AAGbjHwrGnmA5KvztaSpwjOorHvTpN-8s9hoQpQsT",
+            .lazy = true,
+        },
+        .ninja = .{
+            .url = "https://github.com/ninja-build/ninja/releases/download/v1.13.1/ninja-linux.zip",
+            .hash = "N-V-__8AAHBwBADunxW-KasDAM8DFYcfQXxzXXW6NvPfJqmt",
+            .lazy = true,
+        },
     },
     .paths = .{
         "build.zig",

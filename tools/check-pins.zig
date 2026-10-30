@@ -20,6 +20,8 @@ const Pin = struct {
 
 const pins = [_]Pin{
     // What `zig build` fetches: Fil-C's sources at the commit (build.zig.zon, lazy dependency `filc`).
+    // (cmake and ninja, also there, are pinned to their own releases, not to Fil-C's: the release
+    // checklist re-checks them on each Fil-C move.)
     .{ .file = "build.zig.zon", .text = "llvm-project-deluge/archive/{c}.tar.gz" },
     .{ .file = "src/root.zig", .text = "pub const filc_release = \"{v}\";" },
     .{ .file = "tools/lib/tool.ts", .text = "export const FILC_VERSION = \"{v}\";" },

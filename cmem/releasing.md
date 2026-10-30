@@ -267,6 +267,9 @@ changes**, patch releases included. There is no major/minor of our own and no 1.
       4. `zig build patched-clang` rebuilds the clang from the fetched tree, and
          `zig build pure-zig` the runtime pieces (the `verify-*` tools with
          `ZILC_FILC_SRC=<package>`);
-      5. if Zig ever fetches cmake/ninja (open, owner call), their pins are re-checked too.
+      5. `build.zig.zon`'s `cmake` and `ninja` (the `-Dfetch-build-tools` opt-in): check for newer
+         releases; to move one, `zig fetch <url>` for the hash, compare the download's SHA-256
+         with the publisher's (Kitware's `cmake-<v>-SHA-256.txt`; GitHub's asset `digest`), and
+         rebuild `patched-clang` with the option.
       Replaces the 2026-10-27 "re-sync the project folder's duplicate" step: a clone reaches the
       pinned download, so there is no duplicate to keep.

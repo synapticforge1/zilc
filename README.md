@@ -156,9 +156,21 @@ commit zilc is built on, pinned by its hash in `build.zig.zon`, into Zig's cache
 downloads it (`zig build`, `test` and `gate` never do).
 
 ```sh
-zig build patched-clang   # Fil-C's clang with zilc's two pass fixes: needs cmake and ninja
+zig build patched-clang   # Fil-C's clang with zilc's two pass fixes
 zig build pure-zig        # Fil-C's runtime pieces built by Zig: libpas, yolo musl, compiler-rt
 ```
+
+What each needs besides Zig 0.15.2:
+
+| step | needs |
+| --- | --- |
+| `patched-clang` | cmake and ninja (LLVM's build system), or `-Dfetch-build-tools`; Python 3 (LLVM's CMake requires it; Ubuntu ships it) |
+| `pure-zig` | the Linux kernel headers (`/usr/include/linux`; Debian and Ubuntu: `linux-libc-dev`) |
+
+**`-Dfetch-build-tools`** (opt-in) lets `zig build` fetch cmake 4.2.3 and ninja 1.13.1, the
+official release binaries pinned by hash in `build.zig.zon`, into Zig's cache (about 60 MB),
+instead of using the ones on `PATH`. Nothing is installed on the system. Without it, a missing
+cmake or ninja stops the build with a message naming the option.
 
 - `patched-clang` is compiled by **Zig's own C and C++ compilers**, so no other compiler is
   needed (`-Dclang-cc=system` uses the system's `cc`/`c++` instead). It builds in about 20
@@ -166,8 +178,6 @@ zig build pure-zig        # Fil-C's runtime pieces built by Zig: libpas, yolo mu
   and `llvm-split` under `zig-out/patched-clang/bin`. `-Dclang-jobs=<n>` sets ninja's jobs (one
   per core can exhaust memory). Fil-C's own test suite gives the same result with it as with Fil-C's
   release on all 7,269 tests.
-- `pure-zig` needs the Linux kernel headers (`/usr/include/linux`; Debian and Ubuntu:
-  `linux-libc-dev`), as Fil-C's own build does.
 - Offline, or with a checkout of your own: `-Dfilc-src=<Fil-C tree at the same commit>`.
 
 **If the checkout is on an exFAT drive, keep the Zig cache off it.** A `.zig-cache` on exFAT works

@@ -86,11 +86,13 @@ them, with their dates.
   `zig build check-pins` (owner: *"all of these references should be updated each time Fil-C
   updates"*). Numbers and method: `testing.md`; lessons: `best-practices.md` § 5.
   **Still open from it:**
-  - 🗓️ **Owner call: may Zig fetch cmake and ninja?** Proposed: opt-in `-Dfetch-build-tools`,
-    lazy hash-pinned dependencies on Kitware's `cmake-<v>-linux-x86_64.tar.gz` and Ninja's
-    `ninja-linux.zip` (Zig needs no git or curl to fetch). Measure first whether Zig keeps
-    ninja's executable bit (its rule marks ELF files executable, so it should); their pins
-    would join the Fil-C move checklist.
+  - ✅ **Zig fetches cmake and ninja on the user's opt-in, done 2026-10-30** (owner: "yes, with a
+    user opt-in"): `-Dfetch-build-tools`; lazy deps `cmake` (Kitware 4.2.3, 58 MB, SHA-256 =
+    Kitware's published file) and `ninja` (1.13.1, = GitHub's asset digest), requested only when
+    `patched-clang` is named. Both come out executable (Zig's ELF rule) and run. Tested with a
+    PATH holding every system program but cmake and ninja: without the option the build stops
+    naming it; with it, a full rebuild (2,991 steps, 20 min) gives a **byte-identical
+    clang-20**. LLVM's CMake also takes the host's Python 3 (README lists it).
   - **5b. Fil-C's prebuilt becomes optional**: still needed for the Fil-C-compiled runtime pieces
     (Z1 item 3), as the tree the patched clang is installed into (`patched-clang` installs only
     `clang-20` and `llvm-split`; assembling the toolchain tree is still `build-patched-clang.ts`'s
