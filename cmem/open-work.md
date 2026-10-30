@@ -95,11 +95,15 @@ them, with their dates.
     (Z1 item 3), as the tree the patched clang is installed into (`patched-clang` installs only
     `clang-20` and `llvm-split`; assembling the toolchain tree is still `build-patched-clang.ts`'s
     copy-and-replace, done by hand for the 2026-10-30 proofs), and as the oracle.
-  - zilc's INSTALLED patched toolchain (`~/zilc-work/tools/filc-0.687-zilc`, and `toolchain/`'s
-    archive) is still the 2026-10-27 GCC build from the git checkout; switching it to the Zig-built
-    one is an owner call (both proven equal by the suite).
-  - The parked branch `wip/reference-duplicate` (`04aa53d`) is superseded; deleting it is the
-    owner's call. Its proof code lives on, corrected, in `verify-filc-package.ts`.
+  - ✅ **zilc's installed patched toolchain is the Zig-built clang since 2026-10-30** (owner: "yes"):
+    `~/zilc-work/tools/filc-0.687-zilc` (the GCC build kept beside it as `filc-0.687-zilc-gcc` for
+    rollback), gate 8/8, re-archived in `toolchain/` (SHA256SUMS now names the compiler).
+    `check-toolchain` compares `git diff --full-index` (short blob ids grew 9 → 10 characters
+    after 18 blobs were fetched into the clone; the patch file was regenerated with full ids,
+    content unchanged). Rebuilt from the re-applied patch: clang-20 and llvm-split
+    **byte-identical** — Zig's build of the clang is reproducible.
+  - ✅ Branch `wip/reference-duplicate` (`04aa53d`) deleted 2026-10-30 (owner); its proof code lives
+    on, corrected, in `verify-filc-package.ts`.
 - **The pure-Zig track — in progress on `main`** (2026-10-27): the generators
   (byte-identical to 0.687's) and the stock runtime pieces (libpas's stock half, yolo musl's static
   half, compiler-rt; every object = the 0.687 release's symbols) are in, and `gate-zig-modules`

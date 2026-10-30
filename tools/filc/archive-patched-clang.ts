@@ -44,11 +44,16 @@ await must(["sh", "-c", 'tar -C "$0" -cf - "$1" | xz -T0 -6 > "$2"', tmp, name, 
 await must(["sh", "-c", 'xz -T0 -6 -c "$0" > "$1"', `${tmp}/clang-20.debug`, `${out}/${name}-clang-20.debug.xz`]);
 
 const patchSum = (await must(["sha256sum", `${REPO}/third_party/filc-patches/zilc-filc-pass.patch`])).split(" ")[0];
+// Which compiler built it (Zig's clang since 2026-10-30, `zig build patched-clang`; GCC before):
+// the first line of its .comment section.
+const builtBy = (await must(["readelf", "-p", ".comment", `${FILC_PATCHED_TREE}/build/bin/clang-20`]))
+  .split("\n").map((l) => l.match(/\]\s+(.*)$/)?.[1]).find(Boolean) ?? "unknown";
 const fileSums = await must(["sha256sum", `${name}-linux-x86_64.tar.xz`, `${name}-clang-20.debug.xz`], { cwd: out });
 const stamp = new Date().toISOString().slice(0, 16) + "Z";
 await writeFile(`${out}/SHA256SUMS`, [
   `# ${name}: Fil-C ${FILC_VERSION} clang built from ${FILC_SOURCE_URL.split("/").pop()} ${FILC_SHA.slice(0, 8)} with zilc's pass fixes`,
   `# patch: third_party/filc-patches/zilc-filc-pass.patch sha256 ${patchSum}`,
+  `# compiled by: ${builtBy}`,
   `# archived ${stamp} by tools/filc/archive-patched-clang.ts`,
   fileSums.trimEnd(),
 ].join("\n") + "\n");

@@ -20,13 +20,16 @@ let stale = false;
 
 // 1. Edits in the Linux Fil-C source that are not saved into the repo's patch file.
 if (await exists(`${src}/.git`)) {
-  const diff = (await run(["git", "-C", src, "diff"])).out;
+  // --full-index: git shortens blob ids by the repo's object count, so a plain diff's `index` lines
+  // changed length (9 -> 10) when 18 blobs were fetched into the clone (2026-10-30), with no change
+  // in content. Full ids are stable, and tools/patched-clang.zig checks the files against them.
+  const diff = (await run(["git", "-C", src, "diff", "--full-index"], { env: { GIT_NO_LAZY_FETCH: "1" } })).out;
   const saved = await readFile(patch, "utf8").catch(() => "");
   if (diff !== saved) {
     console.log(`STALE: the Linux Fil-C source differs from ${patch}.`);
     console.log("       Put the change in tools/filc/patch-pass.ts or patch-split.ts (the edit scripts are the");
-    console.log("       source of truth), rebuild (build-patched-clang.ts), then save the diff:");
-    console.log(`       git -C ${src} diff > third_party/filc-patches/zilc-filc-pass.patch`);
+    console.log("       source of truth), rebuild (zig build patched-clang), then save the diff:");
+    console.log(`       git -C ${src} diff --full-index > third_party/filc-patches/zilc-filc-pass.patch`);
     stale = true;
   }
 } else {

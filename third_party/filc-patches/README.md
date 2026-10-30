@@ -5,8 +5,10 @@
 
 - **Licence:** `SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception` — the licence of both files
   upstream (`third_party/fil-c/LLVM-LICENSE.txt`, `third_party/llvm/LICENSE.TXT`). The patch carries no
-  header of its own because it is compared byte for byte with `git diff` of the patched source
-  (`tools/filc/check-toolchain.ts`); this README states its licence instead.
+  header of its own because it is compared byte for byte with `git diff --full-index` of the patched
+  source (`tools/filc/check-toolchain.ts`; full blob ids since 2026-10-30, as git's short ones change
+  length with the clone's object count); this README states its licence instead.
+  `zig build patched-clang` applies it without git and checks each file against those ids.
 - **Modified by zilc** (Apache-2.0 §4(b)): every `+` line is zilc's change; what each one does is in
   `third_party/LICENSES.md`, ledger entry `filc-pass-fixes`, and in the edit scripts
   `tools/filc/patch-pass.ts` and `tools/filc/patch-split.ts`, which are the source of truth.
