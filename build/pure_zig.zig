@@ -20,13 +20,15 @@ const compiler_rt_sources = @import("../src/runtime/compiler_rt_sources.zig");
 
 pub fn addSteps(b: *std.Build, gen: *std.Build.Step.Compile, filc_src: ?[]const u8) void {
     const pizfix_opt = b.option([]const u8, "pizfix", "A pizfix/ with os-include and stdfil-include (default: made as upstream makes them, from the Fil-C sources and the host's kernel headers)");
+    const filc_clang = b.option([]const u8, "filc-clang", "libpas: Fil-C's clang (its pizfix/ must hold stdfil-include and os-include) to compile libpas's Fil-C half and link libpizlo.so / libpizlo.a");
     const need = "needs Fil-C's sources: the `filc` dependency (fetched when this step is named) or -Dfilc-src=<the Fil-C tree at zilc's release>";
 
     const all = b.step("pure-zig", "Build every pure-Zig runtime piece (libpas, yolomusl, compiler-rt) from -Dfilc-src");
     // `zig build libpas`: the stock-compiled half of Fil-C's runtime, libpizlo-stock.a, from
     // upstream's sources, compiled by Zig's clang with the flags of libpas/Makefile (PASCC +
-    // PASCFLAGS, static variant). The three Fil-C-compiled pieces (filc/src) are not in it yet.
-    const libpas_step = b.step("libpas", "Build the stock half of Fil-C's runtime from -Dfilc-src: libpizlo-stock.a, filc_crt.o, filc_mincrt.o, libyolounwind.a");
+    // PASCFLAGS, static variant). With -Dfilc-clang, the rest of libpas too: its Fil-C half
+    // (filc/src, compiled by that clang) and libpizlo.so (four variants) and libpizlo.a.
+    const libpas_step = b.step("libpas", "Build Fil-C's runtime from -Dfilc-src: libpizlo-stock.a, filc_crt.o, filc_mincrt.o, libyolounwind.a; with -Dfilc-clang also libpizlo.so (4 variants) and libpizlo.a");
     // `zig build yolomusl`: Fil-C's patched musl (projects/yolomusl) as upstream's
     // build_yolomusl.sh installs it: libyoloc.a, the crt objects and the empty libyolom.a.
     // libyoloc.so and ld-fil1 are not built yet.
@@ -37,11 +39,13 @@ pub fn addSteps(b: *std.Build, gen: *std.Build.Step.Compile, filc_src: ?[]const 
     for ([_]*std.Build.Step{ libpas_step, yolomusl_step, crt_step }) |s| all.dependOn(s);
 
     if (filc_src) |src| {
-        buildStockRuntime(b, libpas_step, gen, src, pizfixIncludes(b, src, pizfix_opt));
         // yolo musl's shared half links compiler-rt's builtins as its LIBCC, as upstream's
         // build_yolomusl.sh does (`LIBCC=…/pizfix/lib/libyolort.a`).
-        const yolort = buildCompilerRt(b, crt_step, src);
-        buildYoloMusl(b, yolomusl_step, gen, src, yolort);
+        const rt = buildCompilerRt(b, crt_step, src);
+        const yolo = buildYoloMusl(b, yolomusl_step, gen, src, rt.lib);
+        // With a Fil-C clang, libpas is built whole: its Fil-C half and libpizlo.so / .a too.
+        const half: ?FilcHalf = if (filc_clang) |c| (if (yolo) |y| FilcHalf{ .clang = c, .rt = rt, .yolo = y } else null) else null;
+        buildStockRuntime(b, libpas_step, gen, src, pizfixIncludes(b, src, pizfix_opt), half);
     } else {
         for ([_]*std.Build.Step{ libpas_step, yolomusl_step, crt_step }) |s|
             s.dependOn(&b.addFail(b.fmt("zig build {s} {s}", .{ s.name, need })).step);
@@ -73,7 +77,9 @@ fn pizfixIncludes(b: *std.Build, filc_src: []const u8, pizfix: ?[]const u8) Pizf
 /// compiler-rt's builtins and crt objects, as its CMake build compiles them for Zig's clang.
 /// Upstream's release built them with GCC 11.4. CMake configured them for x86_64-linux-gnu with
 /// the host's libc headers; here Zig's glibc headers stand in.
-fn buildCompilerRt(b: *std.Build, step: *std.Build.Step, filc_src: []const u8) *std.Build.Step.Compile {
+const CompilerRt = struct { lib: *std.Build.Step.Compile, crtbegin: std.Build.LazyPath, crtend: std.Build.LazyPath };
+
+fn buildCompilerRt(b: *std.Build, step: *std.Build.Step, filc_src: []const u8) CompilerRt {
     const cs = compiler_rt_sources;
     const dir: std.Build.LazyPath = .{ .cwd_relative = b.pathJoin(&.{ filc_src, "compiler-rt", "lib", "builtins" }) };
     const module = struct {
@@ -94,24 +100,30 @@ fn buildCompilerRt(b: *std.Build, step: *std.Build.Step, filc_src: []const u8) *
     const lib = b.addLibrary(.{ .name = "yolort", .root_module = builtins, .linkage = .static });
     step.dependOn(&b.addInstallArtifact(lib, .{}).step);
 
+    var crt: [2]std.Build.LazyPath = undefined;
     for ([_]struct { name: []const u8, path: []const u8, flags: []const []const u8 }{
         .{ .name = "crtbegin", .path = cs.crtbegin_path, .flags = &cs.crtbegin_flags },
         .{ .name = "crtend", .path = cs.crtend_path, .flags = &cs.crtend_flags },
-    }) |o| {
+    }, 0..) |o, i| {
         const m = module(b);
         // CMake's custom command passes no -O: the compiler's default, -O0.
         const flags = std.mem.concat(b.allocator, []const u8, &.{ o.flags, &.{"-O0"} }) catch @panic("OOM");
         m.addCSourceFile(.{ .file = dir.path(b, o.path), .flags = flags });
         const obj = b.addObject(.{ .name = o.name, .root_module = m });
-        step.dependOn(&b.addInstallFile(obj.getEmittedBin(), b.fmt("lib/{s}.o", .{o.name})).step);
+        crt[i] = obj.getEmittedBin();
+        step.dependOn(&b.addInstallFile(crt[i], b.fmt("lib/{s}.o", .{o.name})).step);
     }
-    return lib;
+    return .{ .lib = lib, .crtbegin = crt[0], .crtend = crt[1] };
 }
 
 /// Fil-C's yolo musl, compiled as its Makefile compiles it (yolomusl_sources.zig has the rules'
 /// result). Upstream's release built it with GCC 12.3; here Zig's clang with the flags musl's
 /// configure picks for clang (cmem/workarounds.md W-8).
-fn buildYoloMusl(b: *std.Build, step: *std.Build.Step, gen: *std.Build.Step.Compile, filc_src: []const u8, yolort: *std.Build.Step.Compile) void {
+/// What a later link takes from yolo musl: crti.o / crtn.o, and the directories `-lyoloc` and
+/// `-lyolom` find libyoloc.so and libyolom.a in.
+const YoloMusl = struct { crti: std.Build.LazyPath, crtn: std.Build.LazyPath, yoloc_dir: std.Build.LazyPath, yolom_dir: std.Build.LazyPath };
+
+fn buildYoloMusl(b: *std.Build, step: *std.Build.Step, gen: *std.Build.Step.Compile, filc_src: []const u8, yolort: *std.Build.Step.Compile) ?YoloMusl {
     const ys = yolomusl_sources;
     const tree = b.pathJoin(&.{ filc_src, "projects", "yolomusl" });
 
@@ -122,7 +134,7 @@ fn buildYoloMusl(b: *std.Build, step: *std.Build.Step, gen: *std.Build.Step.Comp
     genh.addArg(ys.arch);
     const genh_inputs = musl_headers.inputs(b.allocator, tree, ys.arch) catch |err| {
         step.dependOn(&b.addFail(b.fmt("cannot list musl's headers in {s}: {s}", .{ tree, @errorName(err) })).step);
-        return;
+        return null;
     };
     for (genh_inputs) |in| if (in.use != .copy) genh.addFileInput(.{ .cwd_relative = b.pathJoin(&.{ tree, in.path }) });
 
@@ -170,18 +182,23 @@ fn buildYoloMusl(b: *std.Build, step: *std.Build.Step, gen: *std.Build.Step.Comp
     step.dependOn(&b.addInstallArtifact(libc, .{}).step);
 
     // The crt objects, one each, installed under their base names (crt/x86_64/crti.s -> crti.o).
+    var crti: ?std.Build.LazyPath = null;
+    var crtn: ?std.Build.LazyPath = null;
     for (ys.crt) |s| {
         const m = runtimeModule(b, .baseline, s.pic);
         includes(m, b, tree, obj_include, version_dir.getDirectory());
         m.addCSourceFile(.{ .file = root.path(b, s.path), .flags = flagsFor(b, s, true, prefix_map) });
         const stem = std.fs.path.stem(s.path);
         const obj = b.addObject(.{ .name = stem, .root_module = m });
+        if (std.mem.eql(u8, stem, "crti")) crti = obj.getEmittedBin();
+        if (std.mem.eql(u8, stem, "crtn")) crtn = obj.getEmittedBin();
         step.dependOn(&b.addInstallFile(obj.getEmittedBin(), b.fmt("lib/{s}.o", .{stem})).step);
     }
 
     // libyolom.a: upstream's `ar cr libyolom.a` with no members.
     const empty = b.addWriteFiles();
-    step.dependOn(&b.addInstallFile(empty.add("libyolom.a", "!<arch>\n"), "lib/libyolom.a").step);
+    const yolom = empty.add("libyolom.a", "!<arch>\n");
+    step.dependOn(&b.addInstallFile(yolom, "lib/libyolom.a").step);
 
     // libyoloc.so, which is also the dynamic loader (build_yolomusl.sh: `ln -fs libyoloc.so
     // ld-fil1-x86_64.so`): the Makefile's
@@ -220,6 +237,7 @@ fn buildYoloMusl(b: *std.Build, step: *std.Build.Step, gen: *std.Build.Step.Comp
     link.addArg("-o");
     const so = link.addOutputFileArg("libyoloc.so");
     step.dependOn(&b.addInstallFile(so, "lib/libyoloc.so").step);
+    return .{ .crti = crti.?, .crtn = crtn.?, .yoloc_dir = so.dirname(), .yolom_dir = yolom.dirname() };
 }
 
 /// The settings every stock-compiled runtime object shares: upstream compiles them with its
@@ -240,7 +258,117 @@ fn runtimeModule(b: *std.Build, cpu: std.Target.Query.CpuModel, pic: bool) *std.
     });
 }
 
-fn buildStockRuntime(b: *std.Build, step: *std.Build.Step, gen: *std.Build.Step.Compile, filc_src: []const u8, pizfix: Pizfix) void {
+/// The libpas objects' compile settings, and a module of them per upstream object set.
+const Pas = struct {
+    b: *std.Build,
+    root: std.Build.LazyPath,
+    cflags: []const []const u8,
+    test_cflags: []const []const u8,
+    yolo_include: std.Build.LazyPath,
+    pizfix: Pizfix,
+    native_h_dir: std.Build.LazyPath,
+    fwd_c: std.Build.LazyPath,
+    libpas_src: []const u8,
+
+    fn addIncludes(p: Pas, m: *std.Build.Module) void {
+        m.addSystemIncludePath(p.yolo_include);
+        m.addSystemIncludePath(p.pizfix.os_include);
+        m.addSystemIncludePath(p.pizfix.stdfil_include);
+        // `./find_clang_include_dir.rb` → the clang resource headers Zig ships (stddef.h, stdarg.h, …).
+        m.addSystemIncludePath(.{ .cwd_relative = p.b.pathJoin(&.{ p.b.graph.zig_lib_directory.path orelse ".", "include" }) });
+    }
+
+    /// PASSRCS (+ the generated forwarders) and the assembly, plus `extras` (src/libpas/<name>.c),
+    /// compiled as upstream's pas-pizlo-release-%.o, or pas-pizlo-test-%.o when `testing` (whose
+    /// assembly is still the release objects: the Makefile reuses them).
+    fn module(p: Pas, extras: []const []const u8, testing: bool) *std.Build.Module {
+        const b = p.b;
+        const flags = if (testing) p.test_cflags else p.cflags;
+        const m = runtimeModule(b, .{ .explicit = &std.Target.x86.cpu.x86_64_v2 }, true); // -march=x86-64-v2
+        p.addIncludes(m);
+        m.addIncludePath(p.native_h_dir);
+        m.addIncludePath(.{ .cwd_relative = p.libpas_src });
+        m.addCSourceFiles(.{ .root = p.root, .files = &libpas_sources.c, .flags = flags });
+        // PASASM = clang -march=x86-64-v2 -fPIC, no PASASMFLAGS.
+        m.addCSourceFiles(.{ .root = p.root, .files = &libpas_sources.assembly, .flags = &.{} });
+        m.addCSourceFile(.{ .file = p.fwd_c, .flags = flags });
+        for (extras) |e| m.addCSourceFile(.{ .file = p.root.path(b, b.fmt("src/libpas/{s}.c", .{e})), .flags = flags });
+        return m;
+    }
+};
+
+/// What libpas's Fil-C half needs: Fil-C's clang (in a tree whose pizfix/ has stdfil-include and
+/// os-include, which it reads by itself), and what libpizlo.so links against.
+const FilcHalf = struct { clang: []const u8, rt: CompilerRt, yolo: YoloMusl };
+
+/// The rest of libpas/Makefile's `all` (2026-10-30; owner: "complete the libpas part"):
+/// filc/src/*.c compiled by Fil-C's clang ($(FILCC) $(FILCFLAGS)), the four libpizlo.so variants
+/// ($(SHLD) … $(SHLDPOST)) and libpizlo.a (`ar cr` of the static objects and the Fil-C half).
+fn buildLibpizlo(b: *std.Build, step: *std.Build.Step, pas: Pas, filc_src: []const u8, fh: FilcHalf) void {
+    // FILPIZLOOBJS: `$(FILCC) $(FILCFLAGS) -c -o $@ $<`, FILCFLAGS = -O3 -g -W -Werror -MD, run in
+    // libpas/ on `../filc/src/x.c` (hence the prefix map, as for filc_crt.o).
+    const src_dir = b.pathJoin(&.{ filc_src, "filc", "src" });
+    var dir = std.fs.cwd().openDir(src_dir, .{ .iterate = true }) catch |err| {
+        step.dependOn(&b.addFail(b.fmt("cannot list {s}: {s}", .{ src_dir, @errorName(err) })).step);
+        return;
+    };
+    defer dir.close();
+    var names: std.ArrayList([]const u8) = .empty;
+    var it = dir.iterate();
+    while (it.next() catch null) |e| if (e.kind == .file and std.mem.endsWith(u8, e.name, ".c")) names.append(b.allocator, b.dupe(e.name)) catch @panic("OOM");
+    std.mem.sort([]const u8, names.items, {}, struct {
+        fn lt(_: void, x: []const u8, y: []const u8) bool {
+            return std.mem.lessThan(u8, x, y);
+        }
+    }.lt);
+    const fil_objs = b.allocator.alloc(std.Build.LazyPath, names.items.len) catch @panic("OOM");
+    for (names.items, 0..) |n, i| {
+        const cc = b.addSystemCommand(&.{ fh.clang, "-O3", "-g", "-W", "-Werror", b.fmt("-ffile-prefix-map={s}/=../", .{filc_src}), "-c", "-o" });
+        fil_objs[i] = cc.addOutputFileArg(b.fmt("fil-pizlo-{s}.o", .{std.fs.path.stem(n)}));
+        cc.addFileArg(.{ .cwd_relative = b.pathJoin(&.{ src_dir, n }) });
+        // The clang reads headers from its own tree (pizfix/stdfil-include, os-include) and
+        // filc/src/syscall.h; none is a declared input, so the compile always reruns (6 files).
+        cc.has_side_effects = true;
+    }
+
+    // libpizlo.a: PASPIZLOSTATICOBJS + FILPIZLOOBJS.
+    const static_mod = pas.module(&.{ "filc_static", "filc_default_settings" }, false);
+    for (fil_objs) |o| static_mod.addObjectFile(o);
+    const static_lib = b.addLibrary(.{ .name = "pizlo", .root_module = static_mod, .linkage = .static });
+    step.dependOn(&b.addInstallArtifact(static_lib, .{}).step);
+
+    // The four libpizlo.so: SHLD = $(HOST_CLANG) -Wl,-dynamic-linker,… -nostdlib -shared crti.o
+    // crtbegin.o -L<lib>; then the objects; SHLDPOST = libyolort.a -lyoloc -lyolom crtend.o crtn.o.
+    // Linked by Zig's LLD with what the release's clang driver added (readelf on 0.687's, and on
+    // one linked by upstream's own script here, 2026-10-30): a SHA-1 build-id, .eh_frame_hdr,
+    // RELRO, .gnu.hash only; no INTERP (a shared object gets none from -dynamic-linker).
+    for ([_]struct { dir: []const u8, testing: bool, settings: []const u8 }{
+        .{ .dir = "lib", .testing = false, .settings = "filc_default_settings" },
+        .{ .dir = "lib_gcverify", .testing = false, .settings = "filc_gc_verify_settings" },
+        .{ .dir = "lib_test", .testing = true, .settings = "filc_default_settings" },
+        .{ .dir = "lib_test_gcverify", .testing = true, .settings = "filc_gc_verify_settings" },
+    }) |v| {
+        const objs = b.addLibrary(.{ .name = b.fmt("pizlo-{s}", .{v.dir}), .root_module = pas.module(&.{ "filc_dynamic", v.settings }, v.testing), .linkage = .static });
+        const link = b.addSystemCommand(&.{ b.graph.zig_exe, "ld.lld", "-m", "elf_x86_64", "-shared", "--build-id=sha1", "--eh-frame-hdr", "-z", "relro", "--hash-style=gnu" });
+        link.addFileArg(fh.yolo.crti);
+        link.addFileArg(fh.rt.crtbegin);
+        link.addArg("--whole-archive");
+        link.addArtifactArg(objs);
+        link.addArg("--no-whole-archive");
+        for (fil_objs) |o| link.addFileArg(o);
+        link.addArtifactArg(fh.rt.lib);
+        link.addPrefixedDirectoryArg("-L", fh.yolo.yoloc_dir);
+        link.addPrefixedDirectoryArg("-L", fh.yolo.yolom_dir);
+        link.addArgs(&.{ "-lyoloc", "-lyolom" });
+        link.addFileArg(fh.rt.crtend);
+        link.addFileArg(fh.yolo.crtn);
+        link.addArg("-o");
+        const so = link.addOutputFileArg("libpizlo.so");
+        step.dependOn(&b.addInstallFile(so, b.fmt("{s}/libpizlo.so", .{v.dir})).step);
+    }
+}
+
+fn buildStockRuntime(b: *std.Build, step: *std.Build.Step, gen: *std.Build.Step.Compile, filc_src: []const u8, pizfix: Pizfix, filc_half: ?FilcHalf) void {
     const libpas_dir = b.pathJoin(&.{ filc_src, "libpas" });
 
     // pizfix/yolo-include: musl's installed headers, generated by zilc-gen from the yolomusl tree
@@ -272,37 +400,34 @@ fn buildStockRuntime(b: *std.Build, step: *std.Build.Step, gen: *std.Build.Step.
     // PASCC = clang -march=x86-64-v2 -fPIC -pthread -nostdinc -isystem yolo-include
     //         -isystem os-include -isystem stdfil-include -isystem <clang resource include>
     // PASCFLAGS = -g -O3 -W -Werror -fno-strict-aliasing (-MD)      plus -DPAS_FILC=1
-    const v2: std.Target.Query.CpuModel = .{ .explicit = &std.Target.x86.cpu.x86_64_v2 }; // -march=x86-64-v2
-    const mod = runtimeModule(b, v2, true);
     const pascc = [_][]const u8{ "-pthread", "-nostdinc", "-g", "-O3", "-W", "-Werror", "-fno-strict-aliasing" };
     // Upstream runs make in libpas/ and names sources `src/libpas/x.c`, so `__FILE__` (in every
     // PAS_ASSERT and panic message) reads `src/libpas/x.c`. Zig passes absolute paths; map them
     // back so the runtime's messages are upstream's (cmem/workarounds.md W-6).
     const libpas_map = b.fmt("-ffile-prefix-map={s}/=", .{libpas_dir});
-    const cflags = b.allocator.dupe([]const u8, &(pascc ++ [_][]const u8{ "-DPAS_FILC=1", libpas_map })) catch @panic("OOM");
-    const addPasccIncludes = struct {
-        fn f(m: *std.Build.Module, bb: *std.Build, yolo: std.Build.LazyPath, piz: Pizfix) void {
-            m.addSystemIncludePath(yolo);
-            m.addSystemIncludePath(piz.os_include);
-            m.addSystemIncludePath(piz.stdfil_include);
-            // `./find_clang_include_dir.rb` → the clang resource headers Zig ships (stddef.h, stdarg.h, …).
-            m.addSystemIncludePath(.{ .cwd_relative = bb.pathJoin(&.{ bb.graph.zig_lib_directory.path orelse ".", "include" }) });
-        }
-    }.f;
-    addPasccIncludes(mod, b, yolo_include, pizfix);
-    mod.addIncludePath(native_h_out.dirname());
-    mod.addIncludePath(.{ .cwd_relative = b.pathJoin(&.{ libpas_dir, "src", "libpas" }) });
+    const pas: Pas = .{
+        .b = b,
+        .root = .{ .cwd_relative = libpas_dir },
+        .cflags = b.allocator.dupe([]const u8, &(pascc ++ [_][]const u8{ "-DPAS_FILC=1", libpas_map })) catch @panic("OOM"),
+        // The pas-pizlo-test-%.o rule: the same, plus -DENABLE_PAS_TESTING=1.
+        .test_cflags = b.allocator.dupe([]const u8, &(pascc ++ [_][]const u8{ "-DPAS_FILC=1", libpas_map, "-DENABLE_PAS_TESTING=1" })) catch @panic("OOM"),
+        .yolo_include = yolo_include,
+        .pizfix = pizfix,
+        .native_h_dir = native_h_out.dirname(),
+        .fwd_c = fwd_c_out,
+        .libpas_src = b.pathJoin(&.{ libpas_dir, "src", "libpas" }),
+    };
 
-    const root: std.Build.LazyPath = .{ .cwd_relative = libpas_dir };
-    mod.addCSourceFiles(.{ .root = root, .files = &libpas_sources.c, .flags = cflags });
-    // PASASM = clang -march=x86-64-v2 -fPIC, no PASASMFLAGS.
-    mod.addCSourceFiles(.{ .root = root, .files = &libpas_sources.assembly, .flags = &.{} });
-    mod.addCSourceFile(.{ .file = fwd_c_out, .flags = cflags });
     // The static variant: PASPIZLOSTATICOBJS adds filc_static.o and filc_default_settings.o.
-    mod.addCSourceFiles(.{ .root = root, .files = &.{ "src/libpas/filc_static.c", "src/libpas/filc_default_settings.c" }, .flags = cflags });
-
-    const lib = b.addLibrary(.{ .name = "pizlo-stock", .root_module = mod, .linkage = .static });
+    const lib = b.addLibrary(.{ .name = "pizlo-stock", .root_module = pas.module(&.{ "filc_static", "filc_default_settings" }, false), .linkage = .static });
     step.dependOn(&b.addInstallArtifact(lib, .{}).step);
+    // pizfix/yolo-include, as upstream's tree has it after build_yolomusl.sh: what libpas's objects
+    // were compiled against, and what Fil-C's clang reads next to its pizfix/.
+    step.dependOn(&b.addInstallDirectory(.{ .source_dir = yolo_include, .install_dir = .prefix, .install_subdir = "yolo-include" }).step);
+
+    if (filc_half) |fh| buildLibpizlo(b, step, pas, filc_src, fh);
+    const v2: std.Target.Query.CpuModel = .{ .explicit = &std.Target.x86.cpu.x86_64_v2 }; // -march=x86-64-v2
+    const addPasccIncludes = Pas.addIncludes;
 
     // filc_crt.o / filc_mincrt.o: $(PASCC) -c ../filc/main/main.c $(MAINCFLAGS) -DUSE_LIBC=1 / 0
     // (MAINCFLAGS = -g -O3 -W -Werror -fno-strict-aliasing, the same as PASCFLAGS without -MD).
@@ -312,7 +437,7 @@ fn buildStockRuntime(b: *std.Build, step: *std.Build.Step, gen: *std.Build.Step.
         .{ .name = "filc_mincrt", .def = "-DUSE_LIBC=0" },
     }) |crt| {
         const m = runtimeModule(b, v2, true);
-        addPasccIncludes(m, b, yolo_include, pizfix);
+        addPasccIncludes(pas, m);
         // Upstream compiles it from libpas/ as `../filc/main/main.c`.
         const crt_map = b.fmt("-ffile-prefix-map={s}/=../", .{filc_src});
         m.addCSourceFile(.{ .file = .{ .cwd_relative = main_c }, .flags = b.allocator.dupe([]const u8, &(pascc ++ [_][]const u8{ crt.def, crt_map })) catch @panic("OOM") });

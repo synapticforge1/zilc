@@ -118,6 +118,58 @@ without `ZILC_ZIG` fails every Zig case on `zig env`, as one attempt did). Its `
 clang and LLD 20.1.2; it needs only glibc (libc++ is static); 1.55 GB with debug info against
 GCC's 3.8 GB; ~20 min at 12 jobs. Unchanged incremental rerun: 9 s, `ninja: no work to do`.
 
+**THE ZIG-ONLY CHAIN (2026-10-30, late; owner: "make sure that the entire compilation no longer
+needs gcc at all")** — `MODE=zig bun tools/filc/build-filc-from-source.ts`, run with a PATH holding
+every system program EXCEPT `gcc* g++* cc c++ cpp* c89 c99 clang*` and the `*-linux-gnu-gcc*`
+names (checked: none resolves): **builds all of Fil-C in ~2 min** — projeny by `zig c++`; every
+stock piece and libpas whole by `zig build pure-zig -Dfilc-clang=…` (27 s); user musl, libc++,
+minilute, sarcasm by the Zig-built Fil-C clang through upstream's scripts. `pizfix/lib` = the
+release's 37 entries. Still from the host: binutils' `ld` (Fil-C's clang links with it; its driver
+"selects" the GCC installation but takes nothing from it: no `/usr/lib/gcc` path, no libgcc on the
+link line, measured with `-v`/`-###`), make, cmake/ninja, python3, perl, ar, patchelf, libcurl
+headers, kernel headers.
+- **libpas whole, by `zig build libpas -Dfilc-clang=<Fil-C clang>`:** all four `libpizlo.so`
+  (lib 2,504 exports, lib_gcverify 2,504, lib_test 2,512, lib_test_gcverify 2,512) and
+  `libpizlo.a` (2,546 exports, 183 members) define **exactly the release's symbols**; NEEDED
+  `libyoloc.so` only, `.gnu.hash`, RELRO, `.eh_frame_hdr`, no INTERP, like the release.
+- **Chains compared (`~/zilc-work/equiv/`, part A, 2026-10-30):** 35 libraries: the zig chain
+  matches the release's exports on ALL; the GCC chain (`MODE=upstream`, Ubuntu GCC 15 + clang 21)
+  differs on one, `libyolort.a` (GCC 15's extra half-float builtins). No `GCC:` string in any
+  zig-chain library. Self-binding relocations (R_X86_64_JUMP_SLOT/GLOB_DAT/64) equal in all three
+  trees for `libyoloc.so` 21, `libc.so` 281, `libc++.so.1.0` 8,883; `libpizlo.so` 2,139 (zig) /
+  2,134 (GCC chain) / 2,133 (release).
+- **✅ FUNCTIONALLY THE SAME (parts B–F, run 2026-10-30, read 2026-11-04):** Fil-C's suite on the
+  zig chain: 6,027 run, 6,026 pass, 1 fail (`inlineasm_rdpkru`), 0 timeouts, 1,242 skipped; **0
+  differences on all 7,269 tests against stock AND against the GCC chain**. Gate **8/8** with each
+  chain, line for line. Corpus (`tests/basics`, C and Zig, all four modes, 156 programs each):
+  **identical verdicts chain against chain** in every mode once the PID in Fil-C's panic prefix
+  (`[555607] filc panic`, program `42_panic`) is masked; 71 OK / 78 per language and mode, as
+  designed. Output comparison against native: **identical reports** for both chains — 496 same,
+  60 expected, 68 shape-checked, 0 unexplained, 0 missing.
+- **`tools/filc/compare-chains.ts` (2026-11-04), the repeatable form:** run from scratch on both
+  chains (suites re-run, native runs, corpus ×2) — **14 of 14 checks PASS**: exports (34 binary
+  libraries; `libc++.so` is a linker script and skipped), relocations (8 shared libraries, every
+  differing one names a symbol defined there or a weak undefined), suite ×2, gate ×3, corpus ×7.
+  Inverted: the GCC tree passed as the zig tree → `exports` FAIL; a zig-chain report doctored to
+  one `DIFFERS` → corpus FAIL; exit 1 both. The output-comparison reports are NOT byte-identical
+  run to run: thread-order programs flip between allowed verdicts (2026-11-04: `36_worker-pools`
+  SAME ↔ EXPECTED, `35_waitgroups` SAME ↔ shape ok; the 2026-10-30 pair happened to match), so the
+  check is "the same programs fail in both chains, and a flip only between SAME / EXPECTED /
+  shape ok". Outputs in `~/zilc-work/equiv-tool/` (`verdicts.txt`).
+- **The `libpizlo.so` relocation gap, explained by type and symbol name** (comparing the `Info`
+  column is wrong: it holds the symbol's dynsym INDEX, different in every link): the zig chain has
+  exactly 5 more than the GCC chain and no other difference — 3 `JUMP_SLOT`s for the weak
+  undefined `__cxa_finalize` / `__register_frame_info` / `__deregister_frame_info` from
+  compiler-rt's `crtbegin.o` (Zig's clang at `-O0`, as upstream's CMake compiles it, calls them
+  through the PLT; the GCC build only through the GOT), and 2 out-of-line calls Zig's clang 20 makes
+  where clang 21 inlined (`pas_bootstrap_free_heap_{allocate_simple,deallocate}_for_config`). The
+  GCC chain differs from the release the same way (clang 21 vs clang 14 inlining). Every name is
+  defined in `libpizlo.so` itself (or weak, from libc) and nowhere else, so each call reaches the
+  same function: a code-path choice, not a change of what runs.
+- **The alias route, measured and NOT adopted** (`workarounds.md` W-13): pointing upstream's own
+  host-compiler steps at `zig cc` needs five fixes and still links `libyoloc.so` differently
+  without an error.
+
 **Fil-C COMPILES with the Zig-built clang (2026-10-30; owner: "verify that Fil-C compiles with the
 zig-built clang")** — `bun tools/filc/build-filc-from-source.ts`: upstream's own `build_base.sh`
 steps after the LLVM build, unchanged, on the fetched sources, with `build/` holding only the

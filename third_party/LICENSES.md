@@ -268,7 +268,9 @@ Newest first. Copy the template for each adopted component.
 - **Source:** Fil-C at `e7947f0` (0.687), the same checkout as above; first written in zailc for
   v0.686 (2026-10-08/09), brought here 2026-10-27
 - **Upstream path(s) and license (SPDX):**
-  - `libpas/common.mk` (`PASSRCS`), `libpas/Makefile` (PASCC / PASCFLAGS / MAINCFLAGS),
+  - `libpas/common.mk` (`PASSRCS`), `libpas/Makefile` (PASCC / PASCFLAGS / MAINCFLAGS; since
+    2026-10-30 also FILCC / FILCFLAGS, the object sets and the SHLD / SHLDPOST / `ar` rules that
+    make `libpizlo.so` ×4 and `libpizlo.a`, re-expressed in `build/pure_zig.zig` `buildLibpizlo`),
     `yolounwind/Makefile` — `BSD-2-Clause` (Fil-C runtime; `third_party/fil-c/PAS-LICENSE.txt`)
   - `build_os_include.sh` (pizfix/os-include: three links into the host's kernel headers) and
     `libpas/build.sh`'s `pizfix/stdfil-include` (a copy of `filc/include`, here read in place),
@@ -291,6 +293,10 @@ Newest first. Copy the template for each adopted component.
   `src/runtime/yolomusl_sources.zig` (MIT), `src/runtime/compiler_rt_sources.zig` (Apache-2.0 WITH
   LLVM-exception) — each generated with its upstream's SPDX line; `build/pure_zig.zig` (the
   recipes, zilc's own code)
+- **Also compiled, not copied (2026-10-30):** `filc/src/*.c` (Fil-C's runtime, BSD-2-Clause) by
+  Fil-C's clang inside `zig build libpas -Dfilc-clang`; projeny, the user musl, libc++/libc++abi,
+  minilute and sarcasm by upstream's own scripts in `tools/filc/build-filc-from-source.ts`, from a
+  local copy of the fetched sources (never committed)
 - **Artifact destination:** **toolchain-only today**: the built libraries install under
   `~/zilc-work/pure-zig/filc-<release>/lib` and are used by `zig build gate-zig-modules`. They are
   Fil-C's runtime, compiled by Zig: if they are ever DISTRIBUTED or linked into distributed

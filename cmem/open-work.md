@@ -5,16 +5,57 @@ once"). Only open items live here; each points at its record. Completed work is 
 end with a pointer to where the full text lives. Counts are not copied here: `testing.md` holds
 them, with their dates.
 
-## State (2026-10-27)
+## State (2026-10-30)
 
 | what | value |
 | --- | --- |
 | version | **`0.15.2-0.687.1`** — `<Zig>-<Fil-C>.<zilc release>`, **published 2026-10-27** (tag `v0.15.2-0.687.1` on `be51808`; `releasing.md`); one of the five places the number lives. Before it: `0.15.2-0.686.1` (2026-10-05) |
-| toolchain | Zig **0.15.2** (user code and build), Fil-C **0.687** with zilc's patched clang (`workarounds.md` KI-22, KI-4); 0.686's kept installed and archived (`toolchain/filc-0.686/`) |
+| toolchain | Zig **0.15.2** (user code and build), Fil-C **0.687** with zilc's patched clang (`workarounds.md` KI-22, KI-4) — **since 2026-10-30 compiled by Zig** (`zig build patched-clang`; the GCC-built one kept as `~/zilc-work/tools/filc-0.687-zilc-gcc` for rollback); 0.686's kept installed and archived (`toolchain/filc-0.686/`) |
+| unpushed | `main` is 5 commits ahead of `origin/main` (2026-10-30: `91e7959`, `5e31ef8`, `31a911a`, `896d1a7`; 2026-11-04: the GCC-free chain and `compare-chains.ts`); nothing pushed (owner's call) |
 | gates | `zig build gate`, `zig build test`, Fil-C's suite, the corpus in four modes, the output comparison: all re-run 2026-10-27 on Fil-C 0.687, counts in `testing.md` |
 | remote | `origin` = `github.com/synapticforge1/zilc` (since 2026-10-27; was `jrmarcum/zilc`, which GitHub redirects). **Purged history pushed 2026-10-27**: `main` = `origin/main`, `v0.15.2` = tag `v0.15.2-0.686.1` = `13ce96a` (was `19e7172`; map `history-map-2026-10-27.md`) |
 | branches | `main` carries the Bun port (`c2841dd`, was `44e0b1a`), merged `--no-ff` 2026-10-27 (owner: "we will merge all to bun tooling since deno is going away"), and the 2026-10-27 work since; `bun-port` (merged, never pushed) deleted 2026-10-27 (owner). Branches: `main`, `v0.15.2` |
 | sibling | **zailc** (`../zailc`, started 2026-10-08) translates Fil-C into Zig; zilc is its stable reference and test oracle and changes nothing for it (`design-decisions.md`) |
+
+## ▶️ NEXT SESSION — pick up here (paused 2026-10-30 by the owner; items 1–4 done 2026-11-04, start at 5)
+
+In order. The owner's conditions, verbatim: libpas finished and *"make sure that the entire
+compilation no longer needs gcc at all"*; *"before we fully remove the gcc, we should make sure that
+the resulting compilations are functionally the same from gcc or the zig only compilation chain"*;
+GCC then stays **maintainer-only** (*"Yes maintainer only. User no."*); *"document all of this for
+future reference"*.
+
+1. ✅ **The chains are FUNCTIONALLY THE SAME, read 2026-11-04** (owner: "finish item 1"): the
+   2026-10-30 run had completed; suite 0 differences (zig vs stock, zig vs GCC chain), gate 8/8
+   both line for line, corpus verdicts identical chain against chain in all four modes (PID
+   masked), output-comparison reports identical; the `libpizlo.so` gap explained by symbol name
+   (`testing.md` "THE ZIG-ONLY CHAIN").
+2. ✅ **`tools/filc/compare-chains.ts`, written 2026-11-04** (owner: "then perform Item 2"): the
+   five parts with pass criteria (exports = release, no `GCC:` in the zig chain; every differing
+   relocation names a symbol defined in that library or a weak undefined; suite; gate; corpus and
+   output comparison). From scratch: **14/14 PASS**; inverted twice (exports, corpus), exit 1
+   both (`testing.md`). `REUSE=1` re-analyses existing results without rebuilding.
+3. ✅ **Committed 2026-11-04** (owner: "proceed with Item 3 and Item 4"; tests 40/40, gate 8/8,
+   path scan clean). Was: `build/pure_zig.zig` (libpas whole, W-12),
+   `tools/filc/build-filc-from-source.ts` (MODE=zig / MODE=upstream), and the memory updates
+   (design-decisions top row, testing, workarounds W-12/W-13, Fil-C.md, LICENSES, releasing,
+   best-practices, this file), and `tools/filc/compare-chains.ts` with its README row. `zig build test` passed on it at the pause (40/40, check-pins
+   11/11); run the gate too before committing; scan for paths.
+4. ✅ **Deleted 2026-11-04** (owner): the GCC build directory of the clang,
+   `~/zilc-work/patched-clang/filc-0.687/build-system` — measured **32 GB** (the 25 GB was an
+   estimate), its `clang-20` `.comment` = GCC 15.2; `patched-clang/` 44 → 12 GB (`build-zig` 9.8 GB
+   and the staged `src` stay). Kept: the system GCC (maintainer QC) and
+   `~/zilc-work/tools/filc-0.687-zilc-gcc`. `-Dclang-cc=system` would rebuild it from scratch
+   (~25 min).
+5. **Maintainer-only: GCC pinned to upstream's versions (11.4, 12.3), built by Zig** — measure
+   build time and size first; then point `MODE=upstream` at it (item under "Open work" below).
+6. **Documentation still to write** (owner: "document all of this"): README — a short "Fil-C from
+   source" note (MODE=zig needs no compiler; GCC is maintainer-only). (`tools/README.md` and
+   `Fil-C.md` § 4 done 2026-11-04.)
+7. Housekeeping: `~/zilc-work/pz-libpas`, `~/zilc-work/path-no-compilers`, `~/zilc-work/equiv`
+   (read 2026-11-04; `equiv-tool` holds compare-chains' run), `~/zilc-work/path-no-tools` are
+   scratch; the two from-source trees (`filc-from-source-0.687`, `-upstream`, ~3 GB each) are
+   compare-chains' default inputs — keep them while comparing, rebuild them on a Fil-C move.
 
 ## 🗓️ Owner calls (evidence gathered; nothing done without the owner)
 
@@ -98,6 +139,15 @@ them, with their dates.
     that results, built entirely from source, passes Fil-C's suite with 0 differences on 7,269
     (`testing.md`). This is upstream's route (its scripts, the host's cc for the stock pieces);
     zilc's own pure-Zig route for the Fil-C-compiled pieces is still Z1 item 3.
+  - 🛠️ **Maintainer-only: GCC pinned to upstream's versions, built by Zig** (owner, 2026-10-30;
+    `design-decisions.md` top row). A `zig build` step like `patched-clang`: hash-pinned GCC
+    11.4 and 12.3 sources plus GMP/MPFR/MPC, `--disable-bootstrap --disable-multilib
+    --enable-languages=c,c++`, compiled by `zig cc`/`zig c++` (GNU `as` from binutils still
+    needed; libgcc/libstdc++ are compiled by the new GCC, as always). Then
+    `build-filc-from-source.ts MODE=upstream` uses them instead of Ubuntu's GCC 15. Measure
+    first: build time and installed size per version (estimate 0.3–0.5 GB each). Upstream's
+    libpas stock half was compiled by Ubuntu clang 14; mirroring that too would be one more LLVM
+    build — decide after the GCC half.
   - **5b. Fil-C's prebuilt becomes optional**: the from-source tree above shows it CAN be replaced
     (every library but GCC-built `libyolort.a` exports the release's symbols). Still needed today
     for the Fil-C-compiled runtime pieces in zilc's own build (Z1 item 3), as the tree the patched clang is installed into (`patched-clang` installs only

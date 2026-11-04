@@ -831,7 +831,7 @@ machine-local memory `no-windows-host-execution`.
 
 ---
 
-## The pure-Zig track: W-1 … W-11 (W-1…W-10 first written in zailc, 2026-10-08/09, brought here 2026-10-27; W-11 zilc's own)
+## The pure-Zig track: W-1 … W-13 (W-1…W-10 first written in zailc, 2026-10-08/09, brought here 2026-10-27; W-11…W-13 zilc's own)
 
 The track (`roadmap.md` Z1) came from zailc with its workaround notes; the code cites them by these
 numbers, so they live here too, condensed. zailc's `cmem/workarounds.md` keeps the long forms.
@@ -908,3 +908,31 @@ numbers, so they live here too, condensed. zailc's `cmem/workarounds.md` keeps t
      78/78 as designed and output comparison 0 unexplained with it linked (`testing.md`). Lasts as
      long as the oracle is a GCC/GNU-ld-built release. A relative: any other set that differs
      between GCC/GNU ld and clang/LLD output (W-8 is the symbol-level family).
+- **W-12. libpas whole: the Fil-C half and `libpizlo.so` without the host's clang** (2026-10-30;
+  owner: "complete the libpas part"). Upstream's `libpas/Makefile` compiles the stock half with
+  `HOST_CLANG` (Ubuntu clang 14 for the release), `filc/src/*.c` with Fil-C's clang, and LINKS the
+  four `libpizlo.so` through `HOST_CLANG` (`$(SHLD) … $(SHLDPOST)`). `build/pure_zig.zig`
+  (`buildLibpizlo`, `-Dfilc-clang`): the four object sets (release/test ×
+  default/gc-verify settings, `filc_dynamic.c`; `filc_static.c` for `libpizlo.a`); the Fil-C half
+  by the given clang with `-O3 -g -W -Werror` and `-ffile-prefix-map=<src>/=../` (W-6); the links
+  by `zig ld.lld` with what the release's driver added (`--build-id=sha1 --eh-frame-hdr -z relro
+  --hash-style=gnu`, measured on the release's), crti/crtbegin … libyolort.a `-lyoloc -lyolom`
+  crtend/crtn, objects as `--whole-archive`. Two traps: (1) the Fil-C clang reads
+  `stdfil-include` and `os-include` from ITS OWN tree's `pizfix/` (`-v` shows the search list), so
+  the tree must have them before the compile; (2) `-dynamic-linker` on a shared object gives LLD an
+  INTERP the release lacks — left out. Proof: exports equal for all five artifacts (`testing.md`).
+- **W-13. `zig cc` as the host compiler for upstream's own scripts — measured, NOT adopted**
+  (2026-10-30; owner asked whether a `cc` alias could redirect the GCC steps to Zig). An alias
+  directory first on PATH (`cc gcc clang c++ g++ ar ranlib` → Zig) needs, found by failing:
+  (1) no `-target` — with one, `zig cc` ignores `/usr/include` and projeny's `<curl/curl.h>` is not
+  found; use the native target with `-mcpu=baseline`; (2) drop `-Wl,--dependency-file=` (CMake 4),
+  "unsupported linker arg"; (3) `-fno-sanitize=all` — `zig cc` turns UBSan on when no `-O` is given,
+  so compiler-rt's `crtbegin.o` (compiled without `-O`) called `__ubsan_handle_*` and the user
+  libc's link failed; (4) alias `clang` too — yolounwind and libpas's stock half call it by name;
+  (5) `-march=x86-64-v2` (libpas) reads to Zig as CPU `x86` with features `64`, `v2` removed
+  ("unknown CPU: 'x86'") — needs `-mcpu=x86_64_v2`. And one it CANNOT fix: musl's `configure`
+  tests each link flag and silently drops `--exclude-libs` and `--dynamic-list`, which `zig cc`
+  refuses, so `libyoloc.so` links with **503** self-binding relocations where the release has
+  **21** — exports identical (1,653), so a symbol check does not see it. Hence the zig chain uses
+  `zig build pure-zig` for every stock piece (faithful, verified) and upstream's scripts only for
+  the steps Fil-C's clang does (`tools/filc/build-filc-from-source.ts` MODE=zig).

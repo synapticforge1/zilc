@@ -247,6 +247,27 @@ citation to the incident.
   libraries, the one whose exports differed (`libyolort.a`) was the one the clang under test does
   not compile (host GCC 15 vs the release's 11.4). Check who built a piece before blaming the
   compiler being verified. (Fil-C from source, 2026-10-30.)
+- **Equal exports do not mean equal linking: count the self-binding relocations too.** The alias
+  route's `libyoloc.so` exported the release's 1,653 symbols exactly, yet bound 503 references to
+  itself through the PLT/GOT where the release binds 21, because configure had silently dropped
+  two link flags. `readelf -rW | grep -cE 'R_X86_64_(JUMP_SLO|GLOB_DAT|64)'` shows it. (W-13,
+  2026-10-30.)
+- **A comparison that cannot see a KNOWN difference proves nothing; test the comparer.** The
+  chain-vs-chain report check said "0 flips" while the totals plainly differed: a lazy `(\S+?):?`
+  matched one character of each program name. Fixed with `([^\s:]+)`, then inverted on a doctored
+  report. Also: demand identity only of what is deterministic — the output-comparison reports flip
+  run to run on thread-order programs, so the check compares failing sets and allowed flips, not
+  bytes. (compare-chains.ts, 2026-11-04.)
+- **Compare relocations by type and symbol NAME, never by the `Info` column:** it holds the
+  symbol's dynsym index, different in every link, so the whole table "differed". (2026-11-04.)
+- **A build system that tests flags drops the ones the compiler refuses, without a word**
+  (musl's `configure`, `tryldflag`). After swapping compilers, diff the configure RESULT
+  (`config.mak`), not just the build's exit code. (W-13.)
+- **A compiler's driver may "select" a host GCC installation and use nothing from it** (Fil-C's
+  clang: `Selected GCC installation` in `-v`, no GCC path in `-###`). Judge a dependency by the
+  commands it runs, not by what `-v` mentions. (2026-10-30.)
+- **The no-heredoc rule covers one-off probe scripts too.** A probe wrote its wrappers with a
+  heredoc; the run was stopped and redone with a file-tool wrapper and `printf`. (2026-10-30.)
 - **`zig objcopy --strip-debug` is "unimplemented" on a large LLVM ELF (Zig 0.15.2)**: build
   `llvm-objcopy` in the same ninja run and strip with it. (2026-10-30.)
 

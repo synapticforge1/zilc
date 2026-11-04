@@ -264,9 +264,11 @@ changes**, patch releases included. There is no major/minor of our own and no 1.
          **`zig build check-pins`** (also in `zig build test`) lists any that disagree;
       3. `bun tools/upstream/verify-filc-package.ts`: the fetched tree equals the commit as checked
          out (blob ids; upstream's `eol=crlf` files by `git check-attr`; Zig's executable rule);
-      4. `zig build patched-clang` rebuilds the clang from the fetched tree (then
-         `bun tools/filc/build-filc-from-source.ts` and Fil-C's suite on its result: Fil-C must
-         still compile with it, 0 differences), and
+      4. `zig build patched-clang` rebuilds the clang from the fetched tree; then
+         `MODE=zig bun tools/filc/build-filc-from-source.ts` (no compiler on PATH) and
+         `MODE=upstream` (the maintainer's GCC chain), Fil-C's suite on both (0 differences), and
+         the chain-against-chain comparison (exports, self-binding relocations, gate, corpus,
+         output comparison: `bun tools/filc/compare-chains.ts`, exit 0), and
          `zig build pure-zig` the runtime pieces (the `verify-*` tools with
          `ZILC_FILC_SRC=<package>`);
       5. `build.zig.zon`'s `cmake` and `ninja` (the `-Dfetch-build-tools` opt-in): check for newer

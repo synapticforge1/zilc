@@ -157,7 +157,8 @@ re-checked against every new release:
 | yolo musl, static half | musl's Makefile + configure → `import-yolomusl-sources.ts` | `zig build yolomusl` | `verify-yolomusl.ts`: the release's members (`.lo`, 1,343) and their symbols | GCC/clang libcall and helper differences (W-8) | ✅ |
 | compiler-rt (`libyolort.a`, `crtbegin.o`, `crtend.o`) | `build_compiler_rt.sh`'s CMake options, run once under `zig cc` → `build.ninja` read by `import-compiler-rt-sources.ts` | `zig build compiler-rt` | `verify-compiler-rt.ts`: the release's members and symbols, **no extra definition** | W-8; the `_Float16` defect kept (W-10) | ✅ |
 | yolo musl, shared half (`libyoloc.so`, the loader) | musl's `lib/libyoloc.so` rule and configure's `LDFLAGS_AUTO` → `import-yolomusl-sources.ts` | `zig build yolomusl`, linked by `zig ld.lld` | `verify-yolomusl.ts`: the release's 1,653 exports (name and type), no undefined symbols, the same dynamic tags, segment kinds, entry at `_dlstart` | `PHDR` (LLD) against `GNU_PROPERTY` (GCC's notes) (W-11) | ✅ |
-| the rest of `libpizlo` (`filc/src`), the user libc, libc++ | compiled by Fil-C's clang | not started | | | ⬜ |
+| the rest of `libpizlo`: `filc/src`, the four `libpizlo.so`, `libpizlo.a` (2026-10-30) | `libpas/Makefile`'s FILCC, SHLD and `ar` rules | `zig build libpas -Dfilc-clang=<Fil-C clang>`; linked by `zig ld.lld` | the release's exports, all five artifacts (2,504 / 2,504 / 2,512 / 2,512 / 2,546); same dynamic properties | self-binding relocations 2,139 vs the release's 2,133 (being judged by the functional comparison) (W-12) | ✅ |
+| the user libc, libc++ | compiled by Fil-C's clang | upstream's own scripts with the Zig-built clang (`build-filc-from-source.ts`); not yet in `zig build` | the release's exports; Fil-C's suite 0 differences | none | 🟡 |
 | a program linked only from Zig's outputs, then Fil-C's suite on it | | | | | ⬜ |
 | **Z2:** the pass itself (`FilPizlonator`, KillUB, DeleteRedundantPollchecks) in Zig | | not started (zailc has not started it either) | the same module through both passes, compared as IR and as behaviour | | ⬜ |
 
@@ -169,6 +170,17 @@ The other built pieces match by symbol, because upstream's compilers (GCC 12.3, 
 10 of them are in a program's default link, the loader included. Gate 8/8, corpus 78/78 as designed
 in all four modes, output comparison 0 unexplained. `libc.so` and `libpizlo.so` are still Fil-C's,
 because they are the Fil-C-compiled pieces.
+
+### All of Fil-C without GCC (2026-10-30; W-12, W-13)
+
+`MODE=zig bun tools/filc/build-filc-from-source.ts` builds Fil-C's whole toolchain with no C or
+C++ compiler on PATH: the Zig-built Fil-C clang (`zig build patched-clang`), every stock piece and
+libpas whole from `zig build pure-zig -Dfilc-clang=…`, projeny by `zig c++`, and upstream's own
+scripts only for the steps Fil-C's clang does (user musl, libc++/libc++abi, minilute, sarcasm).
+Its 35 libraries export exactly the release's symbols. `MODE=upstream` builds the same sources the
+upstream way (host GCC and clang for the stock pieces); it is the maintainer's comparison chain
+(GCC is maintainer-only, `cmem/design-decisions.md`). Pointing upstream's scripts at `zig cc`
+through an alias was measured and rejected: it silently changes how `libyoloc.so` binds (W-13).
 
 ### The shared half: what it took (2026-10-27; W-11)
 
@@ -200,6 +212,10 @@ because they are the Fil-C-compiled pieces.
    `filc` URL and hash (`zig fetch <url>`), prove the download with
    `tools/upstream/verify-filc-package.ts`, and let `zig build check-pins` list every other
    reference still naming the old release.
+   Then build Fil-C from source both ways (`tools/filc/build-filc-from-source.ts`, `MODE=zig` and
+   `MODE=upstream`) and run `tools/filc/compare-chains.ts`: the Zig-only chain must be
+   functionally the same as the GCC chain (exports, self-binding relocations, Fil-C's suite, the
+   gate, the corpus and the output comparison). GCC is the maintainer's, for this check only.
 4. Re-run every oracle in the table above against the new tarball. A changed count of allowed
    differences is a finding, not a number to update.
 5. `zig build gate-zig-modules`, the corpus and the output comparison with the swapped clang.
