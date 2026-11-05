@@ -207,7 +207,19 @@ headers, kernel headers.
      `ld` in both) (L-9).
   7. **Install time, not build** — the release's `RUNPATH` (Fil-C's `setup.sh` patchelf).
   8. **GCC chain only** — `libyolort.a`'s 6 extra half-float definitions (GCC 15), which the pinned
-     GCC 11.4 is meant to remove.
+     GCC 11.4 is meant to remove. ✅ **GONE 2026-11-05** (NEXT SESSION C): `MODE=upstream` now
+     builds with the pinned reference GCCs (projeny and compiler-rt: 11.4.0; yolo musl: 12.3.0),
+     with Ubuntu's defaults in a `specs` file (toolchain-quirks B-7–B-9). The GCC chain against
+     the release, measured: `.comment` the same versions on the same pieces (`zilc reference`
+     for `Ubuntu …-1ubuntu1~22.04.3`); `libyolort.a` defined globals 188 = 188, no difference;
+     `endbr64` 170 = 170; stack-protector members 8 = 8; fortify 1 = 1; `libyoloc.so` `endbr64`
+     1,695 = 1,695; stack-clash probes 15 = 15 in `libyoloc.a` and `.so`. The zig chain on the
+     same counts: 188, 170, 16 (C-10), 1, 1,694 (C-8), 15. **`compare-chains.ts` against the
+     reference-GCC chain, everything fresh (2026-11-05, `OUT=~/zilc-work/equiv-refgcc`): 14/14** —
+     exports: zig chain = release on 34 of 34 AND the GCC chain = release on 34 of 34 (was 33,
+     `libyolort.a`); relocs ok; suite 0 differences on 7,269 vs stock and vs the GCC chain; gate
+     8/8 both, line for line; corpus 500 same / 56 expected / 68 varies, 0 bad, 0 flips, all four
+     modes.
 - **The `libpizlo.so` relocation gap: it is the LINKER, nothing else** (proved 2026-11-04; W-14).
   The zig chain has exactly 5 more `JUMP_SLOT`s than the GCC chain (`__cxa_finalize`,
   `__register_frame_info`, `__deregister_frame_info`,

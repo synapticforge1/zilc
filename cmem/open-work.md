@@ -38,7 +38,8 @@ B. ✅ **COMMITTED 2026-11-05 as `4d7b7dc`** (owner: "proceed with B"; not pushe
    `verify-compiler-rt.ts`), `compare-chains.ts`'s all-or-nothing REUSE, `cmem/toolchain-quirks.md` (new, in INDEX), and the
    record updates (testing, workarounds W-14, best-practices, LICENSES, README, this file). Run
    `zig build test`, the gate and the path scan first.
-C. **Finish item 5**: both pinned GCCs are BUILT by Zig (`~/zilc-work/tools/gcc-11.4.0`, 174 MB;
+C. ✅ **DONE 2026-11-05** (owner: "proceed with item C"; proof: see `testing.md` item 8 and the
+   compare-chains run recorded there). Was: **Finish item 5**: both pinned GCCs are BUILT by Zig (`~/zilc-work/tools/gcc-11.4.0`, 174 MB;
    `gcc-12.3.0`; ~5 min each once staged; smoke-tested 11.4.0: C and C++ run, PIE and SSP on).
    Remaining: (1) give them Ubuntu's other compile defaults through a GCC `specs` file in each
    install (`-fcf-protection`, `-fstack-clash-protection`, `-D_FORTIFY_SOURCE=2` when optimizing;
@@ -233,8 +234,10 @@ future reference"*.
     11.4 and 12.3 sources plus GMP/MPFR/MPC, `--disable-bootstrap --disable-multilib
     --enable-languages=c,c++`, compiled by `zig cc`/`zig c++` (GNU `as` from binutils still
     needed; libgcc/libstdc++ are compiled by the new GCC, as always). Then
-    `build-filc-from-source.ts MODE=upstream` uses them instead of Ubuntu's GCC 15. Measure
-    first: build time and installed size per version (estimate 0.3–0.5 GB each). Upstream's
+    `build-filc-from-source.ts MODE=upstream` uses them instead of Ubuntu's GCC 15. ✅ **DONE
+    2026-11-05** (NEXT SESSION C): both built by Zig (~5 min each, 174 MB for 11.4.0), Ubuntu's
+    defaults by a `specs` file, `MODE=upstream` uses them per step; the GCC chain's runtime now
+    equals the release's on every count measured (`testing.md` item 8). Upstream's
     libpas stock half was compiled by Ubuntu clang 14; mirroring that too would be one more LLVM
     build — decide after the GCC half.
   - **5b. Fil-C's prebuilt becomes optional**: the from-source tree above shows it CAN be replaced

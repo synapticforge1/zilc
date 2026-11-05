@@ -28,6 +28,12 @@ citation to the incident.
   overflowed the gate's 50 KiB capture limit, and the gate died with `StderrStreamTooLong`
   instead of printing FAIL. Capture generously and print a bounded excerpt. (`tools/gate.zig`,
   2026-10-27.)
+- **A file that "adds" to a tool's defaults may replace them; prove it against the tool's real
+  actions, not its self-report.** GCC's `specs` file with two `+` additions silently skipped the
+  driver's `init_spec()`, and `g++` lost the shared libgcc. The asm probe for the new flags passed;
+  only a C++ link failed. `-dumpspecs` could not show it (it runs `init_spec()` itself). The proof
+  that held: the driver's commands (`-###`) with and without the file, equal but for the added
+  flags. (`tools/gcc-reference.zig`, toolchain-quirks B-7–B-9, 2026-11-05.)
 - **A reference run made on another day is not a reference for a program that reads the clock.**
   `REUSE=1` paired a native run from 2026-11-04 with corpus runs from 2026-11-05, and two programs
   that print the time of day "failed". Cached comparison inputs are reused all together or not at
