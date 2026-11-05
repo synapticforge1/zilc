@@ -11,7 +11,7 @@ them, with their dates.
 | --- | --- |
 | version | **`0.15.2-0.687.1`** — `<Zig>-<Fil-C>.<zilc release>`, **published 2026-10-27** (tag `v0.15.2-0.687.1` on `be51808`; `releasing.md`); one of the five places the number lives. Before it: `0.15.2-0.686.1` (2026-10-05) |
 | toolchain | Zig **0.15.2** (user code and build), Fil-C **0.687** with zilc's patched clang (`workarounds.md` KI-22, KI-4) — **since 2026-10-30 compiled by Zig** (`zig build patched-clang`; the GCC-built one kept as `~/zilc-work/tools/filc-0.687-zilc-gcc` for rollback); 0.686's kept installed and archived (`toolchain/filc-0.686/`) |
-| unpushed | `main` is 5 commits ahead of `origin/main` (2026-10-30: `91e7959`, `5e31ef8`, `31a911a`, `896d1a7`; 2026-11-04: `e46fc05`, the GCC-free chain and `compare-chains.ts`) plus UNCOMMITTED work from the rest of 2026-11-04 (NEXT SESSION B); nothing pushed (owner's call) |
+| unpushed | `main` is 5 commits ahead of `origin/main` (2026-10-30: `91e7959`, `5e31ef8`, `31a911a`, `896d1a7`; 2026-11-04: `e46fc05`, the GCC-free chain and `compare-chains.ts`; 2026-11-05: `4d7b7dc`, release parity and the reference GCCs, plus its record commit); nothing pushed (owner's call) |
 | gates | `zig build gate`, `zig build test`, Fil-C's suite, the corpus in four modes, the output comparison: all re-run 2026-10-27 on Fil-C 0.687, counts in `testing.md` |
 | remote | `origin` = `github.com/synapticforge1/zilc` (since 2026-10-27; was `jrmarcum/zilc`, which GitHub redirects). **Purged history pushed 2026-10-27**: `main` = `origin/main`, `v0.15.2` = tag `v0.15.2-0.686.1` = `13ce96a` (was `19e7172`; map `history-map-2026-10-27.md`) |
 | branches | `main` carries the Bun port (`c2841dd`, was `44e0b1a`), merged `--no-ff` 2026-10-27 (owner: "we will merge all to bun tooling since deno is going away"), and the 2026-10-27 work since; `bun-port` (merged, never pushed) deleted 2026-10-27 (owner). Branches: `main`, `v0.15.2` |
@@ -27,7 +27,10 @@ A. ✅ **Re-proof read 2026-11-05** (owner: "proceed with item A"): it had compl
    **14/14** against the GCC chain: suite 0 differences vs stock and vs the GCC chain, gate 8/8
    both line for line, corpus verdicts identical in all four modes, output comparison 0
    unexplained both (one allowed thread-order flip, `36_worker-pools`). `~/zilc-work/equiv-tool/verdicts.txt`.
-B. **Commit the uncommitted work** (owner's word first): item 5's `zig build gcc-reference`
+B. ✅ **COMMITTED 2026-11-05 as `4d7b7dc`** (owner: "proceed with B"; not pushed). Before it: gate
+   8/8, `zig build test` 40/40, capi-smoke and baseline ok, path scan clean, `zig fmt --check`
+   clean (it reformatted `tools/gcc-reference.zig` and `tools/patched-clang.zig`, whitespace
+   only). What went in: item 5's `zig build gcc-reference`
    (`build/gcc_reference.zig`, `tools/gcc-reference.zig`, `tools/gcc-host-shim.zig`, the 5 lazy deps
    in `build.zig.zon`, `filc_source.named()`), `third_party/gcc-patches/` (GCC's own PR 111632
    backports + README), the two parity fixes (`tools/archive-rename.zig`, CET in
