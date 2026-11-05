@@ -156,16 +156,73 @@ headers, kernel headers.
   SAME ↔ EXPECTED, `35_waitgroups` SAME ↔ shape ok; the 2026-10-30 pair happened to match), so the
   check is "the same programs fail in both chains, and a flip only between SAME / EXPECTED /
   shape ok". Outputs in `~/zilc-work/equiv-tool/` (`verdicts.txt`).
-- **The `libpizlo.so` relocation gap, explained by type and symbol name** (comparing the `Info`
-  column is wrong: it holds the symbol's dynsym INDEX, different in every link): the zig chain has
-  exactly 5 more than the GCC chain and no other difference — 3 `JUMP_SLOT`s for the weak
-  undefined `__cxa_finalize` / `__register_frame_info` / `__deregister_frame_info` from
-  compiler-rt's `crtbegin.o` (Zig's clang at `-O0`, as upstream's CMake compiles it, calls them
-  through the PLT; the GCC build only through the GOT), and 2 out-of-line calls Zig's clang 20 makes
-  where clang 21 inlined (`pas_bootstrap_free_heap_{allocate_simple,deallocate}_for_config`). The
-  GCC chain differs from the release the same way (clang 21 vs clang 14 inlining). Every name is
-  defined in `libpizlo.so` itself (or weak, from libc) and nowhere else, so each call reaches the
-  same function: a code-path choice, not a change of what runs.
+- **Parity inventory (2026-11-04; owner: "are there any other items that are not in parity like
+  the one we just fixed?")** — every binary library of the zig chain against the release and the
+  GCC chain on eight properties (defined and undefined symbols, self-binding relocations by name,
+  dynamic tags, segments, section names, NEEDED/SONAME, notes; scan `~/zilc-work/parity/`; its
+  first run missed `JUMP_SLOT` through a pattern typo and was rerun until it saw the known 5).
+  Exports: equal everywhere. The differences, by cause:
+  1. **Linker (LLD vs GNU ld)** — `libpizlo.so` ×4: the 5 `JUMP_SLOT`s (W-14), an unused
+     undefined `__environ` (GNU ld only), `.plt.got` vs `.relro_padding`, LLD's `PHDR`;
+     `libyoloc.so`: `PHDR`, `.relro_padding`. All follow the linker (measured by relinking).
+  2. ✅ **Archive member names — FIXED 2026-11-04** (owner: "fix the two new items"). Were: Zig's
+     static libraries named members by full cache paths (`libyoloc.a` 1,343, `libpizlo.a` 183,
+     `libyolort.a` 167, `libyolounwind.a` 1; Z-b-8). Now `tools/archive-rename.zig`: `ar t` of all
+     four equals the release's line for line (names and order), no member holds a `/`.
+  3. ✅ **CET — FIXED 2026-11-04.** Were: Ubuntu's GCC defaults to `-fcf-protection`, so the
+     release's GCC-built pieces had `endbr64` and IBT/SHSTK notes and the zig chain none (C-7).
+     Now `-fcf-protection` on yolo musl, compiler-rt and the crt objects: `endbr64` equal to the
+     release's per member (`libyoloc.a` 1,715, `libyolort.a` 170, `crt1.o` 1, `rcrt1.o` 2,
+     `crtbegin.o` 2; 0 where the release has 0); `libyoloc.so` 1,694 vs 1,695 is C-8 (inlining).
+     `verify-libpas` / `-yolomusl` / `-compiler-rt` OK after the change. **Re-proof with both
+     fixes (2026-11-04, read 2026-11-05): `compare-chains.ts` 14/14** — suite 0 differences on
+     7,269 vs stock and vs the GCC chain, gate 8/8 both, corpus and output comparison unchanged
+     (CET's `endbr64` is a no-op where CET is not enforced, as expected).
+  3b. **Ubuntu GCC's other hardening defaults (found 2026-11-05 by a rescan; was misfiled under
+     W-8)** — the release's compiler-rt: stack protector (9 `__stack_chk_fail` calls, 18 guard
+     loads, 8 members) and fortify (`__fprintf_chk`); its yolo musl: 15 stack-clash probes. The
+     zig chain: none (C-7b). The rescan (2026-11-05, after the CET and archive fixes): 61 → 52
+     (library, property) pairs, nothing new. ✅ **FIXED 2026-11-05** (owner: "yes"): fortify 1 = 1
+     (C-11: clang's `__vfprintf_chk` for GCC's `__fprintf_chk`); stack-clash page probes 15 = 15 in
+     `libyoloc.a` and `.so` (0 before; C-12 says how to count them); stack protector: all 8
+     release-guarded compiler-rt members guarded, plus 8 clang adds by its own rule (C-10;
+     `verify-compiler-rt.ts` checks both directions); `endbr64` unchanged. Oracles: all three OK;
+     `verify-compiler-rt`'s undefined ratchet 14 → 13 (one member now equal). **Re-proof
+     (2026-11-05): `compare-chains.ts` 14/14** — exports, relocs, suite (0 differences on 7,269),
+     gate on the first run; the corpus part (7 checks: 500 same / 56 expected / 68 varies, 0 bad, 0
+     flips, all four modes) only after a rerun with every run fresh. The first try failed
+     `07_switch` and `52_time-formatting-parsing` because `REUSE=1` paired a day-old native run
+     with a new corpus; both programs print the time of day. `compare-chains.ts` now reuses the
+     corpus only when the native runs AND both chains' corpora all exist, otherwise it reruns all
+     three together.
+  4. **Compiler families, known and ratcheted** — W-4, W-8 (`_GLOBAL_OFFSET_TABLE_`, libcalls,
+     empty TU), inlining (C-8: `__ftello_unlocked`), sections `.llvm_addrsig` (clang) vs empty
+     `.data`/`.bss` (GCC), `.text.unlikely.` (clang 14 vs 20), DWARF relocation section names
+     (GCC emits `.debug_aranges`, clang does not by default), and GNU `as`'s ISA-used notes (C-9).
+  5. **Fil-C's clang is not reproducible (F-1)** — `libc.a` 79/1,332, `libc++.a` 22/54,
+     `libc++abi.a` 5/18 members differ between the chains; the same command twice differs by
+     6–8 bytes, code identical. Not a chain difference.
+  6. **Host binutils version** — the release's `libc.so` / `libc++.so.1.0` / `libc++abi.so.1.0`
+     have one more `LOAD` than both chains (binutils 2.38 vs 2.45; Fil-C's clang uses the host's
+     `ld` in both) (L-9).
+  7. **Install time, not build** — the release's `RUNPATH` (Fil-C's `setup.sh` patchelf).
+  8. **GCC chain only** — `libyolort.a`'s 6 extra half-float definitions (GCC 15), which the pinned
+     GCC 11.4 is meant to remove.
+- **The `libpizlo.so` relocation gap: it is the LINKER, nothing else** (proved 2026-11-04; W-14).
+  The zig chain has exactly 5 more `JUMP_SLOT`s than the GCC chain (`__cxa_finalize`,
+  `__register_frame_info`, `__deregister_frame_info`,
+  `pas_bootstrap_free_heap_{allocate_simple,deallocate}_for_config`) and no other difference. ⚠️ The
+  first explanation recorded here (unoptimized `crtbegin.o`; Zig's clang not inlining) was WRONG,
+  found by testing it: the objects' relocations are identical in both chains (`crtbegin.o` = the
+  release's GCC-11.4 one, `PLT32` + `REX_GOTPCRELX` for each weak function; the libpas callers
+  4/2 and 5/3 `PLT32`/`GOTPCRELX` in both). What differs: GNU ld gives a function referenced
+  through BOTH the PLT and the GOT one `.plt.got` stub that jumps through its GOT slot (one
+  `GLOB_DAT`); LLD has no `.plt.got` and adds a `.got.plt` `JUMP_SLOT`. Same 183 GCC-chain objects:
+  GNU ld 2,134, LLD 2,139. The ZIG chain's objects linked by GNU ld: 2,134 and **identical** to the
+  GCC chain's library by (type, name), exports, dynamic tags and segment kinds. (Comparing by the
+  `Info` column is wrong: it holds the symbol's per-link dynsym index.) Functionally the same
+  either way — every name is defined in `libpizlo.so` or weak, and the suite, gate and corpus
+  agree — and the 5 are removable by linking with GNU ld (scope: `open-work.md`).
 - **The alias route, measured and NOT adopted** (`workarounds.md` W-13): pointing upstream's own
   host-compiler steps at `zig cc` needs five fixes and still links `libyoloc.so` differently
   without an error.

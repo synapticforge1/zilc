@@ -136,6 +136,7 @@ the runtime-linking rule checked.
 | [testing.md](testing.md) | Every gate with its command and dated count; the output comparison; corpus results per mode; planned gates. |
 | [known-issues.md](known-issues.md) | The defect log, KI-1…KI-23: root cause, fix, status. |
 | [workarounds.md](workarounds.md) | The WHY of every workaround (owner rule): symptom index, failure families. **Look up new failures here first.** |
+| [toolchain-quirks.md](toolchain-quirks.md) | C, C++, Zig, linker and build-system peculiarities by TOOL (`zig cc`, clang vs GCC, LLD vs GNU ld, Zig's build/fetch, CMake/GCC/musl, git): symptom, cause, fix, where. **Look here when swapping a compiler or linker** (owner, 2026-11-04). |
 | [releasing.md](releasing.md) | The version scheme `<Zig>-<Fil-C>.<zilc release>` (DESIGN, workspace P8), where the number lives, the release checklist. |
 | [filc-abi.md](filc-abi.md) | Fil-C 0.685's runtime ABI as observed (P3 scoping; P3 moved to zailc 2026-10-27, kept as its record). |
 | [zig-upstream-notes.md](zig-upstream-notes.md) | Zig behaviours we may need to report (Z-1…Z-5), each with whether it is really a Zig bug. |

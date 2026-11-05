@@ -178,6 +178,11 @@ cmake or ninja stops the build with a message naming the option.
   and `llvm-split` under `zig-out/patched-clang/bin`. `-Dclang-jobs=<n>` sets ninja's jobs (one
   per core can exhaust memory). Fil-C's own test suite gives the same result with it as with Fil-C's
   release on all 7,269 tests.
+- **All of Fil-C from source, still without a C compiler:** once `patched-clang` and `pure-zig`
+  have run, `bun tools/filc/build-filc-from-source.ts` builds Fil-C's whole toolchain (runtime,
+  user libc, libc++) with no `gcc`, `cc` or system `clang` on `PATH`. A maintainer additionally
+  keeps GCC to build the same sources the way Fil-C's own scripts do and compare the two
+  (`MODE=upstream`, `tools/filc/compare-chains.ts`); users never need it.
 - Offline, or with a checkout of your own: `-Dfilc-src=<Fil-C tree at the same commit>`.
 
 **If the checkout is on an exFAT drive, keep the Zig cache off it.** A `.zig-cache` on exFAT works

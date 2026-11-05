@@ -52,6 +52,63 @@ pub fn addSteps(b: *std.Build, gen: *std.Build.Step.Compile, filc_src: ?[]const 
     }
 }
 
+/// Ubuntu's GCC compiles with hardening ON by default, so the release's GCC-built pieces carry it:
+/// compiler-rt (GCC 11.4), yolo musl and the crt objects (GCC 12.3). Zig's clang adds each only when
+/// asked (cmem/toolchain-quirks.md C-7, C-7b). The clang-14-built pieces (libpas's stock half,
+/// filc_crt.o, yolounwind) have none of them, as in the release. Per piece, what the release shows:
+///   * CET, `-fcf-protection` (`endbr64`, IBT/SHSTK notes): every GCC-built piece (2026-11-04);
+///   * `-fstack-protector-strong`: compiler-rt (9 `__stack_chk_fail` calls, 18 guard loads); yolo
+///     musl's use already equals the release's, so it is not added there (2026-11-05);
+///   * `-fstack-clash-protection`: yolo musl (15 probes) and compiler-rt;
+///   * `-D_FORTIFY_SOURCE=2`: Ubuntu applies it only when optimizing, so the `-O3` builtins and not
+///     crtbegin/crtend (`-O0`). Under clang glibc's headers fortify `fprintf` as `__vfprintf_chk`
+///     where GCC's give `__fprintf_chk`: the same check through another glibc entry point.
+const ubuntu_gcc_cet = "-fcf-protection";
+const ubuntu_gcc_clash = "-fstack-clash-protection";
+const ubuntu_gcc_ssp = "-fstack-protector-strong";
+const ubuntu_gcc_fortify = "-D_FORTIFY_SOURCE=2";
+
+/// Static libraries with upstream's member names and order (tools/archive-rename.zig; Zig's own
+/// names are full cache paths, toolchain-quirks.md Z-b-8). `specs` are `<stem>=<name>`, in order.
+fn installUpstreamArchive(b: *std.Build, step: *std.Build.Step, lib: *std.Build.Step.Compile, dest: []const u8, specs: []const []const u8) void {
+    const tool = b.addExecutable(.{
+        .name = "archive-rename",
+        .root_module = b.createModule(.{ .root_source_file = b.path("tools/archive-rename.zig"), .target = b.graph.host }),
+    });
+    const run = b.addRunArtifact(tool);
+    run.addArg(b.graph.zig_exe);
+    run.addArtifactArg(lib);
+    const out = run.addOutputFileArg(std.fs.path.basename(dest));
+    run.addArgs(specs);
+    step.dependOn(&b.addInstallFile(out, dest).step);
+}
+
+/// `flags` plus Ubuntu GCC's defaults for an optimized compiler-rt member (above).
+fn withUbuntuGccOptimized(b: *std.Build, flags: []const []const u8) []const []const u8 {
+    return std.mem.concat(b.allocator, []const u8, &.{ flags, &.{ ubuntu_gcc_cet, ubuntu_gcc_ssp, ubuntu_gcc_clash, ubuntu_gcc_fortify } }) catch @panic("OOM");
+}
+
+/// libpas's archive order (libpas/Makefile PASPIZLO*OBJS): PASSRCS as common.mk lists them,
+/// sorted, with the generated filc_native_forwarders.c in its sorted place; then the assembly; then
+/// the variant's own objects; then FILPIZLOOBJS. Names `pas-pizlo-release-<stem>.o`, `fil-pizlo-*.o`.
+fn pasSpecs(b: *std.Build, extras: []const []const u8, fil: []const []const u8) []const []const u8 {
+    var l: std.ArrayList([]const u8) = .empty;
+    var fwd_done = false;
+    for (libpas_sources.c) |c| {
+        const st = std.fs.path.stem(c);
+        if (!fwd_done and std.mem.order(u8, "filc_native_forwarders", st) == .lt) {
+            l.append(b.allocator, "filc_native_forwarders=pas-pizlo-release-filc_native_forwarders.o") catch @panic("OOM");
+            fwd_done = true;
+        }
+        l.append(b.allocator, b.fmt("{s}=pas-pizlo-release-{s}.o", .{ st, st })) catch @panic("OOM");
+    }
+    if (!fwd_done) l.append(b.allocator, "filc_native_forwarders=pas-pizlo-release-filc_native_forwarders.o") catch @panic("OOM");
+    for (libpas_sources.assembly) |a| l.append(b.allocator, b.fmt("{s}=pas-pizlo-release-{s}.o", .{ std.fs.path.stem(a), std.fs.path.stem(a) })) catch @panic("OOM");
+    for (extras) |e| l.append(b.allocator, b.fmt("{s}=pas-pizlo-release-{s}.o", .{ e, e })) catch @panic("OOM");
+    for (fil) |f| l.append(b.allocator, b.fmt("{s}={s}.o", .{ f, f })) catch @panic("OOM");
+    return l.items;
+}
+
 /// The two pizfix include directories libpas is compiled against.
 const Pizfix = struct { os_include: std.Build.LazyPath, stdfil_include: std.Build.LazyPath };
 
@@ -96,9 +153,12 @@ fn buildCompilerRt(b: *std.Build, step: *std.Build.Step, filc_src: []const u8) C
     }.f;
 
     const builtins = module(b);
-    for (cs.builtins) |m| builtins.addCSourceFile(.{ .file = dir.path(b, m.path), .flags = if (m.asm_) &cs.asm_flags else &cs.c_flags });
+    for (cs.builtins) |m| builtins.addCSourceFile(.{ .file = dir.path(b, m.path), .flags = withUbuntuGccOptimized(b, if (m.asm_) &cs.asm_flags else &cs.c_flags) });
     const lib = b.addLibrary(.{ .name = "yolort", .root_module = builtins, .linkage = .static });
-    step.dependOn(&b.addInstallArtifact(lib, .{}).step);
+    // CMake names each member `<source file>.o` (`absvdi2.c.o`, `chkstk.S.o`).
+    const rt_specs = b.allocator.alloc([]const u8, cs.builtins.len) catch @panic("OOM");
+    for (cs.builtins, 0..) |m, i| rt_specs[i] = b.fmt("{s}={s}.o", .{ std.fs.path.stem(m.path), std.fs.path.basename(m.path) });
+    installUpstreamArchive(b, step, lib, "lib/libyolort.a", rt_specs);
 
     var crt: [2]std.Build.LazyPath = undefined;
     for ([_]struct { name: []const u8, path: []const u8, flags: []const []const u8 }{
@@ -107,7 +167,8 @@ fn buildCompilerRt(b: *std.Build, step: *std.Build.Step, filc_src: []const u8) C
     }, 0..) |o, i| {
         const m = module(b);
         // CMake's custom command passes no -O: the compiler's default, -O0.
-        const flags = std.mem.concat(b.allocator, []const u8, &.{ o.flags, &.{"-O0"} }) catch @panic("OOM");
+        // Ubuntu GCC's defaults at -O0: no fortify (it needs optimization).
+        const flags = std.mem.concat(b.allocator, []const u8, &.{ o.flags, &.{ "-O0", ubuntu_gcc_cet, ubuntu_gcc_ssp, ubuntu_gcc_clash } }) catch @panic("OOM");
         m.addCSourceFile(.{ .file = dir.path(b, o.path), .flags = flags });
         const obj = b.addObject(.{ .name = o.name, .root_module = m });
         crt[i] = obj.getEmittedBin();
@@ -168,6 +229,7 @@ fn buildYoloMusl(b: *std.Build, step: *std.Build.Step, gen: *std.Build.Step.Comp
             if (s.nossp) l.appendSlice(bb.allocator, &ys.nossp_flags) catch @panic("OOM");
             if (crt) l.append(bb.allocator, "-DCRT") catch @panic("OOM");
             if (s.pic) l.append(bb.allocator, "-fPIC") catch @panic("OOM");
+            l.appendSlice(bb.allocator, &.{ ubuntu_gcc_cet, ubuntu_gcc_clash }) catch @panic("OOM"); // the release's GCC 12.3 defaults
             l.append(bb.allocator, map) catch @panic("OOM");
             return l.items;
         }
@@ -179,7 +241,10 @@ fn buildYoloMusl(b: *std.Build, step: *std.Build.Step, gen: *std.Build.Step.Comp
     const root: std.Build.LazyPath = .{ .cwd_relative = tree };
     for (ys.libc) |s| libc_mod.addCSourceFile(.{ .file = root.path(b, s.path), .flags = flagsFor(b, s, false, prefix_map) });
     const libc = b.addLibrary(.{ .name = "yoloc", .root_module = libc_mod, .linkage = .static });
-    step.dependOn(&b.addInstallArtifact(libc, .{}).step);
+    // musl's Makefile names each member `<stem>.lo` (two each of clone, free, realloc: in order).
+    const libc_specs = b.allocator.alloc([]const u8, ys.libc.len) catch @panic("OOM");
+    for (ys.libc, 0..) |s, i| libc_specs[i] = b.fmt("{s}={s}.lo", .{ std.fs.path.stem(s.path), std.fs.path.stem(s.path) });
+    installUpstreamArchive(b, step, libc, "lib/libyoloc.a", libc_specs);
 
     // The crt objects, one each, installed under their base names (crt/x86_64/crti.s -> crti.o).
     var crti: ?std.Build.LazyPath = null;
@@ -335,7 +400,9 @@ fn buildLibpizlo(b: *std.Build, step: *std.Build.Step, pas: Pas, filc_src: []con
     const static_mod = pas.module(&.{ "filc_static", "filc_default_settings" }, false);
     for (fil_objs) |o| static_mod.addObjectFile(o);
     const static_lib = b.addLibrary(.{ .name = "pizlo", .root_module = static_mod, .linkage = .static });
-    step.dependOn(&b.addInstallArtifact(static_lib, .{}).step);
+    const fil_stems = b.allocator.alloc([]const u8, names.items.len) catch @panic("OOM");
+    for (names.items, 0..) |n, i| fil_stems[i] = b.fmt("fil-pizlo-{s}", .{std.fs.path.stem(n)});
+    installUpstreamArchive(b, step, static_lib, "lib/libpizlo.a", pasSpecs(b, &.{ "filc_static", "filc_default_settings" }, fil_stems));
 
     // The four libpizlo.so: SHLD = $(HOST_CLANG) -Wl,-dynamic-linker,… -nostdlib -shared crti.o
     // crtbegin.o -L<lib>; then the objects; SHLDPOST = libyolort.a -lyoloc -lyolom crtend.o crtn.o.
@@ -420,7 +487,7 @@ fn buildStockRuntime(b: *std.Build, step: *std.Build.Step, gen: *std.Build.Step.
 
     // The static variant: PASPIZLOSTATICOBJS adds filc_static.o and filc_default_settings.o.
     const lib = b.addLibrary(.{ .name = "pizlo-stock", .root_module = pas.module(&.{ "filc_static", "filc_default_settings" }, false), .linkage = .static });
-    step.dependOn(&b.addInstallArtifact(lib, .{}).step);
+    installUpstreamArchive(b, step, lib, "lib/libpizlo-stock.a", pasSpecs(b, &.{ "filc_static", "filc_default_settings" }, &.{}));
     // pizfix/yolo-include, as upstream's tree has it after build_yolomusl.sh: what libpas's objects
     // were compiled against, and what Fil-C's clang reads next to its pizfix/.
     step.dependOn(&b.addInstallDirectory(.{ .source_dir = yolo_include, .install_dir = .prefix, .install_subdir = "yolo-include" }).step);
@@ -452,5 +519,5 @@ fn buildStockRuntime(b: *std.Build, step: *std.Build.Step, gen: *std.Build.Step.
     const unwind_map = b.fmt("-ffile-prefix-map={s}/=", .{b.pathJoin(&.{ filc_src, "yolounwind" })});
     unwind.addCSourceFile(.{ .file = .{ .cwd_relative = b.pathJoin(&.{ filc_src, "yolounwind", "yolounwind.c" }) }, .flags = b.allocator.dupe([]const u8, &.{ "-O2", "-g", unwind_map }) catch @panic("OOM") });
     const unwind_lib = b.addLibrary(.{ .name = "yolounwind", .root_module = unwind, .linkage = .static });
-    step.dependOn(&b.addInstallArtifact(unwind_lib, .{}).step);
+    installUpstreamArchive(b, step, unwind_lib, "lib/libyolounwind.a", &.{"yolounwind=yolounwind.o"});
 }

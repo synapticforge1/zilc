@@ -12,7 +12,7 @@
 //                                                 "none" = no -Dpizfix, the build makes them itself)
 
 import { readdirSync } from "node:fs";
-import { readdir, stat } from "node:fs/promises";
+import { readdir, rename, stat } from "node:fs/promises";
 import { FILC_PREBUILT_TREE, PURE_ZIG_OUT, REPO, WORK, env, existsSync, linuxOnly, mkdirp, must, requireFilcSrc, rmrf, run, ZIG, zigCacheArgs } from "../lib/tool.ts";
 import { diff, sourcePaths, symbols } from "./lib/objects.ts";
 
@@ -59,7 +59,14 @@ let unknownUndef = 0;
 
 let objects = 0, same = 0, missingRef = 0, defMismatch = 0, undefMismatch = 0;
 const names: string[] = [];
-for (const e of await readdir(ours, { withFileTypes: true })) if (e.isFile() && e.name.endsWith(".o")) names.push(e.name);
+// Our archive carries upstream's member names since 2026-11-04 (`pas-pizlo-release-<x>.o`,
+// tools/archive-rename.zig); before, Zig's (`<x>.o`). The comparison keys on `<x>.o`.
+for (const e of await readdir(ours, { withFileTypes: true })) {
+  if (!e.isFile() || !e.name.endsWith(".o")) continue;
+  const name = e.name.replace(/^pas-pizlo-release-/, "");
+  if (name !== e.name) await rename(`${ours}/${e.name}`, `${ours}/${name}`);
+  names.push(name);
+}
 names.sort();
 for (const name of names) {
   objects++;

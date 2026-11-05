@@ -11,13 +11,44 @@ them, with their dates.
 | --- | --- |
 | version | **`0.15.2-0.687.1`** — `<Zig>-<Fil-C>.<zilc release>`, **published 2026-10-27** (tag `v0.15.2-0.687.1` on `be51808`; `releasing.md`); one of the five places the number lives. Before it: `0.15.2-0.686.1` (2026-10-05) |
 | toolchain | Zig **0.15.2** (user code and build), Fil-C **0.687** with zilc's patched clang (`workarounds.md` KI-22, KI-4) — **since 2026-10-30 compiled by Zig** (`zig build patched-clang`; the GCC-built one kept as `~/zilc-work/tools/filc-0.687-zilc-gcc` for rollback); 0.686's kept installed and archived (`toolchain/filc-0.686/`) |
-| unpushed | `main` is 5 commits ahead of `origin/main` (2026-10-30: `91e7959`, `5e31ef8`, `31a911a`, `896d1a7`; 2026-11-04: the GCC-free chain and `compare-chains.ts`); nothing pushed (owner's call) |
+| unpushed | `main` is 5 commits ahead of `origin/main` (2026-10-30: `91e7959`, `5e31ef8`, `31a911a`, `896d1a7`; 2026-11-04: `e46fc05`, the GCC-free chain and `compare-chains.ts`) plus UNCOMMITTED work from the rest of 2026-11-04 (NEXT SESSION B); nothing pushed (owner's call) |
 | gates | `zig build gate`, `zig build test`, Fil-C's suite, the corpus in four modes, the output comparison: all re-run 2026-10-27 on Fil-C 0.687, counts in `testing.md` |
 | remote | `origin` = `github.com/synapticforge1/zilc` (since 2026-10-27; was `jrmarcum/zilc`, which GitHub redirects). **Purged history pushed 2026-10-27**: `main` = `origin/main`, `v0.15.2` = tag `v0.15.2-0.686.1` = `13ce96a` (was `19e7172`; map `history-map-2026-10-27.md`) |
 | branches | `main` carries the Bun port (`c2841dd`, was `44e0b1a`), merged `--no-ff` 2026-10-27 (owner: "we will merge all to bun tooling since deno is going away"), and the 2026-10-27 work since; `bun-port` (merged, never pushed) deleted 2026-10-27 (owner). Branches: `main`, `v0.15.2` |
 | sibling | **zailc** (`../zailc`, started 2026-10-08) translates Fil-C into Zig; zilc is its stable reference and test oracle and changes nothing for it (`design-decisions.md`) |
 
-## ▶️ NEXT SESSION — pick up here (paused 2026-10-30 by the owner; items 1–4 done 2026-11-04, start at 5)
+## ▶️ NEXT SESSION — pick up here (paused 2026-11-04 by the owner)
+
+**Start with these, in order** (the numbered list below keeps the history):
+
+A. ✅ **Re-proof read 2026-11-05** (owner: "proceed with item A"): it had completed on 2026-11-04
+   16:11, before the pause. The zig chain rebuilt WITH the CET and archive-name fixes (confirmed in
+   the tested tree: archive member lists = the release's, `endbr64` = the release's) is still
+   **14/14** against the GCC chain: suite 0 differences vs stock and vs the GCC chain, gate 8/8
+   both line for line, corpus verdicts identical in all four modes, output comparison 0
+   unexplained both (one allowed thread-order flip, `36_worker-pools`). `~/zilc-work/equiv-tool/verdicts.txt`.
+B. **Commit the uncommitted work** (owner's word first): item 5's `zig build gcc-reference`
+   (`build/gcc_reference.zig`, `tools/gcc-reference.zig`, `tools/gcc-host-shim.zig`, the 5 lazy deps
+   in `build.zig.zon`, `filc_source.named()`), `third_party/gcc-patches/` (GCC's own PR 111632
+   backports + README), the two parity fixes (`tools/archive-rename.zig`, CET in
+   `build/pure_zig.zig`, `verify-libpas.ts`), the hardening fix (`build/pure_zig.zig`,
+   `verify-compiler-rt.ts`), `compare-chains.ts`'s all-or-nothing REUSE, `cmem/toolchain-quirks.md` (new, in INDEX), and the
+   record updates (testing, workarounds W-14, best-practices, LICENSES, README, this file). Run
+   `zig build test`, the gate and the path scan first.
+C. **Finish item 5**: both pinned GCCs are BUILT by Zig (`~/zilc-work/tools/gcc-11.4.0`, 174 MB;
+   `gcc-12.3.0`; ~5 min each once staged; smoke-tested 11.4.0: C and C++ run, PIE and SSP on).
+   Remaining: (1) give them Ubuntu's other compile defaults through a GCC `specs` file in each
+   install (`-fcf-protection`, `-fstack-clash-protection`, `-D_FORTIFY_SOURCE=2` when optimizing;
+   GCC reads `<libdir>/gcc/x86_64-linux-gnu/<v>/specs` by itself) — written by
+   `tools/gcc-reference.zig` after `make install-strip`, then checked (endbr64, `__fprintf_chk`);
+   (2) point `build-filc-from-source.ts MODE=upstream` at them per step as the release's
+   `.comment`s say (compiler-rt + projeny: 11.4.0; yolo musl: 12.3.0; libpas/yolounwind stay the
+   host clang — the release used Ubuntu clang 14, not built here); (3) rebuild the GCC chain and
+   rerun `compare-chains.ts` — expected: the GCC chain's `libyolort.a` now equals the release's.
+D. **Owner calls waiting:** item 8 (link with GNU ld for relocation parity, W-14 family) and the
+   optional cosmetic items listed in item 9.
+
+(Older: paused 2026-10-30; items 1–4 done 2026-11-04.)
 
 In order. The owner's conditions, verbatim: libpas finished and *"make sure that the entire
 compilation no longer needs gcc at all"*; *"before we fully remove the gcc, we should make sure that
@@ -49,13 +80,68 @@ future reference"*.
    (~25 min).
 5. **Maintainer-only: GCC pinned to upstream's versions (11.4, 12.3), built by Zig** — measure
    build time and size first; then point `MODE=upstream` at it (item under "Open work" below).
-6. **Documentation still to write** (owner: "document all of this"): README — a short "Fil-C from
-   source" note (MODE=zig needs no compiler; GCC is maintainer-only). (`tools/README.md` and
-   `Fil-C.md` § 4 done 2026-11-04.)
-7. Housekeeping: `~/zilc-work/pz-libpas`, `~/zilc-work/path-no-compilers`, `~/zilc-work/equiv`
-   (read 2026-11-04; `equiv-tool` holds compare-chains' run), `~/zilc-work/path-no-tools` are
-   scratch; the two from-source trees (`filc-from-source-0.687`, `-upstream`, ~3 GB each) are
-   compare-chains' default inputs — keep them while comparing, rebuild them on a Fil-C move.
+6. ✅ **Documentation, done 2026-11-04** (owner: "proceed with 5, 6, and 7"): README "Building
+   Fil-C's side from a clone" gains the from-source note (no compiler needed; GCC maintainer-only);
+   `tools/README.md` and `Fil-C.md` § 4 done earlier the same day.
+7. ✅ **Housekeeping, done 2026-11-04**: removed `~/zilc-work/pz-libpas`, `path-no-compilers`,
+   `equiv` (superseded by `equiv-tool`, compare-chains' run), two stray logs, and the suite's
+   per-test outputs of three one-off proofs (`test-output-from-source`, `-zigbuild`, `-zigcc`,
+   1.8 GB each; their `results-*.json` kept). Kept: the two from-source trees (compare-chains'
+   inputs), `equiv-tool`, and the suite outputs for stock, patched and both chains.
+
+8. 🗓️ **Owner call: relocation parity for `libpizlo.so` (W-14), scoped 2026-11-04** (owner: "review
+   and test the issue … and scope the fix for it to bring it into parity").
+   - **Cause (measured):** the LINKER only. Zig's LLD has no `.plt.got`; GNU ld does. Same objects:
+     GNU ld 2,134, LLD 2,139. The objects of both chains are equivalent: the zig chain's objects
+     linked by GNU ld are IDENTICAL to the GCC chain's library by (type, name) relocations,
+     exports, dynamic tags and segment kinds.
+   - **Fix:** link zilc's shared objects with GNU ld (`ld`, binutils) instead of `zig ld.lld`, same
+     flags: `build/pure_zig.zig`'s four `libpizlo.so` links (and, optionally, `libyoloc.so`, which
+     would also lose its LLD-only `PHDR` segment, W-11 part 3; its `GNU_PROPERTY` difference stays,
+     as it comes from GCC's object notes). Suggested shape: `-Dpizlo-linker=gnu|lld`, ~20 lines.
+   - **Cost:** no new tool for users — Fil-C's clang already links every program with `/usr/bin/ld`
+     (binutils), so binutils is a prerequisite today. It is a step away from "Zig links everything"
+     for these libraries.
+   - **Proof after the change:** `verify-libpas` / `verify-yolomusl`, `compare-chains.ts` (relocs
+     part must show 0 differing names), Fil-C's suite, the gate.
+   - **Or keep LLD:** functionally the same (every name resolves to the same definition; suite,
+     gate and corpus agree), recorded as W-14.
+
+9. **Parity items found by the 2026-11-04 inventory** (`testing.md` "Parity inventory"); owner:
+   "fix the two new items and document the rest if not fixable, or review and scope fixable items".
+   - ✅ **Archive member names** (Z-b-8): fixed, `tools/archive-rename.zig`.
+   - ✅ **CET** (C-7): fixed, `-fcf-protection` on the GCC-built pieces. The GNU_PROPERTY
+     allowance in `verify-yolomusl.ts` STAYS: the remaining note is GNU `as`'s (C-9).
+   - ✅ **Ubuntu GCC's other hardening defaults — FIXED 2026-11-05** (owner: "yes"; `testing.md` 3b,
+     toolchain-quirks C-7b, C-10–C-12; functional re-proof 2026-11-05: `compare-chains.ts`
+     14/14, corpus after a same-sitting rerun, see `testing.md` 3b). Was scoped as
+     (C-7b; found 2026-11-05, owner asked again "are
+     there any other items that are not in parity"): add to the GCC-built pieces in
+     `build/pure_zig.zig`, beside `ubuntu_gcc_cet` — compiler-rt builtins
+     `-fstack-protector-strong -fstack-clash-protection -D_FORTIFY_SOURCE=2`; crtbegin/crtend the
+     first two (`-O0`: Ubuntu applies fortify only when optimizing); yolo musl
+     `-fstack-clash-protection` (its stack-protector use already equals the release's). Check:
+     the counts in `testing.md` 3b equal the release's, the three `verify-*` oracles, then
+     `compare-chains.ts`. W-8's allowance for `__stack_chk_fail` / `__fprintf_chk` in
+     `verify-compiler-rt.ts` then goes. Unmeasured: whether Zig's glibc headers honour
+     `_FORTIFY_SOURCE` (test first).
+   - **Reviewed, FIXABLE, scoped:**
+     - the linker family (W-14 `JUMP_SLOT`s, L-7 `__environ`, L-8 `.plt.got` / `.relro_padding`,
+       W-11 `PHDR`): link with GNU ld — item 8, owner call;
+     - Ubuntu GCC's other defaults for the pinned VANILLA GCC (item 5): MODE=upstream must pass
+       `-fcf-protection -fstack-clash-protection` and `-D_FORTIFY_SOURCE=2` at `-O` (PIE and SSP
+       are configured) — part of pointing MODE=upstream at the pinned GCC;
+     - optional, cosmetic: `-fno-addrsig` on the GCC-built pieces would remove clang's
+       `.llvm_addrsig` sections (only `--icf` reads them); `-gdwarf-aranges` would add GCC's
+       `.debug_aranges`. Debug/section level only, no code change — not recommended unless byte
+       parity of sections is wanted;
+     - host binutils version (L-9): only by building binutils 2.38 as a pinned maintainer tool, as
+       for GCC; it affects both chains equally, so it does not bear on Zig vs GCC.
+   - **Reviewed, NOT fixable here, documented:** GNU `as`'s ISA-used notes (C-9: clang's assembler
+     has none); compiler families W-4, W-8, C-8 (inlining) — inherent to compiling with a different
+     compiler, which is what the maintainer's GCC chain exists to measure; Fil-C's clang
+     nondeterminism (F-1, upstream's; zilc records, does not file); the release's install-time
+     `RUNPATH` (Fil-C's `setup.sh`, not the build).
 
 ## 🗓️ Owner calls (evidence gathered; nothing done without the owner)
 

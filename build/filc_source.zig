@@ -28,10 +28,16 @@ pub fn path(b: *std.Build) ?[]const u8 {
 }
 
 fn requested(b: *std.Build) bool {
+    for (steps) |s| if (named(b, s)) return true;
+    return false;
+}
+
+/// Whether `step` was named on the command line (for the other lazy dependencies too).
+pub fn named(b: *std.Build, step: []const u8) bool {
     const args = std.process.argsAlloc(b.allocator) catch @panic("OOM");
     for (args[1..]) |a| {
         if (std.mem.eql(u8, a, "--")) break;
-        for (steps) |s| if (std.mem.eql(u8, a, s)) return true;
+        if (std.mem.eql(u8, a, step)) return true;
     }
     return false;
 }

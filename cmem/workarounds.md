@@ -831,7 +831,7 @@ machine-local memory `no-windows-host-execution`.
 
 ---
 
-## The pure-Zig track: W-1 … W-13 (W-1…W-10 first written in zailc, 2026-10-08/09, brought here 2026-10-27; W-11…W-13 zilc's own)
+## The pure-Zig track: W-1 … W-14 (W-1…W-10 first written in zailc, 2026-10-08/09, brought here 2026-10-27; W-11…W-14 zilc's own)
 
 The track (`roadmap.md` Z1) came from zailc with its workaround notes; the code cites them by these
 numbers, so they live here too, condensed. zailc's `cmem/workarounds.md` keeps the long forms.
@@ -862,7 +862,10 @@ numbers, so they live here too, condensed. zailc's `cmem/workarounds.md` keeps t
   with GCC 12.3 and compiler-rt with GCC 11.4; zilc's pure-Zig build uses Zig's clang. Defined
   symbols are equal; only these UNDEFINED differences are allowed, each set in its oracle with an
   exact count: GCC's explicit `_GLOBAL_OFFSET_TABLE_`; clang's `memcpy`/`memset` calls where GCC
-  inlines (both defined by this libc); Ubuntu GCC's `__stack_chk_fail` and `__fprintf_chk`; each
+  inlines (both defined by this libc); Ubuntu GCC's `__stack_chk_fail` and `__fprintf_chk` (⚠️
+  2026-11-05: these two are NOT compiler differences but Ubuntu GCC's default
+  `-fstack-protector-strong` / `-D_FORTIFY_SOURCE=2`; since 2026-11-05 zilc passes them, and what
+  remains is C-10 / C-11 in `cmem/toolchain-quirks.md`); each
   compiler's own helper libcalls (`__divti3` vs `__udivti3`, `__gttf2`/`__letf2`/`__floatsitf` vs
   `__lttf2`); and one empty translation unit (`src/linux/cache.c`) that only GCC gives a compile
   unit. Lasts as long as the oracle is a GCC-built release.
@@ -936,3 +939,14 @@ numbers, so they live here too, condensed. zailc's `cmem/workarounds.md` keeps t
   **21** — exports identical (1,653), so a symbol check does not see it. Hence the zig chain uses
   `zig build pure-zig` for every stock piece (faithful, verified) and upstream's scripts only for
   the steps Fil-C's clang does (`tools/filc/build-filc-from-source.ts` MODE=zig).
+- **W-14. LLD has no `.plt.got`: 5 more `JUMP_SLOT`s in `libpizlo.so` than GNU ld makes**
+  (2026-11-04; owner: "review and test … scope the fix … to bring it into parity"). A function both
+  called through the PLT and loaded through the GOT (the weak `__register_frame_info` /
+  `__deregister_frame_info` / `__cxa_finalize` in compiler-rt's `crtbegin.o`, tested before each
+  call; two `pas_bootstrap_free_heap_*` functions libpas both calls and takes the address of) gets
+  from GNU ld a `.plt.got` stub jumping through its one GOT slot (`GLOB_DAT`), from LLD a regular
+  PLT entry with its own `JUMP_SLOT` as well. Measured on identical objects (2,134 vs 2,139); the
+  zig chain's objects linked by GNU ld equal the GCC chain's library exactly (`testing.md`). No
+  behaviour difference: both resolve to the same definition (yolo musl's loader binds at load).
+  Fix, if parity is wanted: link with GNU ld (scope in `open-work.md`); LLD 20 has no option for it.
+  A relative: W-11 part 3 (`PHDR`), another LLD-vs-GNU-ld layout difference.

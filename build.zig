@@ -3,6 +3,7 @@ const std = @import("std");
 const pure_zig = @import("build/pure_zig.zig");
 const filc_source = @import("build/filc_source.zig");
 const patched_clang = @import("build/patched_clang.zig");
+const gcc_reference = @import("build/gcc_reference.zig");
 const signatures = @import("src/gen/signatures.zig");
 
 pub fn build(b: *std.Build) void {
@@ -76,6 +77,8 @@ pub fn build(b: *std.Build) void {
     pure_zig.addSteps(b, gen, filc_src);
     // The Fil-C side's compiler (`zig build patched-clang`): build/patched_clang.zig.
     patched_clang.addStep(b, filc_src);
+    // MAINTAINER-ONLY: the release's GCC versions, for the comparison chain (build/gcc_reference.zig).
+    gcc_reference.addStep(b);
 
     // ---- Every reference to the Fil-C release names the same one (`zig build check-pins`) ----
     // Owner, 2026-10-30: they all move with each Fil-C update. Also part of `zig build test`.

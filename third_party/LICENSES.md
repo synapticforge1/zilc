@@ -308,6 +308,23 @@ Newest first. Copy the template for each adopted component.
   [x] NOTICE (Fil-C runtime, musl, LLVM already listed)  [ ] binary-distribution notice: not
   needed while the libraries are not distributed
 
+### gcc-reference (GCC 11.4.0 / 12.3.0 with GMP, MPFR, MPC; a MAINTAINER BUILD TOOL, built and used locally only)
+- **Source:** GNU's signed release tarballs, pinned by hash in `build.zig.zon` (signatures checked
+  2026-11-04); fetched only by `zig build gcc-reference`
+- **License:** GCC `GPL-3.0-or-later WITH GCC-exception-3.1`; GMP, MPFR, MPC `LGPL-3.0-or-later`
+  (GMP also `GPL-2.0-or-later` option)
+- **What zilc carries:** `build/gcc_reference.zig` and `tools/gcc-reference.zig` (zilc's own),
+  and two patch files, `third_party/gcc-patches/gcc-{11.4.0,12.3.0}-PR111632-safe-ctype.patch`:
+  GCC's OWN backports of PR middle-end/111632 (release-branch commits `5a419c22` and `a995fded`,
+  diff byte-identical to upstream's; `GPL-3.0-or-later`, as `gcc/system.h`), kept as separate
+  files with their provenance in each header, applied to a local staging copy
+  (`cmem/toolchain-quirks.md` Z-cc-14). zilc's own license does not extend to them
+- **Artifact destination:** `~/zilc-work/tools/gcc-<version>` on the maintainer's machine, used
+  to build Fil-C's runtime the upstream way for comparison (`tools/filc/build-filc-from-source.ts
+  MODE=upstream`); **never distributed**, never in zilc's outputs. The GCC runtime library
+  exception covers whatever it compiles, as for any GCC
+- **Obligations satisfied:** none arise while nothing is distributed
+
 <!--
 ### <component-name>
 - **Source:** https://github.com/<org>/<repo>

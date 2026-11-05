@@ -28,6 +28,10 @@ citation to the incident.
   overflowed the gate's 50 KiB capture limit, and the gate died with `StderrStreamTooLong`
   instead of printing FAIL. Capture generously and print a bounded excerpt. (`tools/gate.zig`,
   2026-10-27.)
+- **A reference run made on another day is not a reference for a program that reads the clock.**
+  `REUSE=1` paired a native run from 2026-11-04 with corpus runs from 2026-11-05, and two programs
+  that print the time of day "failed". Cached comparison inputs are reused all together or not at
+  all. (`tools/filc/compare-chains.ts`, 2026-11-05.)
 
 ## 2. Investigating a defect
 
@@ -258,6 +262,11 @@ citation to the incident.
   report. Also: demand identity only of what is deterministic — the output-comparison reports flip
   run to run on thread-order programs, so the check compares failing sets and allowed flips, not
   bytes. (compare-chains.ts, 2026-11-04.)
+- **Before naming a cause, hold everything else fixed and vary one thing.** The `libpizlo.so`
+  gap was first "explained" as compiler choices (unoptimized `crtbegin`, inlining) and written
+  down; the owner asked for a test. The same objects linked by two linkers settled it in one run:
+  it was LLD vs GNU ld, and the objects of both chains were identical. A plausible story is not a
+  measurement. (W-14, 2026-11-04.)
 - **Compare relocations by type and symbol NAME, never by the `Info` column:** it holds the
   symbol's dynsym index, different in every link, so the whole table "differed". (2026-11-04.)
 - **A build system that tests flags drops the ones the compiler refuses, without a word**

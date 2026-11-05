@@ -1,0 +1,111 @@
+Subject: [PATCH] Include safe-ctype.h after C++ standard headers, to avoid
+ over-poisoning (backport to GCC 12.3.0)
+
+UPSTREAM BACKPORT, applied unchanged by zilc's `zig build gcc-reference`
+(tools/gcc-reference.zig) to GCC 12.3.0. Nothing here is zilc's own work and
+nothing needs submitting: GCC already carries this exact change.
+
+  Upstream:  master 9970b576b7e4ae337af1268395ff221348c4b34a (author:
+             Dimitry Andric), PR middle-end/111632.
+  This copy: releases/gcc-12 a995fded34fe488153b06bb41e026277f01efded,
+             author Francois-Xavier Coudert, committed 2024-06-11; first
+             released in GCC 12.4.0. GCC 12.3.0 (May 2023) predates it.
+  Fetched:   https://github.com/gcc-mirror/gcc/commit/a995fded34fe488153b06bb41e026277f01efded.patch
+             (2026-11-04); the diff below is that file's, byte for byte. Only
+             this header was rewritten: the format-patch mail headers carried
+             e-mail addresses, which zilc's files never hold (attribution is by
+             name, commit and PR above).
+  License:   gcc/system.h is GPL-3.0-or-later; so is this diff. It is kept in
+             zilc's repository as a separate file, to document and reproduce a
+             local maintainer build; it is not linked into anything zilc ships.
+
+Why zilc needs it: zilc builds the GCC versions Fil-C's release was built with
+as a maintainer-only reference, compiled by `zig c++`, whose C++ library is
+libc++. libc++'s <map> reaches <locale> through <functional> and <vector>, and
+GCC 12's gcc/system.h included those headers AFTER safe-ctype.h, whose macros
+poison isalpha() & co. (the same failure as in 11.4.0, found there first,
+2026-11-04). Upstream's commit message, abridged:
+
+  When building gcc's C++ sources against recent libc++, the poisoning of
+  the ctype macros due to including safe-ctype.h before including C++
+  standard headers such as <list>, <map>, etc, causes many compilation
+  errors [...] This is because libc++ uses different transitive includes
+  than libstdc++, and some of those transitive includes pull in various
+  ctype declarations (typically via <locale>).  There was already a special
+  case for including <string> before safe-ctype.h, so move the rest of the
+  C++ standard header includes to the same location, to fix the problem.
+
+  PR middle-end/111632
+
+  gcc/ChangeLog:
+
+  	* system.h: Include safe-ctype.h after C++ standard headers.
+
+Tested in zilc: applies to the pristine 12.3.0 tree with `patch -p1` (dry
+run). It moves includes only: no GCC code changes, so what the built compiler
+emits does not.
+---
+diff --git a/gcc/system.h b/gcc/system.h
+index e10c34f70eca4..38733dd81a6e4 100644
+--- a/gcc/system.h
++++ b/gcc/system.h
+@@ -194,27 +194,8 @@ extern int fprintf_unlocked (FILE *, const char *, ...);
+ #undef fread_unlocked
+ #undef fwrite_unlocked
+ 
+-/* Include <string> before "safe-ctype.h" to avoid GCC poisoning
+-   the ctype macros through safe-ctype.h */
+-
+-#ifdef __cplusplus
+-#ifdef INCLUDE_STRING
+-# include <string>
+-#endif
+-#endif
+-
+-/* There are an extraordinary number of issues with <ctype.h>.
+-   The last straw is that it varies with the locale.  Use libiberty's
+-   replacement instead.  */
+-#include "safe-ctype.h"
+-
+-#include <sys/types.h>
+-
+-#include <errno.h>
+-
+-#if !defined (errno) && defined (HAVE_DECL_ERRNO) && !HAVE_DECL_ERRNO
+-extern int errno;
+-#endif
++/* Include C++ standard headers before "safe-ctype.h" to avoid GCC
++   poisoning the ctype macros through safe-ctype.h */
+ 
+ #ifdef __cplusplus
+ #if defined (INCLUDE_ALGORITHM) || !defined (HAVE_SWAP_IN_UTILITY)
+@@ -229,6 +210,9 @@ extern int errno;
+ #ifdef INCLUDE_SET
+ # include <set>
+ #endif
++#ifdef INCLUDE_STRING
++# include <string>
++#endif
+ #ifdef INCLUDE_VECTOR
+ # include <vector>
+ #endif
+@@ -245,6 +229,19 @@ extern int errno;
+ # include <type_traits>
+ #endif
+ 
++/* There are an extraordinary number of issues with <ctype.h>.
++   The last straw is that it varies with the locale.  Use libiberty's
++   replacement instead.  */
++#include "safe-ctype.h"
++
++#include <sys/types.h>
++
++#include <errno.h>
++
++#if !defined (errno) && defined (HAVE_DECL_ERRNO) && !HAVE_DECL_ERRNO
++extern int errno;
++#endif
++
+ /* Some of glibc's string inlines cause warnings.  Plus we'd rather
+    rely on (and therefore test) GCC's string builtins.  */
+ #define __NO_STRING_INLINES

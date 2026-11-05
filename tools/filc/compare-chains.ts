@@ -31,7 +31,7 @@
 // every part passed. First run 2026-11-04 (cmem/testing.md "THE ZIG-ONLY CHAIN").
 
 import { readdir, readFile, writeFile } from "node:fs/promises";
-import { env, exists, FILC_PREBUILT_TREE, FILC_VERSION, mkdirp, must, REPO, run, WORK, ZIG } from "../lib/tool.ts";
+import { env, exists, FILC_PREBUILT_TREE, FILC_VERSION, mkdirp, must, REPO, rmrf, run, WORK, ZIG } from "../lib/tool.ts";
 
 const zigTree = env("ZIG_TREE", `${WORK}/filc-from-source-${FILC_VERSION}`);
 const gccTree = env("GCC_TREE", `${WORK}/filc-from-source-${FILC_VERSION}-upstream`);
@@ -158,8 +158,14 @@ if (parts.includes("gate")) {
 if (parts.includes("corpus")) {
   const native = [`${out}/outcmp/native1`, `${out}/outcmp/native2`];
   await mkdirp(`${out}/outcmp`);
+  // ALL OR NOTHING: some programs print the date and time of day (07_switch "It's after noon",
+  // 52_time-formatting-parsing), so the native runs and both chains' corpora must come from the same
+  // sitting. Reusing day-old native runs against a fresh corpus failed both on 2026-11-05.
+  const chainDone = async (t: string) => (await exists(`${out}/${t.split("/").pop()}/compare-output.log`)) && (await exists(`${out}/${t.split("/").pop()}/basics-zilc-Debug/results.txt`));
+  const reuseCorpus = reuse && (await exists(native[0])) && (await exists(native[1])) && (await chainDone(gccTree)) && (await chainDone(zigTree));
   for (const n of native) {
-    if (reuse && (await exists(n))) continue;
+    if (reuseCorpus) continue;
+    await rmrf(n);
     await run([bun, `${REPO}/tools/basics/run-native.ts`], { cwd: REPO, env: { OUTROOT: n }, outFile: `${n}.log` });
   }
   const modes = ["Debug", "ReleaseSafe", "ReleaseFast", "ReleaseSmall"];
@@ -169,8 +175,9 @@ if (parts.includes("corpus")) {
     await mkdirp(work);
     // WORK moves zilc-check's output; ZILC_ZIG pins the Zig that WORK would otherwise move too.
     const e = { WORK: work, ZILC_FILC: `${tree}/build/bin/clang`, ZILC_ZIG: ZIG, LANGS: "c zig" };
-    // REUSE=1 keeps a chain's corpus and report when both exist (re-analysis, and the inversion).
-    const have = reuse && (await exists(`${work}/compare-output.log`)) && (await exists(`${work}/basics-zilc-Debug/results.txt`));
+    // REUSE=1 keeps the corpus and reports only when ALL of it exists (above: re-analysis, and the
+    // inversion); otherwise both chains run again beside fresh native runs.
+    const have = reuseCorpus;
     if (!have) await run([bun, `${REPO}/tools/basics/all-modes.ts`], { cwd: REPO, env: e, outFile: `${work}/all-modes.log` });
     if (!have) await run([bun, `${REPO}/tools/basics/compare-output.ts`, ...native, work], { cwd: REPO, outFile: `${work}/compare-output.log` });
     const report = await readFile(`${work}/compare-output.log`, "utf8");

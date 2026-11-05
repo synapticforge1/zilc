@@ -1,0 +1,100 @@
+# toolchain-quirks.md — C, C++, Zig, linker and build-system peculiarities, for future reference
+
+Owner, 2026-11-04: *"we need to document the C, C++, zig ideosyncronicities for future reference for
+these kinds of issues encountered."* One entry per peculiarity: **symptom** (what you see),
+**cause** (measured unless marked *surmised*), **fix**, and **where** zilc applies it. The long
+forms stay where they were first written (`workarounds.md` W-n and KI-n, `best-practices.md`);
+this file is the index by TOOL, so the next person who swaps a compiler or a linker looks here
+first. Zig 0.15.2 (clang/LLD 20.1.2) throughout unless stated.
+
+## `zig cc` / `zig c++` as a drop-in C or C++ compiler
+
+| # | Symptom | Cause | Fix | Where |
+| --- | --- | --- | --- | --- |
+| Z-cc-1 | `fatal error: 'curl/curl.h' file not found` (any system library header) | With an explicit `-target`, Zig uses only its bundled libc headers: `/usr/include` is not searched | Leave `-target` off (the host is native), pin the CPU with `-mcpu=baseline` | projeny in `build-filc-from-source.ts` (W-13) |
+| Z-cc-2 | `-march=native`-tuned output on a build meant to be portable | Without `-target`/`-mcpu`, `zig cc` compiles for the host CPU | `-mcpu=baseline` (or `-target x86_64-linux-gnu -mcpu=baseline`) | `tools/zig-shim.zig`, `gcc-host-shim.zig` |
+| Z-cc-3 | Link fails: `undefined reference to __ubsan_handle_*` | `zig cc` enables UBSan when no `-O` is given (Zig's Debug default) | `-fno-sanitize=all`, or set `-O`; in build.zig `.sanitize_c = .off` | compiler-rt's `crtbegin.o` (no `-O` in its CMake rule); `build/pure_zig.zig` everywhere (W-13) |
+| Z-cc-4 | `unknown CPU: 'x86'` | `-march=x86-64-v2` is parsed with Zig's `-mcpu` syntax: CPU `x86` with features `64`, `v2` REMOVED | Spell it `-mcpu=x86_64_v2` (in build.zig: `.cpu_model = .{ .explicit = &…x86_64_v2 }`) | libpas's stock half (W-13) |
+| Z-cc-5 | `unknown type name 'bool'` compiling a C++ project's `*.c` files with `$(CXX)` | `g++`/`clang++` treat a `.c` input as C++; `zig c++` picks the language from the extension | Wrap each `.c` input: `-x c++ file.c -x none` (`-x` holds for following inputs; `-x none` restores detection) | GCC 11's `libcpp` (`tools/gcc-host-shim.zig`) |
+| Z-cc-6 | `error: unsupported linker arg: --dependency-file=…` | CMake ≥ 3.27/4.x asks the linker for a depfile (`-Wl,--dependency-file`); `zig cc` rejects unknown linker args | `-DCMAKE_LINK_DEPENDS_USE_LINKER=OFF`, or drop the arg in a wrapper | `tools/patched-clang.zig` (zig mode); the alias probe (W-13) |
+| Z-cc-7 | `unsupported linker arg: --exclude-libs` / `--dynamic-list` / `-retain-symbols-file` | Same: `zig cc` accepts only the linker args it knows (libtool's `-export-symbols` becomes `-retain-symbols-file`) | Call `zig ld.lld` directly with the full link rule; or leave out what needs it (`--disable-libcc1`, GDB's plugin, in GCC) | `libyoloc.so` (W-11); `tools/gcc-reference.zig` |
+| Z-cc-8 | A configure-based build "works" but the library binds differently | A build system that tests flags (musl's `tryldflag`) silently DROPS the ones `zig cc` refuses | Diff the configure RESULT (`config.mak`), not just the exit code; don't route such builds through `zig cc` | The alias probe: `libyoloc.so` 503 vs 21 self-binding relocations (W-13) |
+| Z-cc-9 | `-nostdinc` builds miss `stddef.h`, `stdarg.h` | `-nostdinc` drops Zig's bundled clang resource headers too | Add `-isystem <zig lib>/include` (what upstream gets from `find_clang_include_dir.rb`) | libpas (W-3) |
+| Z-cc-10 | `__FILE__` (assert and panic messages) differs from upstream's | Zig passes ABSOLUTE source paths; upstream's make passes relative ones | `-ffile-prefix-map=<dir>/=` (or `=../`) to reproduce upstream's spelling | libpas, crt objects, yolounwind (W-6) |
+| Z-cc-11 | glibc headers behave as one version whatever `x86_64-linux-gnu.2.NN` says | Zig ships ONE set of glibc headers; the version only selects the symbols linked against | Do not expect a header-level fix from the target's glibc version | The MPFR case below (2026-11-04) |
+| Z-cc-12 | `zig objcopy --strip-debug` → `error: unimplemented` | Zig 0.15.2's objcopy does not implement it for (at least) a large LLVM ELF | Build and use `llvm-objcopy` in the same ninja run (binutils' `strip` works too) | `tools/patched-clang.zig` |
+| Z-cc-13 | CMake's `CMAKE_C_COMPILER` cannot take `zig cc` (two words) | CMake wants one executable per tool | A tiny executable per subcommand (`zig-cc`, `zig-c++`, `zig-ar`, `zig-ranlib`) | `tools/zig-shim.zig`, `tools/gcc-host-shim.zig` |
+| Z-cc-14 | Inside **libc++**'s `<__locale>`: `too many arguments provided to function-like macro invocation`, `'__abi_tag__' attribute only applies to …` | `zig c++` always uses libc++ (Zig ships no libstdc++). A project that defines function-like macros named like `isalpha`/`isspace` BEFORE including C++ headers (GCC's `safe-ctype.h` poisons them) breaks when a libc++ header reaches `<locale>`: libc++'s `<map>` does (via `<functional>`, `<vector>`), libstdc++'s does not | Include the C++ standard headers before such macros. GCC FIXED this upstream: PR middle-end/111632 (master `9970b576`, Dimitry Andric; backported to releases/gcc-12 `a995fded` and gcc-11 `5a419c22`, first in 12.4.0 / 11.5.0); zilc applies those backports verbatim to 11.4.0 / 12.3.0 (`third_party/gcc-patches/`) | GCC 11.4 / 12.3 in `tools/gcc-reference.zig` |
+| Z-cc-15 | `zig: error: unsupported option '-print-multi-os-directory'` | GCC-driver-only queries (`-print-multi-os-directory`, `-print-multi-lib` …) are not in `zig cc` | Harmless where only an install subdirectory is computed from it (GCC's host libiberty); answer it in a wrapper if a build depends on it | GCC 11.4 host build (seen, not fatal) |
+
+## Clang (Zig's 20.1.2) versus GCC, as the compiler of the same C
+
+| # | Observation | Cause / note | Where recorded |
+| --- | --- | --- | --- |
+| C-1 | Undefined-symbol differences between clang- and GCC-built objects: `_GLOBAL_OFFSET_TABLE_` (GCC), `memcpy`/`memset` calls (clang) where GCC inlines, `__stack_chk_fail` / `__fprintf_chk` (Ubuntu GCC's default hardening), helper libcalls (`__divti3` vs `__udivti3`, `__gttf2` …) | Compiler choices; defined symbols stay equal | W-8 |
+| C-2 | GCC gives an empty translation unit a compile unit; clang does not | — | W-8 (`src/linux/cache.c`) |
+| C-3 | compiler-rt built by GCC 15 has 5 more half-float/bfloat16 builtins than the release's (GCC 11.4) | CMake probes compiler support for `_Float16` / bf16 and enables members accordingly | `testing.md` (GCC chain's `libyolort.a`); W-10 is the same probe family |
+| C-4 | Clang lacks `_Float128` on x86 (C), but has `__float128`; MPFR 4.1.0 then `#define _Float128 __float128`, and glibc's `bits/floatn.h` (`typedef __float128 _Float128;`) becomes a self-typedef: `cannot combine with previous '__float128' declaration specifier`, surfacing as MPFR's `GMP_NUMB_BITS and sizeof(mp_limb_t) are not consistent` | MPFR's float128 fallback + glibc's header assuming GCC | `--disable-float128` (reaches the in-tree MPFR through GCC's configure); `tools/gcc-reference.zig` |
+| C-5 | GCC's objects carry `.note.gnu.property` (x86 ISA notes); clang's do not, so GNU ld makes a `GNU_PROPERTY` segment only for the former | — | W-11 part 3 |
+| C-6 | `crtbegin.o` built by Zig's clang at `-O0` and by GCC 11.4 have IDENTICAL relocations (`PLT32` + `REX_GOTPCRELX` per weak function) | A difference seen later in a `.so` was the LINKER's, not this (L-3) | W-14 |
+| C-7 | The release's GCC-built pieces start indirect-branch targets with `endbr64` (crt1.o 1, crtbegin.o 2, libyoloc.so 1,695, libyolort.a 170); Zig's clang builds: 0 | **Ubuntu's GCC defaults to `-fcf-protection`** (Intel CET), plus `-fstack-clash-protection` and `-D_FORTIFY_SOURCE=2` at `-O` — distribution patches, so a VANILLA GCC does not apply them either. No-ops unless CET is enforced, and the release's `libyoloc.so` is not CET-marked anyway (its property note lacks IBT/SHSTK) | ✅ FIXED 2026-11-04: `build/pure_zig.zig` passes `-fcf-protection` to yolo musl, compiler-rt and their crt objects (`ubuntu_gcc_cet`); `endbr64` now equals the release's per archive member (libyoloc.a 1,715, libyolort.a 170, crt objects) and the IBT/SHSTK notes are there. A pinned VANILLA GCC still needs Ubuntu's defaults passed explicitly | `testing.md` "Parity inventory" |
+| C-7b | The release's compiler-rt calls `__stack_chk_fail` (9 calls, 18 `%fs:0x28` guard loads in 8 members) and `__fprintf_chk`; its yolo musl has 15 stack-clash probes (`orq $0x0,(%rsp)`); the zig chain has none | The REST of Ubuntu GCC's defaults: `-fstack-protector-strong`, `-D_FORTIFY_SOURCE=2` (only when optimizing), `-fstack-clash-protection` — first misfiled under W-8 as "compiler differences" (2026-11-04), corrected 2026-11-05 by counting them | ✅ FIXED 2026-11-05, as far as two compilers allow: the flags in `build/pure_zig.zig` (compiler-rt builtins all three; crtbegin/crtend SSP + clash, no fortify at `-O0`; yolo musl clash). Fortify: 1 = 1. Stack-clash page probes: 15 = 15 (in `libyoloc.a` / `.so`; which function holds them differs by inlining, C-8). Stack protector: every member the release guards is guarded, plus 8 more — clang's `-fstack-protector-strong` rule guards x87 long-double conversions and `eprintf` that GCC's does not (C-10) | `testing.md` "Parity inventory" |
+| C-10 | `-fstack-protector-strong` guards different function SETS under clang and GCC (compiler-rt: GCC 11.4 8 members, clang 16 — a superset) | Each compiler's own heuristic for "strong" | Not equal-able with clang; ours is stronger, never weaker: `verify-compiler-rt.ts` checks both directions with the 8 extras named | 2026-11-05 |
+| C-11 | glibc's `fprintf` under `_FORTIFY_SOURCE=2` is `__vfprintf_chk` with clang, `__fprintf_chk` with GCC | glibc's headers fortify variadic calls differently for clang (no `__builtin_va_arg_pack`) | The same check through another glibc entry; allowed by name in `verify-compiler-rt.ts` | 2026-11-05 |
+| C-12 | Counting stack-clash probes: GCC writes `orq $0x0,(%rsp)`, clang `movq $0x0,(%rsp)`, each right after `sub $0x1000,%rsp`; `movq $0x0,(%rsp)` alone is ordinary code too | Different probe instructions | Count only a probe that follows a one-page `sub` | 2026-11-05 |
+| C-8 | `libyoloc.so`: 1,694 `endbr64` vs the release's 1,695 although every archive member matches | Zig's clang INLINES the hidden `__ftello_unlocked` into `ftello` (141 bytes vs 70 + 92); `--gc-sections` then drops the unused out-of-line copy and its `endbr64` | An inlining difference (W-8 family), not CET; same behaviour | 2026-11-04 |
+| C-9 | The release's GCC-built objects carry an "x86 ISA used / feature used" property note (and, after linking, `libyoloc.so` a `GNU_PROPERTY` segment from it); Zig's never do | Written by GNU `as` (Ubuntu's binutils default `-mx86-used-note=yes`), not by the compiler; clang's integrated assembler has no equivalent | Not fixable with Zig's toolchain (it would mean assembling with GNU as); allowed by name in `verify-yolomusl.ts` (W-11 part 3) | 2026-11-04 |
+
+## Fil-C's own clang (and the release's install step)
+
+| # | Observation | Cause | Note |
+| --- | --- | --- | --- |
+| F-1 | The same compile command run twice gives objects differing by 6–8 bytes (code and section names identical); 79 of `libc.a`'s 1,332 members, 22 of `libc++.a`'s 54, 5 of `libc++abi.a`'s 18 differ between two builds | Fil-C's clang is not run-to-run reproducible (already the reason zilc's object cache keys on its own hash, KI-22 lever c) | Not a chain difference: compare such pieces by symbols and behaviour, never by bytes (2026-11-04) |
+
+## Linkers: LLD (Zig's) versus GNU ld (binutils)
+
+| # | Observation | Cause | Fix / note | Where |
+| --- | --- | --- | --- | --- |
+| L-1 | `--exclude-libs=ALL` hid all of libc (8 exports instead of 1,653) | It hides every ARCHIVE's symbols; upstream links loose `.lo` objects, zilc an archive | Name the one archive upstream's flag reaches: `--exclude-libs=libyolort.a` | W-11 |
+| L-2 | `PHDR` segment in an LLD shared object, none from GNU ld | Linker layout choice | Allowed by name | W-11 |
+| L-3 | 5 more `JUMP_SLOT`s from LLD than GNU ld on identical objects | GNU ld gives a function referenced through BOTH the PLT and the GOT one `.plt.got` stub over its GOT slot (`GLOB_DAT` only); LLD has no `.plt.got` | Functionally the same; for parity link with GNU ld (scope in `open-work.md`) | W-14 |
+| L-4 | `-dynamic-linker` on a SHARED object gives an `INTERP` segment with LLD; GNU ld omits it | — | Leave `-dynamic-linker` off for shared objects | W-12 |
+| L-5 | What a release's driver added implicitly must be spelled out to LLD | `gcc`/`clang` drivers add `--build-id`, `--eh-frame-hdr`, `-z relro`, `--hash-style=gnu` | Read the release's binary (`readelf -n/-S/-l`) and pass the same | W-11, W-12 |
+| L-6 | Fil-C's clang links every program with `/usr/bin/ld` (GNU ld); its driver prints `Selected GCC installation` but takes nothing from it | Driver probing vs use | Judge a dependency by `-###`, not by `-v` | `testing.md` "THE ZIG-ONLY CHAIN" |
+| L-7 | GNU ld lists `__environ` as an undefined dynamic symbol in `libpizlo.so` with no relocation using it; LLD does not | GNU ld behaviour, whichever chain's objects (measured both ways) | Harmless; disappears or appears with the linker (W-14 family) | `testing.md` "Parity inventory" |
+| L-8 | `.relro_padding` section (LLD) vs `.plt.got` (GNU ld) | Linker layout | W-14 family | same |
+| L-9 | The release's `libc.so`, `libc++.so.1.0`, `libc++abi.so.1.0` have one more `LOAD` segment than either chain's | Linker VERSION: the release's binutils (Ubuntu 22.04, 2.38) vs this machine's (2.45); Fil-C's clang links them with the host's `ld` in both chains | Not a Zig matter; follows the host binutils | same |
+
+## Zig's build system and package manager
+
+| # | Symptom | Cause | Fix | Where |
+| --- | --- | --- | --- | --- |
+| Z-b-1 | A lazy dependency downloads for every `zig build` command | `b.lazyDependency()` marks it needed whenever `build()` calls it; `build()` cannot see which steps were named | Read the build runner's argv (bare args are step names, stop at `--`) and request only then | `build/filc_source.zig` `named()` |
+| Z-b-2 | A run step does not rerun when an input DIRECTORY's files change | Run steps are cached by their arguments; a path argument is only a string | Declare every file read as a file input | `musl-headers` (W-5) |
+| Z-b-3 | Executable bits in a fetched package differ from the archive's | Zig's fetcher IGNORES archive modes and marks a file executable iff it starts with `#!`, ELF or Mach-O (ziglang/zig#17463); its hash records no executable bit | Check packages against that rule | `verify-filc-package.ts`; `best-practices.md` § 5 |
+| Z-b-4 | Zig cannot fetch `.tar.bz2` | No bzip2 decompressor in Zig 0.15.2 | Use the `.tar.xz` / `.tar.gz` of the same release | GCC prerequisites in `build.zig.zon` |
+| Z-b-5 | A fetched tree's files have arbitrary mtimes, so make tries to rerun autoconf/automake/makeinfo | Files are written in archive order | Stage a copy and give every file one timestamp | `tools/gcc-reference.zig` |
+| Z-b-6 | A cached shim's path changes whenever its source file changes, which reconfigures (and fully rebuilds) any CMake build that recorded it | Zig caches by content | Keep shims that other builds record in files that do not change; add new behaviour in a separate shim | `tools/gcc-host-shim.zig` vs `tools/zig-shim.zig` |
+| Z-b-7 | `.zig-cache` on exFAT fails on the second build | exFAT (no atomic rename) | `ZIG_LOCAL_CACHE_DIR` in the Linux home | KI-2 |
+| Z-b-8 | A static library from `b.addLibrary(.static)` names its members by the objects' FULL cache paths (`/home/<user>/.cache/…/o/<hash>/aio.o`); upstream's `ar` uses its own names (`aio.lo`, `absvdi2.c.o`, `pas-pizlo-release-x.o`) | Zig's archiver stores the object path it was given | No link effect, but not reproducible across machines and it bakes a home path into the archive. ✅ FIXED 2026-11-04: `tools/archive-rename.zig` rewrites each archive with upstream's names AND order (`zig ar q`, so repeated names survive; `zig ranlib`); all four now list exactly as the release's | `testing.md` "Parity inventory" (libyoloc.a 1,343, libpizlo.a 183, libyolort.a 167, libyolounwind.a 1) |
+
+## CMake, LLVM, GCC, musl as build systems
+
+| # | Symptom | Cause | Fix | Where |
+| --- | --- | --- | --- | --- |
+| B-1 | `clang --version` of a clang built from a tarball lacks the repository and commit | LLVM reads them from `.git` | `-DLLVM_FORCE_VC_REPOSITORY=… -DLLVM_FORCE_VC_REVISION=…` | `tools/patched-clang.zig` |
+| B-2 | LLVM's configure needs Python 3 | `find_package(Python3)` in LLVM's CMake | Listed as a build tool | README |
+| B-3 | A changed configure option did not reach an existing build dir | Configure ran only when `build.ninja` was missing | Stamp the whole configure command (and the compilers passed by environment) and reconfigure on change | `tools/patched-clang.zig`, `tools/gcc-reference.zig` |
+| B-4 | GCC's top-level `configure` options reach the in-tree GMP/MPFR/MPC | GCC passes its arguments down | Use it to configure a prerequisite (`--disable-float128`) | `tools/gcc-reference.zig` |
+| B-5 | libc++'s build reads LLVM `libc/` (`shared/fp_bits.h`); minilute builds the Luau in `projects/lute-1.0.0`; `install-cxx-linux.sh` expects `build/include` | Fil-C's tree dependencies | Copy them; create `build/include` | `build-filc-from-source.ts` |
+| B-6 | GCC 11's libsanitizer: `invalid application of 'sizeof' to incomplete type '__sanitizer::termio'` | An OLD GCC's target libraries are compiled against the HOST's glibc headers; glibc 2.42 removed `struct termio` | `--disable-libsanitizer` (nothing here uses `-fsanitize`) | `tools/gcc-reference.zig` |
+
+## git, archives, line endings
+
+| # | Symptom | Cause | Fix | Where |
+| --- | --- | --- | --- | --- |
+| G-1 | A GitHub archive's file differs from the commit's blob | `git archive` writes text files as a checkout does: upstream's `eol=crlf` files arrive CRLF | Compare against the checkout form, attributes read with `check-attr` | `verify-filc-package.ts` |
+| G-2 | `git check-attr --source` silently ignores some `.gitattributes` | In a partial, sparse clone, unfetched attribute blobs count as absent | Fetch every attributes blob first; refuse if one is missing | `verify-filc-package.ts` |
+| G-3 | `git fetch origin <blob id>` fails its connectivity check | Blobs are not fetchable that way | Let lazy fetch do it: `git -c url.https://github.com/.insteadOf=git@github.com: cat-file -t <id>` | `verify-filc-package.ts` |
+| G-4 | `git diff`'s `index` lines changed length with no content change | Short blob ids grow with the object count | `git diff --full-index` for anything compared byte for byte | `check-toolchain.ts` |
+| G-5 | `git hash-object` in zilc's repo gave a "wrong" blob id for foreign bytes | It applies the repo's `* text=auto eol=lf` to its input | Compute SHA-1 of `blob <len>\0` + bytes yourself | `best-practices.md` |
