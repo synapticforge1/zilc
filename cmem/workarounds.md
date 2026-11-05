@@ -949,4 +949,6 @@ numbers, so they live here too, condensed. zailc's `cmem/workarounds.md` keeps t
   zig chain's objects linked by GNU ld equal the GCC chain's library exactly (`testing.md`). No
   behaviour difference: both resolve to the same definition (yolo musl's loader binds at load).
   Fix, if parity is wanted: link with GNU ld (scope in `open-work.md`); LLD 20 has no option for it.
+  **Owner, 2026-11-05: not wanted — keep LLD** (*"We are looking for the end result being the same.
+  Not specifically that the end compilation product is the same."*; `design-decisions.md`).
   A relative: W-11 part 3 (`PHDR`), another LLD-vs-GNU-ld layout difference.
