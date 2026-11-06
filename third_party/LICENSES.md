@@ -325,6 +325,21 @@ Newest first. Copy the template for each adopted component.
   exception covers whatever it compiles, as for any GCC
 - **Obligations satisfied:** none arise while nothing is distributed
 
+### filc-benchmarks (Fil-C's `filc/benchmarks` programs, run as BENCHMARKS; nothing copied)
+- **Source:** Fil-C's sources at zilc's pinned commit, the lazy `filc` package `zig build` already
+  fetches (`build.zig.zon`); `tools/bench/bench.ts` READS the files there (2026-11-06; owner: the
+  suite runs *"upstream's plus our zig only ports of upstreams plus new ones"*)
+- **License:** each file's own header (the Benchmarks Game programs and the others carry their
+  authors' notices; the Makefile is Epic Games' BSD-2-Clause). zilc does not restate them because
+  it holds no copy
+- **What zilc carries:** nothing of these files. zilc's own: `tools/bench/bench.ts`, the Zig
+  versions in `tests/bench/zig/` (nbody, spectralnorm, fannkuch, binarytrees: the PUBLIC ALGORITHMS
+  of the Benchmarks Game, written afresh in Zig, not translated line by line; the same for the
+  zilc-only programs), `tests/bench/interop/`, and `tests/bench/compat/stdfil.h` (two `#define`s
+  so the plain build of richards.c compiles)
+- **Artifact destination:** benchmark binaries in `~/zilc-work/bench/`; **never distributed**
+- **Obligations satisfied:** none arise while nothing is copied or distributed
+
 <!--
 ### <component-name>
 - **Source:** https://github.com/<org>/<repo>

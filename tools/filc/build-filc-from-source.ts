@@ -13,10 +13,10 @@
 //                       the steps that use Fil-C's clang (user musl, libc++/libc++abi, minilute,
 //                       sarcasm).
 //   MODE=upstream       build_base.sh's steps after the LLVM build, unchanged: the stock pieces by
-//                       GCC and the host's clang, as upstream does; the GCCs are the release's
-//                       versions, pinned (`zig build gcc-reference`; env GCC_11_4_0 / GCC_12_3_0
-//                       override their directories). The baseline the zig chain is compared with
-//                       (cmem/testing.md).
+//                       GCC and a clang, as upstream does; the GCCs are the release's versions,
+//                       pinned (`zig build gcc-reference`; env GCC_11_4_0 / GCC_12_3_0 override
+//                       their directories), the clang is Zig's (tools/host-clang-shim.zig), not
+//                       the host's. The baseline the zig chain is compared with (cmem/testing.md).
 //
 // In both, `build/` holds nothing but the clang `zig build patched-clang` made (and its resource
 // headers), and pizfix/lib is compared with the release's at the end. Then Fil-C's suite against
@@ -29,10 +29,10 @@
 // Host tools still used: make, cmake + ninja (libc++), python3 (libc++'s CMake), perl and sh
 // (musl's configure), GNU ld (binutils: the linker Fil-C's clang calls), ar/ranlib, patchelf
 // (fix_clang.sh), libcurl headers (projeny), the kernel headers. MODE=upstream also needs the
-// reference GCCs, clang and ruby. Copies (not links) the sources: the scripts write into the tree, and the
+// reference GCCs and ruby (no host clang). Copies (not links) the sources: the scripts write into the tree, and the
 // fetched package in Zig's cache must stay as fetched.
 
-import { readdir } from "node:fs/promises";
+import { readdir, writeFile } from "node:fs/promises";
 import { env, exists, FILC_PREBUILT_TREE, FILC_VERSION, filcPackageDir, mkdirp, must, REPO, rmrf, run, WORK, ZIG, zigCacheArgs } from "../lib/tool.ts";
 
 const mode = env("MODE", "zig");
@@ -84,9 +84,24 @@ if (mode === "upstream") {
   // The GCCs the release was built with (its `.comment`s, 2026-11-04): 11.4.0 for projeny and
   // compiler-rt, 12.3.0 for yolo musl; pinned, built by Zig, with Ubuntu's defaults
   // (`zig build gcc-reference`, MAINTAINER-ONLY). The scripts take CC/CXX from the environment
-  // (projeny's Makefile `CC ?=`, CMake, musl's configure). yolounwind and libpas are the host's
-  // clang, as upstream's scripts name it (the release's was Ubuntu clang 14, not built here).
+  // (projeny's Makefile `CC ?=`, CMake, musl's configure).
   const gccRef = (v: string) => env(`GCC_${v.replaceAll(".", "_")}`, `${WORK}/tools/gcc-${v}`);
+  // yolounwind and libpas's stock half (and its link of libpizlo.so) call `clang` by name; upstream
+  // used Ubuntu's (14 for the release). Owner, 2026-11-05: "The available clang should be the one
+  // that is being uses to compile that corpus, not what is in ubuntu" → Zig's clang, through
+  // tools/host-clang-shim.zig on PATH. libpas's include of clang's own headers
+  // (HOST_CLANG_EXTRA_FLAGS = -isystem `find_clang_include_dir.rb`, which looks for "bin/clang" in
+  // `clang -###`, a line Zig's never has) is given Zig's directory through MAKEFLAGS, where a
+  // variable counts as set on make's command line; MODE=zig uses the same directory.
+  const hostClang = `${out}/zilc-host-clang`;
+  const zigInclude = `${ZIG.slice(0, ZIG.lastIndexOf("/"))}/lib/include`;
+  if (!(await exists(`${zigInclude}/stddef.h`))) throw new Error(`no stddef.h in ${zigInclude}`);
+  await mkdirp(hostClang);
+  await writeFile(`${hostClang}/shim_options.zig`, `pub const zig_exe = ${JSON.stringify(ZIG)};\n`);
+  await must([ZIG, "build-exe", "-OReleaseSafe", "--dep", "shim_options", `-Mroot=${REPO}/tools/host-clang-shim.zig`,
+    `-Mshim_options=${hostClang}/shim_options.zig`, `-femit-bin=${hostClang}/clang`, ...zigCacheArgs()]);
+  const zigClangEnv = { PATH: `${hostClang}:${process.env.PATH}`, MAKEFLAGS: `HOST_CLANG_EXTRA_FLAGS=-isystem${zigInclude}` };
+  console.log(`build_yolounwind.sh, build_runtime.sh (stock half): ${(await must([`${hostClang}/clang`, "--version"])).split("\n")[0]}`);
   const gccEnv = async (v: string) => {
     const d = gccRef(v);
     if (!(await exists(`${d}/lib/gcc/x86_64-linux-gnu/${v}/specs`))) throw new Error(`missing GCC ${v} with Ubuntu's defaults in ${d} (run \`zig build gcc-reference\` first)`);
@@ -95,7 +110,10 @@ if (mode === "upstream") {
   const byStep: Record<string, string> = { "build_projeny_yolo.sh": "11.4.0", "build_compiler_rt.sh": "11.4.0", "build_yolomusl.sh": "12.3.0" };
   for (const [s, v] of Object.entries(byStep)) console.log(`${s}: ${(await must([(await gccEnv(v)).CC, "--version"])).split("\n")[0]}`);
   for (const s of ["build_projeny_yolo.sh", "build_compiler_rt.sh", "build_yolounwind.sh", "build_os_include.sh",
-    "build_yolomusl.sh", "build_runtime.sh", ...filcSteps]) await step(s, [`./${s}`], byStep[s] ? await gccEnv(byStep[s]) : {});
+    "build_yolomusl.sh", "build_runtime.sh", ...filcSteps]) {
+    const e = byStep[s] ? await gccEnv(byStep[s]) : s === "build_yolounwind.sh" || s === "build_runtime.sh" ? zigClangEnv : {};
+    await step(s, [`./${s}`], e);
+  }
 } else {
   // projeny (a host program: Fil-C's package tool) by Zig, for the host as native target, so the
   // system's headers and libraries (libcurl) are found as GCC finds them; baseline CPU; no UBSan,

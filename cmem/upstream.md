@@ -50,6 +50,16 @@ first passing on the Zig that matches Fil-C.
    same release, then run `zig build gate-zig-modules -Dzig-modules=<dir> -Dzig-modules-filc=<release>`
    — the same gate with Fil-C's modules swapped for them (`testing.md` "The gate with pure-Zig
    modules"). zilc is the corpus of truth for both.
+7. **Rebuild everything and recheck for the same results** (owner, 2026-11-06: *"whenever we
+   perform the Fil-C updates we would rebuild everything and recheck for the same results"*):
+   `zig build patched-clang` and the installed tree; both chains from source
+   (`build-filc-from-source.ts` MODE=zig and MODE=upstream, the reference GCCs rebuilt by `zig
+   build gcc-reference` if their pins moved) and `compare-chains.ts` 14/14; the benchmark suite
+   (`tools/bench/bench.ts` on an idle machine, then `compare` against the previous release's
+   `results.json`: step 5's stage-C numbers). The tools not yet run under Bun since the port —
+   `build-patched-clang.ts` (its tree-assembly half) and `build-cosmo.ts` — are run, rewritten or
+   retired at that update, not before; their old outputs are simply overwritten (owner, same day:
+   *"we probaly need to just leave them and overwrite them when we update"*).
 
 > 🔒 **2026-10-27 (owner): zilc does stage A only, always.** It stays on the Zig whose LLVM
 > matches Fil-C's; stages B and C below are **not done in zilc** and are kept as the procedure
@@ -90,8 +100,9 @@ compatible Zig) is zilc's; the latest-Zig column belongs to whoever does stage B
 | `zilc build` wall time per program | compile-time cost of the upgrade |
 | binary size (ReleaseSafe and Debug) | Debug is already 108× (KI-4); watch it |
 
-⚠️ Performance claims need **repeats and a stated noise floor** (`best-practices.md` §1). A benchmark
-suite does not exist yet (`testing.md`, planned gates).
+⚠️ Performance claims need **repeats and a stated noise floor** (`best-practices.md` §1). The suite
+exists since 2026-11-06: `tools/bench/bench.ts` (run; `compare <old> <new>` for version against
+version), first baseline and method in `testing.md` "Benchmark suite".
 
 ### Recommendations for a newer-Zig upgrade (0.17.0 and later; not done here)
 

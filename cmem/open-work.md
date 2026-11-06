@@ -11,13 +11,56 @@ them, with their dates.
 | --- | --- |
 | version | **`0.15.2-0.687.1`** — `<Zig>-<Fil-C>.<zilc release>`, **published 2026-10-27** (tag `v0.15.2-0.687.1` on `be51808`; `releasing.md`); one of the five places the number lives. Before it: `0.15.2-0.686.1` (2026-10-05) |
 | toolchain | Zig **0.15.2** (user code and build), Fil-C **0.687** with zilc's patched clang (`workarounds.md` KI-22, KI-4) — **since 2026-10-30 compiled by Zig** (`zig build patched-clang`; the GCC-built one kept as `~/zilc-work/tools/filc-0.687-zilc-gcc` for rollback); 0.686's kept installed and archived (`toolchain/filc-0.686/`) |
-| unpushed | `main` is 8 commits ahead of `origin/main` (2026-10-30: `91e7959`, `5e31ef8`, `31a911a`, `896d1a7`; 2026-11-04: `e46fc05`, the GCC-free chain and `compare-chains.ts`; 2026-11-05: `4d7b7dc`, release parity and the reference GCCs, `1918e71` its record, `62be22d` the GCC chain on the pinned GCCs); nothing pushed (owner's call) |
+| pushed | `main` = `origin/main` = `04ac719` (pushed 2026-11-05, owner: "proceed with 1-3"; 9 commits since the 0.687.1 release, scanned for personal data first). No new tag: the version line did not move |
 | gates | `zig build gate`, `zig build test`, Fil-C's suite, the corpus in four modes, the output comparison: all re-run 2026-10-27 on Fil-C 0.687, counts in `testing.md` |
 | remote | `origin` = `github.com/synapticforge1/zilc` (since 2026-10-27; was `jrmarcum/zilc`, which GitHub redirects). **Purged history pushed 2026-10-27**: `main` = `origin/main`, `v0.15.2` = tag `v0.15.2-0.686.1` = `13ce96a` (was `19e7172`; map `history-map-2026-10-27.md`) |
 | branches | `main` carries the Bun port (`c2841dd`, was `44e0b1a`), merged `--no-ff` 2026-10-27 (owner: "we will merge all to bun tooling since deno is going away"), and the 2026-10-27 work since; `bun-port` (merged, never pushed) deleted 2026-10-27 (owner). Branches: `main`, `v0.15.2` |
 | sibling | **zailc** (`../zailc`, started 2026-10-08) translates Fil-C into Zig; zilc is its stable reference and test oracle and changes nothing for it (`design-decisions.md`) |
 
-## ▶️ NEXT SESSION — pick up here (paused 2026-11-04 by the owner)
+## ▶️ PICK UP HERE — paused 2026-11-05 afternoon (owner: "need to pause here for now and pick back up later today")
+
+Everything below is UNCOMMITTED (last commit and push: `04ac719`). Owner's items in hand: 8 (Bun
+re-runs) and 12 (benchmark suite); item 4 (GitHub Support purge request) is on hold (owner).
+
+1. **Item 3, done in code, proof RUNNING at the pause:** the reference chain's libpas stock half
+   and yolounwind now use Zig's clang (`tools/host-clang-shim.zig`, wired in
+   `tools/filc/build-filc-from-source.ts` MODE=upstream; quirks B-10, Z-cc-16, Z-cc-17; records in
+   item 5 below and `design-decisions.md`). The chain built (37 = 37 entries, no `Ubuntu clang`
+   left). ✅ `compare-chains.ts` fresh: **14/14** (read 2026-11-06, recorded in `testing.md`
+   item 8). To commit with the rest.
+2. ✅ **Item 8 — done**: six tools verified under Bun; the other two are left for the next Fil-C
+   update's full rebuild (owner, 2026-11-06; `upstream.md` Stage A step 7).
+3. ✅ **Item 12 — DONE 2026-11-06**: the suite runs, first baseline recorded (`testing.md`
+   "Benchmark suite"; `vision.md`'s slowdown row now measured: Zig through zilc ≈ 1.7× ReleaseFast,
+   ≈ 1.8× ReleaseSafe; Fil-C on upstream's C/C++ 2.07×). The trial findings below were resolved:
+   richards' `<stdfil.h>` (plain build: `tests/bench/compat/stdfil.h`; its `zprintf` writes
+   stderr, so stdout + stderr are compared); fannkuch-redux needed Fil-C's default CPU
+   (x86-64-v2) on the plain side too; n-body's "difference" was a printed pointer (masked);
+   upstream binarytrees' 4.5 s plain is real (no frees + 32 threads on musl's malloc lock) and is
+   noted, not averaged; build times made honest (warm shared libraries, an empty cache per build,
+   zilc `--no-cache`, one build at a time). Was: **Item 12 — the benchmark suite, IN PROGRESS** (owner's choice of programs: *"upstream's plus our
+   zig only ports of upstreams plus new ones that we write to test the zig only version
+   specifically"*). Written: `tools/bench/bench.ts` (run / compare), `tests/bench/zig/` (ports:
+   nbody, spectralnorm, fannkuch, binarytrees; zilc's own: hashmap_churn, sort_format, dispatch,
+   slices), `tests/bench/interop/` (interop.zig + kernel.c; needs `--entry zig`: with a `.c`
+   input `--entry auto` picked C's main and the link wanted `pizlonated_main`). Smoke test: all 9
+   give the SAME output under plain Zig and zilc (fannkuch(7) = 228 / 16 ✓). First trial run
+   (`REPEATS=1 LABEL=trial`, `~/zilc-work/bench-trial.log`; timings NOT valid: compare-chains was
+   loading the machine). To do next:
+   - **plain build failed** for upstream `richards` and `fannkuch-redux` (`zig cc`): read
+     `~/zilc-work/bench/trial/bin/<name>-O3-plain.build.log`;
+   - **upstream `n-body`: OUTPUT DIFFERS** plain vs Fil-C (`-march=ivybridge` → `-mcpu=ivybridge`
+     for zig cc; check the printed energies — FP contraction/AVX difference, or a real bug?);
+   - **upstream `binarytrees` (C++): plain `zig c++` 8.25 s vs Fil-C 0.43 s** — the baseline is
+     suspect (musl's malloc under C++ `new`? check before publishing any figure);
+   - calibrate sizes on an idle machine: deltablue 2000 (~1.9 s, lower), reversecomplement
+     (~0.03 s, bigger input), dispatch / slices (~0.06–0.09 s, raise);
+   - then a real run (REPEATS=5), write `tests/bench/README.md`, a `testing.md` row (planned gate
+     4 → real), `upstream.md` stage C, `vision.md`'s slowdown figure, `tools/README.md`; ledger
+     note in `third_party/LICENSES.md` (upstream's programs are READ from the fetched package,
+     never copied; the Zig ports are zilc's own code of public algorithms).
+
+## ▶️ NEXT SESSION (2026-11-04 list — all closed 2026-11-05)
 
 **Start with these, in order** (the numbered list below keeps the history):
 
@@ -246,10 +289,19 @@ future reference"*.
     defaults by a `specs` file, `MODE=upstream` uses them per step; the GCC chain's runtime now
     equals the release's on every count measured (`testing.md` item 8). Upstream's
     libpas stock half was compiled by Ubuntu clang 14; mirroring that too would be one more LLVM
-    build. ✅ **Decided 2026-11-05: NOT DONE** (owner: "proceed with 1-3", on the recommendation
-    to drop it under the end-result rule, `design-decisions.md` top row): the reference chain
-    keeps the host's clang for libpas and yolounwind; their results are proved by behaviour
-    (`verify-libpas.ts`, the suite, `compare-chains.ts`), not by matching the compiler.
+    build. ✅ **Decided and DONE 2026-11-05: not clang 14, and not the host's either — ZIG'S
+    clang** (owner: "proceed with 1-3"; *"if it is using the hosts clang, it could be using any of
+    the latest versions of clang. So just using the one we have would seem to be the recommended
+    path."*; then *"The available clang should be the one that is being uses to compile that
+    corpus, not what is in ubuntu"*; asked which, since Fil-C's own clang instruments everything
+    it compiles and has no off switch: "Zig's clang"). `MODE=upstream` puts
+    `tools/host-clang-shim.zig` on PATH as `clang` for `build_yolounwind.sh` and
+    `build_runtime.sh` (libpas's stock half and its link), with Zig's header dir through
+    `MAKEFLAGS` (toolchain-quirks B-10, Z-cc-4, Z-cc-16, Z-cc-17). Measured: no `Ubuntu clang`
+    `.comment` left in the reference chain's `pizfix/lib`; libpas stock 177 members, yolounwind,
+    filc_crt by Zig's clang 20.1.2. Those two pieces now share their compiler with the zig chain
+    (the GCC-built pieces stay the independent check); proof: `compare-chains.ts`, see
+    `testing.md` item 8.
   - **5b. Fil-C's prebuilt becomes optional**: the from-source tree above shows it CAN be replaced
     (every library but GCC-built `libyolort.a` exports the release's symbols). Still needed today
     for the Fil-C-compiled runtime pieces in zilc's own build (Z1 item 3), as the tree the patched clang is installed into (`patched-clang` installs only
@@ -294,9 +346,23 @@ future reference"*.
 - ~~Cosmo leaves~~ — **not zilc work since 2026-10-27** (owner: zilc stays Fil-C on Linux x86_64 only;
   cross-platform is zailc's). The open points (`statx` missing from the cosmo runtime, real Windows
   unverified, aarch64 Windows / iOS / Android) are in `platforms.md` for zailc.
-- **Not yet re-run under Bun** (see the Bun port below): build/archive/restore-patched-clang,
-  build-cosmo, run-filc-tests (2026-10-27: only its usage line), os-surface, size-compare,
-  clone-upstream. Run each once under Bun before relying on it.
+- **Re-run under Bun, 2026-11-05** (owner: "work on item 8"): ✅ six of eight —
+  `run-filc-tests` (in full, as `compare-chains.ts`'s suite part: 7,269 tests, three runs that
+  day); `archive-patched-clang` (wrote `toolchain/` on 2026-10-30, after the port);
+  `restore-patched-clang` (`DEST=` scratch: checksums ok, `clang --version` right, `llvm-split`
+  byte-identical, `clang-20` = the installed one in every code and data section, only its 10
+  `.debug_*` sections are in the separate `.debug.xz`, linked by `.gnu_debuglink`, as designed);
+  `clone-upstream` (refuses on the real repo, exit 1; from a scratch copy of `tools/`: a fresh
+  clone whose v0.687 = the existing clone's `2db72c64`, same sparse paths, 1,092 = 1,092 files,
+  0 differing); `os-surface` (`os-surface.json` byte-identical to 2026-10-05's);
+  `size-compare` (156 rows = 156; 154 of 156 run with the same exit code under zilc and plain
+  Zig, as on 2026-10-05, no row's run columns changed; zilc ReleaseSafe sizes moved by a median
+  ×1.001, 0.686 → 0.687). ✅ **Decided 2026-11-06 (owner): the other two are LEFT as they are**
+  — *"whenever we perform the Fil-C updates we would rebuild everything and recheck for the same
+  results. we probaly need to just leave them and overwrite them when we update."* So
+  `build-patched-clang` (host GCC; writes the installed tree; its build half superseded by `zig
+  build patched-clang`, its tree-assembly half still needed, 5b) and `build-cosmo` (cosmo not
+  zilc's) are run, rewritten or retired at the next Fil-C update: `upstream.md` Stage A step 7.
   (`compile-check`, `check-toolchain` and `check-upstream` ran fully on 2026-10-27; so did `all-modes`, which runs
   `zilc-check` for every mode, and `compare-output`, against the swapped toolchain, `testing.md`.)
 

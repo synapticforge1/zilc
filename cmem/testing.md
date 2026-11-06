@@ -219,7 +219,13 @@ headers, kernel headers.
      exports: zig chain = release on 34 of 34 AND the GCC chain = release on 34 of 34 (was 33,
      `libyolort.a`); relocs ok; suite 0 differences on 7,269 vs stock and vs the GCC chain; gate
      8/8 both, line for line; corpus 500 same / 56 expected / 68 varies, 0 bad, 0 flips, all four
-     modes.
+     modes. **Then with Zig's clang for the reference chain's libpas stock half and yolounwind**
+     (owner: "not what is in ubuntu"; `tools/host-clang-shim.zig`; no `Ubuntu clang` `.comment`
+     left), everything fresh (2026-11-05, `OUT=~/zilc-work/equiv-zigclang`): **14/14** — exports
+     34/34 both; relocs ok; suite 0 differences on 7,269 vs stock and vs the reference chain; gate
+     8/8 both, line for line; corpus GCC chain 505 same / 52 expected / 67 varies, zig chain 501 /
+     56 / 67, 0 bad, 6 verdict flips, all of the allowed kinds (SAME / EXPECTED / thread-order
+     shape), all four modes.
 - **The `libpizlo.so` relocation gap: it is the LINKER, nothing else** (proved 2026-11-04; W-14).
   The zig chain has exactly 5 more `JUMP_SLOT`s than the GCC chain (`__cxa_finalize`,
   `__register_frame_info`, `__deregister_frame_info`,
@@ -514,10 +520,48 @@ modes**, C and Zig; output comparison **0 unexplained**, with the same totals as
    compatible Zig. The gate already takes `ZILC_ZIG`/`ZILC_FILC`, so this needs two zilc builds
    and a comparison of the two reports, not a new gate. Worth automating once it has been done by
    hand once.
-4. **Benchmark suite (2026-09-30), for upgrade stage C.** Does not exist yet. Needed: a small set of
-   programs (Zig, C, and Zig ⇄ C) that run long enough to time, run under zilc and plain `zig`, with
-   repeats and a stated noise floor. Output: run time, build time and binary size per version pair.
-   Its first run also produces zilc's **own** slowdown figure (`vision.md`). Scripts in Bun.
+4. ✅ **Benchmark suite — BUILT 2026-11-06** (planned 2026-09-30 for upgrade stage C; owner
+   2026-11-05: *"upstream's plus our zig only ports of upstreams plus new ones that we write to
+   test the zig only version specifically"*). See "Benchmark suite" below.
+
+## Benchmark suite (`tools/bench/bench.ts`, `tests/bench/`; first baseline 2026-11-06)
+
+**What runs.** 19 programs, 28 pairs. (a) upstream's `filc/benchmarks` (9 + upstream's
+binarytrees), READ from the fetched Fil-C package, built as its Makefile does (`-O3 -g`, each
+program's flags): Fil-C's clang/clang++ against plain `zig cc`/`zig c++`; pcre_benchmark left out
+(needs a Fil-C-built libpcre2). (b) Zig versions of four of them (`tests/bench/zig/`: nbody,
+spectralnorm, fannkuch, binarytrees). (c) zilc's own Zig programs (hashmap_churn, sort_format,
+dispatch, slices) and one Zig ⇄ C (`tests/bench/interop/`: libc qsort calling a Zig comparator,
+Zig calling a C kernel; needs `--entry zig`). (b) and (c) run in ReleaseSafe and ReleaseFast,
+`zilc build` against `zig build-exe`, both `x86_64-linux-musl`.
+
+**Method.** Same CPU both sides (Fil-C's clang defaults to x86-64-v2, so plain C gets
+`-mcpu=x86_64_v2`; both Zig sides are baseline x86-64; Z-cc-4 respelling for `-march`). Every
+program prints a result, and the two builds must print the same one (stdout + stderr, since
+Fil-C's `zprintf` writes stderr; masks for deltablue's timing and n-body's pointer print;
+stepanov_container prints only timings, unchecked). One warm-up each, then 5 runs alternating
+plain/zilc; median, min, noise = MAD/median; "within noise" = inside twice the larger noise. Build
+time: shared libraries warmed first, an empty local cache per build, zilc `--no-cache`, one build
+at a time. Startup floor measured: an empty program 0.10 ms static vs 1.36 ms with Fil-C's runtime
+(negligible beside the shortest program, 0.15 s). `compare` flags pairs whose input differs.
+
+**First baseline** (2026-11-06, `~/zilc-work/bench/0.15.2-0.687.1/`; i9-13980HX, 32 threads,
+idle; 3 runs that day: upstream 2.25× / 2.11× / 2.07×, Zig ReleaseFast 1.67× / 1.66× / 1.66×; the
+first had parallel builds still loading the machine). Geometric-mean slowdown, zilc / plain:
+upstream C/C++ under Fil-C **2.07×** (9 programs; fannkuch-redux 1.04× … richards 5.06×, n-body-2
+4.13×); Zig ports **1.68× ReleaseFast / 1.82× ReleaseSafe**; zilc's own Zig **1.66× / 1.85×**
+(ReleaseFast: slices 1.40×, sort_format 1.47×, hashmap_churn 1.51×, dispatch 1.64×, interop
+2.46×); all Zig pairs 1.29×–3.04×, the top being zig-binarytrees (a malloc/free per node, 2.93×
+/ 3.04×). Noise ≤ 2 % but deltablue (6 %) and reversecomplement (20 %, 0.09 s mostly I/O: its
+1.36× is "within noise"). **Upstream's binarytrees is NOT a cost figure:** it never frees
+(written for the GC) and runs 32 threads, so plain musl leaks and serializes on its malloc lock
+(4.5 s) while Fil-C takes 0.15 s; excluded from the means, noted in every summary. Build time:
+zilc 1.7–4.4 s against plain Zig 0.4–5.6 s (plain ReleaseSafe ~5 s: the stack-trace code; zilc
+splits code generation, KI-22 lever a). Sizes: Fil-C binaries are dynamic (runtime separate),
+plain ones static.
+
+**Per Fil-C move:** run `bun tools/bench/bench.ts` on an idle machine, then `bun tools/bench/bench.ts
+compare <old>/results.json <new>/results.json` (stage C's first column).
 5. **Upstream test corpus.** `filc/tests` from Fil-C, adopted under the ledger.
 6. **ABI completeness.** As in wazmrt, a C file that takes the address of every function declared in
    `zilc.h`, so a declared-but-undefined symbol breaks the build.

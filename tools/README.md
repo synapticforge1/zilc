@@ -70,6 +70,7 @@ starting elsewhere.
 | `run-gate.ts` | `zig build gate` where Fil-C lives (`cmem/testing.md`) |
 | `basics/` | the `tests/basics` corpus: through zilc in every mode (`zilc-check`, `all-modes`), natively (`run-native`), output comparison, sizes, compile check |
 | `filc/` | zilc's patched Fil-C toolchain: patch, build, archive, restore, check; Fil-C built from source with zilc's clang (`build-filc-from-source`: MODE=zig needs no C/C++ compiler, MODE=upstream is the maintainer's GCC chain) and the two chains compared (`compare-chains`); Fil-C's own test suite (`run-filc-tests`); clang comparison; stock Fil-C built from source in cosmo mode (`build-cosmo`, the cosmo evaluation — now zailc's record) |
+| `bench/` | the benchmark suite (`bench.ts`: run, and `compare` one release with another): upstream's `filc/benchmarks` read from the fetched Fil-C package, Zig versions of them, and zilc's own Zig and Zig ⇄ C programs (`tests/bench/`), each built plain and through zilc/Fil-C; run time, build time, size, and the same output checked (`cmem/testing.md`) |
 | `upstream/` | the read-only Fil-C reference clone and its monitor |
 | `p1/` `p2/` `p3/` | the phase experiments, kept as the record of how each result was measured (each folder has a README) |
 | `p6/` | the platforms scope pass: `os-surface.ts` counts the OS functions, raw kernel asm and int-to-pointer functions Zig's std needs per target (`cmem/platforms.md`; P6 is zailc's since 2026-10-27) |

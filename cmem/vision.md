@@ -10,7 +10,7 @@
 | Safe C++ | ◻️ untried (Fil-C does it; zilc has not) |
 | The runtime written in Zig | ◻️ not started — today the program links **Fil-C's** C runtime (P3) |
 | "Safe calls into ordinary, uninstrumented C libraries" | ❌ **false as stated** — the pass renames every symbol; both sides must be compiled by it |
-| 1.5×–4× slowdown | ❓ **unmeasured by us.** Fil-C's figure, inherited untested. ⚠️ Do not quote it as zilc's |
+| 1.5×–4× slowdown | ✅ **measured 2026-11-06** (`tools/bench/bench.ts`, `testing.md` "Benchmark suite"; one machine, i9-13980HX, idle, 5 runs after a warm-up, noise ≤ 2 % for most programs): **zilc's Zig programs about 1.7× (ReleaseFast: 1.68× for the four ports of upstream's benchmarks, 1.66× for zilc's own five) and about 1.8× (ReleaseSafe: 1.82× / 1.85×), geometric means; every Zig pair 1.29×–3.04×**; Fil-C on upstream's C/C++ benchmarks 2.07× (range 1.04×–5.06×). So Fil-C's 1.5×–4× holds here, and Zig through zilc sits at its low end. A claim with a date: re-measure before quoting |
 
 ## The primary goal (owner, 2026-09-18)
 
