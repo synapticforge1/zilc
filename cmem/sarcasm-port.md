@@ -1,0 +1,124 @@
+# sarcasm-port.md — porting Fil-C's assembler from Luau to Zig
+
+Owner, 2026-11-06: *"Port sarcasm to Zig"* (`design-decisions.md` top row; plan stages S0–S2 in
+`roadmap.md` Z1). This file is the PORTING MAP: what sarcasm is, how it is put together, and what a
+byte-identical port has to reproduce. Measured from Fil-C 0.687's `projects/sarcasm` (paths below
+relative to it) on 2026-11-06; a claim with a date, re-check when the pin moves.
+
+## What it is
+
+Fil-C's "pizlonating assembler": `.s` with Fil-C annotations in, a memory-safe object out. Fil-C's
+clang runs `pizfix/bin/sarcasm [--x86_64|--arm64] [-g] IN.s -o OUT.o` for every `.s` input (a Luau
+script under minilute, which then runs `as`); `-S` writes the rewritten assembly instead — what the
+oracle compares. 28 modules, 34,398 lines; the x86_64 path ≈ 28,100 (the six `arm64_*` modules are
+not ported: zilc is Linux x86_64 only; `lift` requires `arm64_isa` only for a default argument).
+
+## The oracle (S0, done)
+
+`tools/sarcasm/compare-sarcasm.ts`: upstream's sarcasm (the release's `pizfix/bin/sarcasm`) and a
+candidate, `--x86_64 -S`, over all 1,431 `.s` files in Fil-C's `filc/tests`; exit code, stdout,
+stderr and assembly byte for byte. Against itself: 0 differ (746 accepted, 685 rejected with
+`--x86_64`; the rejections' diagnostics are compared too). ~0.56 s per file under minilute.
+
+## The x86_64 pipeline (`sarcasm/sarcasm.luau`)
+
+- `main` (1725–1871): argv; `detect.detect` (syntax; `--x86_64` alone keeps the detected syntax,
+  default AT&T); `makeTarget` (36–57); one `pcall` around parse + compile; `fs.write`.
+- **parse** — `x86_64_parse.parseString` (871–938): statements
+  `{kind=insn|label|directive|blank, …, line, file}`; operands in INTEL order (AT&T reversed):
+  `reg {rc,num,width,name,pseudo?}`, `imm {text,value,absAddr?}`, `mem {base,index,scale,dispVal,
+  dispSym,dispReloc,deco/bcastN}`, `sym {text,reloc}`, `numref {text,num,dir,indirect}`; then
+  `numlabel.resolve`. Lines 1041–2600: an x86 machine-code decoder for `.byte` runs.
+- **compile** (1061–1696): expandRept; .globl/.hidden; `localcall.prescanCalls`; `splitFunctions`
+  (104–200, with `tailcall.scanAliases`); `localcall.discover`; `decodeByteInsns`; stack-buffer
+  resolution (`x86_64_frame.analyzeFrame`, resolution only, 1139–1272); `tailcall.buildContext`;
+  `collectX86Data` (607–1008: data objects, .init/.fini); per function (1500–1631):
+  `sig.parseSignature` (signature = 1 + Ret + 133·Arg, base-11 class codes), `tailcall.rewrite`,
+  `localcall.augment`, decode, **`transform.transformFunction`** (transform 748–5240: validate,
+  analyzeFrame ×2, `frame.preprocess` → `x86_64_frame.rewrite`, `lift.liftFunction`, DCE,
+  `ptrflow.analyze`, `cgm.make` codegen, expandFpSaves → `tr {fipNodes, temps, …}`),
+  **`allocateWithSpilling`** (454–547, ≤ 32 rounds of `regalloc.color` / rewriteSpills /
+  packSpillSlots), then glue (`getter`, `emit.emitFip`, thunks, origins, aliases); callsite
+  thunks in sorted signature order; data globals; .init sections; `.note.GNU-stack`; joined with
+  "\n" and a final "\n". `analyzeFrame` also annotates statements in place (~27 `st.x86_*` fields).
+- **diagnostics** (`err.luau`): `err.at(st, msg)` → `"sarcasm: <file>:<line>: <msg>"`, `err.here`
+  (parser line), `err.plain`; `main` prints the message to STDOUT (`print`) and exits 1 (usage: 2).
+  Errors are also CONTROL FLOW: `pcall` at sarcasm.luau 710 and 1232–1269 (swallows any error,
+  runtime errors included, unless it says "the offsets must match"), transform 862 / 1031,
+  x86_64_frame 2850 2986 4579 4648 5263 6547 6793 7135 8577, x86_64_parse 2514 — so in Zig: error
+  unions carrying the message, and what would be a Luau RUNTIME error must be a catchable error at
+  those sites.
+
+## Progress
+
+- ✅ **S0, the oracle** (2026-11-06): above.
+- ✅ **Foundation 1, Luau's table** (2026-11-06): `src/sarcasm/luau_table.zig`, a port of
+  ltable.cpp (array/hash parts, hashnum/luaS_hash, Brent's newkey, rehash/computesizes/adjustasize,
+  the `lastfree`/`aboundary` union, luaH_getn, luaH_next order) and ltablib's insert/remove
+  (moveelements' two paths). Proven by `tools/sarcasm/check-luau-table.ts` against the release's
+  minilute: 2,000 and 4,000 random scenarios (two seeds), every `#t` and all 10,974 / 21,938
+  traversal orders equal. Inverted (the boundary cache disabled: fails at line 113, `#t` 15 vs
+  10). ⚠️ One thing NOT emulated, by design: a nil-valued node with a STRING key becomes a dead key
+  when Luau's GC traverses the table (lgc removeentry), which moves later keys — GC timing, not the
+  table algorithm (measured: the first run, with string deletions, differed from line 2,459). Number
+  keys are never collected, so number-keyed layouts are exact; sarcasm sorts the string-keyed
+  traversals that reach its output (below).
+
+- ✅ **Foundation 3, Lua patterns** (2026-11-06): `src/sarcasm/lua_pattern.zig`, a port of
+  lstrlib.cpp's matcher (match with its tail calls, classend, matchbracketclass, singlematch,
+  max/min_expand, captures incl. position captures, %b, %f, back-references, the NUL C reads past
+  both ends, C-locale ctype) and find (plain search, init) / match / gmatch / gsub (string
+  replacements with %0–%9, function replacements). Proven by `tools/sarcasm/check-lua-pattern.ts`:
+  211 patterns — all 189 literal patterns in sarcasm's x86_64-path sources plus 22 hand-written —
+  over 601 subjects (corpus lines and tokens), every find / match / gmatch / gsub result equal to
+  Luau's (one malformed pattern errors on both sides). Inverted (the frontier's previous character
+  forced to NUL: the `%f[%w]…` patterns fail).
+
+- ✅ **Foundation 2, number formatting** (2026-11-06): `src/sarcasm/luau_number.zig` —
+  `tostring(n)` is luai_num2str (lnumprint.cpp): the SHORTEST round-trip digits (⚠️ not `%.14g`:
+  sarcasm's own comment at x86_64_parse 192–194 describes an older Luau; minilute prints 2^62 as
+  `4611686018427388000`), fixed layout for a decimal point in −5..21, else scientific with a ≥ 2
+  digit exponent, `nan` / `inf` / `-inf` / `-0`; `string.format("%.0f")` is printf's exact
+  decimal, half to even, `-nan`. The digits come from Zig's formatter (Ryu), the layout is
+  Luau's. Proven by `tools/sarcasm/check-luau-number.ts`: 211,424 doubles (random bit patterns,
+  integers, halves, every power of two ± 1 ulp, 10^−330…10^310) equal to Luau's for both;
+  inverted (the fixed range cut to 20: 10^20 differs).
+
+## What a byte-identical port must reproduce (the foundations)
+
+1. **Luau's table iteration order** (the biggest risk). Output depends on `for k in t` over
+   INTEGER-keyed tables living in the hash part, whose order is Luau's ltable algorithm (array
+   part, hash part, main position, free pointer from the top, rehash/array sizing, dead keys):
+   lift 253 (temp ids; key 0 is always in the hash part) and 213; regalloc 229 281 268 429 313
+   343 (worklists, adjacency, "first move"); sarcasm 331 349 (order of emitted spill
+   reloads/stores); transform 1727 says so in a comment. String-keyed iterations that matter are
+   sorted by upstream (parse 142–150, transform 1305 5015, sarcasm 1223 1636, ptrflow 584,
+   localcall 613 764). → a `LuauTable` in Zig, validated against minilute micro-scripts.
+2. **Numbers are f64.** The expression folder (parse 216–375) is double arithmetic and its
+   inexactness above 2^53 reaches the output; `tostring(n)` (~170 uses, incl. signature numbers
+   in symbol names) is the shortest round-trip form (✅ above; not `%.14g`); `%.0f` (parse 196),
+   `%02x`, `0x%08x%08x`; `bit32` ops are u32.
+3. **Lua patterns**: `%s %w %d %a %x %S`, sets, lazy `.-`, frontier `%f[…]` (14), balanced
+   `%b{}`, position captures `()`, `gsub` with `%1`; `string.find(…, 1, true)`. → port Luau's
+   lstrlib matcher exactly.
+4. **`table.sort` is unstable**: comparators at transform 82, x86_64_frame 5660 / 6081 may tie
+   (not yet checked) — if so, Luau's sort algorithm exactly.
+5. **Module state reset per file**: err 21 30–31, x86_64_parse 69–70 2483, x86_64_frame 263–367,
+   x86_64_render 232–234.
+6. No metatables, no coroutines; OOP is closures (`cgm.make`, `makeTarget`).
+
+## Porting order (leaves first) and the stage dumps
+
+err, build, prof (stub) → numlabel, sig, detect → **x86_64_parse** (first stage dump) →
+x86_64_fp, x86_64_isa (mostly tables) → regalloc, lift, ptrflow, frame → x86_64_frame (8,934) →
+x86_64_codegen → transform (5,243) → tailcall, localcall → x86_64_render, emit, x86_64_glue →
+the driver. Stage dumps (S1), JSON Lines with sorted keys, numbers `%.17g`, table identities as
+indices, from a patched COPY of sarcasm.luau run under minilute (env switch): after parse; after
+split/decode/rewrite; after analyzeFrame (the st.x86_* fields); after lift (temps — the first test
+of the table emulation); fipNodes; each regalloc round; per-function emitFip text and glue.
+
+Sizes (lines / code): x86_64_frame 8934/5112, transform 5243/3189, x86_64_parse 2669/1960,
+x86_64_isa 2032/1118 (tables + classify ~950), x86_64_fp 1693/998 (tables), x86_64_codegen
+1693/1011, sarcasm 1873/1340, localcall 965/636, x86_64_render 954/598, tailcall 744/485,
+x86_64_glue 724/539 (templates), ptrflow 696/389, regalloc 639/491, lift 293/235, sig 236/161,
+detect 169/95, frame 134/70, numlabel 108/74, emit 97/65, build 88/61, err 87/46, prof 51/31.

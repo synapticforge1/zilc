@@ -84,6 +84,39 @@ zilc, and re-verified against zilc's Fil-C release (0.686 work moves to 0.687 on
           fails on exactly #0 and #1). Found on the way: B-11 (the sparse FILC_SRC changes
           libc++'s CMake), F-2's C++ half. MODE=zig now runs only `fix_clang.sh` (what
           build_cxx.sh ran besides building), minilute and sarcasm from upstream's scripts.
+    - [ ] **sarcasm, Fil-C's assembler, in ZIG** (owner, 2026-11-06: "Port sarcasm to Zig";
+          `design-decisions.md` top row). What it is (measured 2026-11-06): `projects/sarcasm`,
+          28 Luau modules, 34,398 lines (x86_64: parse 2,669, isa 2,032, codegen 1,693, fp
+          1,693, frame 8,934, glue 724, render 954; shared: transform 5,243, sarcasm 1,873,
+          localcall 965, tailcall 744, ptrflow 696, regalloc 639, lift 293, sig 236, detect 169,
+          frame 134, numlabel 108, emit 97, build 88, err 87, prof 51; arm64 six modules 4,276 —
+          NOT ported: zilc is Linux x86_64 only), plus DESIGN.md (200 KB), README, ABI notes.
+          Run by Fil-C's clang for every `.s` input as `pizfix/bin/sarcasm [--x86_64|--arm64]
+          [-g] IN.s -o OUT.o` (a Luau script under minilute, which then runs `as`); `-S` writes
+          the rewritten assembly instead — the oracle. Corpus: Fil-C's own `filc/tests`, 1,431
+          `.s` files (`sarcasm-*-att`, `-int`, a few `-arm`). Plan: (S0) the oracle,
+          `tools/sarcasm/compare-sarcasm.ts`: upstream's `sarcasm -S` against the port's on every
+          corpus file, output, diagnostics and exit code byte for byte; upstream against itself
+          first (determinism); (S1) the port, module by module in dependency order, each stage
+          checked against upstream's by a Luau harness under minilute that dumps the stage's
+          result canonically for every corpus file, the Zig side dumping the same; (S2) `zig
+          build sarcasm` → `pizfix/bin/sarcasm`, then MODE=zig drops minilute and upstream's
+          sarcasm, Fil-C's suite (which runs those tests end to end) and compare-chains 14/14.
+          Until S2 is proven, upstream's sarcasm on minilute stays (built by upstream's scripts).
+          **S0 measured 2026-11-06** (a one-off run, upstream's `sarcasm -S` twice over the 1,431
+          files, 16 at a time): **deterministic** — 0 files differ between the two runs in output,
+          diagnostics or exit code; 939 accepted, 492 rejected (the rejection tests check the
+          diagnostics, so those must match too); 303 are arm64 inputs; ~0.56 s per file under
+          minilute. Fil-C's x86_64 driver always passes `--x86_64`, so the oracle runs the corpus
+          that way, as the driver does (an arm64 file is then a rejection on both sides).
+          ✅ S0's oracle committed-to-be: `tools/sarcasm/compare-sarcasm.ts` (self-check 1,431 /
+          0 differ). ✅ Foundation 1 (Luau's table, the iteration order the output depends on):
+          `src/sarcasm/luau_table.zig`, proven against Luau by `check-luau-table.ts` (32,912
+          traversals equal, inverted). The porting map, foundations and progress live in
+          `cmem/sarcasm-port.md`. ✅ Foundations 2 (number formatting, 211,424 doubles equal) and 3
+          (Lua patterns, sarcasm's 189 literal patterns × 601 corpus subjects equal), each proven
+          against Luau and inverted. Next: the modules, from err / numlabel / sig / detect up to
+          the parser (the first stage dump).
     - (the measurements and plan, as written before the build:) **libc++ / libc++abi** (`build_cxx.sh`: CMake + Ninja over LLVM's
           `runtimes/` with Fil-C's clang/clang++, then `install-cxx-linux.sh`). Measured from
           upstream's run (MODE=zig tree, `runtimes-build/build.ninja`): 149 C++ compiles —
