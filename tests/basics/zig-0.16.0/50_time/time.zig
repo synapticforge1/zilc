@@ -70,16 +70,22 @@ fn epochToDateTime(secs: i64, nano: u32) DateTime {
     const day: u8 = @intCast(remaining + 1);
 
     return DateTime{
-        .year = year, .month = month, .day = day,
-        .hour = hour, .minute = minute, .second = second,
-        .nano = nano, .weekday = weekday,
+        .year = year,
+        .month = month,
+        .day = day,
+        .hour = hour,
+        .minute = minute,
+        .second = second,
+        .nano = nano,
+        .weekday = weekday,
     };
 }
 
 fn printDateTime(writer: anytype, dt: DateTime) !void {
     try writer.print("{d}-{d:0>2}-{d:0>2} {d:0>2}:{d:0>2}:{d:0>2}.{d:0>9} +0000 UTC\n", .{
-        dt.year, dt.month, dt.day,
-        dt.hour, dt.minute, dt.second, dt.nano,
+        dt.year, dt.month,  dt.day,
+        dt.hour, dt.minute, dt.second,
+        dt.nano,
     });
 }
 
