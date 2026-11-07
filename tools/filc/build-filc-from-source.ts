@@ -8,10 +8,10 @@
 //   MODE=zig (default)  NO GCC, no host clang. Every piece upstream builds with the host's
 //                       compilers comes from `zig build pure-zig` (compiler-rt, yolo musl static and
 //                       shared, yolounwind, libpas whole: its stock half by Zig's clang, its Fil-C
-//                       half by the Zig-built Fil-C clang, libpizlo.so/.a linked by Zig's LLD) and
-//                       projeny is compiled by `zig cc`/`zig c++`; upstream's own scripts run only
-//                       the steps that use Fil-C's clang (user musl, libc++/libc++abi, minilute,
-//                       sarcasm).
+//                       half by the Zig-built Fil-C clang, libpizlo.so/.a linked by Zig's LLD; and
+//                       since 2026-11-06 the user libc, compiled by that Fil-C clang) and projeny
+//                       is compiled by `zig cc`/`zig c++`; upstream's own scripts run only
+//                       libc++/libc++abi, minilute and sarcasm.
 //   MODE=upstream       build_base.sh's steps after the LLVM build, unchanged: the stock pieces by
 //                       GCC and a clang, as upstream does; the GCCs are the release's versions,
 //                       pinned (`zig build gcc-reference`; env GCC_11_4_0 / GCC_12_3_0 override
@@ -130,7 +130,10 @@ if (mode === "upstream") {
     `-Dpizfix=${out}/pizfix`, "--prefix", `${out}/pizfix`, "--build-file", `${REPO}/build.zig`, ...zigCacheArgs()]);
   await rmrf(`${out}/pizfix/lib/libpizlo-stock.a`); // zilc's verification archive, not part of Fil-C's tree
   await must(["ln", "-fs", "libyoloc.so", `${out}/pizfix/lib/ld-fil1-x86_64.so`]); // build_yolomusl.sh's link
-  for (const s of filcSteps) await step(s, [`./${s}`]);
+  // The user libc came from `zig build pure-zig` too (its usermusl step, compiled by this tree's
+  // Fil-C clang; roadmap.md Z1 item 3, 2026-11-06), so build_usermusl.sh is not run; upstream's
+  // scripts build only libc++/libc++abi, minilute and sarcasm.
+  for (const s of filcSteps.filter((x) => x !== "build_usermusl.sh")) await step(s, [`./${s}`]);
 }
 
 // 4. pizfix/lib against the release's: the same files (names), and for each the same kind.

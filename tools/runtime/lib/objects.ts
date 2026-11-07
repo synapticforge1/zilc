@@ -61,6 +61,17 @@ export interface Policy {
   why: string;
   /** Is a path carried in read-only data (`__FILE__`) in upstream's form? */
   sourceForm: (p: string) => boolean;
+  /** Instead of the form rule: compare ours and upstream's read-only-data paths as SETS, each
+   *  through this normalisation first. For Fil-C-compiled objects (verify-usermusl.ts): their
+   *  `__FILE__` strings include Fil-C's own headers by the compiler tree's absolute path, and the
+   *  scan finds fragments of the others, so no form rule fits; equality with upstream does. */
+  sourceNormalize?: (p: string) => string;
+  /** With sourceNormalize: a member whose paths (either side) include one of these is not
+   *  compared but counted (`sourceSkipped`, ratcheted by the caller). Fil-C lays a constant
+   *  string out in pieces, at offsets set by the strings before it; a member that embeds the
+   *  compiler tree's ABSOLUTE path (Fil-C's stdfil.h) therefore breaks the others differently on
+   *  each machine (measured 2026-11-06: `fil-include/stdfil.h`, a lost `./src/internal/…`). */
+  sourceUncomparable?: (p: string) => boolean;
 }
 
 /**
@@ -72,6 +83,9 @@ export class Oracle {
   cuCompared = 0;
   emptyTu = 0;
   undefDiffering = 0;
+  /** With sourceNormalize: members whose read-only-data paths were compared equal / skipped. */
+  sourceCompared = 0;
+  sourceSkipped = 0;
   /** Symbols ours defines under `oursOnlyDefined` (a departure's count, ratcheted by the caller). */
   departedDefined = 0;
   constructor(private policy: Policy) {}
@@ -98,7 +112,17 @@ export class Oracle {
       ...minus.filter((s) => !this.policy.theirsOnlyUndef.has(s)).map((s) => `-${s}`),
     ];
     if (bad.length) this.fail(`UNDEFINED DIFFERS  ${label}: ${bad.join(",")} (outside the compiler-difference sets, ${this.policy.why})`);
-    for (const p of await sourcePaths(ours)) if (!this.policy.sourceForm(p)) this.fail(`SOURCE PATH FORM  ${label}: ${p}`);
+    const norm = this.policy.sourceNormalize;
+    if (norm) {
+      const [sA, sB] = await Promise.all([sourcePaths(ours), sourcePaths(theirs)]);
+      const skip = this.policy.sourceUncomparable;
+      if (skip && [...sA, ...sB].some(skip)) this.sourceSkipped++;
+      else {
+        const a = new Set([...sA].map(norm)), t = new Set([...sB].map(norm));
+        if (diff(a, t).length || diff(t, a).length) this.fail(`SOURCE PATHS DIFFER  ${label}: ours only ${diff(a, t).join(",") || "-"}, upstream's only ${diff(t, a).join(",") || "-"}`);
+        else this.sourceCompared++;
+      }
+    } else for (const p of await sourcePaths(ours)) if (!this.policy.sourceForm(p)) this.fail(`SOURCE PATH FORM  ${label}: ${p}`);
     const [cA, cB] = await Promise.all([compileUnitNames(ours), compileUnitNames(theirs)]);
     if (cA.join("|") === cB.join("|")) this.cuCompared += cA.length;
     else if (cA.length === 0 && dB.size === 0 && uB.size === 0) this.emptyTu++;

@@ -94,12 +94,17 @@ const zig_0_15_2 = [_]Patch{
         ,
         .count = 1,
     } } },
-    .{ .file = "std/heap/debug_allocator.zig", .edit = .{ .replace = .{
-        // alloc: `page` is already a pointer.
-        .old = "const bucket: *BucketHeader = .fromPage(@intFromPtr(page), slot_count);",
-        .new = "const bucket: *BucketHeader = .fromPage(@alignCast(page), slot_count); // zilc: Z-5",
-        .count = 1,
-    } } },
+    .{
+        .file = "std/heap/debug_allocator.zig",
+        .edit = .{
+            .replace = .{
+                // alloc: `page` is already a pointer.
+                .old = "const bucket: *BucketHeader = .fromPage(@intFromPtr(page), slot_count);",
+                .new = "const bucket: *BucketHeader = .fromPage(@alignCast(page), slot_count); // zilc: Z-5",
+                .count = 1,
+            },
+        },
+    },
     // Native stack walking (KI-15, zig-upstream-notes.md Z-8; owner chose this option).
     // In Debug, DebugAllocator captures a stack trace on every alloc/free by walking raw
     // frame pointers and probing them with process_vm_readv, which Fil-C stops ("unsupported
@@ -175,13 +180,18 @@ const zig_0_15_2 = [_]Patch{
         ,
         .count = 1,
     } } },
-    .{ .file = "std/heap/debug_allocator.zig", .edit = .{ .replace = .{
-        // free and resizeSmall: page_addr comes from @intFromPtr(memory.ptr) in the SAME
-        // function, so @ptrFromInt here recovers that pointer's capability.
-        .old = "const bucket: *BucketHeader = .fromPage(page_addr, slot_count);",
-        .new = "const bucket: *BucketHeader = .fromPage(@ptrFromInt(page_addr), slot_count); // zilc: Z-5",
-        .count = 2,
-    } } },
+    .{
+        .file = "std/heap/debug_allocator.zig",
+        .edit = .{
+            .replace = .{
+                // free and resizeSmall: page_addr comes from @intFromPtr(memory.ptr) in the SAME
+                // function, so @ptrFromInt here recovers that pointer's capability.
+                .old = "const bucket: *BucketHeader = .fromPage(page_addr, slot_count);",
+                .new = "const bucket: *BucketHeader = .fromPage(@ptrFromInt(page_addr), slot_count); // zilc: Z-5",
+                .count = 2,
+            },
+        },
+    },
 };
 
 /// The patches for one Zig version (from `zig env`'s `.version`); empty if none.

@@ -240,12 +240,12 @@ const f128_rt_files = [_][]const u8{
 /// so that, for example, round.zig's `round` and `roundf` cannot displace Fil-C's
 /// own libm functions for C code linked into the same program.
 const f128_rt_exports = [_][]const u8{
-    "__addtf3",    "__subtf3",     "__multf3",     "__divtf3",     "__cmptf2",     "__eqtf2",
-    "__netf2",     "__lttf2",      "__letf2",      "__getf2",      "__gttf2",      "__unordtf2",
-    "__extendsftf2", "__extenddftf2", "__trunctfsf2", "__trunctfdf2", "__fixtfsi",  "__fixtfdi",
-    "__fixtfti",   "__fixunstfsi", "__fixunstfdi", "__fixunstfti", "__floatsitf",  "__floatditf",
-    "__floattitf", "__floatunsitf", "__floatunditf", "__floatuntitf", "__extendxftf2",
-    "__trunctfxf2", "roundq",
+    "__addtf3",      "__subtf3",      "__multf3",      "__divtf3",      "__cmptf2",      "__eqtf2",
+    "__netf2",       "__lttf2",       "__letf2",       "__getf2",       "__gttf2",       "__unordtf2",
+    "__extendsftf2", "__extenddftf2", "__trunctfsf2",  "__trunctfdf2",  "__fixtfsi",     "__fixtfdi",
+    "__fixtfti",     "__fixunstfsi",  "__fixunstfdi",  "__fixunstfti",  "__floatsitf",   "__floatditf",
+    "__floattitf",   "__floatunsitf", "__floatunditf", "__floatuntitf", "__extendxftf2", "__trunctfxf2",
+    "roundq",
 };
 
 /// What zilc needs from `zig env` (ZON: `.lib_dir = "…"`, `.version = "…"`).
@@ -440,9 +440,9 @@ fn compileZig(
     var zig_args: std.ArrayListUnmanaged([]const u8) = .{};
     defer zig_args.deinit(gpa);
     try zig_args.appendSlice(gpa, &.{
-        opts.zig,  "build-obj",
-        "-target", opts.target,
-        "-O",      opts.optimize,
+        opts.zig,        "build-obj",
+        "-target",       opts.target,
+        "-O",            opts.optimize,
         "-fno-emit-bin", emit_arg,
         // Always: Fil-C always links its libc, and without -lc Zig's std reaches
         // the kernel through raw `syscall` asm in many more places (KI-7).
@@ -450,7 +450,7 @@ fn compileZig(
         // Debug defaults to Valgrind client requests: a magic asm sequence that is a
         // no-op unless running under Valgrind. Fil-C refuses all inline asm, and a
         // zilc program never runs under Valgrind, so leave them out (KI-14).
-        "-fno-valgrind",
+                  "-fno-valgrind",
         // Always the LLVM backend. Debug otherwise defaults to Zig's own x86_64
         // backend, which emits no LLVM module at all (`-femit-llvm-ir` used to
         // force LLVM implicitly; the unoptimized route does not, KI-17).
@@ -727,8 +727,8 @@ fn filcCompile(
     const bc_path = try std.fmt.allocPrint(gpa, "{s}/{s}.opt.bc", .{ tmp_path, stem });
     defer gpa.free(bc_path);
     try runFilc(gpa, opts, &.{
-        opts.filc,  "-O1", "-g", "-Wno-override-module", "-c", "-emit-llvm",
-        "-Xclang", "-emit-llvm-uselists", "-o", bc_path, filc_ll_path,
+        opts.filc, "-O1",                 "-g", "-Wno-override-module", "-c",         "-emit-llvm",
+        "-Xclang", "-emit-llvm-uselists", "-o", bc_path,                filc_ll_path,
     });
 
     // 2. The cut.

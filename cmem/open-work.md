@@ -11,7 +11,7 @@ them, with their dates.
 | --- | --- |
 | version | **`0.15.2-0.687.1`** — `<Zig>-<Fil-C>.<zilc release>`, **published 2026-10-27** (tag `v0.15.2-0.687.1` on `be51808`; `releasing.md`); one of the five places the number lives. Before it: `0.15.2-0.686.1` (2026-10-05) |
 | toolchain | Zig **0.15.2** (user code and build), Fil-C **0.687** with zilc's patched clang (`workarounds.md` KI-22, KI-4) — **since 2026-10-30 compiled by Zig** (`zig build patched-clang`; the GCC-built one kept as `~/zilc-work/tools/filc-0.687-zilc-gcc` for rollback); 0.686's kept installed and archived (`toolchain/filc-0.686/`) |
-| pushed | `main` = `origin/main` = `04ac719` (pushed 2026-11-05, owner: "proceed with 1-3"; 9 commits since the 0.687.1 release, scanned for personal data first). No new tag: the version line did not move |
+| pushed | `main` = `origin/main` (2026-11-06: `ec3d6da`, the benchmark suite, the Zig-clang reference chain, the Bun re-runs; then the user libc in `zig build` with the `zig fmt` cleanup of `src/`, owner: "fix that first then commit and push"; before them `04ac719`, 2026-11-05; each push scanned for personal data first). No new tag: the version line did not move |
 | gates | `zig build gate`, `zig build test`, Fil-C's suite, the corpus in four modes, the output comparison: all re-run 2026-10-27 on Fil-C 0.687, counts in `testing.md` |
 | remote | `origin` = `github.com/synapticforge1/zilc` (since 2026-10-27; was `jrmarcum/zilc`, which GitHub redirects). **Purged history pushed 2026-10-27**: `main` = `origin/main`, `v0.15.2` = tag `v0.15.2-0.686.1` = `13ce96a` (was `19e7172`; map `history-map-2026-10-27.md`) |
 | branches | `main` carries the Bun port (`c2841dd`, was `44e0b1a`), merged `--no-ff` 2026-10-27 (owner: "we will merge all to bun tooling since deno is going away"), and the 2026-10-27 work since; `bun-port` (merged, never pushed) deleted 2026-10-27 (owner). Branches: `main`, `v0.15.2` |
@@ -19,8 +19,12 @@ them, with their dates.
 
 ## ▶️ PICK UP HERE — paused 2026-11-05 afternoon (owner: "need to pause here for now and pick back up later today")
 
-Everything below is UNCOMMITTED (last commit and push: `04ac719`). Owner's items in hand: 8 (Bun
-re-runs) and 12 (benchmark suite); item 4 (GitHub Support purge request) is on hold (owner).
+✅ All three items below were finished, committed and pushed as `ec3d6da` (2026-11-06). Still
+open from the 2026-11-05 list: item 4 (GitHub Support purge request, on hold, owner); **the
+pure-Zig track, started 2026-11-06** (owner: "then we can start on the pure-Zig track"): Z1 item 3
+(the Fil-C-compiled pieces in pure Zig), 5b, Z2. The small checks (W-7 on the new release, the
+upstream commits after the tag, KI-7's `getcontext`) are carried to the next Fil-C update
+(owner, 2026-11-06; `upstream.md` Stage A step 8).
 
 1. **Item 3, done in code, proof RUNNING at the pause:** the reference chain's libpas stock half
    and yolounwind now use Zig's clang (`tools/host-clang-shim.zig`, wired in

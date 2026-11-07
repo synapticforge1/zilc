@@ -857,7 +857,8 @@ numbers, so they live here too, condensed. zailc's `cmem/workarounds.md` keeps t
 - **W-7. Fil-C 0.686: `landing_pad_impl` asserts `can_catch` when an inlined destructor writes a
   global** (C++ at `-O1`). An upstream defect, found and reduced in zailc
   (`../zailc/tests/link/eh_dtor_writes_global.cpp`, `../zailc/UPSTREAM-ISSUES.md`). ⏳ Not yet
-  re-checked on 0.687: the link-and-run item will.
+  re-checked on 0.687: carried to the next Fil-C update (owner, 2026-11-06; `upstream.md` Stage A
+  step 8), unless the link-and-run item reaches it first.
 - **W-8. What GCC (upstream's release) and Zig's clang emit differently.** Upstream built yolo musl
   with GCC 12.3 and compiler-rt with GCC 11.4; zilc's pure-Zig build uses Zig's clang. Defined
   symbols are equal; only these UNDEFINED differences are allowed, each set in its oracle with an

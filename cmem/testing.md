@@ -225,7 +225,12 @@ headers, kernel headers.
      34/34 both; relocs ok; suite 0 differences on 7,269 vs stock and vs the reference chain; gate
      8/8 both, line for line; corpus GCC chain 505 same / 52 expected / 67 varies, zig chain 501 /
      56 / 67, 0 bad, 6 verdict flips, all of the allowed kinds (SAME / EXPECTED / thread-order
-     shape), all four modes.
+     shape), all four modes. **Then with the user libc from `zig build`** (roadmap Z1 item 3;
+     MODE=zig no longer runs `build_usermusl.sh`; `verify-usermusl.ts` OK), everything fresh
+     (2026-11-06, `OUT=~/zilc-work/equiv-usermusl`): **14/14** — exports 34/34 both, relocs ok,
+     suite 0 differences on 7,269 vs stock and vs the reference chain, gate 8/8 both line for
+     line, corpus GCC chain 502 / 57 / 65 and zig chain 504 / 56 / 64, 0 bad, 2 allowed flips,
+     all four modes.
 - **The `libpizlo.so` relocation gap: it is the LINKER, nothing else** (proved 2026-11-04; W-14).
   The zig chain has exactly 5 more `JUMP_SLOT`s than the GCC chain (`__cxa_finalize`,
   `__register_frame_info`, `__deregister_frame_info`,

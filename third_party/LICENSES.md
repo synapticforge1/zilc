@@ -264,7 +264,7 @@ Newest first. Copy the template for each adopted component.
 - **Obligations satisfied:** [x] licence present  [x] NOTICE updated  [x] SPDX header  [x] notice
   installed with the binary
 
-### libpas-recipe, yolomusl-recipe, compiler-rt-recipe (Fil-C's runtime build rules, as data; the pure-Zig track)
+### libpas-recipe, yolomusl-recipe, compiler-rt-recipe, usermusl-recipe (Fil-C's runtime build rules, as data; the pure-Zig track)
 - **Source:** Fil-C at `e7947f0` (0.687), the same checkout as above; first written in zailc for
   v0.686 (2026-10-08/09), brought here 2026-10-27
 - **Upstream path(s) and license (SPDX):**
@@ -283,6 +283,11 @@ Newest first. Copy the template for each adopted component.
   - `compiler-rt/` builtins' CMake (source selection and flags, read from the `build.ninja` it
     generates) and `build_compiler_rt.sh`'s install layout — `Apache-2.0 WITH LLVM-exception`
     (`third_party/fil-c/LLVM-LICENSE.txt`)
+  - `projects/usermusl/Makefile` (the object rules, EMPTY_LIBS, the `lib/libc.so` link rule as
+    Fil-C's driver expands it) and the flags musl's `configure` chooses for Fil-C's clang
+    (2026-11-06; `tools/runtime/import-usermusl-sources.ts`) — `MIT` (musl, as patched by Fil-C;
+    `third_party/fil-c/MUSL-LICENSE.txt`). Its sources and headers are compiled and installed from
+    the checkout, not copied
 - **What we reused:** the file lists and flags, as data, imported mechanically by
   `tools/runtime/import-libpas-sources.ts`, `import-yolomusl-sources.ts`,
   `import-compiler-rt-sources.ts`; the rules re-expressed as Zig build steps. **No source file of
@@ -291,12 +296,13 @@ Newest first. Copy the template for each adopted component.
   checkout given by `-Dfilc-src`
 - **Where it lives in zilc:** `src/runtime/libpas_sources.zig` (BSD-2-Clause),
   `src/runtime/yolomusl_sources.zig` (MIT), `src/runtime/compiler_rt_sources.zig` (Apache-2.0 WITH
-  LLVM-exception) — each generated with its upstream's SPDX line; `build/pure_zig.zig` (the
-  recipes, zilc's own code)
+  LLVM-exception), `src/runtime/usermusl_sources.zig` (MIT) — each generated with its upstream's
+  SPDX line; `build/pure_zig.zig` (the recipes, zilc's own code)
 - **Also compiled, not copied (2026-10-30):** `filc/src/*.c` (Fil-C's runtime, BSD-2-Clause) by
-  Fil-C's clang inside `zig build libpas -Dfilc-clang`; projeny, the user musl, libc++/libc++abi,
-  minilute and sarcasm by upstream's own scripts in `tools/filc/build-filc-from-source.ts`, from a
-  local copy of the fetched sources (never committed)
+  Fil-C's clang inside `zig build libpas -Dfilc-clang`; since 2026-11-06 the user musl by Fil-C's
+  clang inside `zig build usermusl -Dfilc-clang`; projeny, libc++/libc++abi, minilute and sarcasm
+  by upstream's own scripts in `tools/filc/build-filc-from-source.ts`, from a local copy of the
+  fetched sources (never committed)
 - **Artifact destination:** **toolchain-only today**: the built libraries install under
   `~/zilc-work/pure-zig/filc-<release>/lib` and are used by `zig build gate-zig-modules`. They are
   Fil-C's runtime, compiled by Zig: if they are ever DISTRIBUTED or linked into distributed

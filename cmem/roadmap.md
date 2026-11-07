@@ -37,7 +37,45 @@ zilc, and re-verified against zilc's Fil-C release (0.686 work moves to 0.687 on
         release's 1,653 symbols, with dynamic tags equal; then `gate-zig-modules` ran with 10 linked,
         gate 8/8, corpus 78/78 as designed and comparison 0 unexplained (`testing.md`).
   - [ ] the three Fil-C-compiled pieces (`filc/src` → the rest of `libpizlo`, the user libc,
-        libc++).
+        libc++). **Started 2026-11-06** (owner: "then we can start on the pure-Zig track").
+    - [x] `filc/src` → the rest of libpizlo: done 2026-10-30 as part of libpas whole
+          (`buildLibpizlo`, W-12; Fil-C's clang from `zig build`, linked by `zig ld.lld`).
+    - [x] **the user libc — BUILT AND VERIFIED 2026-11-06** (all four steps below; step 4: MODE=zig
+          builds it with `zig build` instead of `build_usermusl.sh`, and `compare-chains.ts` is
+          14/14, `testing.md` item 8):
+          `zig build usermusl -Dfilc-clang=…` (also in `pure-zig` with -Dfilc-clang);
+          `verify-usermusl.ts` OK against the release: `libc.a` 1,333 members in upstream's order,
+          defined and undefined symbols equal (but F-4: 2 members, the patched clang's own),
+          1,330 compile-unit names equal, `__FILE__` strings equal in 1,322 members (11 not
+          comparable, F-3); `libc.so` 4,511 exports and 281 undefined equal, NEEDED and tag kinds
+          equal (RUNPATH: the install's); the eight empty archives; 219 headers byte-identical.
+          Inverted (two table entries swapped: it still builds, the oracle fails on exactly those
+          two members). Found on the way: F-2, F-3, F-4, C-13. ⚠️ C-13 says yolomusl's headers'
+          `__FILE__` likely read `src/internal/…` where upstream's read `./src/internal/…`
+          (`verify-yolomusl.ts`'s form rule accepts both): check with the set comparison and fix
+          as `buildUserMusl` does.
+    - (the plan, as written before the build:) **the user libc** (`projects/usermusl` → `pizfix/lib/libc.a`, `libc.so`, the eight empty
+          `libm.a` … `libdl.a`, and `pizfix/include`). Measured from upstream's own run
+          (2026-11-06, `build_usermusl.sh` under MODE=zig): musl's configure with `CC = <Fil-C
+          clang> -yolo-assembler`; 1,333 compiles, ALL C (no x86_64 assembly in user musl);
+          the Makefile is yolomusl's but for: no `-g` in CFLAGS_ALL, no `-fPIE` on LIBC_OBJS, no
+          crt or ldso objects, and `libc.so` linked through the DRIVER as `$(CC) $(CFLAGS_ALL)
+          $(LDFLAGS_ALL) -shared -o lib/libc.so $(LOBJS) -lyolort -nodefaultlibs`, to which
+          Fil-C's driver still adds `crti.o crtbegin.o -L<pizfix>/lib -rpath <pizfix>/lib …
+          -lpizlo -lyolort -lyoloc -lyolom -lyolort -lyolounwind crtend.o crtn.o`
+          (`clang -###`). Plan, the yolomusl pattern: (1)
+          `tools/runtime/import-usermusl-sources.ts` → `src/runtime/usermusl_sources.zig`
+          (configure with Fil-C's clang in a scratch copy; the Makefile rules asserted); (2)
+          `buildUserMusl` in `build/pure_zig.zig`: GENH and version.h as for yolomusl, each
+          object a Fil-C-clang step (as `buildLibpizlo`'s), `libc.a` with upstream's member
+          names, `libc.so` by `zig ld.lld` with the driver's additions and LDFLAGS_AUTO
+          (`--exclude-libs` naming the archives upstream's line has, W-11 part 2), headers by
+          `zilc-gen musl-headers` on the usermusl tree; (3) `tools/runtime/verify-usermusl.ts`
+          against the release (symbols and exports, never bytes: F-1); (4) MODE=zig takes it
+          instead of `build_usermusl.sh`, then `compare-chains.ts` 14/14.
+    - [ ] **libc++ / libc++abi** (`build_cxx.sh`: CMake + Ninja over LLVM's `runtimes/` with
+          Fil-C's clang/clang++). After the user libc. (minilute and sarcasm, Fil-C's Luau tools,
+          are built by upstream's scripts too; not in this item, decide after libc++.)
 - **Z2 — the pass in Zig** (zailc step 3, not started there): an LLVM IR model in Zig, the pass
   (`FilPizlonator.cpp`), the analyses it needs, KillUB and DeleteRedundantPollchecks; oracle: the
   same module through Fil-C's pass and through zilc's, compared as IR and as behaviour.

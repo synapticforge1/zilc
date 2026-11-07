@@ -275,8 +275,9 @@ fn rewriteSyscallLine(gpa: std.mem.Allocator, out: *std.ArrayListUnmanaged(u8), 
     const dbg = if (std.mem.indexOf(u8, rest, "!dbg ")) |d| rest[d..] else "";
 
     try out.print(gpa, "{s}call i64 @{s}(i64 {s}, ptr {s}, ptr {s}, ptr {s}, ptr {s}, ptr {s}, ptr {s})", .{
-        head, syscall_helper, operands[0],
-        ptr_args[0], ptr_args[1], ptr_args[2], ptr_args[3], ptr_args[4], ptr_args[5],
+        head,        syscall_helper, operands[0],
+        ptr_args[0], ptr_args[1],    ptr_args[2],
+        ptr_args[3], ptr_args[4],    ptr_args[5],
     });
     if (dbg.len > 0) try out.print(gpa, ", {s}", .{std.mem.trimRight(u8, dbg, " ")});
     return true;
@@ -493,8 +494,8 @@ fn foldExtract(gpa: std.mem.Allocator, out: *std.ArrayListUnmanaged(u8), line: [
 
 /// Linkage and visibility words that may precede a definition's return type.
 const linkage_words = [_][]const u8{
-    "external", "weak",            "weak_odr",  "linkonce", "linkonce_odr", "available_externally",
-    "hidden",   "protected",       "default",   "dso_local", "dso_preemptable",
+    "external", "weak",      "weak_odr", "linkonce",  "linkonce_odr",    "available_externally",
+    "hidden",   "protected", "default",  "dso_local", "dso_preemptable",
 };
 
 /// Makes every `define` whose name is not in `keep` internal. Declarations,

@@ -60,6 +60,12 @@ first passing on the Zig that matches Fil-C.
    `build-patched-clang.ts` (its tree-assembly half) and `build-cosmo.ts` — are run, rewritten or
    retired at that update, not before; their old outputs are simply overwritten (owner, same day:
    *"we probaly need to just leave them and overwrite them when we update"*).
+8. **The small checks carried to that update** (owner, 2026-11-06: *"the small check will be taken
+   care of when we update"*): review the upstream commits after the current tag (today
+   `f565a56`, the callee roots its arguments, an ABI change; `7d4ed7b`, symbol visibility; "Review
+   of Fil-C 0.687" below); re-run W-7's reduced case (`../zailc/tests/link/eh_dtor_writes_global.cpp`,
+   C++ at `-O1`; found on 0.686) against the new release; re-test KI-7's remainder (`getcontext`,
+   `known-issues.md`) in case std or Fil-C moved. Each gets its result recorded where it lives.
 
 > 🔒 **2026-10-27 (owner): zilc does stage A only, always.** It stays on the Zig whose LLVM
 > matches Fil-C's; stages B and C below are **not done in zilc** and are kept as the procedure
