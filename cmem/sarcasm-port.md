@@ -84,6 +84,31 @@ stderr and assembly byte for byte. Against itself: 0 differ (746 accepted, 685 r
   integers, halves, every power of two ± 1 ulp, 10^−330…10^310) equal to Luau's for both;
   inverted (the fixed range cut to 20: 10^20 differs).
 
+- ✅ **The stage checker and the first modules** (2026-11-06): `src/sarcasm/sarcasm.zig` (the
+  package root), `err.zig` (diagnostics: upstream's module state; a rejection stores its exact
+  message and returns `error.Sarcasm`; locations are `Loc{file, line}`), `sig.zig`, `detect.zig`.
+  `tools/sarcasm/check-stages.ts` runs each stage of the port (`tools/sarcasm/stage-check.zig`)
+  against UPSTREAM'S OWN Luau module (the release's `pizfix/lib/sarcasm`, required by a generated
+  harness under minilute), both dumped canonically: **detect** on all 1,431 corpus files, **sig**
+  (parseSignature + checkSupportedClasses) on all 473 distinct `;!`/`#!` annotation bodies of the
+  corpus plus 14 synthetic — 0 differ, rejection messages included. Inverted (sig's base 11 → 12:
+  99 differ; detect's `.intel_syntax` → AT&T: 162 differ). Found: detect's `%%rip` check can never
+  decide (`%rip` already matches the earlier `%%r[a-z0-9]`): removing it changes nothing — kept,
+  as upstream has it.
+
+- ✅ **Foundation 4, `tonumber`** (2026-11-06; found while reading the parser, which leans on it):
+  `luau_number.tonumber` = luaO_str2d — C's strtod (the libc minilute links: Fil-C's musl) on the
+  longest valid prefix (whitespace, sign, decimal / hex floats, inf / infinity / nan[(…)]), the
+  strtoul-base-16 fallback when strtod stops at an `x`, then only whitespace. Decimal goes through
+  Zig's correctly rounded parser (= musl's decfloat); HEX is a port of musl's `hexfloat()`
+  (floatscan.c) in x87 `long double` (Zig's f80), because musl's result is not simply correctly
+  rounded: its bias trick and strtod's narrowing round some subnormals UP (0xd.87a1cbe50f29436d8p-1047
+  → …60 where exact rounding gives …5f), and Zig's own parser truncates hex past 64 bits; and
+  musl's `-nan` is +nan. Proven by `check-luau-number.ts`: 18,811 strings (every operand-shaped
+  corpus token, edge cases, 8,000 random long hex integers and hex floats across the exponent
+  range incl. subnormals), the result's BITS equal to Luau's. (Both earlier versions failed it:
+  that is the inversion.)
+
 ## What a byte-identical port must reproduce (the foundations)
 
 1. **Luau's table iteration order** (the biggest risk). Output depends on `for k in t` over

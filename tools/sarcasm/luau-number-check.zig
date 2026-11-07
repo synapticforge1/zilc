@@ -12,8 +12,21 @@ pub fn main() !void {
     var arena_state: std.heap.ArenaAllocator = .init(std.heap.page_allocator);
     const gpa = arena_state.allocator();
     const args = try std.process.argsAlloc(gpa);
-    const text = try std.fs.cwd().readFileAlloc(gpa, args[1], 1 << 30);
     var out: std.ArrayList(u8) = .empty;
+    if (std.mem.eql(u8, args[1], "--tonumber")) {
+        // tonumber of each hex-encoded string: the result's bits, or nil
+        const t = try std.fs.cwd().readFileAlloc(gpa, args[2], 1 << 30);
+        var lines = std.mem.splitScalar(u8, t, '\n');
+        while (lines.next()) |line| {
+            if (line.len == 0 and lines.peek() == null) break;
+            const s = try gpa.alloc(u8, line.len / 2);
+            _ = try std.fmt.hexToBytes(s, line);
+            if (ln.tonumber(s)) |n| try out.print(gpa, "{x:0>16}\n", .{@as(u64, @bitCast(n))}) else try out.appendSlice(gpa, "nil\n");
+        }
+        try std.fs.File.stdout().writeAll(out.items);
+        return;
+    }
+    const text = try std.fs.cwd().readFileAlloc(gpa, args[1], 1 << 30);
     var it = std.mem.tokenizeScalar(u8, text, '\n');
     var buf: [64]u8 = undefined;
     while (it.next()) |line| {

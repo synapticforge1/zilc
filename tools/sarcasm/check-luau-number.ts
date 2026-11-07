@@ -65,4 +65,51 @@ for (let i = 0; i < Math.max(a.length, b.length); i++) if (a[i] !== b[i]) bad.pu
 console.log(`${nums.length} doubles; Luau printed ${a.length} lines, Zig ${b.length}`);
 for (const i of bad.slice(0, 10)) console.log(`  DIFFER bits ${nums[i]?.toString(16)}: luau ${JSON.stringify(a[i]?.slice(0, 80))} / zig ${JSON.stringify(b[i]?.slice(0, 80))}`);
 console.log(bad.length ? `FAILED: ${bad.length} differ` : "OK: tostring and %.0f equal to Luau's for every double");
-process.exit(bad.length ? 1 : 0);
+
+// ---- tonumber(s): corpus tokens and edge cases, compared as the result's exact bits (or nil)
+import { readdirSync, readFileSync, statSync } from "node:fs";
+import { filcPackageDir } from "../lib/tool.ts";
+const strs = new Set<string>([
+  "", " ", "0", "-0", "+1", " 12 ", "\t7\n", "1e3", "1E+3", "1e", "1e+", ".5", "5.", ".", "-.5e-2", "0x", "0X1F", "0x1p4", "0x1.8p1", "0x.8", "0x1p", "0xg",
+  "0x10 ", " 0x10", "-0x10", "0x8000000000000000", "0xffffffffffffffff", "0x10000000000000000", "0x7fffffffffffffffff", "inf", "-inf", "Infinity", "INF", "infinit",
+  "nan", "-nan", "NaN", "nan(123)", "nan(", "1,2", "1 2", "12abc", "1_000", "0b101", "1e400", "-1e400", "4.9e-324", "2e-324", "9007199254740993", "123456789012345678901234567890",
+  "0x1fffffffffffff", "0x20000000000001", "00012", "0e0", "+", "-", "++1", "1.2.3", "$1", "%rax", "1f", "2b",
+]);
+{
+  const pkg = await filcPackageDir();
+  const walk = (d: string, out: string[]) => { for (const n of readdirSync(d)) { const p = `${d}/${n}`; if (statSync(p).isDirectory()) walk(p, out); else if (p.endsWith(".s")) out.push(p); } return out; };
+  for (const f of walk(`${pkg}/filc/tests`, []).sort()) for (const tok of readFileSync(f, "latin1").split(/[\s,()$*%[\]{}:;!#]+/)) if (tok && tok.length < 40) strs.add(tok);
+}
+// hex rounding: long hex integers, and hex floats across the whole exponent range (subnormals too)
+for (let i = 0; i < 4000; i++) {
+  const len = 14 + Number(rnd64() % 10n);
+  let h = "";
+  for (let k = 0; k < len; k++) h += "0123456789abcdef"[Number(rnd64() % 16n)];
+  strs.add(`0x${h}`);
+  const e = Number(rnd64() % 2200n) - 1150;
+  strs.add(`0x${h.slice(0, 1)}.${h.slice(1)}p${e}`);
+}
+for (const t of ["0x1p-1074", "0x1p-1075", "0x1.0000000000001p-1075", "0x0.8p-1074", "0x1.fffffffffffff8p1023", "0x1.fffffffffffff7p1023", "0x8.000000000000400p0", "0x8.000000000000c00p0", "0x8.0000000000004001p0"]) strs.add(t);
+const list = [...strs];
+await writeFile(`${dir}/strings.hex`, list.map((s) => Buffer.from(s, "latin1").toString("hex")).join("\n") + "\n");
+const lua2 = [
+  "local fs = require('@lute/fs')",
+  `local h = fs.open(${JSON.stringify(`${dir}/strings.hex`)}, 'r'); local text = fs.read(h); fs.close(h)`,
+  "local out = {}",
+  "for line in string.gmatch(text, '[^\\n]*\\n') do",
+  "  local s = string.gsub(string.sub(line, 1, -2), '%x%x', function(x) return string.char(tonumber(x, 16)) end)",
+  "  local n = tonumber(s)",
+  "  if n == nil then table.insert(out, 'nil') else",
+  "    local b = string.pack('<d', n); local o = {} for i = 8, 1, -1 do table.insert(o, string.format('%02x', string.byte(b, i))) end",
+  "    table.insert(out, table.concat(o)) end",
+  "end",
+  "print(table.concat(out, '\\n'))",
+].join("\n");
+await writeFile(`${dir}/tonumber.luau`, lua2 + "\n");
+const [l2, z2] = await Promise.all([must([minilute, `${dir}/tonumber.luau`]), must([exe, "--tonumber", `${dir}/strings.hex`])]);
+const a2 = l2.trimEnd().split("\n"), b2 = z2.trimEnd().split("\n");
+const bad2 = list.map((s, i) => ({ s, a: a2[i], b: b2[i] })).filter((x) => x.a !== x.b);
+console.log(`tonumber: ${list.length} strings (${a2.filter((x) => x !== "nil").length} numbers in Luau)`);
+for (const x of bad2.slice(0, 10)) console.log(`  DIFFER ${JSON.stringify(x.s)}: luau ${x.a} / zig ${x.b}`);
+console.log(bad2.length ? `FAILED: ${bad2.length} differ` : "OK: tonumber equal to Luau's for every string");
+process.exit(bad.length || bad2.length ? 1 : 0);
