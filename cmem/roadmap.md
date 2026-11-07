@@ -50,10 +50,10 @@ zilc, and re-verified against zilc's Fil-C release (0.686 work moves to 0.687 on
           comparable, F-3); `libc.so` 4,511 exports and 281 undefined equal, NEEDED and tag kinds
           equal (RUNPATH: the install's); the eight empty archives; 219 headers byte-identical.
           Inverted (two table entries swapped: it still builds, the oracle fails on exactly those
-          two members). Found on the way: F-2, F-3, F-4, C-13. ⚠️ C-13 says yolomusl's headers'
-          `__FILE__` likely read `src/internal/…` where upstream's read `./src/internal/…`
-          (`verify-yolomusl.ts`'s form rule accepts both): check with the set comparison and fix
-          as `buildUserMusl` does.
+          two members). Found on the way: F-2, F-3, F-4, C-13. ✅ C-13's yolomusl check, done
+          2026-11-06 (owner: "proceed with C-13"): no `__FILE__` strings there at all; the
+          `./` spelling differed only in DWARF line tables, fixed in `buildYoloMusl` (the
+          generated include dirs keep their cache path, debug info only; toolchain-quirks C-13).
     - (the plan, as written before the build:) **the user libc** (`projects/usermusl` → `pizfix/lib/libc.a`, `libc.so`, the eight empty
           `libm.a` … `libdl.a`, and `pizfix/include`). Measured from upstream's own run
           (2026-11-06, `build_usermusl.sh` under MODE=zig): musl's configure with `CC = <Fil-C

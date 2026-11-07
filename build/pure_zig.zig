@@ -220,16 +220,20 @@ fn buildYoloMusl(b: *std.Build, step: *std.Build.Step, gen: *std.Build.Step.Comp
     const version_dir = b.addWriteFiles();
     _ = version_dir.add("version.h", b.fmt("#define VERSION \"{s}\"\n", .{ys.version}));
 
-    // CFLAGS_ALL's -I list, in the Makefile's order.
+    // CFLAGS_ALL's -I list, in the Makefile's order. The tree's directories are spelled
+    // `<tree>/./…` so that, under the prefix map below, a header reads `./src/internal/…` as
+    // upstream's make (srcdir = .) spells it in DWARF's line tables (toolchain-quirks C-13; the
+    // main file stays `src/…`). The two generated directories (version.h, obj/include) sit in
+    // Zig's cache and keep that path: debug info only, recorded in C-13.
     const includes = struct {
         fn add(m: *std.Build.Module, bb: *std.Build, t: []const u8, oi: std.Build.LazyPath, vd: std.Build.LazyPath) void {
-            m.addIncludePath(.{ .cwd_relative = bb.pathJoin(&.{ t, "arch", ys.arch }) });
-            m.addIncludePath(.{ .cwd_relative = bb.pathJoin(&.{ t, "arch", "generic" }) });
+            m.addIncludePath(.{ .cwd_relative = bb.fmt("{s}/./arch/{s}", .{ t, ys.arch }) });
+            m.addIncludePath(.{ .cwd_relative = bb.fmt("{s}/./arch/generic", .{t}) });
             m.addIncludePath(vd);
-            m.addIncludePath(.{ .cwd_relative = bb.pathJoin(&.{ t, "src", "include" }) });
-            m.addIncludePath(.{ .cwd_relative = bb.pathJoin(&.{ t, "src", "internal" }) });
+            m.addIncludePath(.{ .cwd_relative = bb.fmt("{s}/./src/include", .{t}) });
+            m.addIncludePath(.{ .cwd_relative = bb.fmt("{s}/./src/internal", .{t}) });
             m.addIncludePath(oi);
-            m.addIncludePath(.{ .cwd_relative = bb.pathJoin(&.{ t, "include" }) });
+            m.addIncludePath(.{ .cwd_relative = bb.fmt("{s}/./include", .{t}) });
         }
     }.add;
 
