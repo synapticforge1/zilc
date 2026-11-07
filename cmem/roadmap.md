@@ -115,8 +115,12 @@ zilc, and re-verified against zilc's Fil-C release (0.686 work moves to 0.687 on
           traversals equal, inverted). The porting map, foundations and progress live in
           `cmem/sarcasm-port.md`. ✅ Foundations 2 (number formatting, 211,424 doubles equal) and 3
           (Lua patterns, sarcasm's 189 literal patterns × 601 corpus subjects equal), each proven
-          against Luau and inverted. Next: the modules, from err / numlabel / sig / detect up to
-          the parser (the first stage dump).
+          against Luau and inverted. ✅ Foundation 4 (tonumber, musl's strtod incl. its hexfloat in
+          f80). ✅ Modules err, sig, detect, numlabel and the parser (parseString), each proven
+          against upstream's own Luau module by `tools/sarcasm/check-stages.ts` (detect 1,431
+          files, sig 487 annotations, parse 61,518 statement dumps: 0 differ; each inverted).
+          Next (paused 2026-11-06): the ISA tables (x86_64_fp, x86_64_isa), then regalloc, lift,
+          ptrflow, frame; the `.byte` decoder when compile needs it. Progress: `sarcasm-port.md`.
     - (the measurements and plan, as written before the build:) **libc++ / libc++abi** (`build_cxx.sh`: CMake + Ninja over LLVM's
           `runtimes/` with Fil-C's clang/clang++, then `install-cxx-linux.sh`). Measured from
           upstream's run (MODE=zig tree, `runtimes-build/build.ninja`): 149 C++ compiles —

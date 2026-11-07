@@ -84,7 +84,7 @@ pub fn tostring(buf: []u8, n: f64) []const u8 {
 }
 
 /// string.format("%.0f", n): C printf's exact decimal rounding (half to even), into `buf`.
-pub fn formatF0(alloc: std.mem.Allocator, n: f64) ![]u8 {
+pub fn formatF0(alloc: std.mem.Allocator, n: f64) error{OutOfMemory}![]u8 {
     if (std.math.isNan(n)) return alloc.dupe(u8, if (std.math.signbit(n)) "-nan" else "nan");
     if (std.math.isInf(n)) return alloc.dupe(u8, if (n < 0) "-inf" else "inf");
     const neg = std.math.signbit(n);
@@ -105,7 +105,10 @@ pub fn formatF0(alloc: std.mem.Allocator, n: f64) ![]u8 {
     const e = biased - 1075; // r = m · 2^e
     var big = try std.math.big.int.Managed.initSet(alloc, m);
     if (e > 0) try big.shiftLeft(&big, @intCast(e)) else if (e < 0) try big.shiftRight(&big, @intCast(-e));
-    const s = try big.toString(alloc, 10, .lower);
+    const s = big.toString(alloc, 10, .lower) catch |failure| switch (failure) {
+        error.OutOfMemory => return error.OutOfMemory,
+        error.InvalidBase => unreachable, // base 10
+    };
     try out.appendSlice(alloc, s);
     return out.items;
 }

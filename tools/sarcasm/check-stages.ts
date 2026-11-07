@@ -99,6 +99,45 @@ stages.push({
   });
 }
 
+// parse: x86parse.parseString (+ numlabel) on every corpus file, as main runs it with --x86_64
+// (the detected syntax, else AT&T), each statement serialized canonically (ser: fields sorted
+// by key repr, "#n" for array indices; strings quoted with \ddd escapes; tostring numbers).
+stages.push({
+  name: "parse",
+  inputs: files,
+  zigArg: "files",
+  lua: [
+    "local detect = require('./sarcasm/detect')",
+    "local x86parse = require('./sarcasm/x86_64_parse')",
+    "local function qs(v) return '\"' .. (string.gsub(v, '[%c\"\\\\\\128-\\255]', function(c) return '\\\\' .. tostring(string.byte(c)) end)) .. '\"' end",
+    "local ser",
+    "ser = function(v)",
+    "  local t = type(v)",
+    "  if t == 'string' then return qs(v) end",
+    "  if t == 'number' or t == 'boolean' then return tostring(v) end",
+    "  local keys = {}",
+    "  for k in v do local r = type(k) == 'string' and k or ('#' .. tostring(k)); table.insert(keys, { r = r, k = k }) end",
+    "  table.sort(keys, function(a, b) return a.r < b.r end)",
+    "  local parts = {}",
+    "  for _, e in keys do table.insert(parts, e.r .. '=' .. ser(v[e.k])) end",
+    "  return '{' .. table.concat(parts, ',') .. '}'",
+    "end",
+    "local out = {}",
+    "for line in string.gmatch(INPUT, '[^\\n]+') do",
+    "  local text = FS.readfile(line)",
+    "  local _, syn = detect.detect(text)",
+    "  local ok, r = pcall(x86parse.parseString, text, syn or 'att', '<in>')",
+    "  if ok then",
+    "    table.insert(out, 'file ' .. tostring(#r))",
+    "    for _, st in r do table.insert(out, ser(st)) end",
+    "  else",
+    "    table.insert(out, 'file err ' .. tostring(r))",
+    "  end",
+    "end",
+    "print(table.concat(out, '\\n'))",
+  ].join("\n"),
+});
+
 const want = ARGS.filter((a) => !a.startsWith("-"));
 let failed = 0;
 for (const st of stages.filter((s) => !want.length || want.includes(s.name))) {

@@ -109,6 +109,19 @@ stderr and assembly byte for byte. Against itself: 0 differ (746 accepted, 685 r
   range incl. subnormals), the result's BITS equal to Luau's. (Both earlier versions failed it:
   that is the inversion.)
 
+- ✅ **The parser** (2026-11-06): `src/sarcasm/ir.zig` (the parse IR: `Stmt`, `Operand` with
+  upstream's field names as optionals, f64 numbers; numref's string `num` as `refNum`),
+  `numlabel.zig`, `x86_64_parse.zig` (upstream lines 1–946: classifyReg with the per-file pseudo
+  registry, regName, splitOperands, the recursive-descent constant folder with upstream's error
+  order, AVX512 decorators, the AT&T and Intel operand parsers, attMnemonic, comment / annotation
+  splitting, lock / rep prefixes, encoding hints, `.alloca`, the line loop). Stage **parse** in
+  `check-stages.ts`: every corpus file through upstream's parseString and the port's, every
+  statement serialized canonically (fields sorted, \ddd-quoted strings, tostring numbers) —
+  61,518 dump lines (~84,000 operands; 154 files rejected, their messages compared), 0 differ.
+  Inverted (a two-letter mnemonic given an AT&T size suffix: `bl` / `jb` statements, 29 differ).
+  Not yet ported: the `.byte` decoder (decodeByteInsns, upstream lines 948–2669), called later
+  by compile.
+
 ## What a byte-identical port must reproduce (the foundations)
 
 1. **Luau's table iteration order** (the biggest risk). Output depends on `for k in t` over

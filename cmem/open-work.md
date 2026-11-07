@@ -17,9 +17,20 @@ them, with their dates.
 | branches | `main` carries the Bun port (`c2841dd`, was `44e0b1a`), merged `--no-ff` 2026-10-27 (owner: "we will merge all to bun tooling since deno is going away"), and the 2026-10-27 work since; `bun-port` (merged, never pushed) deleted 2026-10-27 (owner). Branches: `main`, `v0.15.2` |
 | sibling | **zailc** (`../zailc`, started 2026-10-08) translates Fil-C into Zig; zilc is its stable reference and test oracle and changes nothing for it (`design-decisions.md`) |
 
-## ▶️ PICK UP HERE — paused 2026-11-05 afternoon (owner: "need to pause here for now and pick back up later today")
+## ▶️ PICK UP HERE — paused 2026-11-06 (owner: "update the project memory files, commit and push and pause here to today")
 
-✅ All three items below were finished, committed and pushed as `ec3d6da` (2026-11-06). Still
+**Where the work stands:** the pure-Zig track's runtime pieces are all `zig build`-built and
+verified (user libc, libc++; C-13 done). **Now: sarcasm, Fil-C's assembler, being ported to Zig**
+(owner: "Port sarcasm to Zig"; `design-decisions.md` top row). Read `cmem/sarcasm-port.md` first
+(the porting map and progress). Done and proven against Luau / upstream's own modules: the S0
+oracle (`tools/sarcasm/compare-sarcasm.ts`), foundations (Luau table, number formatting, Lua
+patterns, tonumber), and the modules err, sig, detect, numlabel and the parser
+(`tools/sarcasm/check-stages.ts`: detect, sig, parse all 0 differ). **Next:** x86_64_fp and
+x86_64_isa (mostly tables), then regalloc, lift, ptrflow, frame (the order in sarcasm-port.md),
+each with its stage added to check-stages.ts and an inversion. Until the whole port passes the
+S0 oracle, MODE=zig keeps upstream's sarcasm on minilute. Item 4 (GitHub purge request) on hold.
+
+(The 2026-11-05 pick-up list, below, is closed.) ✅ All three items below were finished, committed and pushed as `ec3d6da` (2026-11-06). Still
 open from the 2026-11-05 list: item 4 (GitHub Support purge request, on hold, owner); **the
 pure-Zig track, started 2026-11-06** (owner: "then we can start on the pure-Zig track"): Z1 item 3
 — `filc/src` ✅ (2026-10-30), the user libc ✅ (2026-11-06, `94020ab`), libc++ / libc++abi ✅

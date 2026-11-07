@@ -10,3 +10,6 @@ pub const lua_pattern = @import("lua_pattern.zig");
 pub const err = @import("err.zig");
 pub const sig = @import("sig.zig");
 pub const detect = @import("detect.zig");
+pub const ir = @import("ir.zig");
+pub const numlabel = @import("numlabel.zig");
+pub const x86_64_parse = @import("x86_64_parse.zig");
