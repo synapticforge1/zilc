@@ -73,9 +73,39 @@ zilc, and re-verified against zilc's Fil-C release (0.686 work moves to 0.687 on
           `zilc-gen musl-headers` on the usermusl tree; (3) `tools/runtime/verify-usermusl.ts`
           against the release (symbols and exports, never bytes: F-1); (4) MODE=zig takes it
           instead of `build_usermusl.sh`, then `compare-chains.ts` 14/14.
-    - [ ] **libc++ / libc++abi** (`build_cxx.sh`: CMake + Ninja over LLVM's `runtimes/` with
-          Fil-C's clang/clang++). After the user libc. (minilute and sarcasm, Fil-C's Luau tools,
-          are built by upstream's scripts too; not in this item, decide after libc++.)
+    - [x] **libc++ / libc++abi — BUILT AND VERIFIED 2026-11-06** (steps 1–3 done; step 4 wired,
+          its compare-chains run recorded in `testing.md` item 8): `zig build libcxx
+          -Dfilc-clang=…` (also in `pure-zig`); `verify-libcxx.ts` OK against the release — the
+          three archives 54 / 18 / 5 members in order, defined and undefined symbols equal with NO
+          allowance, 76 compile-unit names and the `__FILE__` strings of all 77 members equal
+          (each build's location stripped); `libc++.so.1.0` 5,601 and `libc++abi.so.1.0` 682
+          exports equal, undefined, NEEDED, SONAME, tag kinds equal; the script, the links and
+          all 2,084 headers byte-identical. Inverted (two archive members swapped: it builds,
+          fails on exactly #0 and #1). Found on the way: B-11 (the sparse FILC_SRC changes
+          libc++'s CMake), F-2's C++ half. MODE=zig now runs only `fix_clang.sh` (what
+          build_cxx.sh ran besides building), minilute and sarcasm from upstream's scripts.
+    - (the measurements and plan, as written before the build:) **libc++ / libc++abi** (`build_cxx.sh`: CMake + Ninja over LLVM's
+          `runtimes/` with Fil-C's clang/clang++, then `install-cxx-linux.sh`). Measured from
+          upstream's run (MODE=zig tree, `runtimes-build/build.ninja`): 149 C++ compiles —
+          `cxx_static` 54, `cxx_shared` 54 (the same sources, + `-fPIC`), `cxxabi_static_objects`
+          18, `cxxabi_shared_objects` 18, `cxx_experimental` 5 — one DEFINES/FLAGS/INCLUDES set per
+          target; links `libc++abi.so.1.0` and `libc++.so.1.0` (`-shared -Wl,-z,defs -Wl,-z,nodelete
+          -nostdlib++`, soname `libc++.so.1`, against `libc++abi.so.1.0 -lpthread -lc`, a build-tree
+          rpath); archives `libc++.a`, `libc++abi.a`, `libc++experimental.a`; `libc++.so` is the
+          script `INPUT(libc++.so.1 -lc++abi)`, plus the `.so.1`/`.so` links. Headers: 2,083 in
+          `build/include/c++/v1` (2,079 copies of `libcxx/include`; `__assertion_handler`,
+          `__cxxabi_config.h`, `cxxabi.h`, `libcxx.imp` from elsewhere) and the configured
+          `build/include/x86_64-unknown-linux-gnu/c++/v1/__config_site` — exactly what the release
+          ships (2,083 + 1); the 131 module files upstream's script copies to `build/modules` are
+          NOT in the release, so not built. Plan, the compiler-rt pattern: (1)
+          `tools/runtime/import-libcxx-sources.ts` runs upstream's CMake configure (options
+          asserted against `build_cxx.sh`) from the fetched package into a scratch dir, plus the
+          header targets only, and reads `build.ninja` → `src/runtime/libcxx_sources.zig`; (2)
+          `buildLibcxx` in `build/pure_zig.zig` (Fil-C clang++ per object with depfiles, the
+          archives with CMake's member names, the two links by `zig ld.lld` with what Fil-C's
+          clang++ driver adds, the header tree); (3) `verify-libcxx.ts` against the release; (4)
+          MODE=zig without `build_cxx.sh`, compare-chains 14/14. (minilute and sarcasm, Fil-C's
+          Luau tools, are built by upstream's scripts too; decide after libc++.)
 - **Z2 — the pass in Zig** (zailc step 3, not started there): an LLVM IR model in Zig, the pass
   (`FilPizlonator.cpp`), the analyses it needs, KillUB and DeleteRedundantPollchecks; oracle: the
   same module through Fil-C's pass and through zilc's, compared as IR and as behaviour.

@@ -72,6 +72,9 @@ export interface Policy {
    *  compiler tree's ABSOLUTE path (Fil-C's stdfil.h) therefore breaks the others differently on
    *  each machine (measured 2026-11-06: `fil-include/stdfil.h`, a lost `./src/internal/…`). */
   sourceUncomparable?: (p: string) => boolean;
+  /** Compile-unit names through this before comparing (default: as they are). For pieces CMake
+   *  compiles from ABSOLUTE source paths (libc++), whose names carry each build's own location. */
+  cuNormalize?: (name: string) => string;
 }
 
 /**
@@ -123,7 +126,8 @@ export class Oracle {
         else this.sourceCompared++;
       }
     } else for (const p of await sourcePaths(ours)) if (!this.policy.sourceForm(p)) this.fail(`SOURCE PATH FORM  ${label}: ${p}`);
-    const [cA, cB] = await Promise.all([compileUnitNames(ours), compileUnitNames(theirs)]);
+    const cuN = this.policy.cuNormalize ?? ((n: string) => n);
+    const [cA, cB] = (await Promise.all([compileUnitNames(ours), compileUnitNames(theirs)])).map((xs) => xs.map(cuN));
     if (cA.join("|") === cB.join("|")) this.cuCompared += cA.length;
     else if (cA.length === 0 && dB.size === 0 && uB.size === 0) this.emptyTu++;
     else this.fail(`COMPILE UNIT NAME  ${label}: ours ${cA.join(",") || "(none)"}, upstream's ${cB.join(",") || "(none)"}`);

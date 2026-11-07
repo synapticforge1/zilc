@@ -16,7 +16,7 @@
 const std = @import("std");
 
 /// The steps that read Fil-C's sources (build/pure_zig.zig, build/patched_clang.zig).
-pub const steps = [_][]const u8{ "pure-zig", "libpas", "yolomusl", "compiler-rt", "usermusl", "patched-clang" };
+pub const steps = [_][]const u8{ "pure-zig", "libpas", "yolomusl", "compiler-rt", "usermusl", "libcxx", "patched-clang" };
 
 /// The Fil-C source tree, or null when no named step needs it (or it is still being fetched:
 /// the build runner then fetches it and runs build.zig again).

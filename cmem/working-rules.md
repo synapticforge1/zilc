@@ -23,6 +23,12 @@ named below. Method lessons are in [best-practices.md](best-practices.md), not h
 - Branches: one branch per Zig line, `main` the base (`releasing.md`); work branches such as
   `bun-port` (merged and deleted 2026-10-27) are merged by the owner's call.
 - Docs and memory land in the same commit as the code they describe.
+- **Every `.zig` file is formatted with the project's Zig (0.15.2 today), and `zig fmt --check
+  build.zig build tools tests src` is clean before a commit** — the `tests/basics` copies of the
+  owner's programs included, both the `zig-0.15.2` and `zig-0.16.0` folders (owner, 2026-11-06:
+  *"if we need to fix formatting, lets fix that first then commit and push"*; then *"they need to
+  be formatted for the version we are currently using in this project"*). Confirm the diff is
+  layout only and rebuild what the file feeds.
 - Line endings are LF, pinned in `.gitattributes` wildcard-first (`* text=auto eol=lf`). Never
   "fix" a line-ending complaint with `git config`; check with `git check-attr`.
 - The exFAT `.git` recipe is KI-23's (`known-issues.md`); the workspace standard differs —

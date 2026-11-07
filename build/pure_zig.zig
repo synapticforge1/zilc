@@ -18,6 +18,7 @@ const musl_headers = @import("../src/gen/musl_headers.zig");
 const yolomusl_sources = @import("../src/runtime/yolomusl_sources.zig");
 const compiler_rt_sources = @import("../src/runtime/compiler_rt_sources.zig");
 const usermusl_sources = @import("../src/runtime/usermusl_sources.zig");
+const libcxx_sources = @import("../src/runtime/libcxx_sources.zig");
 
 pub fn addSteps(b: *std.Build, gen: *std.Build.Step.Compile, filc_src: ?[]const u8) void {
     const pizfix_opt = b.option([]const u8, "pizfix", "A pizfix/ with os-include and stdfil-include (default: made as upstream makes them, from the Fil-C sources and the host's kernel headers)");
@@ -41,7 +42,12 @@ pub fn addSteps(b: *std.Build, gen: *std.Build.Step.Compile, filc_src: ?[]const 
     // `zig build usermusl -Dfilc-clang=…`: Fil-C's user libc, compiled by Fil-C's clang (Z1 item 3).
     // Part of pure-zig whenever -Dfilc-clang is given.
     const usermusl_step = b.step("usermusl", "Build Fil-C's user libc from -Dfilc-src with -Dfilc-clang: libc.a, libc.so, libm.a … libdl.a (empty), include/");
-    if (filc_clang != null) all.dependOn(usermusl_step);
+    // `zig build libcxx -Dfilc-clang=…`: Fil-C's libc++ / libc++abi, by Fil-C's clang++ (Z1 item 3).
+    const libcxx_step = b.step("libcxx", "Build Fil-C's libc++ and libc++abi from -Dfilc-src with -Dfilc-clang: lib/libc++*, cxx-include/ (the clang's build/include)");
+    if (filc_clang != null) {
+        all.dependOn(usermusl_step);
+        all.dependOn(libcxx_step);
+    }
 
     if (filc_src) |src| {
         // yolo musl's shared half links compiler-rt's builtins as its LIBCC, as upstream's
@@ -52,10 +58,13 @@ pub fn addSteps(b: *std.Build, gen: *std.Build.Step.Compile, filc_src: ?[]const 
         const half: ?FilcHalf = if (filc_clang) |c| (if (yolo) |y| FilcHalf{ .clang = c, .rt = rt, .yolo = y } else null) else null;
         const stock = buildStockRuntime(b, libpas_step, gen, src, pizfixIncludes(b, src, pizfix_opt), half);
         if (half) |fh| {
-            if (stock.pizlo_so) |so| buildUserMusl(b, usermusl_step, gen, src, fh, so, stock.unwind.?);
-        } else usermusl_step.dependOn(&b.addFail("zig build usermusl needs -Dfilc-clang=<Fil-C's clang>: Fil-C's clang compiles the user libc").step);
+            if (stock.pizlo_so) |so| {
+                if (buildUserMusl(b, usermusl_step, gen, src, fh, so, stock.unwind.?)) |um| buildLibcxx(b, libcxx_step, src, fh, so, stock.unwind.?, um);
+            }
+        } else for ([_]*std.Build.Step{ usermusl_step, libcxx_step }) |s|
+            s.dependOn(&b.addFail(b.fmt("zig build {s} needs -Dfilc-clang=<Fil-C's clang>: Fil-C's clang compiles it", .{s.name})).step);
     } else {
-        for ([_]*std.Build.Step{ libpas_step, yolomusl_step, crt_step, usermusl_step }) |s|
+        for ([_]*std.Build.Step{ libpas_step, yolomusl_step, crt_step, usermusl_step, libcxx_step }) |s|
             s.dependOn(&b.addFail(b.fmt("zig build {s} {s}", .{ s.name, need })).step);
     }
 }
@@ -545,7 +554,17 @@ fn buildStockRuntime(b: *std.Build, step: *std.Build.Step, gen: *std.Build.Step.
 /// -yolo-assembler, LIBCC = -lyolort (usermusl_sources.zig has the rules' result; roadmap.md Z1).
 /// Every object is a Fil-C-clang command, as buildLibpizlo's are, with its depfile, so a header
 /// edit recompiles exactly what includes it.
-fn buildUserMusl(b: *std.Build, step: *std.Build.Step, gen: *std.Build.Step.Compile, filc_src: []const u8, fh: FilcHalf, pizlo_so: std.Build.LazyPath, unwind: *std.Build.Step.Compile) void {
+/// What libc++ links against and compiles over from the user libc.
+const UserMusl = struct {
+    /// libc.so's directory, and the empty libm.a / libpthread.a … (what -lc -lm -lpthread find).
+    libc_dir: std.Build.LazyPath,
+    empty_dir: std.Build.LazyPath,
+    /// Fil-C's clang reads the user libc's headers from its own tree's pizfix/include: a compile
+    /// over them waits for this install.
+    headers_installed: *std.Build.Step,
+};
+
+fn buildUserMusl(b: *std.Build, step: *std.Build.Step, gen: *std.Build.Step.Compile, filc_src: []const u8, fh: FilcHalf, pizlo_so: std.Build.LazyPath, unwind: *std.Build.Step.Compile) ?UserMusl {
     const us = usermusl_sources;
     const tree = b.pathJoin(&.{ filc_src, "projects", "usermusl" });
 
@@ -556,7 +575,7 @@ fn buildUserMusl(b: *std.Build, step: *std.Build.Step, gen: *std.Build.Step.Comp
     genh.addArg(us.arch);
     const inputs = musl_headers.inputs(b.allocator, tree, us.arch) catch |err| {
         step.dependOn(&b.addFail(b.fmt("cannot list musl's headers in {s}: {s}", .{ tree, @errorName(err) })).step);
-        return;
+        return null;
     };
     for (inputs) |in| if (in.use != .copy) genh.addFileInput(.{ .cwd_relative = b.pathJoin(&.{ tree, in.path }) });
     const version_dir = b.addWriteFiles();
@@ -568,7 +587,8 @@ fn buildUserMusl(b: *std.Build, step: *std.Build.Step, gen: *std.Build.Step.Comp
     const include = headers.addOutputDirectoryArg("include");
     headers.addArg(us.arch);
     for (inputs) |in| headers.addFileInput(.{ .cwd_relative = b.pathJoin(&.{ tree, in.path }) });
-    step.dependOn(&b.addInstallDirectory(.{ .source_dir = include, .install_dir = .prefix, .install_subdir = "include" }).step);
+    const install_headers = b.addInstallDirectory(.{ .source_dir = include, .install_dir = .prefix, .install_subdir = "include" });
+    step.dependOn(&install_headers.step);
 
     // CC_CMD = $(CC) $(CFLAGS_ALL) -c -o $@ $<, for every .lo. Upstream's make runs in the tree
     // with srcdir = . (W-6), and clang then spells the two kinds of path differently, which
@@ -642,4 +662,129 @@ fn buildUserMusl(b: *std.Build, step: *std.Build.Step, gen: *std.Build.Step.Comp
     link.addFileArg(fh.rt.crtend);
     link.addFileArg(fh.yolo.crtn);
     step.dependOn(&b.addInstallFile(so, "lib/libc.so").step);
+    return .{ .libc_dir = so.dirname(), .empty_dir = empty.getDirectory(), .headers_installed = &install_headers.step };
+}
+
+/// Fil-C's libc++ and libc++abi (LLVM's runtimes/), as build_cxx.sh builds them with CMake for
+/// Fil-C's clang++ and install-cxx-linux.sh installs them (libcxx_sources.zig has what CMake
+/// generated: tools/runtime/import-libcxx-sources.ts; roadmap.md Z1). pizfix/lib gets libc++.a,
+/// libc++abi.a, libc++experimental.a, libc++.so.1.0, libc++abi.so.1.0, the `libc++.so` script and
+/// the .so links; the header tree, which upstream puts in the CLANG's build/include, is installed
+/// under <prefix>/cxx-include for the caller to move there.
+fn buildLibcxx(b: *std.Build, step: *std.Build.Step, filc_src: []const u8, fh: FilcHalf, pizlo_so: std.Build.LazyPath, unwind: *std.Build.Step.Compile, um: UserMusl) void {
+    const cx = libcxx_sources;
+    const clangxx = b.fmt("{s}++", .{fh.clang});
+
+    // <gen>/include: the header tree CMake writes (copies of the sources, and __config_site and
+    // libcxx.imp as generated). Compiles read it through -I<gen>/include/…
+    const tree = b.addWriteFiles();
+    for (cx.headers) |h| {
+        if (h.copy) |c| _ = tree.addCopyFile(.{ .cwd_relative = b.pathJoin(&.{ filc_src, c }) }, h.dest) else _ = tree.add(h.dest, h.content.?);
+    }
+    const gen_include = tree.getDirectory();
+    step.dependOn(&b.addInstallDirectory(.{ .source_dir = gen_include, .install_dir = .prefix, .install_subdir = "cxx-include" }).step);
+
+    // A CMake word: `<gen>/include/…` becomes a path into the header tree, `<src>` the Fil-C tree.
+    const addWord = struct {
+        fn f(bb: *std.Build, cmd: *std.Build.Step.Run, w: []const u8, gi: std.Build.LazyPath, src: []const u8) void {
+            if (std.mem.indexOf(u8, w, "<gen>/include/")) |i| {
+                cmd.addPrefixedDirectoryArg(w[0..i], gi.path(bb, w[i + "<gen>/include/".len ..]));
+            } else cmd.addArg(std.mem.replaceOwned(u8, bb.allocator, w, "<src>", src) catch @panic("OOM"));
+        }
+    }.f;
+
+    // The compiles, CMake's rule: `clang++ $DEFINES $INCLUDES $FLAGS -MD -MT $out -MF $DEP_FILE -o
+    // $out -c $in`, each object named as CMake names it (`<file>.cpp.o`).
+    var objects = std.StringHashMap([]std.Build.LazyPath).init(b.allocator);
+    for (cx.targets) |t| {
+        const objs = b.allocator.alloc(std.Build.LazyPath, t.sources.len) catch @panic("OOM");
+        for (t.sources, 0..) |s, i| {
+            const cc = b.addSystemCommand(&.{clangxx});
+            for (t.defines) |w| addWord(b, cc, w, gen_include, filc_src);
+            for (t.includes) |w| addWord(b, cc, w, gen_include, filc_src);
+            for (t.flags) |w| addWord(b, cc, w, gen_include, filc_src);
+            cc.addArg("-MD");
+            _ = cc.addPrefixedDepFileOutputArg("-MF", b.fmt("{s}.d", .{std.fs.path.basename(s)}));
+            cc.addArg("-o");
+            objs[i] = cc.addOutputFileArg(b.fmt("{s}.o", .{std.fs.path.basename(s)}));
+            cc.addArg("-c");
+            addWord(b, cc, s, gen_include, filc_src);
+            cc.step.dependOn(um.headers_installed); // the user libc's headers, read by the clang
+        }
+        objects.put(t.name, objs) catch @panic("OOM");
+    }
+    const objectFor = struct {
+        fn f(objs: std.StringHashMap([]std.Build.LazyPath), target: []const u8, source: []const u8) std.Build.LazyPath {
+            for (cx.targets) |t| if (std.mem.eql(u8, t.name, target)) {
+                for (t.sources, 0..) |s, i| if (std.mem.eql(u8, s, source)) return objs.get(target).?[i];
+            };
+            @panic("libcxx_sources: an archive member that is not a compiled object");
+        }
+    }.f;
+
+    // The archives, members in CMake's order with CMake's names (installed under upstream's file
+    // name; the Zig library's own name is only an index, `+` not being a safe one).
+    for (cx.archives, 0..) |a, ai| {
+        const m = runtimeModule(b, .baseline, true);
+        const specs = b.allocator.alloc([]const u8, a.members.len) catch @panic("OOM");
+        for (a.members, 0..) |mem, i| {
+            m.addObjectFile(objectFor(objects, mem.target, mem.source));
+            const file = b.fmt("{s}.o", .{std.fs.path.basename(mem.source)});
+            specs[i] = b.fmt("{s}={s}", .{ std.fs.path.stem(file), file });
+        }
+        const lib = b.addLibrary(.{ .name = b.fmt("filc-cxx-archive-{d}", .{ai}), .root_module = m, .linkage = .static });
+        installUpstreamArchive(b, step, lib, b.fmt("lib/{s}", .{a.name}), specs);
+    }
+
+    // The shared libraries: the linker line Fil-C's clang++ driver makes of CMake's link (recorded
+    // by the import tool), by Zig's LLD. The driver's own pizfix (crt files, -L, -rpath) becomes
+    // this build's outputs and the install's lib/; CMake's --dependency-file is dropped (a build-
+    // system file); CMake's build-tree rpath `<libdir>:` names where libc++abi lives: the install.
+    const lib_dir = b.getInstallPath(.lib, "");
+    var abi_so: ?std.Build.LazyPath = null;
+    for (cx.links) |l| {
+        const link = b.addSystemCommand(&.{ b.graph.zig_exe, "ld.lld" });
+        var out: ?std.Build.LazyPath = null;
+        for (l.ld) |w| {
+            if (std.mem.eql(u8, w, "<out>")) {
+                out = link.addOutputFileArg(l.name);
+            } else if (std.mem.eql(u8, w, "<objects>")) {
+                for (cx.targets) |t| if (std.mem.eql(u8, t.name, l.target)) for (objects.get(t.name).?) |o| link.addFileArg(o);
+            } else if (std.mem.endsWith(u8, w, "/pizfix/lib/crti.o")) {
+                link.addFileArg(fh.yolo.crti);
+            } else if (std.mem.endsWith(u8, w, "/pizfix/lib/crtn.o")) {
+                link.addFileArg(fh.yolo.crtn);
+            } else if (std.mem.endsWith(u8, w, "/pizfix/lib/crtbegin.o")) {
+                link.addFileArg(fh.rt.crtbegin);
+            } else if (std.mem.endsWith(u8, w, "/pizfix/lib/crtend.o")) {
+                link.addFileArg(fh.rt.crtend);
+            } else if (std.mem.startsWith(u8, w, "-L<filc>")) {
+                for ([_]std.Build.LazyPath{ um.libc_dir, um.empty_dir, pizlo_so.dirname(), fh.rt.lib.getEmittedBin().dirname(), fh.yolo.yoloc_dir, fh.yolo.yolom_dir, unwind.getEmittedBin().dirname() }) |d| link.addPrefixedDirectoryArg("-L", d);
+            } else if (std.mem.startsWith(u8, w, "<filc>") and std.mem.endsWith(u8, w, "/pizfix/lib")) {
+                link.addArg(lib_dir); // the argument of the driver's -rpath
+            } else if (std.mem.startsWith(u8, w, "--dependency-file=")) {
+                // dropped
+            } else if (std.mem.startsWith(u8, w, "<libdir>")) {
+                link.addArg(std.mem.replaceOwned(u8, b.allocator, w, "<libdir>", lib_dir) catch @panic("OOM"));
+            } else if (std.mem.endsWith(u8, w, "/libc++abi.so.1.0")) {
+                link.addFileArg(abi_so orelse @panic("libcxx_sources: libc++.so.1.0 before libc++abi.so.1.0"));
+            } else if (std.mem.indexOf(u8, w, "<") != null) {
+                std.debug.panic("libcxx_sources: an unhandled token in a link: {s}", .{w});
+            } else link.addArg(w);
+        }
+        const so = out orelse @panic("libcxx_sources: a link without <out>");
+        if (std.mem.eql(u8, l.name, "libc++abi.so.1.0")) abi_so = so;
+        step.dependOn(&b.addInstallFile(so, b.fmt("lib/{s}", .{l.name})).step);
+    }
+
+    // libc++.so is a linker script (CMake's LIBCXX_ENABLE_ABI_LINKER_SCRIPT), and the .so links
+    // install-cxx-linux.sh makes.
+    const script = b.addWriteFiles();
+    step.dependOn(&b.addInstallFile(script.add("libc++.so", "INPUT(libc++.so.1 -lc++abi)\n"), "lib/libc++.so").step);
+    for ([_][2][]const u8{ .{ "libc++.so.1.0", "libc++.so.1" }, .{ "libc++abi.so.1.0", "libc++abi.so.1" }, .{ "libc++abi.so.1", "libc++abi.so" } }) |ln| {
+        const cmd = b.addSystemCommand(&.{ "ln", "-sfn", ln[0], b.pathJoin(&.{ lib_dir, ln[1] }) });
+        cmd.has_side_effects = true;
+        for (step.dependencies.items) |d| cmd.step.dependOn(d); // after the installs above
+        step.dependOn(&cmd.step);
+    }
 }

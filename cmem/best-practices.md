@@ -28,6 +28,10 @@ citation to the incident.
   overflowed the gate's 50 KiB capture limit, and the gate died with `StderrStreamTooLong`
   instead of printing FAIL. Capture generously and print a bounded excerpt. (`tools/gate.zig`,
   2026-10-27.)
+- **A rule about what a value LOOKS like can pass a value that is still not upstream's; compare
+  with upstream's itself.** The source-path "form" rule (relative, exists in the tree) passed
+  `src/internal/atomic.h` where upstream's `__FILE__` reads `./src/internal/atomic.h`; only
+  comparing the two sets found it (toolchain-quirks C-13; `verify-usermusl.ts`, 2026-11-06).
 - **A file that "adds" to a tool's defaults may replace them; prove it against the tool's real
   actions, not its self-report.** GCC's `specs` file with two `+` additions silently skipped the
   driver's `init_spec()`, and `g++` lost the shared libgcc. The asm probe for the new flags passed;
