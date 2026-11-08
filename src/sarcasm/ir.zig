@@ -41,6 +41,10 @@ pub const Operand = struct {
     implicit: ?bool = null,
     fixedReg: ?[]const u8 = null,
     isSlot: ?bool = null,
+    // set on the operands lift adds to a classification (the return / call marshalling registers)
+    retReg: ?bool = null,
+    argReg: ?bool = null,
+    resultReg: ?bool = null,
 };
 
 /// localcall.luau's marks on a call / ret statement.

@@ -6,6 +6,7 @@
 // pizfix/lib/sarcasm (copied beside a generated harness, run by the release's minilute).
 //
 //   bun tools/sarcasm/check-stages.ts [stage …]     stages: detect sig parse isa fplookup isasyn
+//                                                   lift framecalls
 //                                                   (default: all); both outputs are kept in
 //                                                   $WORK/sarcasm/stages/<stage>.{luau,zig}.out
 //
@@ -400,6 +401,287 @@ stages.push({
   });
 }
 
+// lift / ptrflow / regalloc / frame on the corpus. Each file's body is its parse with the
+// instructions classify rejects left out (the same filter both sides), then:
+//   lift      liftFunction with x86 classify, returnRegs {0, 2}, and a callInfo rule;
+//   ptrflow   analyze with seeds chosen by rule (arg pointers rdi/rsi, load / call pointer defs,
+//             save / restore pairs so both phases run), x86 baseMnemonic, widenSwaps;
+//   regalloc  color with x86 ALLOCATABLE, with 5 registers (spills), and with rcx reserved, over
+//             insns built from the lift (labels, defs / uses, targets, full / narrow moves); liveOut;
+//   frame     preprocess with a small test policy (the same on both sides).
+// Tables upstream iterates are dumped in iteration order; the rest sorted.
+const LIFT_DUMP = [
+  "local x86 = require('./sarcasm/x86_64_isa')",
+  "local lift = require('./sarcasm/lift')",
+  "local ptrflow = require('./sarcasm/ptrflow')",
+  "local regalloc = require('./sarcasm/regalloc')",
+  "local framem = require('./sarcasm/frame')",
+  "local function L(t) local o = {} for _, x in t do table.insert(o, tostring(x)) end return '[' .. table.concat(o, ',') .. ']' end",
+  "local function sortedNum(t, f) local ks = {} for k in t do table.insert(ks, k) end table.sort(ks) local o = {} for _, k in ks do table.insert(o, f(k, t[k])) end return '{' .. table.concat(o, ',') .. '}' end",
+  "local function iterKV(t) local o = {} for k, v in t do table.insert(o, tostring(k) .. ':' .. tostring(v)) end return '{' .. table.concat(o, ',') .. '}' end",
+  "local function callInfo(st)",
+  "  local o = st.operands[1]",
+  "  if o and o.kind == 'sym' then",
+  "    local c = string.byte(o.text, 1) or 0",
+  "    if c % 2 == 0 then return { argRegs = { 7, 6 }, resultReg = 0 } end",
+  "    if c % 3 == 0 then return { argRegs = { 2 } } end",
+  "  end",
+  "  return nil",
+  "end",
+  "local function isRegRegMov(st)",
+  "  local a, b = st.operands[1], st.operands[2]",
+  "  return x86.baseMnemonic(st.mnemonic) == 'mov' and #st.operands == 2 and a.kind == 'reg' and a.rc == 'gpr' and b.kind == 'reg' and b.rc == 'gpr'",
+  "end",
+  "local function liftDump(out, r)",
+  "  local body = {}",
+  "  for _, st in r do if st.kind ~= 'insn' or pcall(x86.classify, st) then table.insert(body, st) end end",
+  "  local ok, lf = pcall(lift.liftFunction, body, { classify = x86.classify, returnRegs = { 0, 2 }, callInfo = callInfo })",
+  "  if not ok then table.insert(out, 'lift err ' .. tostring(lf)) return end",
+  "  table.insert(out, 'L n=' .. #lf.flow .. ' next=' .. lf.nextTemp)",
+  "  local tr = {} for _, t in lf.temps do table.insert(tr, tostring(t.reg)) end",
+  "  table.insert(out, 'T ' .. table.concat(tr, ','))",
+  "  table.insert(out, 'E ' .. sortedNum(lf.entryTemp, function(k, v) return tostring(k) .. ':' .. tostring(v) end))",
+  "  for _, nd in lf.nodes do",
+  "    if nd.kind == 'insn' then",
+  "      local o = {}",
+  "      for _, r in nd.c.defs do table.insert(o, tostring(nd.opTemp[r] or '-')) end",
+  "      for _, r in nd.c.uses do table.insert(o, tostring(nd.opTemp[r] or '-')) end",
+  "      table.insert(out, 'I ' .. nd.fi .. ' d=' .. L(nd.defTemps) .. ' u=' .. L(nd.useTemps) .. ' o=[' .. table.concat(o, ',') .. '] s=' .. L(lf.succ[nd.fi]))",
+  "    elseif nd.kind == 'label' then table.insert(out, 'B ' .. qs(nd.name))",
+  "    else table.insert(out, 'O') end",
+  "  end",
+  "  local lk = {} for k in lf.labelToFlow do table.insert(lk, k) end table.sort(lk)",
+  "  local lo = {} for _, k in lk do table.insert(lo, qs(k) .. ':' .. lf.labelToFlow[k]) end",
+  "  table.insert(out, 'F ' .. table.concat(lo, ','))",
+  // ptrflow
+  "  local seeds = { argPtrTemps = {}, loadPtrDefs = {}, callPtrDefs = {}, capSave = {}, capRestore = {} }",
+  "  if lf.entryTemp[7] then table.insert(seeds.argPtrTemps, lf.entryTemp[7]) end",
+  "  if lf.entryTemp[6] then table.insert(seeds.argPtrTemps, lf.entryTemp[6]) end",
+  "  local lastSave = nil",
+  "  for _, nd in lf.nodes do",
+  "    if nd.kind == 'insn' then",
+  "      local st = nd.stmt",
+  "      local m = x86.baseMnemonic(st.mnemonic)",
+  "      local a, b = st.operands[1], st.operands[2]",
+  "      if m == 'mov' and a and b and a.kind == 'reg' and b.kind == 'mem' and nd.fi % 2 == 0 then seeds.loadPtrDefs[nd] = true end",
+  "      if nd.c.control == 'call' and nd.fi % 3 == 0 then seeds.callPtrDefs[nd] = true end",
+  "      if isRegRegMov(st) and nd.fi % 5 == 0 then seeds.capSave[nd] = 'v' .. nd.fi; lastSave = nd.fi",
+  "      elseif isRegRegMov(st) and nd.fi % 7 == 0 and lastSave then seeds.capRestore[nd] = 'v' .. lastSave end",
+  "    end",
+  "  end",
+  "  local nt, alloc = lf.nextTemp, {}",
+  "  local function allocTemp(info) nt += 1; table.insert(alloc, tostring(nt) .. ':' .. tostring(info.forPtr) .. ':' .. tostring(info.dynamicLower or false)) return nt end",
+  "  local okp, pf = pcall(ptrflow.analyze, lf, seeds, allocTemp, { baseMnemonic = x86.baseMnemonic, widenSwaps = true })",
+  "  if not okp then table.insert(out, 'pf err ' .. tostring(pf)) else",
+  "    table.insert(out, 'P ' .. iterKV(pf.isPtr) .. ' W ' .. iterKV(pf.lowerTemp) .. ' D ' .. iterKV(pf.dynamic))",
+  "    local y = {}",
+  "    for _, nd in lf.nodes do local dc = pf.dynCopy[nd] if dc then",
+  "      local c = {} for _, x in dc.copies do table.insert(c, tostring(x.dst) .. '>' .. tostring(x.src)) end",
+  "      table.insert(y, tostring(nd.fi) .. ':' .. tostring(dc.xchg or false) .. '/' .. tostring(dc.cmov or false) .. ':[' .. table.concat(c, ',') .. ']') end end",
+  "    table.insert(out, 'Y ' .. table.concat(y, ' '))",
+  "    local hk = {} for k in pf.capShot do table.insert(hk, k) end table.sort(hk)",
+  "    local h = {} for _, k in hk do table.insert(h, k .. ':' .. tostring(pf.capShot[k].web) .. ',' .. tostring(pf.capShot[k].lo)) end",
+  "    table.insert(out, 'H ' .. table.concat(h, ' ') .. ' N ' .. table.concat(alloc, ' '))",
+  "  end",
+  "  local okq, pq = pcall(ptrflow.analyze, lf, seeds, allocTemp, { baseMnemonic = x86.baseMnemonic, widenSwaps = false })",
+  "  table.insert(out, okq and ('Q ' .. iterKV(pq.isPtr) .. ' W ' .. iterKV(pq.lowerTemp)) or ('Q err ' .. tostring(pq)))",
+  // regalloc
+  "  local insns = {}",
+  "  for _, nd in lf.nodes do",
+  "    if nd.kind == 'label' then table.insert(insns, { isLabelDef = nd.name })",
+  "    elseif nd.kind == 'insn' then",
+  "      local ins = { defs = nd.defTemps, uses = nd.useTemps, targets = nd.c.targets, fallsThrough = nd.c.fallsThrough }",
+  "      if isRegRegMov(nd.stmt) and #nd.defTemps == 1 and #nd.useTemps == 1 then ins.move = { dst = nd.defTemps[1], src = nd.useTemps[1], wide = nd.stmt.operands[1].width == 64 } end",
+  "      table.insert(insns, ins)",
+  "    end",
+  "  end",
+  "  local function mkTemps(same)",
+  "    local temps = {}",
+  "    for t = 1, lf.nextTemp do temps[t] = { spillCost = 1 + (t % 3) } end",
+  "    if lf.entryTemp[7] then temps[lf.entryTemp[7]].precolor = 'rdi' end",
+  "    if lf.entryTemp[6] then temps[lf.entryTemp[6]].precolor = same and 'rdi' or 'rsi' end",
+  "    return temps",
+  "  end",
+  "  local small = { 'rax', 'rcx', 'rdx', 'rbx', 'rbp' }",
+  "  for vi, o in { { allocatable = x86.ALLOCATABLE }, { allocatable = small }, { allocatable = x86.ALLOCATABLE, reserved = { 'rcx' } }, { allocatable = x86.ALLOCATABLE } } do",
+  "    local okc, cr = pcall(regalloc.color, insns, mkTemps(vi == 4), o)",
+  "    if not okc then table.insert(out, 'R' .. vi .. ' err ' .. tostring(cr)) else",
+  "      local b = {} for _, bl in cr.blocks do table.insert(b, bl.first .. '-' .. bl.last .. '>' .. table.concat(bl.succ, '.')) end",
+  "      local al = {} for t = 1, lf.nextTemp do local a = cr.aliasOf(t) if a ~= t then table.insert(al, t .. '>' .. a) end end",
+  "      table.insert(out, 'R' .. vi .. ' C ' .. iterKV(cr.color) .. ' S ' .. L(cr.spilled) .. ' K ' .. table.concat(b, ' ') .. ' A ' .. table.concat(al, ' '))",
+  "    end",
+  "  end",
+  "  local lo2 = regalloc.liveOut(insns)",
+  "  local v = {} for i = 1, #insns do local s = {} for t in lo2[i] do table.insert(s, tostring(t)) end table.insert(v, table.concat(s, '.')) end",
+  "  table.insert(out, 'V ' .. table.concat(v, ' '))",
+  "end",
+  // frame
+  "local policy = {",
+  "  analyzeFrame = function(body, sigDesc, regions) return 96, 16, true, nil end,",
+  "  rewrite = function(st, ctx)",
+  "    for i, o in st.operands do",
+  "      if o.kind == 'mem' and o.base and o.base.rc == 'sp' then",
+  "        local off = o.dispVal or 0",
+  "        if x86.baseMnemonic(st.mnemonic) == 'lea' then ctx.rejectEscape(st.raw, (off % 2 == 0) and st or nil) end",
+  "        local r = ctx.regionOf(off, i == 1)",
+  "        if r then ctx.emit({ kind = 'insn', mnemonic = 'region', operands = { ctx.slotReg(r.base) }, raw = st.raw }) return end",
+  "        ctx.checkBounds(off, o.size or 8, i == 1, st.raw, -128, (off % 16 == 0) and st or nil)",
+  "        ctx.emit({ kind = 'insn', mnemonic = 'slot', operands = { ctx.slotReg(off, (o.size or 8) * 8) }, raw = st.raw })",
+  "        return",
+  "      end",
+  "      if o.kind == 'imm' and ctx.immVal(o) == 4096 then ctx.emit({ kind = 'insn', mnemonic = 'imm4096', operands = {}, raw = st.raw }) return end",
+  "    end",
+  "    ctx.emit(st)",
+  "  end,",
+  "}",
+  "local regions = { { base = 32, size = 16, anchored = false }, { base = 0, size = 8, anchored = true } }",
+  "local function frameDump(out, r)",
+  "  local ok, o = pcall(framem.preprocess, r, regions, policy, nil)",
+  "  if not ok then table.insert(out, 'frame err ' .. tostring(o)) return end",
+  "  local p = {}",
+  "  for _, st in o do",
+  "    local s = st.kind .. ':' .. tostring(st.mnemonic)",
+  "    if st.mnemonic == 'slot' or st.mnemonic == 'region' then s ..= ':' .. ser(st.operands[1]) end",
+  "    table.insert(p, s)",
+  "  end",
+  "  table.insert(out, 'frame ' .. #o .. ' ' .. table.concat(p, ' '))",
+  "end",
+].join("\n");
+
+stages.push({
+  name: "lift",
+  inputs: files,
+  zigArg: "files",
+  lua: [
+    "local detect = require('./sarcasm/detect')",
+    "local x86parse = require('./sarcasm/x86_64_parse')",
+    SER,
+    LIFT_DUMP,
+    "local out = {}",
+    "table.insert(out, 'yolo ' .. ser(framem.yoloSlotReg(3, 32)) .. ' ' .. ser(framem.yoloSlotReg(0)) .. ' ' .. ser(framem.slotReg(-8)))",
+    "for line in string.gmatch(INPUT, '[^\\n]+') do",
+    "  local text = FS.readfile(line)",
+    "  local _, syn = detect.detect(text)",
+    "  local ok, r = pcall(x86parse.parseString, text, syn or 'att', '<in>')",
+    "  if ok then",
+    "    table.insert(out, 'file')",
+    "    frameDump(out, r)",
+    "    liftDump(out, r)",
+    "  else",
+    "    table.insert(out, 'file err')",
+    "  end",
+    "end",
+    "print(table.concat(out, '\\n'))",
+  ].join("\n"),
+});
+
+// framecalls: frame.zig's context against the REAL policy. Upstream's whole driver runs on every
+// corpus file (sarcasm.main --x86_64 -S, as the S0 oracle runs it) with frame.preprocess wrapped
+// so that every call x86_64_frame's policy makes into the frame context (regionOf, checkBounds,
+// rejectEscape, slotReg) is logged with its arguments and upstream's result. The Zig side reads
+// that log and REPLAYS each call into frame.zig's Ctx (the same frame size and regions, the same
+// default file), printing its own result; the two must be equal line for line. Lines that only
+// carry context (F file, P frame size + regions, O output count) are echoed.
+interface SeqStage { name: string; lua: string }
+const seqStages: SeqStage[] = [{
+  name: "framecalls",
+  lua: [
+    SER,
+    "local framem = require('./sarcasm/frame')",
+    "local sarcasm = require('./sarcasm/sarcasm')",
+    "local function hx(s) if s == nil then return '-' end return 'x' .. (string.gsub(s, '.', function(c) return string.format('%02x', string.byte(c)) end)) end",
+    "local function nv(x) if x == nil then return '-' end return tostring(x) end",
+    "local function stOf(st) if not st then return '- -' end return hx(st.file) .. ' ' .. nv(st.line) end",
+    "local out = {}",
+    "local orig = framem.preprocess",
+    "framem.preprocess = function(body, regions, policy, sigDesc)",
+    "  local regs, rl = {}, {}",
+    "  for i, r in (regions or {}) do table.insert(rl, nv(r.base) .. ',' .. nv(r.size) .. ',' .. tostring(r.anchored and true or false)); regs[r] = i end",
+    "  local proxyOf = {}",
+    "  local wrapped = {}",
+    "  wrapped.analyzeFrame = function(...)",
+    "    local a, b, c, d = policy.analyzeFrame(...)",
+    "    table.insert(out, 'P ' .. nv(a) .. ' ' .. (#rl > 0 and table.concat(rl, ';') or '-'))",
+    "    return a, b, c, d",
+    "  end",
+    "  wrapped.rewrite = function(st, ctx)",
+    "    local p = proxyOf[ctx]",
+    "    if not p then",
+    "      p = {}",
+    "      for k, v in ctx do p[k] = v end",
+    "      p.regionOf = function(off, dyn)",
+    "        local r = ctx.regionOf(off, dyn)",
+    "        table.insert(out, 'R ' .. nv(off) .. ' ' .. tostring(dyn and true or false) .. '\\t' .. (r and tostring(regs[r]) or 'nil'))",
+    "        return r",
+    "      end",
+    "      p.checkBounds = function(off, width, isWrite, raw, lowBound, st2)",
+    "        local line = 'C ' .. nv(off) .. ' ' .. nv(width) .. ' ' .. tostring(isWrite and true or false) .. ' ' .. hx(raw) .. ' ' .. nv(lowBound) .. ' ' .. stOf(st2)",
+    "        local ok, e = pcall(ctx.checkBounds, off, width, isWrite, raw, lowBound, st2)",
+    "        table.insert(out, line .. '\\t' .. (ok and 'ok' or ('E ' .. tostring(e))))",
+    "        if not ok then error(e, 0) end",
+    "      end",
+    "      p.rejectEscape = function(raw, st2)",
+    "        local line = 'X ' .. hx(raw) .. ' ' .. stOf(st2)",
+    "        local ok, e = pcall(ctx.rejectEscape, raw, st2)",
+    "        table.insert(out, line .. '\\t' .. (ok and 'ok' or ('E ' .. tostring(e))))",
+    "        if not ok then error(e, 0) end",
+    "      end",
+    "      p.slotReg = function(off, width)",
+    "        local r = ctx.slotReg(off, width)",
+    "        table.insert(out, 'S ' .. nv(off) .. ' ' .. nv(width) .. '\\t' .. ser(r))",
+    "        return r",
+    "      end",
+    "      proxyOf[ctx] = p",
+    "    end",
+    "    return policy.rewrite(st, p)",
+    "  end",
+    "  local res = orig(body, regions, wrapped, sigDesc)",
+    "  table.insert(out, 'O ' .. #res)",
+    "  return res",
+    "end",
+    "for line in string.gmatch(INPUT, '[^\\n]+') do",
+    "  table.insert(out, 'F ' .. hx(line))",
+    "  sarcasm.main({ 'sarcasm', '--x86_64', '-S', '-o', '/dev/null', line })",
+    "end",
+    // The boundary sweep: the corpus never touches some edges (an access exactly at the lower
+    // bound, for one), so a policy drives every context function over a grid of edges, through
+    // the same wrapped preprocess (rejections caught so the sweep goes on).
+    "do",
+    "  local SW = 'sweep.s'",
+    "  table.insert(out, 'F ' .. hx(SW))",
+    "  local errm = require('./sarcasm/err')",
+    "  errm.setDefaultFile(SW)",
+    "  local sts = { { file = SW, line = 7 }, { line = 9 }, false }",
+    "  local sweep = {",
+    "    analyzeFrame = function() return 64, 0, false, nil end,",
+    "    rewrite = function(st, ctx)",
+    "      for off = -132, 100 do",
+    "        for _, w in { 1, 8, 16 } do",
+    "          for _, iw in { false, true } do",
+    "            for _, lb in { false, -128, 0 } do",
+    "              for _, s2 in sts do",
+    "                pcall(ctx.checkBounds, off, w, iw, (off % 3 == 0) and nil or 'raw text', lb or nil, s2 or nil)",
+    "              end",
+    "            end",
+    "          end",
+    "        end",
+    "      end",
+    "      for _, off in { -0.5, 0.25, 63.5, 1e300 } do pcall(ctx.checkBounds, off, 8, true, 'frac', nil, nil) end",
+    "      for off = -12, 60 do ctx.regionOf(off, false); ctx.regionOf(off, true) end",
+    "      ctx.regionOf(15.5, true); ctx.regionOf(-0.0, true)",
+    "      for _, off in { -136, -8, 0, 8, 1.5, 4096, 1e20 } do ctx.slotReg(off); ctx.slotReg(off, 32) end",
+    "      for _, s2 in sts do pcall(ctx.rejectEscape, nil, s2 or nil); pcall(ctx.rejectEscape, 'lea 8(%rsp), %rax', s2 or nil) end",
+    "      ctx.emit(st)",
+    "    end,",
+    "  }",
+    "  framem.preprocess({ { kind = 'insn', mnemonic = 'nop', operands = {}, raw = 'nop' } },",
+    "    { { base = 0, size = 16, anchored = true }, { base = 16, size = 8 }, { base = 40, size = 8, anchored = false } }, sweep, nil)",
+    "end",
+    // sarcasm.main prints its own diagnostics: the log goes to a file, not stdout
+    "local h = fs.open(LOGFILE, 'w+'); fs.write(h, table.concat(out, '\\n') .. '\\n'); fs.close(h)",
+  ].join("\n"),
+}];
+
 const want = ARGS.filter((a) => !a.startsWith("-"));
 let failed = 0;
 for (const st of stages.filter((s) => !want.length || want.includes(s.name))) {
@@ -421,6 +703,31 @@ for (const st of stages.filter((s) => !want.length || want.includes(s.name))) {
   for (let i = 0; i < Math.max(a.length, b.length); i++) if (a[i] !== b[i]) bad.push(i);
   console.log(`${st.name}: ${st.inputs.length} inputs, ${a.length} lines (${luauOut.length} bytes), ${bad.length} differ`);
   for (const i of bad.slice(0, 6)) console.log(`  input ${JSON.stringify((st.zigArg === "hex" ? unhexTs(st.inputs[i] ?? "x") : st.inputs[i] ?? "").slice(0, 90))}\n    luau: ${a[i]?.slice(0, 160)}\n    zig:  ${b[i]?.slice(0, 160)}`);
+  if (bad.length) failed++;
+}
+for (const st of seqStages.filter((s) => !want.length || want.includes(s.name))) {
+  const inFile = `${dir}/${st.name}.in`;
+  const logFile = `${dir}/${st.name}.luau.out`;
+  await writeFile(inFile, files.join("\n") + "\n");
+  const lua = [
+    "local fs = require('@lute/fs')",
+    "local FS = { readfile = function(p) local h = fs.open(p, 'r'); local t = fs.read(h); fs.close(h); return t end }",
+    `local INPUT = FS.readfile(${JSON.stringify(inFile)})`,
+    `local LOGFILE = ${JSON.stringify(logFile)}`,
+    st.lua,
+  ].join("\n");
+  await writeFile(`${dir}/${st.name}.luau`, lua + "\n");
+  await must([minilute, `${dir}/${st.name}.luau`]);
+  const log = readFileSync(logFile, "latin1");
+  const zigOut = await must([exe, st.name, logFile]);
+  await writeFile(`${dir}/${st.name}.zig.out`, zigOut);
+  const a = log.trimEnd().split("\n"), b = zigOut.trimEnd().split("\n");
+  const bad: number[] = [];
+  for (let i = 0; i < Math.max(a.length, b.length); i++) if (a[i] !== b[i]) bad.push(i);
+  const kinds = new Map<string, number>();
+  for (const l of a) kinds.set(l[0], (kinds.get(l[0]) ?? 0) + 1);
+  console.log(`${st.name}: ${files.length} files, ${a.length} log lines (${[...kinds].map(([k, n]) => `${k} ${n}`).join(", ")}), ${bad.length} differ`);
+  for (const i of bad.slice(0, 6)) console.log(`  line ${i + 1}\n    luau: ${a[i]?.slice(0, 200)}\n    zig:  ${b[i]?.slice(0, 200)}`);
   if (bad.length) failed++;
 }
 console.log(failed ? `FAILED: ${failed} stage(s) differ` : "OK: every stage equal to upstream's");

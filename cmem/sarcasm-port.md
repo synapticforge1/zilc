@@ -152,6 +152,40 @@ stderr and assembly byte for byte. Against itself: 0 differ (746 accepted, 685 r
   input lines are now `x` + hex: sig 487 lines, 0 differ (`""` → "cannot parse function signature
   annotation: " on both sides); inverted (a fault only `""` reaches: exactly 1 differ).
 
+- ✅ **prof, frame, lift, ptrflow, regalloc** (2026-11-07). `prof.zig` (inert unless
+  SARCASM_PROFILE; callers pass a format, formatted only when on). `frame.zig`: the skeleton,
+  the architecture policy as an interface (`Policy`, `Ctx`, `Region` with an opaque `ext` for
+  transform's data). `lift.zig`: entry temps numbered in the iteration order of `entrySites` /
+  `usedRegs` (Luau tables); the reaching-definition sets are bit sets (they only pick a web's
+  union-find root, never the webs or their numbering — proven, not assumed: 0 differ below);
+  classify is required (upstream's default is arm64's, not ported). `regalloc.zig`: every table
+  upstream ITERATES is a Luau table (the first worklist move, adjacency sets, live sets, the
+  caller's temps, color); lookup-only tables are hash maps. `ptrflow.zig`: isPtr / lowerTemp /
+  dynamic are Luau tables; node-keyed seeds are hash maps.
+  Stage **lift** (corpus, the body = the parse minus what classify rejects): liftFunction with a
+  callInfo rule; ptrflow with rule-chosen seeds (arg pointers, load / call defs, save / restore
+  pairs) both widening and not; regalloc.color four ways (full, 5 registers, rcx reserved, both
+  argument temps precolored rdi) + liveOut; frame.preprocess through a test policy (the same on
+  both sides). 68,705 lines, 0 differ: 1,277 files lifted (0–7,403 instructions, 27,134 nodes),
+  pointers in 1,036, 86 dynamic webs, 121 snapshots, 60 non-convergence rejections, 53 spill
+  colorings, 1,493 with aliases, 185 backstop rejections; frame 463 slots, 179 region hits, 174
+  bounds rejections. Ten planted faults all caught (8 to 21,486 differ), among them REVERSED
+  iteration order in regalloc's sets (2,667 differ): the stage sees Luau-order faults.
+  Stage **framecalls** (frame against the REAL policy): upstream's whole driver runs on every
+  corpus file with frame.preprocess wrapped; every call x86_64_frame makes into the context
+  (regionOf 3,396, checkBounds 15,144, slotReg 2,357, rejectEscape 19) is logged with upstream's
+  result and REPLAYED into frame.zig's Ctx: 25,230 lines, 0 differ. A boundary sweep through the
+  same wrapper covers what the corpus never reaches (an access exactly at the lower bound, the
+  region edges, fractional / huge offsets, located / default-file / unlocated rejections):
+  inverted, `<` → `<=` at the lower bound is caught only with it (54 differ; 0 without — the gap
+  it closes); a slot-name fault 2,357. What remains for frame: preprocess's own ten-line loop
+  with the real policy is exercised only through the test policy until x86_64_frame is ported.
+  **ptrflow's `pairs(seeds.capSave)`** (address order upstream, seed order here) is PROVEN not to
+  matter: each save writes only capShot[its var], and transform rejects a second save of a name
+  before recording it (transform.luau 1510–1517; one save clause per annotation, line 71);
+  upstream's own test sarcasm-reject-dup-save-capability is rejected by upstream's sarcasm at the
+  second save (line 13, first at 11), exit 1.
+
 ## What a byte-identical port must reproduce (the foundations)
 
 1. **Luau's table iteration order** (the biggest risk). Output depends on `for k in t` over

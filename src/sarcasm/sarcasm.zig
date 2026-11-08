@@ -15,6 +15,11 @@ pub const numlabel = @import("numlabel.zig");
 pub const x86_64_parse = @import("x86_64_parse.zig");
 pub const x86_64_fp = @import("x86_64_fp.zig");
 pub const x86_64_isa = @import("x86_64_isa.zig");
+pub const prof = @import("prof.zig");
+pub const frame = @import("frame.zig");
+pub const lift = @import("lift.zig");
+pub const ptrflow = @import("ptrflow.zig");
+pub const regalloc = @import("regalloc.zig");
 
 test {
     _ = x86_64_fp;

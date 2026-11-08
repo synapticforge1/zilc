@@ -121,8 +121,10 @@ zilc, and re-verified against zilc's Fil-C release (0.686 work moves to 0.687 on
           files, sig 487 annotations, parse 61,518 statement dumps: 0 differ; each inverted).
           ✅ (2026-11-07) x86_64_fp and x86_64_isa: stages isa (39,257 corpus dumps), isasyn
           (398,810 synthetic instructions), fplookup (12,169 names), 0 differ; ten planted faults
-          all caught. Next: regalloc, lift, ptrflow, frame; the `.byte` decoder when compile
-          needs it. Progress: `sarcasm-port.md`.
+          all caught. ✅ (2026-11-07) prof, frame, lift, ptrflow, regalloc: stages lift (68,705
+          lines) and framecalls (every frame-context call of the real policy replayed, 25,230
+          lines), 0 differ, inverted. Next: x86_64_frame, x86_64_codegen, transform; the `.byte`
+          decoder when compile needs it. Progress: `sarcasm-port.md`.
     - (the measurements and plan, as written before the build:) **libc++ / libc++abi** (`build_cxx.sh`: CMake + Ninja over LLVM's
           `runtimes/` with Fil-C's clang/clang++, then `install-cxx-linux.sh`). Measured from
           upstream's run (MODE=zig tree, `runtimes-build/build.ninja`): 149 C++ compiles —

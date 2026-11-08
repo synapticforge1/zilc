@@ -26,8 +26,10 @@ verified (user libc, libc++; C-13 done). **Now: sarcasm, Fil-C's assembler, bein
 oracle (`tools/sarcasm/compare-sarcasm.ts`), foundations (Luau table, number formatting, Lua
 patterns, tonumber), and the modules err, sig, detect, numlabel, the parser, and (2026-11-07)
 x86_64_fp and x86_64_isa (`tools/sarcasm/check-stages.ts`: detect, sig, parse, isa, isasyn,
-fplookup all 0 differ; ten planted faults all caught). **Next:** regalloc, lift, ptrflow, frame
-(the order in sarcasm-port.md), each with its stage added to check-stages.ts and an inversion.
+fplookup all 0 differ; ten planted faults all caught), and prof, frame, lift, ptrflow, regalloc
+(stages lift and framecalls, 0 differ; frame proven against every call the real x86_64_frame
+policy makes; ptrflow's capSave order proven irrelevant). **Next:** x86_64_frame (8,934 lines),
+then x86_64_codegen, transform (the order in sarcasm-port.md), each with its stage and an inversion.
 (The harness's empty-input gap, sig's `""` annotation, was closed 2026-11-07: 0 differ,
 inverted.) Until the whole port passes the S0 oracle, MODE=zig keeps upstream's sarcasm on
 minilute. Item 4 (GitHub purge request) on hold.
