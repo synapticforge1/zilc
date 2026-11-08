@@ -119,8 +119,10 @@ zilc, and re-verified against zilc's Fil-C release (0.686 work moves to 0.687 on
           f80). ✅ Modules err, sig, detect, numlabel and the parser (parseString), each proven
           against upstream's own Luau module by `tools/sarcasm/check-stages.ts` (detect 1,431
           files, sig 487 annotations, parse 61,518 statement dumps: 0 differ; each inverted).
-          Next (paused 2026-11-06): the ISA tables (x86_64_fp, x86_64_isa), then regalloc, lift,
-          ptrflow, frame; the `.byte` decoder when compile needs it. Progress: `sarcasm-port.md`.
+          ✅ (2026-11-07) x86_64_fp and x86_64_isa: stages isa (39,257 corpus dumps), isasyn
+          (398,810 synthetic instructions), fplookup (12,169 names), 0 differ; ten planted faults
+          all caught. Next: regalloc, lift, ptrflow, frame; the `.byte` decoder when compile
+          needs it. Progress: `sarcasm-port.md`.
     - (the measurements and plan, as written before the build:) **libc++ / libc++abi** (`build_cxx.sh`: CMake + Ninja over LLVM's
           `runtimes/` with Fil-C's clang/clang++, then `install-cxx-linux.sh`). Measured from
           upstream's run (MODE=zig tree, `runtimes-build/build.ninja`): 149 C++ compiles —

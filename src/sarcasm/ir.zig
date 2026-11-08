@@ -37,6 +37,47 @@ pub const Operand = struct {
     size: ?f64 = null,
     deco: ?[]const u8 = null,
     bcastN: ?f64 = null,
+    // set on the operands x86_64_isa.classify makes (implicit registers), and by the frame pass
+    implicit: ?bool = null,
+    fixedReg: ?[]const u8 = null,
+    isSlot: ?bool = null,
+};
+
+/// localcall.luau's marks on a call / ret statement.
+pub const LocalCall = struct { entry: []const u8 };
+pub const LocalRet = struct { conts: []const []const u8 };
+/// x86_64_frame's routing marker on a narrow slot access.
+pub const SlotPartial = struct { write: ?bool = null };
+
+/// What x86_64_isa.classify (and x86_64_fp.classify) returns for an instruction: upstream's
+/// `{ defs, uses, rmw, control, targets, fallsThrough, pin, rep, flagsPush, flagsPop, unknown }`.
+/// defs / uses hold the statement's own operand tables or fresh implicit ones; which is which
+/// matters (the lift keys by table identity), so they are pointers as in Luau.
+pub const Control = enum { none, branch, condbranch, call, indcall, indirect, @"return" };
+pub const Pin = struct { uses: std.ArrayList(*Operand) = .empty, defs: std.ArrayList(*Operand) = .empty };
+pub const Rep = struct {
+    kind: []const u8,
+    elem: ?f64,
+    repPrefix: ?[]const u8,
+    rsi: ?*Operand = null,
+    rdi: ?*Operand = null,
+    rax: ?*Operand = null,
+    rcxUse: ?*Operand = null,
+    rcxDef: ?*Operand = null,
+};
+pub const Class = struct {
+    defs: std.ArrayList(*Operand) = .empty,
+    uses: std.ArrayList(*Operand) = .empty,
+    rmw: std.ArrayList(f64) = .empty,
+    control: Control = .none,
+    /// nil, or a list (jmp / jcc / loop: possibly empty)
+    targets: ?[]const []const u8 = null,
+    fallsThrough: bool = true,
+    pin: ?Pin = null,
+    rep: ?Rep = null,
+    flagsPush: bool = false,
+    flagsPop: bool = false,
+    unknown: bool = false,
 };
 
 pub const StmtKind = enum { insn, label, directive, blank };
@@ -60,6 +101,10 @@ pub const Stmt = struct {
     lockPrefix: ?bool = null,
     repPrefix: ?[]const u8 = null,
     dotAlloca: ?bool = null,
+    // later passes' marks
+    localCall: ?LocalCall = null,
+    localRet: ?LocalRet = null,
+    x86_slotPartial: ?SlotPartial = null,
 
     pub fn loc(st: *const Stmt) @import("err.zig").Loc {
         return .{ .file = st.file, .line = st.line };

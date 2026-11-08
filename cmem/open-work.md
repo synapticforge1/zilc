@@ -24,10 +24,11 @@ verified (user libc, libc++; C-13 done). **Now: sarcasm, Fil-C's assembler, bein
 (owner: "Port sarcasm to Zig"; `design-decisions.md` top row). Read `cmem/sarcasm-port.md` first
 (the porting map and progress). Done and proven against Luau / upstream's own modules: the S0
 oracle (`tools/sarcasm/compare-sarcasm.ts`), foundations (Luau table, number formatting, Lua
-patterns, tonumber), and the modules err, sig, detect, numlabel and the parser
-(`tools/sarcasm/check-stages.ts`: detect, sig, parse all 0 differ). **Next:** x86_64_fp and
-x86_64_isa (mostly tables), then regalloc, lift, ptrflow, frame (the order in sarcasm-port.md),
-each with its stage added to check-stages.ts and an inversion. Until the whole port passes the
+patterns, tonumber), and the modules err, sig, detect, numlabel, the parser, and (2026-11-07)
+x86_64_fp and x86_64_isa (`tools/sarcasm/check-stages.ts`: detect, sig, parse, isa, isasyn,
+fplookup all 0 differ; ten planted faults all caught). **Next:** regalloc, lift, ptrflow, frame
+(the order in sarcasm-port.md), each with its stage added to check-stages.ts and an inversion.
+(The harness's empty-input gap, sig's `""` annotation, was closed 2026-11-07: 0 differ, inverted.) Until the whole port passes the
 S0 oracle, MODE=zig keeps upstream's sarcasm on minilute. Item 4 (GitHub purge request) on hold.
 
 (The 2026-11-05 pick-up list, below, is closed.) ✅ All three items below were finished, committed and pushed as `ec3d6da` (2026-11-06). Still

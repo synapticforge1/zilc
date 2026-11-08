@@ -13,3 +13,10 @@ pub const detect = @import("detect.zig");
 pub const ir = @import("ir.zig");
 pub const numlabel = @import("numlabel.zig");
 pub const x86_64_parse = @import("x86_64_parse.zig");
+pub const x86_64_fp = @import("x86_64_fp.zig");
+pub const x86_64_isa = @import("x86_64_isa.zig");
+
+test {
+    _ = x86_64_fp;
+    _ = x86_64_isa;
+}

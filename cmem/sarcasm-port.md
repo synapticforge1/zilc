@@ -122,6 +122,36 @@ stderr and assembly byte for byte. Against itself: 0 differ (746 accepted, 685 r
   Not yet ported: the `.byte` decoder (decodeByteInsns, upstream lines 948–2669), called later
   by compile.
 
+- ✅ **The ISA knowledge: `x86_64_fp.zig`, `x86_64_isa.zig`** (2026-11-07), with `util.zig` (shared
+  Luau idioms) and `ir.zig`'s `Class` (classify's result: defs / uses as operand pointers,
+  rmw, control, targets, pin, rep, flagsPush / flagsPop / unknown) plus the operand fields
+  classify makes or reads (`implicit`, `fixedReg`, `isSlot`) and the later passes' statement
+  marks (`localCall`, `localRet`, `x86_slotPartial`). The EXACT table is a comptime string map;
+  upstream's width FUNCTIONS are the `WFn` enum (pmov / pmovtr carry their divisor), so
+  SIZE_DRIVEN is a set of enum values; unit tests prove EXACT, BASE and FIXED have no duplicate
+  keys (where Luau's later assignment would silently win). Three stages in `check-stages.ts`,
+  every entry point dumped (classify with operand IDENTITY: `@i` the statement's own operand,
+  `@ib`/`@ix` its base / index, `#n{…}` a fresh table numbered by first appearance, so a missing
+  or extra share shows; lookup, accessWidth both lowercase and as spelled, vecEffects in
+  iteration order, maskedAccessInfo, the flag predicates and masks, lockAllows / isMemRmw /
+  gprAccessRegWidth, narrowSuffix, unsafeReject, hasFpReg):
+  **isa** — every instruction of the 1,431 corpus files, 39,257 lines (10,692 rejections);
+  **isasyn** — every name token of upstream's fp / isa sources and every corpus mnemonic, bare and
+  v-prefixed, across ~150 AT&T / Intel operand shapes, plus ~400 hand-written edge lines
+  (.alloca, lock / rep, high bytes, string ops, masked AVX512, narrowing converts, …):
+  398,810 inputs; 203,356 classified, 194,751 rejected (12,117 distinct messages), 19 distinct
+  access width/alignment pairs, 7,201 masked-access results, 2,665 pins, 2,799 shared fresh tables;
+  **fplookup** — 12,169 names (those tokens with v-prefix, b/w/l/q/x/y/z suffixes, upper case):
+  lookup, narrowFamily, and the dump on a zero-operand statement. **All 0 differ.** Inverted with
+  ten planted faults, one at a time, files restored byte-identical after: narrowing-convert dest
+  class 49 differ, an EXACT width 320, `int $3` 3, movmskPd 132, gprByPosition swapped 4,103,
+  the self-zero idiom 5, loop's shared counter made fresh 191, inc/dec flag mask 164 (isa),
+  mwait's implicit-only branch 2 (fplookup), cmpxchg's default width 57.
+  Gap found and closed in the harness: an EMPTY input line was skipped by both sides, so sig's
+  `""` annotation (one of the 14 synthetic) had never been compared (487 inputs, 486 lines). Hex
+  input lines are now `x` + hex: sig 487 lines, 0 differ (`""` → "cannot parse function signature
+  annotation: " on both sides); inverted (a fault only `""` reaches: exactly 1 differ).
+
 ## What a byte-identical port must reproduce (the foundations)
 
 1. **Luau's table iteration order** (the biggest risk). Output depends on `for k in t` over
