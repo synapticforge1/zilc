@@ -45,6 +45,9 @@ pub const Region = struct {
     base: f64,
     size: f64,
     anchored: ?bool = null,
+    // transform's region fields (x86_64_frame reads them)
+    @"align": ?f64 = null,
+    frameRegion: ?bool = null,
     ext: ?*anyopaque = null,
 };
 

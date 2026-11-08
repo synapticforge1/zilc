@@ -20,6 +20,7 @@ pub const frame = @import("frame.zig");
 pub const lift = @import("lift.zig");
 pub const ptrflow = @import("ptrflow.zig");
 pub const regalloc = @import("regalloc.zig");
+pub const x86_64_frame = @import("x86_64_frame.zig");
 
 test {
     _ = x86_64_fp;

@@ -186,6 +186,42 @@ stderr and assembly byte for byte. Against itself: 0 differ (746 accepted, 685 r
   upstream's own test sarcasm-reject-dup-save-capability is rejected by upstream's sarcasm at the
   second save (line 13, first at 11), exit 1.
 
+## x86_64_frame (in progress, started 2026-11-07)
+
+8,934 lines (5,112 code); two entry points: `analyzeFrame` (lines 677–7221, ONE function of
+~6,500 lines, closures throughout) and `rewrite` (7222–8922), plus helpers (137–676) and the
+stack-buffer API (beginStackBufResolution / endStackBufResolution / stackBufCanonOf /
+recordStackBufCanon / stackBufLayout / stackBufGroupBaseFor / resolveStackBufDeclAt) and
+frameBaseDepth / rbpNormalization. Requires x86_64_isa, x86_64_parse, x86_64_fp, sig, frame,
+err. Module state carried from analyzeFrame to rewrite (D0, rbpNorm, maskScratchNum,
+frameAlignReq / frameAndDepth / frameAndIdx / frameAndSeen, slotGranules, cloneRetProofRan,
+yoloCount / yoloBase, sbLayout) and across a FILE (sbCanon, sbResolving).
+
+The boundary, measured on the corpus under upstream's driver (2026-11-07): analyzeFrame runs
+4,576 times (1,530 with regions = nil: transform's early geometry run, which skips the cloneRet
+proof), rewrite 23,949 times. Statements arrive with the parse fields plus transform's
+(b2clone, cloneRet, crossJumpEntry, localClone, localCloneEntry, localCall, localRet,
+stackBufAnno, tailCall, tailRet; 68 also carry stale x86_* marks — copied clones, cleared by
+analyzeFrame first); analyzeFrame ADDS 25 x86_* fields (x86_depth number or "dyn", x86_saves
+table or string, x86_smap, x86_fp, x86_prologue, x86_teardown*, …, x86StackBufRep); rewrite adds
+none to its input (it emits). Regions carry base (number or table), size, align, anchored,
+frameRegion; sigDesc is sig's Descriptor.
+
+The check — stage **xframe** in `check-stages.ts` (built 2026-11-07): under the real driver,
+every analyzeFrame call writes its full input (`A <iser>`: statements with table identity —
+`&id{…}` / `*id`, fixed-width `\ddd` escapes so the capture can be READ — sigDesc, regions, the
+stack-buffer table; the stale x86_* marks are left out because analyzeFrame clears all of them
+first, upstream 685–719); a patched COPY of upstream's module (`x86_64_frame_cp.luau`, a hook
+inserted at each checkpoint line after verifying the line's exact text) stops at a checkpoint and
+dumps its locals (`K<n>`). The port reads each capture (`tools/sarcasm/luau_value.zig` +
+`capture.zig`: an unmodeled field is an error naming it), runs `analyzeFrameTo(…, stop)` and
+prints its K. Progress:
+- ✅ **checkpoint 1** — upstream 677–1189 (setup, stack-buffer probes, sigHasFp, yolo count,
+  labelAt / nextInsn, the prologue prefix scan, D0 / rbpNorm / frameSize): 4,576 calls, 0 differ
+  (233 fp frames, 87 alignment notes, 18 spill pushes, 45 with stack args, 173 buffer probes, 13
+  b2 declarations); inverted twice (13 and 6 differ).
+- next: upstream 1191 on (the control-flow rsp-depth / save-pairing analysis: transferCore …).
+
 ## What a byte-identical port must reproduce (the foundations)
 
 1. **Luau's table iteration order** (the biggest risk). Output depends on `for k in t` over

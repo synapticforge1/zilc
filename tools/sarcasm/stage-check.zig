@@ -675,6 +675,149 @@ const Replay = struct {
     }
 };
 
+// ---- xframe: run the port's analyzeFrame on each captured call, print its checkpoint state
+const lvx = @import("luau_value.zig");
+const capx = @import("capture.zig");
+
+fn qsOpt(gpa: Alloc, v: ?[]const u8) ![]const u8 {
+    return if (v) |x| qstr(gpa, x) else "nil";
+}
+
+fn dumpK1(gpa: Alloc, an: *s.x86_64_frame.Analysis) ![]const u8 {
+    const XF = s.x86_64_frame;
+    var o: std.ArrayList(u8) = .empty;
+    const idx: ?f64 = if (XF.frameAndIdx) |x| @floatFromInt(x) else null;
+    try o.print(gpa, "K1 D0={s} rbpNorm={s} frameSize={s} prologueEnd={d} usesRbp={s} fpDepth={s} depth={s} subBytes={s} spillBytes={s} frameAlignReq={s} frameAndDepth={s} frameAndIdx={s} frameAndSeen={s} cloneRetProofRan={s} yoloCount={s} yoloBase={s} sigHasFp={s} bufProbeSuppress={s}", .{
+        try tsN(gpa, XF.D0),         try tsN(gpa, XF.rbpNorm),       try tsN(gpa, an.frameSize),     an.prologueEnd,
+        tsB(an.usesRbp),             try tsN(gpa, an.fpDepth),       try tsN(gpa, an.depth),         try tsN(gpa, an.subBytes),
+        try tsN(gpa, an.spillBytes), try tsN(gpa, XF.frameAlignReq), try tsN(gpa, XF.frameAndDepth), try tsN(gpa, idx),
+        tsB(XF.frameAndSeen),        tsB(XF.cloneRetProofRan),       try tsN(gpa, XF.yoloCount),     try tsN(gpa, XF.yoloBase),
+        tsB(an.sigHasFp),            tsB(an.bufProbeSuppress),
+    });
+    try o.appendSlice(gpa, " pstack=[");
+    for (an.pstack.items, 0..) |e, i| {
+        if (i > 0) try o.append(gpa, ',');
+        try o.print(gpa, "{s}@{s}", .{ e.name, try tsN(gpa, e.depth) });
+    }
+    try o.appendSlice(gpa, "] rep=[");
+    {
+        var ks: std.ArrayList(f64) = .empty;
+        for (an.bufRepRegs.keys()) |k| try ks.append(gpa, @bitCast(k));
+        std.mem.sort(f64, ks.items, {}, std.sort.asc(f64));
+        for (ks.items, 0..) |k, i| {
+            if (i > 0) try o.append(gpa, ',');
+            try o.appendSlice(gpa, try tsN(gpa, k));
+        }
+    }
+    try o.append(gpa, ']');
+    if (an.bufProbeRanges) |pr| {
+        try o.appendSlice(gpa, " probe=[");
+        for (pr.items, 0..) |r, i| {
+            if (i > 0) try o.append(gpa, ';');
+            try o.print(gpa, "{s},{s},{s}", .{ try tsN(gpa, r.lo), try tsN(gpa, r.hi), try qstr(gpa, r.id) });
+        }
+        try o.append(gpa, ']');
+    } else try o.appendSlice(gpa, " probe=nil");
+    if (an.bufB2DeclRaw) |b2| {
+        var ks: std.ArrayList(f64) = .empty;
+        for (b2.keys()) |k| try ks.append(gpa, @bitCast(k));
+        std.mem.sort(f64, ks.items, {}, std.sort.asc(f64));
+        try o.appendSlice(gpa, " b2=[");
+        for (ks.items, 0..) |k, i| {
+            if (i > 0) try o.append(gpa, ' ');
+            try o.print(gpa, "{s}:[", .{try tsN(gpa, k)});
+            for (b2.get(@bitCast(k)).?.items, 0..) |sb, j| {
+                if (j > 0) try o.append(gpa, ';');
+                try o.print(gpa, "{s},{s},{s},{s}", .{ try qstr(gpa, sb.id), try tsN(gpa, sb.lo), try tsN(gpa, sb.hi), try qsOpt(gpa, sb.base) });
+            }
+            try o.append(gpa, ']');
+        }
+        try o.append(gpa, ']');
+    } else try o.appendSlice(gpa, " b2=nil");
+    const lessStr = struct {
+        fn lt(_: void, a: []const u8, b: []const u8) bool {
+            return std.mem.lessThan(u8, a, b);
+        }
+    }.lt;
+    {
+        const ks = try gpa.dupe([]const u8, an.targeted.keys());
+        std.mem.sort([]const u8, ks, {}, lessStr);
+        try o.appendSlice(gpa, " targeted=[");
+        for (ks, 0..) |k, i| {
+            if (i > 0) try o.append(gpa, ',');
+            try o.appendSlice(gpa, try qstr(gpa, k));
+        }
+        try o.append(gpa, ']');
+    }
+    {
+        const ks = try gpa.dupe([]const u8, an.labelAt.keys());
+        std.mem.sort([]const u8, ks, {}, lessStr);
+        try o.appendSlice(gpa, " labelAt=[");
+        for (ks, 0..) |k, i| {
+            if (i > 0) try o.append(gpa, ',');
+            try o.print(gpa, "{s}:{d}", .{ try qstr(gpa, k), an.labelAt.get(k).? });
+        }
+        try o.append(gpa, ']');
+    }
+    try o.appendSlice(gpa, " nextInsn=[");
+    for (an.nextInsn, 0..) |x, i| {
+        if (i > 0) try o.append(gpa, ',');
+        try o.print(gpa, "{d}", .{x});
+    }
+    try o.append(gpa, ']');
+    return o.items;
+}
+
+fn xframeRecord(gpa: Alloc, out: *std.ArrayList(u8), rec: []const u8) !void {
+    const XF = s.x86_64_frame;
+    var p: lvx.Parser = .{ .a = gpa, .s = rec };
+    const v = try p.value();
+    var c: capx.Conv = .{ .a = gpa };
+    const conv = struct {
+        fn run(cc: *capx.Conv, a: Alloc, vv: lvx.Value) !struct { body: []*Stmt, sd: ?*s.sig.Descriptor, regions: ?[]*s.frame.Region } {
+            var body: std.ArrayList(*Stmt) = .empty;
+            for (try vv.get("body").?.list(a)) |x| try body.append(a, try cc.stmt(x));
+            const sd: ?*s.sig.Descriptor = if (vv.get("sigDesc")) |x| (if (x == .table) try cc.descriptor(x) else null) else null;
+            var regions: ?[]*s.frame.Region = null;
+            if (vv.get("regions")) |x| if (x == .table) {
+                var rl: std.ArrayList(*s.frame.Region) = .empty;
+                for (try x.list(a)) |r| try rl.append(a, try cc.region(r));
+                regions = rl.items;
+            };
+            XF.sbCanon = null;
+            if (vv.get("canon")) |x| if (x == .table) {
+                XF.sbCanon = .empty;
+                for (x.table.entries.items) |e| {
+                    const ce = e.val;
+                    try XF.sbCanon.?.put(a, e.key.name, .{
+                        .lo = ce.get("lo").?.num,
+                        .hi = ce.get("hi").?.num,
+                        .fn_ = if (ce.get("fn")) |y| (if (y == .str) y.str else null) else null,
+                        .sub = if (ce.get("sub")) |y| (if (y == .boolean) y.boolean else null) else null,
+                        .st = if (ce.get("st")) |y| (if (y == .table) try cc.stmt(y) else null) else null,
+                    });
+                }
+            };
+            XF.sbResolving = if (vv.get("resolving")) |x| (x == .boolean and x.boolean) else false;
+            return .{ .body = body.items, .sd = sd, .regions = regions };
+        }
+    };
+    const in = conv.run(&c, gpa, v) catch |e| {
+        if (e == error.UnknownField) {
+            try out.print(gpa, "K capture: unmodeled field {s}\n", .{c.unknown.?});
+            return;
+        }
+        return e;
+    };
+    const regs: ?[]const *s.frame.Region = if (in.regions) |r| r else null;
+    if (XF.analyzeFrameTo(gpa, in.body, in.sd, regs, .prologue)) |an| {
+        try out.print(gpa, "{s}\n", .{try dumpK1(gpa, an)});
+    } else |e| {
+        if (e != error.Sarcasm) return e;
+        try out.print(gpa, "K err {s}\n", .{s.err.message});
+    }
+}
+
 pub fn main() !void {
     var arena_state: std.heap.ArenaAllocator = .init(std.heap.page_allocator);
     const gpa = arena_state.allocator();
@@ -684,6 +827,25 @@ pub fn main() !void {
     var out: std.ArrayList(u8) = .empty;
     var lines = std.mem.tokenizeScalar(u8, list, '\n');
     var nb: [64]u8 = undefined;
+    if (std.mem.eql(u8, stage, "xframe")) {
+        var rec_arena: std.heap.ArenaAllocator = .init(std.heap.page_allocator);
+        while (lines.next()) |l| {
+            if (l.len < 2) continue;
+            if (l[0] == 'F') {
+                var p: lvx.Parser = .{ .a = gpa, .s = l[2..] };
+                const fv = try p.value();
+                s.err.setDefaultFile(fv.str);
+                try out.print(gpa, "{s}\n", .{l});
+            } else if (l[0] == 'A') {
+                _ = rec_arena.reset(.retain_capacity);
+                var tmp: std.ArrayList(u8) = .empty;
+                try xframeRecord(rec_arena.allocator(), &tmp, l[2..]);
+                try out.appendSlice(gpa, tmp.items);
+            }
+        }
+        try std.fs.File.stdout().writeAll(out.items);
+        return;
+    }
     if (std.mem.eql(u8, stage, "framecalls")) {
         var rp: Replay = .{ .gpa = gpa };
         while (lines.next()) |l| try rp.line(&out, l);

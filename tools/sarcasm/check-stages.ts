@@ -582,7 +582,44 @@ stages.push({
 // that log and REPLAYS each call into frame.zig's Ctx (the same frame size and regions, the same
 // default file), printing its own result; the two must be equal line for line. Lines that only
 // carry context (F file, P frame size + regions, O output count) are echoed.
-interface SeqStage { name: string; lua: string }
+// xframe: x86_64_frame, phase by phase. A patched COPY of upstream's module
+// (sarcasm/x86_64_frame_cp.luau) stops analyzeFrame at a checkpoint line and hands its locals to
+// the harness; the driver itself keeps the unpatched module (plus a state getter, appended). For
+// every analyzeFrame call under the real driver the harness writes the call's full input
+// ("A <iser>": statements with identity, sigDesc, regions, the stack-buffer table; the x86_*
+// marks of a previous run are left out — analyzeFrame clears every one of them first, upstream
+// 685–719) and the checkpoint state ("K ..."); the port reads each A, runs to the same
+// checkpoint, and prints its K. Each checkpoint names its upstream line and the exact text there,
+// so a moved line fails loudly instead of patching the wrong place.
+interface Checkpoint { n: number; afterLine: number; anchor: string; dump: string }
+const XF_CHECKPOINTS: Checkpoint[] = [{
+  n: 1,
+  afterLine: 1189,
+  anchor: "\t\tor (subBytes + spillBytes)",
+  dump: "{ D0 = D0, rbpNorm = rbpNorm, frameSize = frameSize, prologueEnd = prologueEnd, usesRbp = usesRbp, fpDepth = fpDepth, depth = depth, subBytes = subBytes, spillBytes = spillBytes, pstack = pstack, frameAlignReq = frameAlignReq, frameAndDepth = frameAndDepth, frameAndIdx = frameAndIdx, frameAndSeen = frameAndSeen, cloneRetProofRan = cloneRetProofRan, yoloCount = yoloCount, yoloBase = yoloBase, sigHasFp = sigHasFp, bufRepRegs = bufRepRegs, bufProbeRanges = bufProbeRanges, bufProbeSuppress = bufProbeSuppress, bufB2DeclRaw = bufB2DeclRaw, targeted = targeted, labelAt = labelAt, nextInsn = nextInsn }",
+}];
+const XF_CLEARED = ["x86_prologue", "x86_depth", "x86_saves", "x86_unpairedPop", "x86_spillPop", "x86_flagsPop", "x86_teardownStart", "x86_teardown", "x86_fp", "x86_spRecover", "x86_saveStore", "x86_carrierLoad", "x86_leaSave", "x86_carrierCallArg", "x86_spSave", "x86_dropRestore", "x86_midSp", "x86_regionCarrier", "x86_aliasOff", "x86_aliasSaveIdx", "x86_midAnd", "x86_preAnd", "x86_postAnd", "x86_smap", "x86_b2band", "x86StackBufAccess", "x86StackBufIdx", "x86StackBufRep", "x86StackBufLea", "x86StackBufAddr", "x86StackBufLeaValue", "x86StackBufLeaValueComputed", "x86_alignKeyed", "x86_alignAndBase"];
+{
+  const src = readFileSync(`${dir}/sarcasm/x86_64_frame.luau`, "latin1").split("\n");
+  for (const c of XF_CHECKPOINTS) {
+    if (src[c.afterLine - 1] !== c.anchor) throw new Error(`xframe checkpoint ${c.n}: upstream line ${c.afterLine} is ${JSON.stringify(src[c.afterLine - 1])}, not ${JSON.stringify(c.anchor)}`);
+  }
+  const ret = src.lastIndexOf("return x86_64_frame");
+  if (ret < 0) throw new Error("xframe: no `return x86_64_frame` in upstream's module");
+  const getter = "function x86_64_frame.__getSb() return sbCanon, sbResolving end";
+  const setter = "function x86_64_frame.__setSb(c, r) sbCanon = c; sbResolving = r end";
+  const orig = [...src];
+  orig.splice(ret, 0, getter);
+  await writeFile(`${dir}/sarcasm/x86_64_frame.luau`, orig.join("\n"));
+  const cp = [...src];
+  cp.splice(ret, 0, setter);
+  for (const c of [...XF_CHECKPOINTS].sort((x, y) => y.afterLine - x.afterLine)) {
+    cp.splice(c.afterLine, 0, `\tif x86_64_frame.__cp then return x86_64_frame.__cp(${c.n}, ${c.dump}) end`);
+  }
+  await writeFile(`${dir}/sarcasm/x86_64_frame_cp.luau`, cp.join("\n"));
+}
+
+interface SeqStage { name: string; lua: string; keep?: (line: string) => boolean }
 const seqStages: SeqStage[] = [{
   name: "framecalls",
   lua: [
@@ -682,6 +719,81 @@ const seqStages: SeqStage[] = [{
   ].join("\n"),
 }];
 
+seqStages.push({
+  name: "xframe",
+  keep: (l) => l.startsWith("F ") || l.startsWith("K"),
+  lua: [
+    SER,
+    "local xf = require('./sarcasm/x86_64_frame')",
+    "local cp = require('./sarcasm/x86_64_frame_cp')",
+    "local sarcasm = require('./sarcasm/sarcasm')",
+    `local CLEARED = {} for _, k in { ${XF_CLEARED.map((k) => JSON.stringify(k)).join(", ")} } do CLEARED[k] = true end`,
+    // the capture's strings are READ back, so their escapes are fixed-width (\ddd): qs's
+    // unpadded ones are ambiguous before a digit (byte 25 then "6" would read as \256)
+    "local function qsx(v) return '\"' .. (string.gsub(v, '[%c\"\\\\\\128-\\255]', function(c) return string.format('\\\\%03d', string.byte(c)) end)) .. '\"' end",
+    "local function mkIser()",
+    "  local ids, n = {}, 0",
+    "  local function key(k) if type(k) == 'number' then return '#' .. tostring(k) end if string.match(k, '^[%a_][%w_]*$') then return k end return qsx(k) end",
+    "  local iser",
+    "  iser = function(v)",
+    "    local t = type(v)",
+    "    if t == 'nil' then return 'nil' end",
+    "    if t == 'string' then return qsx(v) end",
+    "    if t == 'number' or t == 'boolean' then return tostring(v) end",
+    "    if t ~= 'table' then error('iser: cannot serialize a ' .. t) end",
+    "    if ids[v] then return '*' .. ids[v] end",
+    "    n += 1; ids[v] = n",
+    "    local id = n",
+    "    local keys = {}",
+    "    for k in v do if not (type(k) == 'string' and CLEARED[k]) then table.insert(keys, { r = key(k), k = k }) end end",
+    "    table.sort(keys, function(a, b) return a.r < b.r end)",
+    "    local parts = {}",
+    "    for _, e in keys do table.insert(parts, e.r .. '=' .. iser(v[e.k])) end",
+    "    return '&' .. id .. '{' .. table.concat(parts, ',') .. '}'",
+    "  end",
+    "  return iser",
+    "end",
+    "local function nv(x) if x == nil then return 'nil' end if type(x) == 'string' then return qs(x) end return tostring(x) end",
+    "local function numKeys(t) local ks = {} for k in (t or {}) do table.insert(ks, k) end table.sort(ks) return ks end",
+    "local function strKeys(t) local ks = {} for k in (t or {}) do table.insert(ks, k) end table.sort(ks) return ks end",
+    "local DUMP = {}",
+    "DUMP[1] = function(K)",
+    "  local p = {}",
+    "  for _, f in { 'D0', 'rbpNorm', 'frameSize', 'prologueEnd', 'usesRbp', 'fpDepth', 'depth', 'subBytes', 'spillBytes', 'frameAlignReq', 'frameAndDepth', 'frameAndIdx', 'frameAndSeen', 'cloneRetProofRan', 'yoloCount', 'yoloBase', 'sigHasFp', 'bufProbeSuppress' } do table.insert(p, f .. '=' .. nv(K[f])) end",
+    "  local ps = {} for _, e in K.pstack do table.insert(ps, e.name .. '@' .. tostring(e.depth)) end",
+    "  table.insert(p, 'pstack=[' .. table.concat(ps, ',') .. ']')",
+    "  local rr = {} for _, k in numKeys(K.bufRepRegs) do table.insert(rr, tostring(k)) end",
+    "  table.insert(p, 'rep=[' .. table.concat(rr, ',') .. ']')",
+    "  if K.bufProbeRanges then local pr = {} for _, r in K.bufProbeRanges do table.insert(pr, tostring(r.lo) .. ',' .. tostring(r.hi) .. ',' .. qs(r.id)) end table.insert(p, 'probe=[' .. table.concat(pr, ';') .. ']') else table.insert(p, 'probe=nil') end",
+    "  if K.bufB2DeclRaw then local b = {} for _, k in numKeys(K.bufB2DeclRaw) do local l = {} for _, sb in K.bufB2DeclRaw[k] do table.insert(l, qs(sb.id) .. ',' .. nv(sb.lo) .. ',' .. nv(sb.hi) .. ',' .. nv(sb.base)) end table.insert(b, tostring(k) .. ':[' .. table.concat(l, ';') .. ']') end table.insert(p, 'b2=[' .. table.concat(b, ' ') .. ']') else table.insert(p, 'b2=nil') end",
+    "  local tg = {} for _, k in strKeys(K.targeted) do table.insert(tg, qs(k)) end",
+    "  table.insert(p, 'targeted=[' .. table.concat(tg, ',') .. ']')",
+    "  local la = {} for _, k in strKeys(K.labelAt) do table.insert(la, qs(k) .. ':' .. tostring(K.labelAt[k])) end",
+    "  table.insert(p, 'labelAt=[' .. table.concat(la, ',') .. ']')",
+    "  local ni = {} for i = 1, #K.nextInsn do table.insert(ni, tostring(K.nextInsn[i])) end",
+    "  table.insert(p, 'nextInsn=[' .. table.concat(ni, ',') .. ']')",
+    "  return table.concat(p, ' ')",
+    "end",
+    "local out = {}",
+    "local origA = xf.analyzeFrame",
+    "xf.analyzeFrame = function(body, sigDesc, regions)",
+    "  local canon, resolving = xf.__getSb()",
+    "  table.insert(out, 'A ' .. mkIser()({ body = body, sigDesc = sigDesc, regions = regions, canon = canon, resolving = resolving }))",
+    "  cp.__setSb(canon, resolving)",
+    "  local got = nil",
+    "  cp.__cp = function(n, K) got = 'K' .. n .. ' ' .. DUMP[n](K) return 0 end",
+    "  local ok, e = pcall(cp.analyzeFrame, body, sigDesc, regions)",
+    "  table.insert(out, got or ('K err ' .. tostring(e)))",
+    "  return origA(body, sigDesc, regions)",
+    "end",
+    "for line in string.gmatch(INPUT, '[^\\n]+') do",
+    "  table.insert(out, 'F ' .. qsx(line))",
+    "  sarcasm.main({ 'sarcasm', '--x86_64', '-S', '-o', '/dev/null', line })",
+    "end",
+    "local h = fs.open(LOGFILE, 'w+'); fs.write(h, table.concat(out, '\\n') .. '\\n'); fs.close(h)",
+  ].join("\n"),
+});
+
 const want = ARGS.filter((a) => !a.startsWith("-"));
 let failed = 0;
 for (const st of stages.filter((s) => !want.length || want.includes(s.name))) {
@@ -721,7 +833,7 @@ for (const st of seqStages.filter((s) => !want.length || want.includes(s.name)))
   const log = readFileSync(logFile, "latin1");
   const zigOut = await must([exe, st.name, logFile]);
   await writeFile(`${dir}/${st.name}.zig.out`, zigOut);
-  const a = log.trimEnd().split("\n"), b = zigOut.trimEnd().split("\n");
+  const a = log.trimEnd().split("\n").filter(st.keep ?? (() => true)), b = zigOut.trimEnd().split("\n");
   const bad: number[] = [];
   for (let i = 0; i < Math.max(a.length, b.length); i++) if (a[i] !== b[i]) bad.push(i);
   const kinds = new Map<string, number>();

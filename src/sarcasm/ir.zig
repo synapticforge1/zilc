@@ -48,8 +48,16 @@ pub const Operand = struct {
 };
 
 /// localcall.luau's marks on a call / ret statement.
-pub const LocalCall = struct { entry: []const u8 };
-pub const LocalRet = struct { conts: []const []const u8 };
+pub const LocalCall = struct { entry: []const u8, clone: ?f64 = null, cont: ?[]const u8 = null };
+pub const LocalRet = struct { conts: []const []const u8, clone: ?f64 = null, entry: ?[]const u8 = null };
+/// x86_64_frame.analyzeFrame's per-statement marks (upstream's `st.x86_*` fields): its OUTPUT,
+/// cleared at the start of every run. Fields are added as the analysis is ported.
+pub const FrameMarks = struct {};
+
+/// tailcall.luau's mark on a cloned `ret`.
+pub const CloneRet = struct { entry: []const u8 };
+/// transform's parsed `#! stack buffer (...)` annotation: the long form carries base / lo / hi.
+pub const StackBufAnno = struct { id: []const u8, short: bool, base: ?[]const u8 = null, lo: ?f64 = null, hi: ?f64 = null };
 /// x86_64_frame's routing marker on a narrow slot access.
 pub const SlotPartial = struct { write: ?bool = null };
 
@@ -109,6 +117,17 @@ pub const Stmt = struct {
     localCall: ?LocalCall = null,
     localRet: ?LocalRet = null,
     x86_slotPartial: ?SlotPartial = null,
+    // transform's (tailcall / localcall / stack-buffer) marks, read by x86_64_frame
+    b2clone: ?f64 = null,
+    cloneRet: ?CloneRet = null,
+    crossJumpEntry: ?bool = null,
+    localClone: ?f64 = null,
+    localCloneEntry: ?bool = null,
+    stackBufAnno: ?StackBufAnno = null,
+    tailCall: ?bool = null,
+    tailRet: ?bool = null,
+    /// x86_64_frame's marks
+    x86: FrameMarks = .{},
 
     pub fn loc(st: *const Stmt) @import("err.zig").Loc {
         return .{ .file = st.file, .line = st.line };
