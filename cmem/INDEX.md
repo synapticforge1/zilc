@@ -136,7 +136,7 @@ the runtime-linking rule checked.
 | [testing.md](testing.md) | Every gate with its command and dated count; the output comparison; corpus results per mode; planned gates. |
 | [known-issues.md](known-issues.md) | The defect log, KI-1…KI-23: root cause, fix, status. |
 | [workarounds.md](workarounds.md) | The WHY of every workaround (owner rule): symptom index, failure families. **Look up new failures here first.** |
-| [sarcasm-port.md](sarcasm-port.md) | The porting map for sarcasm, Fil-C's assembler (Luau → Zig, owner 2026-11-06): pipeline, data shapes, diagnostics, the oracle, and what a byte-identical port must reproduce (Luau table iteration order, f64 numbers, Lua patterns). **Read before touching the port.** |
+| [sarcasm-port.md](sarcasm-port.md) | The porting map for sarcasm, Fil-C's assembler (Luau → Zig, owner 2026-11-06): pipeline, data shapes, diagnostics, the oracle, and what a byte-identical port must reproduce (Luau table iteration order, f64 numbers, Lua patterns), and the progress (ported and proven through x86_64_fp / x86_64_isa, 2026-11-07). **Read before touching the port.** |
 | [toolchain-quirks.md](toolchain-quirks.md) | C, C++, Zig, linker and build-system peculiarities by TOOL (`zig cc`, clang vs GCC, LLD vs GNU ld, Zig's build/fetch, CMake/GCC/musl, git): symptom, cause, fix, where. **Look here when swapping a compiler or linker** (owner, 2026-11-04). |
 | [releasing.md](releasing.md) | The version scheme `<Zig>-<Fil-C>.<zilc release>` (DESIGN, workspace P8), where the number lives, the release checklist. |
 | [filc-abi.md](filc-abi.md) | Fil-C 0.685's runtime ABI as observed (P3 scoping; P3 moved to zailc 2026-10-27, kept as its record). |

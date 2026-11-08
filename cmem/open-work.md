@@ -17,7 +17,7 @@ them, with their dates.
 | branches | `main` carries the Bun port (`c2841dd`, was `44e0b1a`), merged `--no-ff` 2026-10-27 (owner: "we will merge all to bun tooling since deno is going away"), and the 2026-10-27 work since; `bun-port` (merged, never pushed) deleted 2026-10-27 (owner). Branches: `main`, `v0.15.2` |
 | sibling | **zailc** (`../zailc`, started 2026-10-08) translates Fil-C into Zig; zilc is its stable reference and test oracle and changes nothing for it (`design-decisions.md`) |
 
-## ▶️ PICK UP HERE — paused 2026-11-06 (owner: "update the project memory files, commit and push and pause here to today")
+## ▶️ PICK UP HERE — 2026-11-07, `8aa6a7a` pushed (owner: "update the project memory files, commit and push. Then start on the next items")
 
 **Where the work stands:** the pure-Zig track's runtime pieces are all `zig build`-built and
 verified (user libc, libc++; C-13 done). **Now: sarcasm, Fil-C's assembler, being ported to Zig**
@@ -28,8 +28,9 @@ patterns, tonumber), and the modules err, sig, detect, numlabel, the parser, and
 x86_64_fp and x86_64_isa (`tools/sarcasm/check-stages.ts`: detect, sig, parse, isa, isasyn,
 fplookup all 0 differ; ten planted faults all caught). **Next:** regalloc, lift, ptrflow, frame
 (the order in sarcasm-port.md), each with its stage added to check-stages.ts and an inversion.
-(The harness's empty-input gap, sig's `""` annotation, was closed 2026-11-07: 0 differ, inverted.) Until the whole port passes the
-S0 oracle, MODE=zig keeps upstream's sarcasm on minilute. Item 4 (GitHub purge request) on hold.
+(The harness's empty-input gap, sig's `""` annotation, was closed 2026-11-07: 0 differ,
+inverted.) Until the whole port passes the S0 oracle, MODE=zig keeps upstream's sarcasm on
+minilute. Item 4 (GitHub purge request) on hold.
 
 (The 2026-11-05 pick-up list, below, is closed.) ✅ All three items below were finished, committed and pushed as `ec3d6da` (2026-11-06). Still
 open from the 2026-11-05 list: item 4 (GitHub Support purge request, on hold, owner); **the
