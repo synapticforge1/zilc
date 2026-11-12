@@ -1,25 +1,9 @@
 # Releasing & Versioning
 
-## ✅ PUBLISHED 2026-10-27: `v0.15.2-0.687.1`
-
-Owner: "release", after the checklist run the same day ("run through the check list now"). Pushed
-to `https://github.com/synapticforge1/zilc`: `main` and branch `v0.15.2` at `be51808`, annotated tag
-`v0.15.2-0.687.1` (tag object `303b597`) on the same commit; all three fast-forwards / new, read
-back with `ls-remote`. Checked first: every per-release checklist item on the committed tree
-(`testing.md`, `upstream.md` "Review of Fil-C 0.687"), the five version places, the 3 pushed
-commits scanned (no personal path, none in a message). No CI workflow, so nothing ran on the push;
-no GitHub Release page (no `gh` here; `RELEASE-NOTES.md` is its text).
-
-## ✅ PUBLISHED 2026-10-05: `v0.15.2-0.686.1`
-
-Pushed to `https://github.com/jrmarcum/zilc` (the repo has since moved to
-`https://github.com/synapticforge1/zilc`, where `origin` points since 2026-10-27; it serves the same
-`19e7172`): `main` + branch `v0.15.2` at `19e7172`, annotated tag `v0.15.2-0.686.1`. Since the
-2026-10-27 history purge that commit is **`13ce96a`** and the tag object `7dbddf8` (was `fda2d43`);
-map: `history-map-2026-10-27.md`. The local `v0.15.2-3` tag was deleted, never pushed. No GitHub Release page (no
-`gh` CLI on this machine); add one from the tag if wanted, with `RELEASE-NOTES.md` as its text.
-From here on, every release follows "Per-release checklist" below and pushes only when the owner
-says.
+**The records of the releases made and HOW a release runs moved to [release.md](release.md)**
+(2026-11-12; workspace letter H33 — one place, § "Release History", newest first; the CI process:
+checks → tag → page). This file keeps the version scheme, where the number lives, and the
+per-release checklist.
 
 ## 📦 PUBLISH PLAN (owner, 2026-09-30; updated 2026-10-05: Fil-C 0.686 and the new version) — DONE
 
@@ -235,8 +219,13 @@ changes**, patch releases included. There is no major/minor of our own and no 1.
 
 ## Per-release checklist (draft)
 
+Run before the notes are written; then the process in [release.md](release.md): the two required
+reviews recorded, `bun tools/release/bump.ts release`, `bun tools/release/release.ts` (which
+re-checks the five places, the privacy scan and the gate, then pushes `main` — CI tags and makes
+the page).
+
 - [ ] `zig build test`, `capi-smoke`, and every active gate in `testing.md` are green.
-- [ ] Version synced in all five places above.
+- [ ] Version synced in all five places above (`bun tools/release/bump.ts --check`).
 - [ ] `RELEASE-NOTES.md` has the release's section: **the basis** (latest-line releases), **the Zig
       user code needs**, **the Fil-C release**, what changed, what to know. Its claims are checked
       against the gates (2026-10-05: a "C++" claim was removed, C++ is untested). A new Zig line

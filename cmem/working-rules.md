@@ -38,8 +38,11 @@ named below. Method lessons are in [best-practices.md](best-practices.md), not h
 
 - A change to `src/` (or to a tool a gate runs) triggers the full gate, run on the committed tree
   after the last edit, reading every exit code and diffing OUTPUT, not exit codes: `testing.md`.
-  zilc has no CI workflow, so `testing.md` is the gate's definition. `zig build gate` prints
-  `SKIPPED` and exits 0 without Fil-C — read its first line.
+  `testing.md` is the gate's definition. Since 2026-11-12 CI (`.github/workflows/release.yml`,
+  every push to `main`) runs the half that needs no Fil-C — format, `zig build test`, the release
+  scripts' tests, the version places, the privacy scan; the Fil-C gate stays local
+  (`release.md` § "What runs where"). `zig build gate` prints `SKIPPED` and exits 0 without Fil-C
+  — read its first line.
 - 🛑 Nothing built by Fil-C, cosmo or zilc is ever executed on the Windows host
   (`workarounds.md`).
 
@@ -65,6 +68,13 @@ named below. Method lessons are in [best-practices.md](best-practices.md), not h
   the documented Bun step (`tools/README.md` "First-time setup") plus `tools/p1/setup-wsl.ts`. A one-time probe deleted after use may be
   any language, still written with the file tools.
 - **No heredocs, ever**, in any language (`bun -e`, `@'…'@`, `-F -` included). No host Python.
+- 🔒 **No `gh`, in CI too** (owner, 2026-11-08; workspace Tooling rule 9, letter H30): check the
+  repo instead — `git ls-remote` and the repo's own files; in a workflow, GitHub's REST API from a
+  Bun step with `GITHUB_TOKEN` (`tools/release/github-*.ts`); a GitHub web-UI task is an owner item.
+  `git grep` finds no `gh` invocation in zilc (2026-11-12).
+- 🔒 **Bun versions: every notation is the latest installed Bun** (owner, 2026-11-09; workspace
+  Tooling rule 10, letter H31) — the pin in `tools/README.md`, `roadmap.md`'s toolchain row and the
+  workflow's `BUN_VERSION` move together; 1.4.4 since 2026-11-07.
 - After any scripted edit, read back the changed lines; an edit script asserts each match exactly
   once and writes atomically.
 - When the exit code IS the measurement, do not pipe: redirect to a file, then read the code.
@@ -115,3 +125,37 @@ force-push is `open-work.md` owner call 1.
 - Owner calls stay owner calls: where a record says 🗓️, gather the evidence and stop.
 - Retired siblings: wabt-ts and binaryen-ts (2026-10-26) are cited only as history, never as a
   location; their memory is binaryang's `cmem/wabt-ts.md` and `cmem/binaryen-ts.md`.
+- 🔒 **zailc reads zilc's tests, examples and recorded results as its corpus** (ledger C28,
+  2026-11-12): `tests/` (the `basics` copies, the corpus, `tests/sarcasm/`), `examples/`, the gate
+  cases, and the dated results in `testing.md` / `sarcasm-port.md`. **A move, rename or removal of
+  any of them is announced** — in that release's entry in `release.md`, or, between releases, as a
+  row to zailc in `../cmem/workspace-correspondence.md` — before or with the commit. zilc still
+  changes nothing FOR zailc; it only says what moved.
+
+## Owner commands: "commit", "push", "release" (owner, 2026-11-10)
+
+🔒 Written into every project by the workspace session on the owner's direction (2026-11-10:
+"please write that into each project"; workspace `cmem/working-rules.md` Tooling rule 12, letter
+H34). When the owner says:
+
+- **"commit"** — first run "update the project memory files" (re-derive this repo's `cmem/` from
+  its current state), then commit to the branch being worked on. Nothing is pushed.
+- **"push"** — perform "commit", then merge the branch into `main`, then push `main` (and the
+  working branch) to GitHub (`origin`) and read it back with `git ls-remote`.
+- **"release"** — perform "push", then the release process: the workspace's
+  `cmem/release-process.md` §§ 5–8 — CI checks first, then CI pushes the tag, then the GitHub
+  Release page from the tag, then the publish to the registry — recorded in `cmem/release.md`
+  § "Release History" (newest first, a summary of what changed). The level (patch / minor /
+  major) is the owner's: ask if it was not given.
+
+Each command includes the one before it, and none goes further than its own word (a "commit"
+never pushes, a "push" never releases). This repo's own gate and merge rules apply at each step.
+For zilc, "release" is [release.md](release.md): no registry, so CI's tag and page are the release,
+and the KIND (`release`, N + 1) replaces the level.
+
+## Owner commands: "review", "security review", "hardening review" (owner, 2026-11-12)
+
+🔒 Workspace `cmem/review-process.md`, letter H35: a targeted agent code review, a security review,
+a hardening review — fresh read-only reviewers, rounds until a round finds nothing; **the security
+and hardening reviews are required before every release**. zilc's slots:
+[review-process.md](review-process.md). None of them commits, pushes or releases.

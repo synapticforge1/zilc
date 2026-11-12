@@ -15,14 +15,15 @@ Run in a WSL or Linux shell (x86_64). No root is needed; everything goes under `
 
 1. **Install Bun** (once). Taken from npm's `@oven/bun-linux-x64` because that is a `.tgz`: Bun's
    own installer needs `unzip`, which a fresh Ubuntu lacks and installing needs root. The SHA-256 is
-   the file's as downloaded on 2026-10-22 (its SHA-1 matched the registry's `dist.shasum`,
-   `2f13abdede6651ab4c393e7754cbe64981dd325d`); `sha256sum -c` must print `OK`.
+   the file's as downloaded on 2026-11-07 (its SHA-512 matched the registry's `dist.integrity`,
+   `sha512-CHbbkmHVM28T1GFq+6GL4Ao4ujwwYwj1CxFFwEFzLanPfNsId9AhbIP0Q4reWuWBkGimUkoQygrK7Rgjtj3vog==`;
+   moved from 1.4.3 on 2026-11-07, owner); `sha256sum -c` must print `OK`.
 
    ```sh
    mkdir -p ~/zilc-work/dl/bun ~/.bun/bin
-   curl -fsSL https://registry.npmjs.org/@oven/bun-linux-x64/-/bun-linux-x64-1.4.3.tgz -o ~/zilc-work/dl/bun-1.4.3.tgz
-   echo "efd069d474e6addceede0dc9c0981b4421cf35ceb3348e4b83462053a177281f  $HOME/zilc-work/dl/bun-1.4.3.tgz" | sha256sum -c
-   tar -xzf ~/zilc-work/dl/bun-1.4.3.tgz -C ~/zilc-work/dl/bun
+   curl -fsSL https://registry.npmjs.org/@oven/bun-linux-x64/-/bun-linux-x64-1.4.4.tgz -o ~/zilc-work/dl/bun-1.4.4.tgz
+   echo "93ca5a2abe45f3bcac6dd55baff8bb06c4ac824b70f89650b54e5c8b80dbef18  $HOME/zilc-work/dl/bun-1.4.4.tgz" | sha256sum -c
+   tar -xzf ~/zilc-work/dl/bun-1.4.4.tgz -C ~/zilc-work/dl/bun
    cp ~/zilc-work/dl/bun/package/bin/bun ~/.bun/bin/bun
    chmod +x ~/.bun/bin/bun
    ~/.bun/bin/bun --version
@@ -30,7 +31,7 @@ Run in a WSL or Linux shell (x86_64). No root is needed; everything goes under `
 
    Then put it on `PATH`, so plain `bun` works: append this block to `~/.profile` (login shells)
    and to `~/.bashrc` (interactive shells); the `case` keeps it from being added twice when
-   `~/.profile` sources `~/.bashrc`. Open a new shell, and `bun --version` prints `1.4.3`.
+   `~/.profile` sources `~/.bashrc`. Open a new shell, and `bun --version` prints `1.4.4`.
 
    ```sh
    if [ -d "$HOME/.bun/bin" ]; then

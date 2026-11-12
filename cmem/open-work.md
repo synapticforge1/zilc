@@ -17,7 +17,27 @@ them, with their dates.
 | branches | `main` carries the Bun port (`c2841dd`, was `44e0b1a`), merged `--no-ff` 2026-10-27 (owner: "we will merge all to bun tooling since deno is going away"), and the 2026-10-27 work since; `bun-port` (merged, never pushed) deleted 2026-10-27 (owner). Branches: `main`, `v0.15.2` |
 | sibling | **zailc** (`../zailc`, started 2026-10-08) translates Fil-C into Zig; zilc is its stable reference and test oracle and changes nothing for it (`design-decisions.md`) |
 
-## ▶️ PICK UP HERE — 2026-11-07, `8aa6a7a` pushed (owner: "update the project memory files, commit and push. Then start on the next items")
+## ▶️ PICK UP HERE — paused 2026-11-07 evening (owner: "need to pause here for today. please note where we are in the fix list")
+
+**Committed 2026-11-12 on branch `work-2026-11-12`** (owner: "commit"; two commits — the sarcasm
+checkpoint, then the Bun pin + the workspace letters; NOT merged into `main`, NOT pushed): x86_64_frame
+checkpoint 2 (`src/sarcasm/x86_64_frame_flow.zig`, ir / frame / parse additions, the xframe harness
+updates, `tests/sarcasm/frame-branches/*.s`), two harness fixes (latin1 module write, byte-wise
+sequential compare), and the **Bun pin moved 1.4.3 → 1.4.4** (owner's choice; `tools/README.md`,
+`roadmap.md` toolchain row, a dated note below). Verified before pausing: the installed Bun is
+byte-identical to npm's 1.4.4 tarball's binary (SHA-512 = the registry's `dist.integrity`); under
+1.4.4 every stage is 0 differ (detect sig parse isa fplookup isasyn lift framecalls xframe), gate
+8/8, test 40/40, capi-smoke / baseline ok, sarcasm unit tests 3/3, zig fmt clean.
+**Next:** x86_64_frame checkpoint 3 (upstream 3213–3750; `sarcasm-port.md` "x86_64_frame").
+
+**Also in that branch, 2026-11-12 (owner: "review workspace for items needing this project's attention
+and make the requested fixes"):** the workspace letters H30–H35 and C28 answered — the release
+process (`release.md`, `tools/release/`, `.github/workflows/release.yml`), `review-process.md`, the
+`working-rules.md` additions; C22–C25 verified and closed (§ "Workspace letters" below). Checked
+2026-11-12: zig fmt clean, `zig build test` 40/40, `bun test tools/release/` 27/27,
+`bump.ts --check` ok, privacy scan = the one permitted hit.
+
+### Earlier, 2026-11-07 (`8aa6a7a` pushed; owner: "update the project memory files, commit and push. Then start on the next items")
 
 **Where the work stands:** the pure-Zig track's runtime pieces are all `zig build`-built and
 verified (user libc, libc++; C-13 done). **Now: sarcasm, Fil-C's assembler, being ported to Zig**
@@ -397,13 +417,20 @@ future reference"*.
 | H22 | record the path test | `working-rules.md` § Privacy |
 | H27 | old-folder prose (`upstream.md:127`) | sibling-relative now; `git grep -i` for the old folder name is empty |
 | H28 | record-only: maintainer address; wabt-ts/binaryen-ts retired | recorded in `working-rules.md`; zilc carries the address in no tracked file; binaryen-ts is cited only as history |
+| H30 | no `gh`, CI too | 2026-11-12: `working-rules.md` § Tooling; the release jobs use the REST API from Bun (`tools/release/github-*.ts`); `git grep` finds no `gh` invocation; `releasing.md`'s two "no `gh` CLI on this machine" lines are gone (moved to `release.md`, re-worded) |
+| H31 | Bun = latest installed; one current-tense line | 2026-11-12: the `open-work.md` Bun-port line now says "the latest installed — 1.4.4"; the pin moved 2026-11-07 (`tools/README.md`, `roadmap.md`, the workflow's `BUN_VERSION`); rule in `working-rules.md` § Tooling |
+| H32 / H33 | release page from CI; U1–U12 | 2026-11-12: `release.md` (slots, what runs where, § "Release History" with the two releases moved from `releasing.md`), `tools/release/` (bump, release, github-tag, github-release + 27 tests, 3 mutants caught), `.github/workflows/release.yml` (checks → tag → release; no publish: no registry). Not yet run on GitHub: proven at the first push / first release |
+| H34 | owner commands section | kept as written by the workspace; zilc's note on "release" added below it |
+| H35 | review process | 2026-11-12: `review-process.md` (zilc's slots), the three words in `working-rules.md`; `bump.ts` / `release.ts` refuse a release entry without both reviews |
+| C28 (from zailc) | zilc's tests / examples / results are zailc's corpus | 2026-11-12: `working-rules.md` § Records — a move, rename or removal is announced in the release entry or the ledger |
+| C22–C25 (zilc's own) | zailc's answers | verified 2026-11-12 on zailc's local `main` (`84ea70b`/`cd17f16`, `b7cc4ee`/`aa54a81`; not on its `origin/main` `258f0d2` — the push is the owner's); workspace adoptions 7.18–7.20 and 3.17 present. Closed in the ledger |
 
 ## The Bun port (2026-10-22, `c2841dd`, was `44e0b1a`): what was verified
 
 Moved verbatim from `INDEX.md` (2026-10-27). **Every tool is Bun** (owner: "Bun only", Deno is
 going away). All 38 `.ts` files (37 tools + `lib/tool.ts`) ported from `Deno.*`/`jsr:` to
-`node:*` + `Bun.spawn`/`Bun.Glob`/`Bun.YAML`; run `bun tools/<group>/<tool>.ts`. Bun 1.4.3 in WSL
-at `~/.bun/bin` (then `setup-wsl.sh`; since 2026-10-27 the documented step in `tools/README.md`; from npm's tarball: no `unzip`/root). Checked against Deno runs:
+`node:*` + `Bun.spawn`/`Bun.Glob`/`Bun.YAML`; run `bun tools/<group>/<tool>.ts`. Bun in WSL is the latest installed — 1.4.4 (pinned
+2026-11-07; `roadmap.md` toolchain table, `tools/README.md`) — at `~/.bun/bin` (then `setup-wsl.sh`; since 2026-10-27 the documented step in `tools/README.md`; from npm's tarball: no `unzip`/root). Checked against Deno runs:
 gate 8/8 identical (also started from Windows through the WSL bridge), run-native identical (632
 files; differences only in times, random values, thread order, PIDs, paths), the p1–p3 experiments
 same exit codes and reports (byte-identical or differing only in ASLR/PIDs/paths),

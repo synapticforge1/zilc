@@ -1,0 +1,191 @@
+name: release
+
+# zilc's release process (workspace release-process.md § 5, letters H32 / H33; cmem/release.md).
+# 🔒 Owner, 2026-11-10: "the CI to check first, then push the tag, and then create the release
+# page from the tag, then publish the package to the registry for the project in that order." So
+# this workflow runs on every push to `main`, and a release is ONE run:
+#
+#   checks (U5) → tag (U6) → release (U7, the page from the tag)
+#
+# - `checks` runs everything that executes repository code with a read-only token on a token-less
+#   clone of the pushed commit, and decides "is this a release?": build.zig.zon's version has no
+#   tag yet (or, on a re-run, its tag is already on THIS commit). It runs what a runner CAN run:
+#   zig fmt, `zig build test` (needs no Fil-C — rehearsed 2026-11-12 on a fresh clone with empty
+#   caches), the release scripts' tests, the five-places check and the privacy scan. The Fil-C
+#   safety gate needs a Fil-C toolchain a runner does not have; `bun tools/release/release.ts`
+#   runs it on the owner's machine before it pushes (cmem/release.md § "What runs where").
+# - `tag` creates the annotated tag v<Zig>-<Fil-C>.<N> on that commit through the REST API
+#   (tools/release/github-tag.ts). A tag pushed with the job's GITHUB_TOKEN starts no new run, so
+#   the page follows here, by `needs:`.
+# - `release` makes the GitHub Release page from the tag (tools/release/github-release.ts, H32's
+#   order).
+# - No `publish` job (U8) and no install-as-a-user read-back (U10): zilc publishes to no registry
+#   (release-process.md § 6, "no registry"); the tag and its page ARE the release.
+#
+# The local `bun tools/release/release.ts` pushes `main` only; it never makes a tag (U4). No job
+# runs the GitHub CLI (H30). The write jobs check out nothing: each fetches its one script at the
+# tested commit (ledger C30). Re-runs are safe (U12): each job skips what is already done.
+#
+# No `uses:` steps (U9): Bun and Zig come from their official downloads, pinned by version AND
+# sha256 (measured 2026-11-12 at the source: Zig from https://ziglang.org/download/index.json,
+# Bun from the release's SHASUMS256.txt). Move a pin by changing both together. Zig is the
+# project's Zig (build.zig.zon minimum_zig_version); Bun is the latest installed Bun (workspace
+# Tooling rule 10, letter H31).
+
+on:
+  push:
+    branches:
+      - main
+
+permissions: {}
+
+# One group per commit, never cancelled (U9): a release run is never cut short by a later push.
+concurrency:
+  group: release-${{ github.sha }}
+  cancel-in-progress: false
+
+env:
+  BUN_VERSION: 1.4.4
+  BUN_SHA256_LINUX: bf8ccbfb2b0b80159e0f9a6d15c55317add8077534dbc6130a3edb52fccb395c
+  ZIG_VERSION: 0.15.2
+  ZIG_SHA256_LINUX: 02aa270f183da276e5b5920b1dac44a63f1a49e55050ebde3aecc9eb82f93239
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    outputs:
+      release: ${{ steps.decide.outputs.release }}
+      tag: ${{ steps.decide.outputs.tag }}
+    steps:
+      - name: Clone the pushed commit (full history and tags; no token)
+        run: |
+          set -euo pipefail
+          git clone "https://github.com/${{ github.repository }}" .
+          git checkout --quiet --detach "${{ github.sha }}"
+          test "$(git rev-parse HEAD)" = "${{ github.sha }}"
+
+      # "Is this a release?" (U5): the manifest's version has no tag yet. A tag already on THIS
+      # commit means a re-run of a release (U12); a tag elsewhere means the version was released
+      # before and this push is ordinary work.
+      - name: Is this a release?
+        id: decide
+        run: |
+          set -euo pipefail
+          version="$(sed -n 's/^ *\.version = "\(.*\)",$/\1/p' build.zig.zon)"
+          [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+-[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "::error::cannot read build.zig.zon's .version as <Zig>-<Fil-C>.<N> ($version)"; exit 1; }
+          tag="v$version"
+          if at="$(git rev-parse -q --verify "refs/tags/$tag^{commit}")"; then
+            if [ "$at" = "${{ github.sha }}" ]; then release=true; why="$tag is already on this commit (a re-run)"
+            else release=false; why="$tag exists at $at: released before"; fi
+          else
+            release=true; why="$tag does not exist yet"
+          fi
+          echo "release=$release ($why)"
+          echo "release=$release" >> "$GITHUB_OUTPUT"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+
+      - name: Install Zig and Bun (pinned by sha256)
+        run: |
+          set -euo pipefail
+          curl -fsSL --max-time 300 --retry 5 --retry-all-errors --retry-delay 5 -o "$RUNNER_TEMP/zig.tar.xz" \
+            "https://ziglang.org/download/${ZIG_VERSION}/zig-x86_64-linux-${ZIG_VERSION}.tar.xz"
+          echo "${ZIG_SHA256_LINUX}  $RUNNER_TEMP/zig.tar.xz" | sha256sum -c -
+          tar -xJf "$RUNNER_TEMP/zig.tar.xz" -C "$RUNNER_TEMP"
+          echo "$RUNNER_TEMP/zig-x86_64-linux-${ZIG_VERSION}" >> "$GITHUB_PATH"
+          curl -fsSL --max-time 300 --retry 5 --retry-all-errors --retry-delay 5 -o "$RUNNER_TEMP/bun.zip" \
+            "https://github.com/oven-sh/bun/releases/download/bun-v${BUN_VERSION}/bun-linux-x64.zip"
+          echo "${BUN_SHA256_LINUX}  $RUNNER_TEMP/bun.zip" | sha256sum -c -
+          unzip -q -d "$RUNNER_TEMP" "$RUNNER_TEMP/bun.zip"
+          echo "$RUNNER_TEMP/bun-linux-x64" >> "$GITHUB_PATH"
+
+      - name: Versions
+        run: zig version && bun --version
+
+      - name: zig fmt --check (the whole repo, the project's Zig)
+        run: zig fmt --check build.zig build tools tests src
+
+      - name: zig build test
+        run: |
+          set -o pipefail
+          zig build test --summary all 2>&1 | tee test.log
+          grep -E 'Build Summary: ([0-9]+)/\1 steps succeeded' test.log
+
+      - name: Release scripts' tests (mock GitHub API)
+        run: bun test tools/release/
+
+      - name: The five places agree on the version
+        run: bun tools/release/bump.ts --check
+
+      # A scan STOPS a push (workspace review-process.md § 3.1, item 7; cmem/working-rules.md
+      # § Privacy). The one permitted hit is the rule's own text in cmem/working-rules.md.
+      - name: Privacy scan (text and binaries)
+        run: |
+          set -euo pipefail
+          p='[A-Za-z]:[\\/]+(Programs|Users|scoop|tools)[\\/]|/[a-z]/(Programs|Users)/'
+          for flag in -I -a; do
+            hits="$(git grep "$flag" -l -i -E "$p" | grep -vx 'cmem/working-rules.md' || true)"
+            if [ -n "$hits" ]; then echo "::error::privacy scan ($flag) found: $hits"; exit 1; fi
+          done
+          echo "privacy scan: clean"
+
+  tag:
+    needs: checks
+    if: needs.checks.outputs.release == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write # only for the tag write in tools/release/github-tag.ts
+    steps:
+      - name: Install Bun (pinned by sha256)
+        run: |
+          set -euo pipefail
+          curl -fsSL --max-time 300 --retry 5 --retry-all-errors --retry-delay 5 -o "$RUNNER_TEMP/bun.zip" \
+            "https://github.com/oven-sh/bun/releases/download/bun-v${BUN_VERSION}/bun-linux-x64.zip"
+          echo "${BUN_SHA256_LINUX}  $RUNNER_TEMP/bun.zip" | sha256sum -c -
+          unzip -q -d "$RUNNER_TEMP" "$RUNNER_TEMP/bun.zip"
+          echo "$RUNNER_TEMP/bun-linux-x64" >> "$GITHUB_PATH"
+
+      - name: Fetch the tag script at the tested commit (no checkout)
+        run: |
+          set -euo pipefail
+          curl -fsSL --max-time 60 --retry 5 --retry-all-errors --retry-delay 5 -o "$RUNNER_TEMP/github-tag.ts" \
+            "https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}/tools/release/github-tag.ts"
+
+      - name: Create the annotated tag on the tested commit (REST API)
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ needs.checks.outputs.tag }}
+          RELEASE_SHA: ${{ github.sha }}
+        run: bun "$RUNNER_TEMP/github-tag.ts"
+
+  release:
+    needs: [checks, tag]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write # only for the Release write in tools/release/github-release.ts
+    steps:
+      - name: Install Bun (pinned by sha256)
+        run: |
+          set -euo pipefail
+          curl -fsSL --max-time 300 --retry 5 --retry-all-errors --retry-delay 5 -o "$RUNNER_TEMP/bun.zip" \
+            "https://github.com/oven-sh/bun/releases/download/bun-v${BUN_VERSION}/bun-linux-x64.zip"
+          echo "${BUN_SHA256_LINUX}  $RUNNER_TEMP/bun.zip" | sha256sum -c -
+          unzip -q -d "$RUNNER_TEMP" "$RUNNER_TEMP/bun.zip"
+          echo "$RUNNER_TEMP/bun-linux-x64" >> "$GITHUB_PATH"
+
+      - name: Fetch the release script at the tested commit (no checkout)
+        run: |
+          set -euo pipefail
+          curl -fsSL --max-time 60 --retry 5 --retry-all-errors --retry-delay 5 -o "$RUNNER_TEMP/github-release.ts" \
+            "https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}/tools/release/github-release.ts"
+
+      - name: Create the GitHub Release page from the tag (REST API)
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ needs.checks.outputs.tag }}
+          RELEASE_SHA: ${{ github.sha }}
+        run: bun "$RUNNER_TEMP/github-release.ts"
