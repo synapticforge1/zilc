@@ -374,7 +374,7 @@ and so do `argv`, files, stdin, child processes and threads.
 
 ## Current gates (re-run 2026-10-27 in WSL on Fil-C 0.687, commit `b33b6eb`: gate 8/8, tests 29/29, capi-smoke and baseline exit 0, `zilc --version` ok/ok; the same on 0.686 that morning)
 
-**CI (since 2026-11-12, not yet run on GitHub):** `.github/workflows/release.yml` runs, on every
+**CI (since 2026-11-12; first run 43295657634 on `bba102f`, `checks` green):** `.github/workflows/release.yml` runs, on every
 push to `main`, the steps that need no Fil-C: `zig fmt --check`, `zig build test` (40/40 on a fresh
 clone with empty caches, rehearsed in WSL 2026-11-12), `bun test tools/release/` (27 cases against a
 mock GitHub API), `bump.ts --check`, the privacy scan. The rows below that need Fil-C stay local;

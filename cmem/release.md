@@ -35,10 +35,11 @@ zilc publishes to **no registry** (release-process.md § 6, "no registry"): a re
   runner has no Fil-C toolchain (zilc builds it from source in hours, or installs the release's
   prebuilt). Fil-C's own suite, the corpus and the output comparison are the per-release checklist
   in `releasing.md`, run before the notes are written.
-- **First real CI run:** none yet (the workflow landed 2026-11-12, not pushed). A changed release
-  job is rehearsed before it lands (best-practices 7.22): the scripts against a mock API
-  (27 cases, 3 mutants), `checks` on a fresh clone; the GitHub half is proven by the first push
-  (checks only) and the first release (tag and page).
+- **First real CI run: 2026-11-12, run 43295657634 on `bba102f`** — `checks` green, every step;
+  `tag` and `release` skipped (`v0.15.2-0.687.1` already tagged elsewhere, so "not a release"), as
+  designed. Before it, rehearsed (best-practices 7.22): the scripts against a mock API (27 cases,
+  3 mutants), `checks` on a fresh clone. Still unproven on GitHub: `tag` and `release` — the first
+  release proves them.
 
 ## Release History (newest first)
 
