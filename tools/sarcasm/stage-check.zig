@@ -768,6 +768,74 @@ fn dumpK1(gpa: Alloc, an: *s.x86_64_frame.Analysis) ![]const u8 {
     return o.items;
 }
 
+fn nvS(gpa: Alloc, v: ?[]const u8) ![]const u8 {
+    return if (v) |x| qstr(gpa, x) else "nil";
+}
+fn nvB(v: ?bool) []const u8 {
+    return if (v) |x| tsB(x) else "nil";
+}
+
+fn dumpK2(gpa: Alloc, an: *s.x86_64_frame.Analysis) ![]const u8 {
+    const XF = s.x86_64_frame;
+    var o: std.ArrayList(u8) = .empty;
+    for (an.body, 1..) |st, i| {
+        const d = an.depthIn[i - 1];
+        const cca = st.x86.carrierCallArg;
+        const lvc = st.x86.stackBufLeaValueComputed;
+        const rep = st.x86.stackBufRep;
+        const lmo = an.leaMemOnlyCache.get(st);
+        if (!(d != null or lvc != null or cca != null or rep != null or lmo != null)) continue;
+        try o.print(gpa, "K2 {d} d=", .{i});
+        if (d) |x| try o.appendSlice(gpa, if (x == .dyn) "dyn" else try tsN(gpa, x.num)) else try o.appendSlice(gpa, "nil");
+        try o.appendSlice(gpa, " s=");
+        if (an.savesIn[i - 1]) |sv| {
+            if (XF.isDynSaves(sv)) {
+                try o.appendSlice(gpa, "dyn");
+            } else {
+                try o.append(gpa, '[');
+                for (sv.items, 0..) |e, j| {
+                    if (j > 0) try o.append(gpa, ',');
+                    try o.print(gpa, "{s}/{s}/{s}/{s}/{s}", .{ try qstr(gpa, e.name), try tsN(gpa, e.num), try tsN(gpa, e.depth), nvB(e.spill), tsB(e.redefined) });
+                }
+                try o.append(gpa, ']');
+            }
+        } else try o.appendSlice(gpa, "nil");
+        try o.print(gpa, " f={s} m=", .{if (an.fpIn[i - 1]) |f| try qstr(gpa, @tagName(f)) else "nil"});
+        if (an.smapIn[i - 1]) |m| {
+            try o.append(gpa, '{');
+            var it = m.iterator();
+            var j: usize = 0;
+            while (it.next()) |pe| : (j += 1) {
+                if (j > 0) try o.append(gpa, ';');
+                const e = pe.val;
+                try o.print(gpa, "{s}:{s},{s},{s},{s},{s},{s},{s},{s},{s},{s},{s},{s},{s}", .{
+                    try qstr(gpa, pe.key.str), try nvS(gpa, e.name),  try tsN(gpa, e.num),    try tsN(gpa, e.depth), try tsN(gpa, e.saveIdx),
+                    nvB(e.redefined),          try nvS(gpa, e.form),  nvB(e.slot),            try tsN(gpa, e.off),   try nvS(gpa, e.space),
+                    try tsN(gpa, e.roff),      try tsN(gpa, e.rbase), try nvS(gpa, e.rspace), nvB(e.conflict),
+                });
+            }
+            try o.append(gpa, '}');
+        } else try o.appendSlice(gpa, "nil");
+        try o.print(gpa, " lvc={s} cca=", .{nvB(lvc)});
+        if (cca) |c| try o.print(gpa, "{s}/{s}", .{ try qstr(gpa, c.name), try nvS(gpa, c.form) }) else try o.appendSlice(gpa, "nil");
+        try o.appendSlice(gpa, " rep=");
+        if (rep) |r| {
+            try o.print(gpa, "{s},{s},{s}|", .{ try tsN(gpa, r.lo), try tsN(gpa, r.hi), try qstr(gpa, r.id) });
+            if (r.side) |sd| try o.print(gpa, "{s}:{s},{s},{s}", .{ try qstr(gpa, sd.name), try tsN(gpa, sd.K), try tsN(gpa, sd.num), tsB(sd.isWrite) }) else try o.appendSlice(gpa, "nil");
+        } else try o.appendSlice(gpa, "nil");
+        try o.print(gpa, " lmo={s}\n", .{nvB(lmo)});
+    }
+    try o.appendSlice(gpa, "K2 end\n");
+    return o.items;
+}
+
+fn seedPseudos(gpa: Alloc, body: []const *Stmt) !void {
+    s.x86_64_parse.resetPseudos();
+    for (body) |st| for (st.operands.items) |op| {
+        for ([_]?*Op{ op, op.base, op.index }) |x| if (x) |r| if (r.pseudo != null and r.num != null) try s.x86_64_parse.seedPseudo(gpa, r.name.?, r.num.?);
+    };
+}
+
 fn xframeRecord(gpa: Alloc, out: *std.ArrayList(u8), rec: []const u8) !void {
     const XF = s.x86_64_frame;
     var p: lvx.Parser = .{ .a = gpa, .s = rec };
@@ -810,8 +878,17 @@ fn xframeRecord(gpa: Alloc, out: *std.ArrayList(u8), rec: []const u8) !void {
         return e;
     };
     const regs: ?[]const *s.frame.Region = if (in.regions) |r| r else null;
+    try seedPseudos(gpa, in.body);
+    // one run per checkpoint (each run starts by clearing the previous run's marks)
     if (XF.analyzeFrameTo(gpa, in.body, in.sd, regs, .prologue)) |an| {
         try out.print(gpa, "{s}\n", .{try dumpK1(gpa, an)});
+    } else |e| {
+        if (e != error.Sarcasm) return e;
+        try out.print(gpa, "K err {s}\n", .{s.err.message});
+        return;
+    }
+    if (XF.analyzeFrameTo(gpa, in.body, in.sd, regs, .fixpoint)) |an| {
+        try out.appendSlice(gpa, try dumpK2(gpa, an));
     } else |e| {
         if (e != error.Sarcasm) return e;
         try out.print(gpa, "K err {s}\n", .{s.err.message});

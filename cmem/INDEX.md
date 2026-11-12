@@ -121,7 +121,7 @@ the runtime-linking rule checked.
 | File | What it holds |
 | --- | --- |
 | [open-work.md](open-work.md) | **The state (version, gates, branches) and everything outstanding**: owner calls, open work, workspace letters, the summarized dated log. |
-| [working-rules.md](working-rules.md) | The checklist for every increment: the workspace floor as it applies here — git, gate, tooling (Bun), privacy and the path test. |
+| [working-rules.md](working-rules.md) | The checklist for every increment: the workspace floor as it applies here — git, gate, tooling (Bun, no `gh`), privacy and the path test, the owner's commands, zailc's dependency on zilc's tests. |
 | [overview.md](overview.md) | What zilc is, repo layout, key files, build steps. |
 | [vision.md](vision.md) | The goal: one `zig` binary compiling Zig, C and C++ to one memory-safe target; unverified claims marked. |
 | [architecture.md](architecture.md) | The pipeline, InvisiCap and FUGC, and the runtime contract measured 2026-09-30 (`libpizlo`'s four layers). |
@@ -139,6 +139,8 @@ the runtime-linking rule checked.
 | [sarcasm-port.md](sarcasm-port.md) | The porting map for sarcasm, Fil-C's assembler (Luau → Zig, owner 2026-11-06): pipeline, data shapes, diagnostics, the oracle, and what a byte-identical port must reproduce (Luau table iteration order, f64 numbers, Lua patterns), and the progress (ported and proven through x86_64_fp / x86_64_isa, 2026-11-07). **Read before touching the port.** |
 | [toolchain-quirks.md](toolchain-quirks.md) | C, C++, Zig, linker and build-system peculiarities by TOOL (`zig cc`, clang vs GCC, LLD vs GNU ld, Zig's build/fetch, CMake/GCC/musl, git): symptom, cause, fix, where. **Look here when swapping a compiler or linker** (owner, 2026-11-04). |
 | [releasing.md](releasing.md) | The version scheme `<Zig>-<Fil-C>.<zilc release>` (DESIGN, workspace P8), where the number lives, the release checklist. |
+| [release.md](release.md) | **How a release runs** (workspace U1–U12: `tools/release/bump.ts`, `release.ts` pushes `main`, CI's `release.yml` checks → tag → page; no registry) and **§ "Release History"**, newest first. |
+| [review-process.md](review-process.md) | zilc's slots in the workspace review standard ("review", "security review", "hardening review"; both of the last two required before every release). |
 | [filc-abi.md](filc-abi.md) | Fil-C 0.685's runtime ABI as observed (P3 scoping; P3 moved to zailc 2026-10-27, kept as its record). |
 | [zig-upstream-notes.md](zig-upstream-notes.md) | Zig behaviours we may need to report (Z-1…Z-5), each with whether it is really a Zig bug. |
 | [ports/](ports/README.md) | Port notes, one file per new Zig line: basis, API changes, sites touched. |

@@ -591,35 +591,49 @@ stages.push({
 // 685–719) and the checkpoint state ("K ..."); the port reads each A, runs to the same
 // checkpoint, and prints its K. Each checkpoint names its upstream line and the exact text there,
 // so a moved line fails loudly instead of patching the wrong place.
-interface Checkpoint { n: number; afterLine: number; anchor: string; dump: string }
+interface Checkpoint { n: number; afterLine: number; anchor: string; next?: string; dump: string }
 const XF_CHECKPOINTS: Checkpoint[] = [{
   n: 1,
   afterLine: 1189,
   anchor: "\t\tor (subBytes + spillBytes)",
   dump: "{ D0 = D0, rbpNorm = rbpNorm, frameSize = frameSize, prologueEnd = prologueEnd, usesRbp = usesRbp, fpDepth = fpDepth, depth = depth, subBytes = subBytes, spillBytes = spillBytes, pstack = pstack, frameAlignReq = frameAlignReq, frameAndDepth = frameAndDepth, frameAndIdx = frameAndIdx, frameAndSeen = frameAndSeen, cloneRetProofRan = cloneRetProofRan, yoloCount = yoloCount, yoloBase = yoloBase, sigHasFp = sigHasFp, bufRepRegs = bufRepRegs, bufProbeRanges = bufProbeRanges, bufProbeSuppress = bufProbeSuppress, bufB2DeclRaw = bufB2DeclRaw, targeted = targeted, labelAt = labelAt, nextInsn = nextInsn }",
+}, {
+  n: 2,
+  afterLine: 3211,
+  anchor: "\tend",
+  next: "\t-- Verify epilogue teardown regions: from the instruction after a teardown starter to a",
+  dump: "{ body = body, depthIn = depthIn, savesIn = savesIn, fpIn = fpIn, smapIn = smapIn, leaMemOnlyCache = leaMemOnlyCache }",
 }];
+const XF_STOP = Math.max(...XF_CHECKPOINTS.map((c) => c.n));
 const XF_CLEARED = ["x86_prologue", "x86_depth", "x86_saves", "x86_unpairedPop", "x86_spillPop", "x86_flagsPop", "x86_teardownStart", "x86_teardown", "x86_fp", "x86_spRecover", "x86_saveStore", "x86_carrierLoad", "x86_leaSave", "x86_carrierCallArg", "x86_spSave", "x86_dropRestore", "x86_midSp", "x86_regionCarrier", "x86_aliasOff", "x86_aliasSaveIdx", "x86_midAnd", "x86_preAnd", "x86_postAnd", "x86_smap", "x86_b2band", "x86StackBufAccess", "x86StackBufIdx", "x86StackBufRep", "x86StackBufLea", "x86StackBufAddr", "x86StackBufLeaValue", "x86StackBufLeaValueComputed", "x86_alignKeyed", "x86_alignAndBase"];
 {
   const src = readFileSync(`${dir}/sarcasm/x86_64_frame.luau`, "latin1").split("\n");
   for (const c of XF_CHECKPOINTS) {
     if (src[c.afterLine - 1] !== c.anchor) throw new Error(`xframe checkpoint ${c.n}: upstream line ${c.afterLine} is ${JSON.stringify(src[c.afterLine - 1])}, not ${JSON.stringify(c.anchor)}`);
+    if (c.next !== undefined && src[c.afterLine + 1] !== c.next) throw new Error(`xframe checkpoint ${c.n}: upstream line ${c.afterLine + 2} is ${JSON.stringify(src[c.afterLine + 1])}, not ${JSON.stringify(c.next)}`);
   }
   const ret = src.lastIndexOf("return x86_64_frame");
   if (ret < 0) throw new Error("xframe: no `return x86_64_frame` in upstream's module");
   const getter = "function x86_64_frame.__getSb() return sbCanon, sbResolving end";
   const setter = "function x86_64_frame.__setSb(c, r) sbCanon = c; sbResolving = r end";
+  // written back BYTE FOR BYTE (latin1, as read): a default UTF-8 write would re-encode every
+  // non-ASCII byte of upstream's source (its messages' em dashes among them)
   const orig = [...src];
   orig.splice(ret, 0, getter);
-  await writeFile(`${dir}/sarcasm/x86_64_frame.luau`, orig.join("\n"));
+  await writeFile(`${dir}/sarcasm/x86_64_frame.luau`, orig.join("\n"), "latin1");
   const cp = [...src];
   cp.splice(ret, 0, setter);
   for (const c of [...XF_CHECKPOINTS].sort((x, y) => y.afterLine - x.afterLine)) {
-    cp.splice(c.afterLine, 0, `\tif x86_64_frame.__cp then return x86_64_frame.__cp(${c.n}, ${c.dump}) end`);
+    // the hook records every checkpoint it passes and stops the run at the last one
+    cp.splice(c.afterLine, 0, `\tif x86_64_frame.__cp and x86_64_frame.__cp(${c.n}, ${c.dump}) then return 0 end`);
   }
-  await writeFile(`${dir}/sarcasm/x86_64_frame_cp.luau`, cp.join("\n"));
+  await writeFile(`${dir}/sarcasm/x86_64_frame_cp.luau`, cp.join("\n"), "latin1");
 }
 
-interface SeqStage { name: string; lua: string; keep?: (line: string) => boolean }
+// extra: zilc's own inputs run after the corpus, for branches no Fil-C test reaches
+interface SeqStage { name: string; lua: string; keep?: (line: string) => boolean; extra?: string[] }
+const frameBranches = readdirSync(`${REPO}/tests/sarcasm/frame-branches`).filter((n) => n.endsWith(".s")).sort()
+  .map((n) => `${REPO}/tests/sarcasm/frame-branches/${n}`);
 const seqStages: SeqStage[] = [{
   name: "framecalls",
   lua: [
@@ -722,6 +736,7 @@ const seqStages: SeqStage[] = [{
 seqStages.push({
   name: "xframe",
   keep: (l) => l.startsWith("F ") || l.startsWith("K"),
+  extra: frameBranches,
   lua: [
     SER,
     "local xf = require('./sarcasm/x86_64_frame')",
@@ -758,7 +773,7 @@ seqStages.push({
     "local function strKeys(t) local ks = {} for k in (t or {}) do table.insert(ks, k) end table.sort(ks) return ks end",
     "local DUMP = {}",
     "DUMP[1] = function(K)",
-    "  local p = {}",
+    "  local p = { 'K1' }",
     "  for _, f in { 'D0', 'rbpNorm', 'frameSize', 'prologueEnd', 'usesRbp', 'fpDepth', 'depth', 'subBytes', 'spillBytes', 'frameAlignReq', 'frameAndDepth', 'frameAndIdx', 'frameAndSeen', 'cloneRetProofRan', 'yoloCount', 'yoloBase', 'sigHasFp', 'bufProbeSuppress' } do table.insert(p, f .. '=' .. nv(K[f])) end",
     "  local ps = {} for _, e in K.pstack do table.insert(ps, e.name .. '@' .. tostring(e.depth)) end",
     "  table.insert(p, 'pstack=[' .. table.concat(ps, ',') .. ']')",
@@ -774,16 +789,35 @@ seqStages.push({
     "  table.insert(p, 'nextInsn=[' .. table.concat(ni, ',') .. ']')",
     "  return table.concat(p, ' ')",
     "end",
+    // checkpoint 2: per statement, the fixpoint's state and the marks it sets (smap in
+    // iteration order — its order is upstream's output)
+    "local function dDump(d) if d == nil then return 'nil' end return tostring(d) end",
+    "local function svDump(sv) if sv == nil then return 'nil' end if sv == 'dyn' then return 'dyn' end local o = {} for _, e in sv do table.insert(o, qs(e.name) .. '/' .. nv(e.num) .. '/' .. nv(e.depth) .. '/' .. nv(e.spill) .. '/' .. nv(e.redefined)) end return '[' .. table.concat(o, ',') .. ']' end",
+    "local SMF = { 'name', 'num', 'depth', 'saveIdx', 'redefined', 'form', 'slot', 'off', 'space', 'roff', 'rbase', 'rspace', 'conflict' }",
+    "local function smDump(m) if m == nil then return 'nil' end local o = {} for k, e in m do local f = {} for _, x in SMF do table.insert(f, nv(e[x])) end table.insert(o, qs(k) .. ':' .. table.concat(f, ',')) end return '{' .. table.concat(o, ';') .. '}' end",
+    "local function repDump(r) if r == nil then return 'nil' end local s = 'nil' for k, v in r do if k ~= 'lo' and k ~= 'hi' and k ~= 'id' then s = qs(k) .. ':' .. nv(v.K) .. ',' .. nv(v.num) .. ',' .. nv(v.isWrite) end end return nv(r.lo) .. ',' .. nv(r.hi) .. ',' .. qs(r.id) .. '|' .. s end",
+    "DUMP[2] = function(K)",
+    "  local lines = {}",
+    "  for i, st in K.body do",
+    "    local cca = st.x86_carrierCallArg and (qs(st.x86_carrierCallArg.name) .. '/' .. nv(st.x86_carrierCallArg.form)) or 'nil'",
+    "    local lvc, rep, lmo = st.x86StackBufLeaValueComputed, st.x86StackBufRep, K.leaMemOnlyCache[st]",
+    "    if K.depthIn[i] ~= nil or lvc ~= nil or st.x86_carrierCallArg or rep or lmo ~= nil then",
+    "      table.insert(lines, 'K2 ' .. i .. ' d=' .. dDump(K.depthIn[i]) .. ' s=' .. svDump(K.savesIn[i]) .. ' f=' .. nv(K.fpIn[i]) .. ' m=' .. smDump(K.smapIn[i]) .. ' lvc=' .. nv(lvc) .. ' cca=' .. cca .. ' rep=' .. repDump(rep) .. ' lmo=' .. nv(lmo))",
+    "    end",
+    "  end",
+    "  table.insert(lines, 'K2 end')",
+    "  return table.concat(lines, '\\n')",
+    "end",
     "local out = {}",
     "local origA = xf.analyzeFrame",
     "xf.analyzeFrame = function(body, sigDesc, regions)",
     "  local canon, resolving = xf.__getSb()",
     "  table.insert(out, 'A ' .. mkIser()({ body = body, sigDesc = sigDesc, regions = regions, canon = canon, resolving = resolving }))",
     "  cp.__setSb(canon, resolving)",
-    "  local got = nil",
-    "  cp.__cp = function(n, K) got = 'K' .. n .. ' ' .. DUMP[n](K) return 0 end",
+    "  local last = nil",
+    `  cp.__cp = function(n, K) table.insert(out, DUMP[n](K)) last = n return n == ${XF_STOP} end`,
     "  local ok, e = pcall(cp.analyzeFrame, body, sigDesc, regions)",
-    "  table.insert(out, got or ('K err ' .. tostring(e)))",
+    `  if last ~= ${XF_STOP} then table.insert(out, 'K err ' .. tostring(e)) end`,
     "  return origA(body, sigDesc, regions)",
     "end",
     "for line in string.gmatch(INPUT, '[^\\n]+') do",
@@ -820,7 +854,8 @@ for (const st of stages.filter((s) => !want.length || want.includes(s.name))) {
 for (const st of seqStages.filter((s) => !want.length || want.includes(s.name))) {
   const inFile = `${dir}/${st.name}.in`;
   const logFile = `${dir}/${st.name}.luau.out`;
-  await writeFile(inFile, files.join("\n") + "\n");
+  const inputs = [...files, ...(st.extra ?? [])];
+  await writeFile(inFile, inputs.join("\n") + "\n");
   const lua = [
     "local fs = require('@lute/fs')",
     "local FS = { readfile = function(p) local h = fs.open(p, 'r'); local t = fs.read(h); fs.close(h); return t end }",
@@ -833,12 +868,15 @@ for (const st of seqStages.filter((s) => !want.length || want.includes(s.name)))
   const log = readFileSync(logFile, "latin1");
   const zigOut = await must([exe, st.name, logFile]);
   await writeFile(`${dir}/${st.name}.zig.out`, zigOut);
-  const a = log.trimEnd().split("\n").filter(st.keep ?? (() => true)), b = zigOut.trimEnd().split("\n");
+  // both sides compared as BYTES (latin1): the log is read that way, and stdout arrives
+  // UTF-8-decoded, so a non-ASCII byte (a message's em dash) would never compare equal
+  const zigBytes = readFileSync(`${dir}/${st.name}.zig.out`, "latin1");
+  const a = log.trimEnd().split("\n").filter(st.keep ?? (() => true)), b = zigBytes.trimEnd().split("\n");
   const bad: number[] = [];
   for (let i = 0; i < Math.max(a.length, b.length); i++) if (a[i] !== b[i]) bad.push(i);
   const kinds = new Map<string, number>();
   for (const l of a) kinds.set(l[0], (kinds.get(l[0]) ?? 0) + 1);
-  console.log(`${st.name}: ${files.length} files, ${a.length} log lines (${[...kinds].map(([k, n]) => `${k} ${n}`).join(", ")}), ${bad.length} differ`);
+  console.log(`${st.name}: ${files.length} files${st.extra?.length ? ` + ${st.extra.length} of zilc's` : ""}, ${a.length} log lines (${[...kinds].map(([k, n]) => `${k} ${n}`).join(", ")}), ${bad.length} differ`);
   for (const i of bad.slice(0, 6)) console.log(`  line ${i + 1}\n    luau: ${a[i]?.slice(0, 200)}\n    zig:  ${b[i]?.slice(0, 200)}`);
   if (bad.length) failed++;
 }

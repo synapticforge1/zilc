@@ -220,7 +220,26 @@ prints its K. Progress:
   labelAt / nextInsn, the prologue prefix scan, D0 / rbpNorm / frameSize): 4,576 calls, 0 differ
   (233 fp frames, 87 alignment notes, 18 spill pushes, 45 with stack args, 173 buffer probes, 13
   b2 declarations); inverted twice (13 and 6 differ).
-- next: upstream 1191 on (the control-flow rsp-depth / save-pairing analysis: transferCore …).
+- ✅ **checkpoint 2** (2026-11-07) — upstream 1191–3211 (transferCore, the carrier map, transfer,
+  the merges, successors, leaSaveUsesMemoryOnly, flagsDeadAfter, the depth fixpoint) in
+  `src/sarcasm/x86_64_frame_flow.zig`: per statement the fixpoint's depth / saves / fp / smap
+  (smap a Luau table — its order is upstream's output: the use check names the first offending
+  carrier) and the marks it sets. 83,131 K lines, 0 differ (73,844 statement states; 95 at dyn
+  depth, 2,495 with an established fp, 3,682 non-empty smaps, 646 slot carriers, 12 conflicts, 1,027
+  region pointers, 8 rejections). Inverted: the call poison 63,367 differ, REVERSED smap copy order
+  451, a no-op control 0. Two branches no Fil-C test reaches (measured: 0 hits) are driven by zilc's
+  own inputs `tests/sarcasm/frame-branches/` (xframe runs them after the corpus): the saveIdx merge
+  (saveidx-merge.s — both keep and rewrite traced directly) and D-space slot carriers /
+  clearDynSlots (dyn-slot.s); with them a fault in each is caught (27 and 12 differ). Table depths
+  are unreachable (corpus: x86_depth only number / "dyn"), so Depth is number | dyn. The replay
+  seeds the parser's pseudo-register registry from the captured operands (classifyReg in
+  leaSaveUsesMemoryOnly).
+  Harness bugs found and fixed: the patched upstream module was written back UTF-8-re-encoded
+  (now latin1, verified byte-identical to the release minus the inserted line), and the sequential
+  comparator decoded the two sides differently (now both as bytes). Open curiosity: an in-harness
+  stderr probe undercounted a branch the direct trace shows hit; trace the checker binary directly.
+- next: **checkpoint 3** — upstream 3213–3750 (validateTeardown, checkLostReload, the annotation
+  pass that sets x86_prologue / x86_depth / x86_saves / … on every statement).
 
 ## What a byte-identical port must reproduce (the foundations)
 

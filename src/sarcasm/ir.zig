@@ -52,7 +52,20 @@ pub const LocalCall = struct { entry: []const u8, clone: ?f64 = null, cont: ?[]c
 pub const LocalRet = struct { conts: []const []const u8, clone: ?f64 = null, entry: ?[]const u8 = null };
 /// x86_64_frame.analyzeFrame's per-statement marks (upstream's `st.x86_*` fields): its OUTPUT,
 /// cleared at the start of every run. Fields are added as the analysis is ported.
-pub const FrameMarks = struct {};
+pub const FrameMarks = struct {
+    /// x86_prologue (set by the annotation pass, after the fixpoint; nil during it)
+    prologue: ?bool = null,
+    // set by the depth fixpoint's transfer
+    stackBufLeaValueComputed: ?bool = null,
+    carrierCallArg: ?CarrierCallArg = null,
+    stackBufRep: ?BufRep = null,
+};
+/// x86_carrierCallArg: a call reading a live carrier as a yolo argument register.
+pub const CarrierCallArg = struct { name: []const u8, form: ?[]const u8 };
+/// x86StackBufRep: an annotated rep's buffer range and its stack-alias side (upstream rebuilds
+/// the table for each side, so one side — the last — survives).
+pub const BufRep = struct { lo: f64, hi: f64, id: []const u8, side: ?BufRepSide = null };
+pub const BufRepSide = struct { name: []const u8, K: f64, num: f64, isWrite: bool };
 
 /// tailcall.luau's mark on a cloned `ret`.
 pub const CloneRet = struct { entry: []const u8 };
