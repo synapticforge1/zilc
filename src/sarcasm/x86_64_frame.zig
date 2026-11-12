@@ -22,7 +22,9 @@ const isa = @import("x86_64_isa.zig");
 const fp = @import("x86_64_fp.zig");
 const sig = @import("sig.zig");
 const ln = @import("luau_number.zig");
+const lt = @import("luau_table.zig");
 const u = @import("util.zig");
+const flow = @import("x86_64_frame_flow.zig");
 
 const Allocator = std.mem.Allocator;
 const E = err.Error;
@@ -33,7 +35,7 @@ const eq = std.mem.eql;
 // ---------------------------------------------------------------------------
 // helpers (upstream 137–257)
 
-fn widthLetter(c: u8) ?f64 {
+pub fn widthLetter(c: u8) ?f64 {
     return switch (c) {
         'b' => 1,
         'w' => 2,
@@ -43,46 +45,46 @@ fn widthLetter(c: u8) ?f64 {
     };
 }
 
-fn isStackReg(op: ?*const Op, usesRbp: bool) bool {
+pub fn isStackReg(op: ?*const Op, usesRbp: bool) bool {
     const o = op orelse return false;
     return o.kind == .reg and (o.rc == .sp or (usesRbp and u.eql(o.name, "rbp")));
 }
 
 /// `op.value or tonumber(op.text) or 0` for an immediate, else 0.
-fn immVal(op: ?*const Op) f64 {
+pub fn immVal(op: ?*const Op) f64 {
     return frameShared.immVal(op);
 }
 
 /// A power of two >= 16 (an `and $-n, %rsp` alignment note).
-fn isStackAlign(n_in: f64) bool {
+pub fn isStackAlign(n_in: f64) bool {
     var n = n_in;
     if (n < 16) return false;
     while (@mod(n, 2) == 0) n = n / 2;
     return n == 1;
 }
 
-fn at(ops: []const *Op, i: usize) ?*Op {
+pub fn at(ops: []const *Op, i: usize) ?*Op {
     return if (i < ops.len) ops[i] else null;
 }
-fn rcIs(o: ?*const Op, rc: ir.RegClass) bool {
+pub fn rcIs(o: ?*const Op, rc: ir.RegClass) bool {
     const x = o orelse return false;
     return x.rc == rc;
 }
-fn kindIs(o: ?*const Op, k: ir.OpKind) bool {
+pub fn kindIs(o: ?*const Op, k: ir.OpKind) bool {
     const x = o orelse return false;
     return x.kind == k;
 }
-fn nameIs(o: ?*const Op, n: []const u8) bool {
+pub fn nameIs(o: ?*const Op, n: []const u8) bool {
     const x = o orelse return false;
     return u.eql(x.name, n);
 }
-fn width64OrNil(o: *const Op) bool {
+pub fn width64OrNil(o: *const Op) bool {
     return o.width == null or o.width.? == 64;
 }
 
 /// Reads or writes rsp (operand or memory base / index), or accesses memory through rbp while it
 /// is the frame pointer.
-fn insnTouchesFrame(st: *const Stmt, usesRbp: bool) bool {
+pub fn insnTouchesFrame(st: *const Stmt, usesRbp: bool) bool {
     for (st.operands.items) |o| {
         if (o.kind == .reg) {
             if (o.rc == .sp) return true;
@@ -96,7 +98,7 @@ fn insnTouchesFrame(st: *const Stmt, usesRbp: bool) bool {
 
 /// Writes rsp (destination operand, or the implicit push / pop write, the RFLAGS stack transfers
 /// included).
-fn insnWritesSp(alloc: Allocator, st: *const Stmt) E!bool {
+pub fn insnWritesSp(alloc: Allocator, st: *const Stmt) E!bool {
     const ops = st.operands.items;
     if (kindIs(at(ops, 0), .reg) and rcIs(at(ops, 0), .sp)) return true;
     const m = try u.lower(alloc, st.mnemonic.?);
@@ -156,8 +158,43 @@ pub const Depth = union(enum) { num: f64, dyn };
 pub const PSave = struct { name: []const u8, depth: f64 };
 pub const ProbeRange = struct { lo: f64, hi: f64, id: []const u8 };
 
+/// The frame-pointer state: "no", "est" (established), "dyn".
+pub const FpState = enum { no, est, dyn };
+
+/// An outstanding push on the abstract save stack.
+pub const SaveEntry = struct { name: []const u8, num: ?f64 = null, depth: f64, spill: ?bool = null, redefined: bool = false };
+/// A save stack. Upstream compares these by IDENTITY (the fixpoint's change detection), so they
+/// are pointers; `dyn_saves` is the "dyn" sentinel.
+pub const SaveList = struct { items: []const SaveEntry };
+pub var dyn_saves: SaveList = .{ .items = &.{} };
+pub const Saves = *const SaveList;
+pub fn isDynSaves(s: Saves) bool {
+    return s == &dyn_saves;
+}
+
+/// A saved-rsp carrier map entry (upstream's smap tables; never mutated once made).
+pub const SmapEntry = struct {
+    name: ?[]const u8 = null,
+    num: ?f64 = null,
+    depth: ?f64 = null,
+    saveIdx: ?f64 = null,
+    redefined: ?bool = null,
+    form: ?[]const u8 = null,
+    slot: ?bool = null,
+    off: ?f64 = null,
+    space: ?[]const u8 = null,
+    roff: ?f64 = null,
+    rbase: ?f64 = null,
+    rspace: ?[]const u8 = null,
+    conflict: ?bool = null,
+};
+/// The smap: a Luau table keyed by register name or slot key ("S<off>" / "D<off>"), because
+/// upstream's output depends on its iteration order (the use check names the first offending
+/// carrier); compared by identity like the save lists.
+pub const Smap = lt.Table(*const SmapEntry);
+
 /// Where analyzeFrame stops (for the stage check's checkpoints); `none` runs to the end.
-pub const Stop = enum { none, prologue };
+pub const Stop = enum { none, prologue, fixpoint };
 
 /// analyzeFrame's locals. Field names are upstream's.
 pub const Analysis = struct {
@@ -189,7 +226,15 @@ pub const Analysis = struct {
     prologueEnd: usize = 0,
     frameSize: f64 = 0,
 
-    fn st_(a: *Analysis, i: usize) *Stmt {
+    // the depth fixpoint (upstream 1191–3211; x86_64_frame_flow.zig): per statement, [i - 1]
+    depthIn: []?Depth = &.{},
+    savesIn: []?Saves = &.{},
+    fpIn: []?FpState = &.{},
+    smapIn: []?*Smap = &.{},
+    classCache: std.AutoHashMapUnmanaged(*const Stmt, *ir.Class) = .empty,
+    leaMemOnlyCache: std.AutoHashMapUnmanaged(*const Stmt, bool) = .empty,
+
+    pub fn st_(a: *Analysis, i: usize) *Stmt {
         return a.body[i - 1];
     }
 
@@ -430,5 +475,7 @@ pub fn analyzeFrameTo(alloc: Allocator, body: []const *Stmt, sigDesc: ?*const si
     try a.indexBody();
     try a.prologueScan();
     if (stop == .prologue) return a;
-    @panic("x86_64_frame: analyzeFrame is ported only to the prologue checkpoint");
+    try flow.fixpoint(a);
+    if (stop == .fixpoint) return a;
+    @panic("x86_64_frame: analyzeFrame is ported only to the fixpoint checkpoint");
 }

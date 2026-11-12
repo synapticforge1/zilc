@@ -80,6 +80,18 @@ const PSEUDO_BASE: f64 = 2000;
 var pseudo_nums: std.StringHashMapUnmanaged(f64) = .empty;
 var num_pseudos: f64 = 0;
 
+/// The per-file pseudo-register registry, as a capture replay finds it: cleared, then each
+/// `fil_<ident>` name the captured statements carry bound to its number (a later pass classifying
+/// one of those names gets upstream's number back).
+pub fn resetPseudos() void {
+    pseudo_nums = .empty;
+    num_pseudos = 0;
+}
+pub fn seedPseudo(alloc: Allocator, canon: []const u8, num: f64) E!void {
+    try pseudo_nums.put(alloc, canon, num);
+    num_pseudos = @max(num_pseudos, num - PSEUDO_BASE);
+}
+
 /// classifyReg.
 pub fn classifyReg(alloc: Allocator, name: []const u8) E!?*ir.Operand {
     const low = try lower(alloc, name);
