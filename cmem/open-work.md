@@ -11,7 +11,7 @@ them, with their dates.
 | --- | --- |
 | version | **`0.15.2-0.687.1`** — `<Zig>-<Fil-C>.<zilc release>`, **published 2026-10-27** (tag `v0.15.2-0.687.1` on `be51808`; `releasing.md`); one of the five places the number lives. Before it: `0.15.2-0.686.1` (2026-10-05) |
 | toolchain | Zig **0.15.2** (user code and build), Fil-C **0.687** with zilc's patched clang (`workarounds.md` KI-22, KI-4) — **since 2026-10-30 compiled by Zig** (`zig build patched-clang`; the GCC-built one kept as `~/zilc-work/tools/filc-0.687-zilc-gcc` for rollback); 0.686's kept installed and archived (`toolchain/filc-0.686/`) |
-| pushed | `main` = `origin/main` = `beaa4c3` (2026-11-06: `ec3d6da` the benchmark suite, the Zig-clang reference chain, the Bun re-runs; `94020ab` the user libc in `zig build` and the `zig fmt` cleanup of `src/`; `beaa4c3` the two `tests/basics` `50_time` copies formatted; before them `04ac719`, 2026-11-05; each push scanned for personal data first). No new tag: the version line did not move |
+| pushed | **2026-11-12:** `main` = `origin/main` = the merge of `work-2026-11-12` (pushed with the branch, read back with `ls-remote`; the first push the new `release.yml` runs on — its `checks` only, as `v0.15.2-0.687.1` is already tagged). Before it `79e8040` (2026-11-07), and `beaa4c3` (2026-11-06: `ec3d6da` the benchmark suite, the Zig-clang reference chain, the Bun re-runs; `94020ab` the user libc in `zig build` and the `zig fmt` cleanup of `src/`; `beaa4c3` the two `tests/basics` `50_time` copies formatted; before them `04ac719`, 2026-11-05; each push scanned for personal data first). No new tag: the version line did not move |
 | gates | `zig build gate`, `zig build test`, Fil-C's suite, the corpus in four modes, the output comparison: all re-run 2026-10-27 on Fil-C 0.687, counts in `testing.md` |
 | remote | `origin` = `github.com/synapticforge1/zilc` (since 2026-10-27; was `jrmarcum/zilc`, which GitHub redirects). **Purged history pushed 2026-10-27**: `main` = `origin/main`, `v0.15.2` = tag `v0.15.2-0.686.1` = `13ce96a` (was `19e7172`; map `history-map-2026-10-27.md`) |
 | branches | `main` carries the Bun port (`c2841dd`, was `44e0b1a`), merged `--no-ff` 2026-10-27 (owner: "we will merge all to bun tooling since deno is going away"), and the 2026-10-27 work since; `bun-port` (merged, never pushed) deleted 2026-10-27 (owner). Branches: `main`, `v0.15.2` |
@@ -19,8 +19,9 @@ them, with their dates.
 
 ## ▶️ PICK UP HERE — paused 2026-11-07 evening (owner: "need to pause here for today. please note where we are in the fix list")
 
-**Committed 2026-11-12 on branch `work-2026-11-12`** (owner: "commit"; two commits — the sarcasm
-checkpoint, then the Bun pin + the workspace letters; NOT merged into `main`, NOT pushed): x86_64_frame
+**Committed 2026-11-12 on branch `work-2026-11-12`** (owner: "commit"; two commits — `2b9c44c` the
+sarcasm checkpoint, `df6b565` the Bun pin + the workspace letters), **then pushed** (owner: "push"):
+merged into `main` and pushed with the branch; State row "pushed" below): x86_64_frame
 checkpoint 2 (`src/sarcasm/x86_64_frame_flow.zig`, ir / frame / parse additions, the xframe harness
 updates, `tests/sarcasm/frame-branches/*.s`), two harness fixes (latin1 module write, byte-wise
 sequential compare), and the **Bun pin moved 1.4.3 → 1.4.4** (owner's choice; `tools/README.md`,
