@@ -10,7 +10,7 @@ one compiler binary.
 ## What it is
 
 [Fil-C](https://github.com/pizlonator/fil-c) makes C and C++ memory-safe at runtime. It gives every
-pointer an invisible *capability* (InvisiCap) holding its allocation bounds, and replaces `free()`
+pointer an invisible _capability_ (InvisiCap) holding its allocation bounds, and replaces `free()`
 with an accurate, non-moving garbage collector (FUGC). Out-of-bounds accesses and use-after-free
 become deterministic panics instead of memory corruption.
 
@@ -162,10 +162,10 @@ zig build pure-zig        # Fil-C's runtime pieces built by Zig: libpas, yolo mu
 
 What each needs besides Zig 0.15.2:
 
-| step | needs |
-| --- | --- |
+| step            | needs                                                                                                                 |
+| --------------- | --------------------------------------------------------------------------------------------------------------------- |
 | `patched-clang` | cmake and ninja (LLVM's build system), or `-Dfetch-build-tools`; Python 3 (LLVM's CMake requires it; Ubuntu ships it) |
-| `pure-zig` | the Linux kernel headers (`/usr/include/linux`; Debian and Ubuntu: `linux-libc-dev`) |
+| `pure-zig`      | the Linux kernel headers (`/usr/include/linux`; Debian and Ubuntu: `linux-libc-dev`)                                  |
 
 **`-Dfetch-build-tools`** (opt-in) lets `zig build` fetch cmake 4.2.3 and ninja 1.13.1, the
 official release binaries pinned by hash in `build.zig.zon`, into Zig's cache (about 60 MB),
@@ -219,7 +219,7 @@ Code derived from Fil-C, LLVM or Zig keeps its original license (Apache-2.0 WITH
 BSD-2-Clause, or MIT). See [NOTICE](NOTICE) and [third_party/LICENSES.md](third_party/LICENSES.md).
 
 **zilc bundles none of those toolchains** — it invokes the Zig and Fil-C you point it at. Note,
-though, that a binary *produced* by `zilc build` contains Fil-C's runtime (BSD-2-Clause) and musl
+though, that a binary _produced_ by `zilc build` contains Fil-C's runtime (BSD-2-Clause) and musl
 (MIT), because Fil-C links them. If you distribute programs built with zilc, their notices travel
 with those programs.
 

@@ -26,7 +26,7 @@
 import { lstatSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { ARGS, REPO, ZIG, linuxOnly, must, run } from "../lib/tool.ts";
-import { BUMP_FILES, bumpEdits, bumpSubject, findEntry, gitIn, tagsDifferFrom, disagreements as placeDisagreements, reviewsCoverRelease, zonVersion, type Places, type Version } from "./guards.ts";
+import { BUMP_FILES, bumpEdits, bumpSubject, findEntry, gitIn, githubRender, renderedProblems, reviewRecords, tagsDifferFrom, disagreements as placeDisagreements, reviewsCoverRelease, zonVersion, type Places, type Version } from "./guards.ts";
 
 await linuxOnly(import.meta);
 
@@ -91,6 +91,15 @@ if (entry !== null) {
     pre.push(...(await reviewsCoverRelease(gitIn(REPO), entry, head, false)).map((b) => `${b} (required before every release — H35)`));
   } catch (e) {
     fail(`git failed while checking the reviews: ${(e as Error).message}`);
+  }
+  // The places a person wrote, as GitHub would show them (KI-38). The README's status line is the
+  // bump's own edit, so check-reviews.ts renders it after the bump.
+  if (!pre.length) {
+    try {
+      pre.push(...(await renderedProblems(githubRender(), { release: read("cmem/release.md"), notes: read("RELEASE-NOTES.md"), openWork: read("cmem/open-work.md") }, nextV, reviewRecords(entry).records)));
+    } catch (e) {
+      fail(`GitHub's renderer could not be asked (a render that did not happen is never a pass): ${(e as Error).message}`);
+    }
   }
 }
 if (pre.length) fail(`not ready to bump to ${next}:\n  ${pre.join("\n  ")}`);

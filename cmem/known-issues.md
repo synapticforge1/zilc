@@ -19,8 +19,8 @@ happens there.
 
 Fil-C's README: *"Fil-C only works on Linux/X86_64 or Linux/ARM64."* The earlier Darwin and
 FreeBSD ports were dropped in favor of a faithful libc. This dev machine is **Windows 11**.
-- **Impact:** building or running upstream Fil-C needs Linux. ✅ *Superseded 2026-09-23 — WSL2 is
-  installed; see above.*
+- **Impact:** building or running upstream Fil-C needs Linux. ✅ _Superseded 2026-09-23 — WSL2 is
+  installed; see above._
 - Upstream publishes **prebuilt releases**, so the LLVM fork never needs building for the
   experiments: `filc-<ver>-linux-x86_64.tar.xz` (v0.685 was published 2026-09-16) at
   https://github.com/pizlonator/fil-c/releases.
@@ -50,7 +50,7 @@ below 20 or at 21 and above, and its bundled libc++ is `_LIBCPP_VERSION 200100` 
 `cmake/Modules/LLVMVersion.cmake` is **20.1.8**. Same major version, so the IR is compatible.
 Experiments use 0.15.2.
 
-🎯 **Owner goal 2026-09-30:** after the initial work, zilc moves to the *latest* Zig with minimal
+🎯 **Owner goal 2026-09-30:** after the initial work, zilc moves to the _latest_ Zig with minimal
 layout rework. The LLVM match binds only the Zig that compiles **user code**, not the one that
 builds zilc (`design-decisions.md` invariant 4).
 
@@ -77,7 +77,7 @@ the reverse of that change.** `main.zig` goes back to `std.process.Init`/`std.Io
 > `workarounds.md` KI-4. The dialect facts below are unaffected.
 
 > ⚠️ **READ THE REVERSAL AT THE END OF THIS ENTRY BEFORE ACTING ON ANYTHING ABOVE IT.** The dialect
-> facts below are all correct and still load-bearing. The *conclusion* drawn from them — "externally
+> facts below are all correct and still load-bearing. The _conclusion_ drawn from them — "externally
 > produced IR is not an entry point" — was **wrong**, and was falsified the same afternoon by the
 > first P2 experiment. Kept in full, because the mistake is the lesson.
 
@@ -98,7 +98,7 @@ target datalayout_after_filc = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-i1
 ```
 
 ⚠️ **Position matters** (`ni:0` goes right after `m:e`): LLVM compares layout strings textually, so
-appending `-ni:0` produces a *different* layout and fails the backend's match check. The exact
+appending `-ni:0` produces a _different_ layout and fails the backend's match check. The exact
 string was recovered from the error emitted by `clang -Xclang -disable-llvm-passes`.
 
 **Consequences, all verified 2026-09-23 (`roadmap.md` P1 step 3):**
@@ -117,37 +117,37 @@ entry point (or a `-fno-filc`-style pre-pass emit), re-test — it would restore
 
 Stock LLVM here = Zig 0.15.2's bundled clang (LLVM 21), fed each module by `.ll` extension:
 
-| input | stock LLVM verdict |
-| --- | --- |
-| Fil-C's emitted IR, unmodified | ❌ `unknown target property` — **the `datalayout_after_filc` line, and nothing else** |
-| the same file with only that line deleted | ✅ **accepted** |
-| any module whose layout contains `ni:0` | ❌ `address space 0 cannot be non-integral` |
-| the same with `ni:1` | ✅ accepted — **`ni` is standard; only `ni:0` is Fil-C's extension** |
+| input                                     | stock LLVM verdict                                                                    |
+| ----------------------------------------- | ------------------------------------------------------------------------------------- |
+| Fil-C's emitted IR, unmodified            | ❌ `unknown target property` — **the `datalayout_after_filc` line, and nothing else** |
+| the same file with only that line deleted | ✅ **accepted**                                                                       |
+| any module whose layout contains `ni:0`   | ❌ `address space 0 cannot be non-integral`                                           |
+| the same with `ni:1`                      | ✅ accepted — **`ni` is standard; only `ni:0` is Fil-C's extension**                  |
 
 🔑 **So Fil-C does NOT emit or consume "invalid" IR.** Its output is ordinary LLVM IR plus one extra
-target-property line; its *input* requirement (`ni:0`) is the one thing stock LLVM refuses to
+target-property line; its _input_ requirement (`ni:0`) is the one thing stock LLVM refuses to
 express — deliberately, since non-integral AS 0 is what forbids the optimizer from round-tripping
 pointers through integers behind the pass's back. And Fil-C not re-reading its own output is a
-**round-trip** mismatch (output carries the *after* layout, the pass wants the *before* one), not
+**round-trip** mismatch (output carries the _after_ layout, the pass wants the _before_ one), not
 malformedness.
 
 🙂 **This is encouraging for P2:** if the divergence really is two layout lines plus the pass, then
 teaching Zig's LLVM backend to emit them may be a small change, with everything else ordinary IR.
 ⚠️ Do not assume it — hand-patching those two lines still segfaulted inside the pass, so something
-beyond the layout differs. Finding out *what* is P2's first experiment.
+beyond the layout differs. Finding out _what_ is P2's first experiment.
 
 ### ✅ THE REVERSAL (2026-09-23, P2 experiment 1) — **the two layout lines ARE enough**
 
-| experiment | result |
-| --- | --- |
-| **hand-written** `.ll` (never touched by Fil-C's frontend) carrying both layout lines | ✅ **ACCEPTED** at `-O0` and `-O1` |
-| Zig IR, layouts patched, **ReleaseSmall / ReleaseFast / ReleaseSafe** | ✅ **ACCEPTED** (37 / 161 / 4,007 lines) |
-| Zig IR, layouts patched, **Debug** | ❌ segfault — 189,740 lines, **1,110 functions, 114 inline-asm blocks** |
+| experiment                                                                            | result                                                                  |
+| ------------------------------------------------------------------------------------- | ----------------------------------------------------------------------- |
+| **hand-written** `.ll` (never touched by Fil-C's frontend) carrying both layout lines | ✅ **ACCEPTED** at `-O0` and `-O1`                                      |
+| Zig IR, layouts patched, **ReleaseSmall / ReleaseFast / ReleaseSafe**                 | ✅ **ACCEPTED** (37 / 161 / 4,007 lines)                                |
+| Zig IR, layouts patched, **Debug**                                                    | ❌ segfault — 189,740 lines, **1,110 functions, 114 inline-asm blocks** |
 
 🎓 **The segfault was never about "Zig IR" or about frontend provenance. It was about DEBUG-MODE
 Zig IR**, and every earlier test happened to use Debug because that is Zig's default. One variable —
 the optimization mode — was never varied, and a structural conclusion was drawn from a single
-setting. *This is `best-practices.md` §2's "vary one thing at a time" all over again.*
+setting. _This is `best-practices.md` §2's "vary one thing at a time" all over again._
 
 **So the wrapper-driver route is ALIVE**: emit IR with stock Zig → rewrite two `target datalayout`
 lines → hand it to Fil-C's clang. No Zig fork, no LLVM build. See `roadmap.md` P1/P2 for what that
@@ -155,16 +155,16 @@ already achieves, and KI-5/KI-6 for the two limits that remain.
 
 ### ✅ DEBUG MODE IS SUPPORTED NOW (2026-09-23, P2 item 1) — two concessions, and the cause is upstream's
 
-**❌ Inline asm was NOT the cause.** Fil-C accepts `__asm__` in ordinary C *and* an `asm sideeffect`
+**❌ Inline asm was NOT the cause.** Fil-C accepts `__asm__` in ordinary C _and_ an `asm sideeffect`
 call in a hand-written dialect module. 114 occurrences, all innocent — the prime suspect named in the
 original entry was wrong.
 
 **The actual shape of it, measured on identical Debug IR (189,741 lines, 1,110 functions):**
 
-| what changed | result |
-| --- | --- |
-| `filc -O0` | ✅ **compiles** |
-| `filc -O1` / `-O2` | ❌ segfault inside the pass |
+| what changed                                       | result                                                                                                   |
+| -------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| `filc -O0`                                         | ✅ **compiles**                                                                                          |
+| `filc -O1` / `-O2`                                 | ❌ segfault inside the pass                                                                              |
 | Zig `-fstrip` (11,326 lines, 163 defines) at `-O1` | ✅ compiles — but it removes **code as well as** the 54,636 `!DI` lines, so it proves nothing on its own |
 
 🔑 **So it is an interaction between LLVM's OPTIMIZER and the pass on this module, not a construct
@@ -179,14 +179,14 @@ are required. The repro and its reproduction steps: **`tools/p2/repro/`**.
 **The 8 are Zig's `std.compress.flate.Decompress` Huffman decoder** — Debug builds pull it in because
 Zig's stack-trace printer decompresses DWARF.
 
-| hypothesis | verdict |
-| --- | --- |
-| inline asm | ❌ Fil-C compiles `__asm__` in C and `asm sideeffect` in IR |
-| debug metadata / `!DI` records | ❌ stripped every one; **still crashes** |
-| odd-width ints (`i46` in an `sret`) | ❌ a hand-written `i46`-through-`sret` module builds at `-O0/-O1/-O2` |
-| "this Zig code is unsupported" | ❌ the same flate code in **ReleaseSafe** (146,488 lines) compiles fine |
+| hypothesis                          | verdict                                                                 |
+| ----------------------------------- | ----------------------------------------------------------------------- |
+| inline asm                          | ❌ Fil-C compiles `__asm__` in C and `asm sideeffect` in IR             |
+| debug metadata / `!DI` records      | ❌ stripped every one; **still crashes**                                |
+| odd-width ints (`i46` in an `sret`) | ❌ a hand-written `i46`-through-`sret` module builds at `-O0/-O1/-O2`   |
+| "this Zig code is unsupported"      | ❌ the same flate code in **ReleaseSafe** (146,488 lines) compiles fine |
 
-**What is left:** the *unoptimized shape* of that code plus LLVM's `-O1` pipeline around the pass.
+**What is left:** the _unoptimized shape_ of that code plus LLVM's `-O1` pipeline around the pass.
 Narrowing further needs line-level reduction or a debug build of Fil-C's clang — neither of which
 zilc needs, since the driver compiles Debug IR at `-O0`.
 
@@ -194,7 +194,7 @@ zilc needs, since the driver compiles Debug IR at `-O0`.
 ~~Filing it is the owner's call.~~ **Settled 2026-10-01:** upstream reporting is optional and not
 planned (`design-decisions.md`), and this crash is fixed in zilc's patched clang (top of KI-4).
 
-**What zilc does about it (`src/driver.zig`):** `-O Debug` now *works*, with two concessions applied
+**What zilc does about it (`src/driver.zig`):** `-O Debug` now _works_, with two concessions applied
 automatically and announced:
 
 1. **`filc -O0`** for the instrumented IR — the segfault above.
@@ -246,7 +246,7 @@ kind of platform plumbing. Each use is a potential trap site.
 
 ### ✅ The fix that shipped: a generated C-ABI entry shim
 
-`zilc build hello.zig` now works with **no C file**. The driver writes `zilc_entry.zig`, makes *it*
+`zilc build hello.zig` now works with **no C file**. The driver writes `zilc_entry.zig`, makes _it_
 the root module and the user's file a module named `user`, so **Zig never pulls `start.zig` in**:
 
 ```
@@ -391,7 +391,7 @@ had **two independent causes**, each confirmed by experiment, not reasoning alon
    Zig 0.16 itself rewrote `fromPage` with wrapping `+% -%`, which emits plain arithmetic, so the
    direction matches upstream.
 2. **An address passed as an integer parameter.** `BucketHeader.fromPage(page_addr: usize, …)`:
-   an integer *parameter* is BOTTOM, whatever the caller held. **Fix: std overlay patch**
+   an integer _parameter_ is BOTTOM, whatever the caller held. **Fix: std overlay patch**
    (`src/stdpatch.zig`, zilc's own, **not a backport**, since 0.16.0 has the same signature):
    `fromPage` takes the page **pointer**; the three call sites pass `page`, or
    `@ptrFromInt(page_addr)` computed in the same function as `@intFromPtr(memory.ptr)`.
@@ -434,12 +434,12 @@ so no behaviour changes.
 - **std offers no switch:** `std.Options` has no stack-trace knob; `sys_can_stack_trace` is a fixed
   per-architecture constant (`debug.zig:171`).
 - **Safe equivalents (owner chose 1, 2026-09-30, "I agree with your recommendation"; 3 stays possible later, on top of 1):**
-  1. **std overlay patch: `std.debug.sys_can_stack_trace = false` under zilc** *(recommended)*.
+  1. **std overlay patch: `std.debug.sys_can_stack_trace = false` under zilc** _(recommended)_.
      It tells std the truth, that native stack walking is unavailable, so every std path that would
      walk the stack (allocator traces, panic traces, `dumpCurrentStackTrace`) takes its existing
      "no stack traces" branch. Fil-C already supplies traces for every safety stop, with
      file:line, and the panic handler uses `zerror` (KI-7). Loses only `DebugAllocator`'s leak and
-     double-free *allocation-site* traces; Fil-C itself catches double free and use-after-free.
+     double-free _allocation-site_ traces; Fil-C itself catches double free and use-after-free.
   2. Patch only `default_sys_stack_trace_frames` to 0: narrower, but leaves other stack-walking
      paths reachable.
   3. Later: implement `captureStackTrace` over **Fil-C's `zstack_scan`** (frames with function,
@@ -454,7 +454,7 @@ Zig's LLVM optimization passes (Zig's help: "Produce a .ll file with optimized L
 passes ran under Zig's ordinary data layout, where pointers are plain integers, so LLVM is free to
 canonicalise a pointer load into **`load i64` + `inttoptr`**. Under Fil-C a loaded integer has **no
 capability**, so the pointer dies. Fil-C's `ni:0` layout exists to forbid exactly that transform,
-but zilc applied it *after* Zig had already optimized.
+but zilc applied it _after_ Zig had already optimized.
 
 - **Found by** the 5 thread-join failures (KI-10): Zig's source keeps `pthread_t` as a pointer
   throughout, but in the emitted IR `Thread.join` did `%v = load i64, ptr %slot; %p = inttoptr i64
@@ -545,14 +545,14 @@ it. A full `git repack -a -d` consolidated six packs to one, but the next repack
 
 **Mitigation (repo-local config, not committed):** since 2026-10-27 the workspace standard,
 **`maintenance.strategy gc`** (divergence P7). Until then `maintenance.geometric-repack.enabled=false`
-+ `maintenance.gc.enabled=true`, which a traced run on git 2.54 showed to be the same `gc` plus one
-more task, `commit-graph write --split`; both keep the failing geometric repack and
-`multi-pack-index write` from running. The automatic run after commits is clean. `gc` only runs when
-loose objects pass `gc.auto` (~6,700), so the error is rare, and harmless when it occurs. This is
-the final answer (owner decision above). ~~Full fix: keep repos on NTFS~~: rejected, because the
-projects stay on D: for portability.
+- `maintenance.gc.enabled=true`, which a traced run on git 2.54 showed to be the same `gc` plus one
+  more task, `commit-graph write --split`; both keep the failing geometric repack and
+  `multi-pack-index write` from running. The automatic run after commits is clean. `gc` only runs when
+  loose objects pass `gc.auto` (~6,700), so the error is rare, and harmless when it occurs. This is
+  the final answer (owner decision above). ~~Full fix: keep repos on NTFS~~: rejected, because the
+  projects stay on D: for portability.
 
-*History (2026-10-01).* The owner pointed to wazmrt's NTFS setup (`working-rules.md`:
+_History (2026-10-01)._ The owner pointed to wazmrt's NTFS setup (`working-rules.md`:
 `ZIG_LOCAL_CACHE_DIR=C:\zig-cache\wazmrt`, plus an NTFS cwd for `test-security`). That covers the
 **Zig cache**, which zilc already handles the same way (`C:\zig-cache\zilc`, KI-2); it does not
 move git's object store. Moving `.git` to NTFS behind a `gitdir:` pointer file was proposed and
@@ -659,24 +659,24 @@ buffer (1: 58).
 **Owner: "We may also need to check that all release modes do not have differing issues with
 these found conditions."** The conditions found so far **depend on the mode**:
 
-| condition | Debug | ReleaseSafe | ReleaseFast | ReleaseSmall |
-| --- | --- | --- | --- | --- |
-| overflow-checked arithmetic (KI-13 #1) | yes | yes | no (plain wrap) | no |
-| inlining hides or exposes KI-13 #2 | **no inlining** (`filc -O0`) | `-O1` inlines | `-O1` | `-O1` |
-| Valgrind client requests (KI-14) | **yes** (default) | no | no | no |
-| `DebugAllocator` stack traces (KI-15) | **6 frames** | 0 | 0 | 0 |
-| stack-probe symbol (KI-8) | yes | yes (large frames) | ? | ? |
-| stack-trace / panic code in the binary | full | full | full | **mostly stripped** |
+| condition                              | Debug                        | ReleaseSafe        | ReleaseFast     | ReleaseSmall        |
+| -------------------------------------- | ---------------------------- | ------------------ | --------------- | ------------------- |
+| overflow-checked arithmetic (KI-13 #1) | yes                          | yes                | no (plain wrap) | no                  |
+| inlining hides or exposes KI-13 #2     | **no inlining** (`filc -O0`) | `-O1` inlines      | `-O1`           | `-O1`               |
+| Valgrind client requests (KI-14)       | **yes** (default)            | no                 | no              | no                  |
+| `DebugAllocator` stack traces (KI-15)  | **6 frames**                 | 0                  | 0               | 0                   |
+| stack-probe symbol (KI-8)              | yes                          | yes (large frames) | ?               | ?                   |
+| stack-trace / panic code in the binary | full                         | full               | full            | **mostly stripped** |
 
 So **the corpus runs in every mode** (`tools/basics/zilc-check.ts`, `MODE=…`), and results are
 recorded per mode in `testing.md`.
 
 **Measured 2026-09-30 (Zig corpus, as designed out of 78):**
 
-| route | ReleaseSafe | ReleaseFast | ReleaseSmall | Debug |
-| --- | --- | --- | --- | --- |
-| optimized IR (old) | 71 | 75 | 69 | stopped by KI-15 |
-| **unoptimized IR (default now)**, plus the wrapper-call rewrite | **76** | **76** | **76** | **63** (57 clean exits); see KI-19 |
+| route                                                           | ReleaseSafe | ReleaseFast | ReleaseSmall | Debug                              |
+| --------------------------------------------------------------- | ----------- | ----------- | ------------ | ---------------------------------- |
+| optimized IR (old)                                              | 71          | 75          | 69           | stopped by KI-15                   |
+| **unoptimized IR (default now)**, plus the wrapper-call rewrite | **76**      | **76**      | **76**       | **63** (57 clean exits); see KI-19 |
 
 **The modes differed because of LLVM's pre-optimisation (KI-17). Once it was removed, the three Release
 modes give identical results.** The 2 left in each are the KI-18 Fil-C assertion. Two
@@ -855,25 +855,25 @@ comment inside a fence allowed, or a shorter fence line not closing — tests ad
 ## ✅ KI-32 — A fence inside a list item: the guard's one remaining reading of Markdown structure (class 1 retest 5; 2026-11-15, FIXED)
 
 **Same class, found by the class's fifth retest (fresh reviewer; RUN end to end):** the fence reader
-took an INDENTED fence (`  ```` under `- item`) as a fence running to its matching closer, but on
-GitHub a fence in a list item ends with the item, so a column-0 `<!--` after it is a live comment
-that can hide the whole Release History section — while the guard skipped that `<!--` as "inside a
-fence" and passed (`check-reviews.ts` exit 0, `bump --check` exit 0). The same trick split the
+took an INDENTED fence (` ```` under`- item`) as a fence running to its matching closer, but on
+GitHub a fence in a list item ends with the item, so a column-0 `<!--`after it is a live comment
+that can hide the whole Release History section — while the guard skipped that`<!--` as "inside a
+fence" and passed (`check-reviews.ts`exit 0,`bump --check` exit 0). The same trick split the
 README status line in two readings. Smaller, same round: a one-dash setext underline (`-`) was not
-heading-like; `outsideCode` paired an escaped backtick and backtick runs of different lengths
-(CommonMark § 6.1 pairs only equal runs); the shared `run()` in `tools/lib/tool.ts` (release.ts's
-git helper, bump.ts's fetch) waited for the pipes after a timeout kill — the hang `gitIn` had just
+heading-like; `outsideCode`paired an escaped backtick and backtick runs of different lengths
+(CommonMark § 6.1 pairs only equal runs); the shared`run()`in`tools/lib/tool.ts`(release.ts's
+git helper, bump.ts's fetch) waited for the pipes after a timeout kill — the hang`gitIn` had just
 been fixed for. **Fix:** fences only at column 0 (`fenceLines`), and any fence-like line after
 indentation, a list marker or `>` is refused by name (`containerFence`) — the guard no longer reads
-container structure at all, it refuses it; `headingLike` takes `-+`; `outsideCode` removes escaped
-backticks first and pairs only equal runs; `run()` stops waiting 2 s after its timeout kill
+container structure at all, it refuses it; `headingLike`takes`-+`; `outsideCode`removes escaped
+backticks first and pairs only equal runs;`run()` stops waiting 2 s after its timeout kill
 (`tools/lib/tool.ts`, all tools: behaviour changes only where a timeout fires and something still
 holds the pipes, which used to hang). Measured first: none of the four Markdown files holds an
-indented or prefixed fence, a lone `-` line, or an escaped backtick. **Test:** the reviewer's trap
-above the section and in the README; fences indented, quoted, nested-quoted, after `-` / `1.` / a
+indented or prefixed fence, a lone `-`line, or an escaped backtick. **Test:** the reviewer's trap
+above the section and in the README; fences indented, quoted, nested-quoted, after`-`/`1.`/ a
 tab; an indented CLOSER of a column-0 fence still closing (allowed); the one-dash underline; both
-backtick cases; `run()` against the never-answering remote helper (exit 124 within the limit).
-**Inversion 2026-11-15: 51 of 51 mutants caught** on a passing baseline; `bun test tools/release/`
+backtick cases;`run()`against the never-answering remote helper (exit 124 within the limit).
+**Inversion 2026-11-15: 51 of 51 mutants caught** on a passing baseline;`bun test tools/release/`
 133/133; the scratch end-to-end release passes.
 
 ## ✅ KI-33 — The comment check subtracted code spans first, which is the renderer's call (class 1 retest 6; 2026-11-15, FIXED)
@@ -883,20 +883,20 @@ backtick cases; `run()` against the never-answering remote helper (exit 124 with
 backticks pair is decided by CommonMark's precedence: a backtick inside a tag's attribute
 (`<b title="`">`) is no span opener, and a backslash inside a span does not escape (§ 6.1, § 6.6) —
 so a live comment passed, and the README status line could pass while a reader saw no version.
-Smaller: inline `<details>` / `<summary>` (which collapse what follows on GitHub, everything after an
+Smaller: inline `<details>`/`<summary>` (which collapse what follows on GitHub, everything after an
 unclosed one) passed anywhere but a line start; the status line's version could sit in a tag
 attribute, a code span or strikethrough. The records, entry headings, notes heading and State row
 were NOT reachable (fixed column-0 text, which an inline construct cannot swallow — the reviewer's
-analysis). **Fix:** the checks run on the RAW line — no code span is ever subtracted (`<!--` even in
-backticks is refused; zilc's files hold none, measured); `<details>` / `<summary>` refused anywhere
-outside column-0 fences; the text before the status line's version may hold no `<`, backtick,
+analysis). **Fix:** the checks run on the RAW line — no code span is ever subtracted (`<!--`even in
+backticks is refused; zilc's files hold none, measured);`<details>`/`<summary>`refused anywhere
+outside column-0 fences; the text before the status line's version may hold no`<`, backtick,
 backslash or `~`. Placeholders such as `<n>` or `` `<Zig>` `` mid-line stay allowed (they hide
-nothing a guard counts). A `(?!~)` written for strikethrough after the version was seen by no test
-(GFM strikethrough needs `~~` on both sides, and the prefix rule already refuses the opening one)
-and was removed. **Test:** the reviewer's two inputs, `<details>` mid-line / indented / quoted / in a
-list, `</summary>`, the status version in an attribute / struck through / in a code span, and
+nothing a guard counts). A `(?!~)`written for strikethrough after the version was seen by no test
+(GFM strikethrough needs`~~`on both sides, and the prefix rule already refuses the opening one)
+and was removed. **Test:** the reviewer's two inputs,`<details>`mid-line / indented / quoted / in a
+list,`</summary>`, the status version in an attribute / struck through / in a code span, and
 placeholders allowed. **Inversion 2026-11-15: 51 of 51 mutants caught** on a passing baseline;
-`bun test tools/release/` 144/144 (with a test that the real `cmem/release.md` stays readable — this ledger's own first wording of the rule put a literal tag there); the scratch end-to-end release passes.
+`bun test tools/release/`144/144 (with a test that the real`cmem/release.md` stays readable — this ledger's own first wording of the rule put a literal tag there); the scratch end-to-end release passes.
 
 ## ✅ KI-34 — The two free-text places could be hidden by their surroundings (class 1 retest 7; 2026-11-15, FIXED)
 
@@ -982,3 +982,43 @@ continuation (four leads), four code points, the ASCII-only trim, a BOM before f
 a row above, a one-dash delimiter allowed, an autolink allowed and `<div>` refused, `$$` in four
 positions, `.github/README.md`. **Inversion 2026-11-15: 72 of 72 mutants caught** on a passing
 baseline; `bun test tools/release/` 182/182; the scratch end-to-end release passes.
+
+## ✅ KI-38 — The guard stops reading Markdown for itself: GitHub's renderer decides what is shown, Biome formats (owner, 2026-11-15; FIXED)
+
+**Why (owner, 2026-11-15):** retests 2–10 each found another way GitHub's rendering could differ
+from the guard's own reading of Markdown, and KI-31–KI-37 answered by FORBIDDING valid Markdown.
+The owner: "Characters that define valid markdown elements are not forbidden"; "a markdown record
+that is not rendered is an error"; and, for formatting, "biome. I know it works correctly" (the
+tool the other projects use). **Measured first:** GitHub's `POST /markdown` (`gfm`, unauthenticated,
+8 calls) on the reviewers' hiding cases — a comment removed; an attribute's and an image's alt text
+kept out of the text; `<details>` kept, collapsed; a list item's fence ending with the item; a
+mismatched table not a table; a plain record a visible `<li>`. Biome 2.5.x ignores `.md` (2.5.14:
+"These paths were provided but ignored"); 2.6.0 (2026-10-21) is the first with Markdown; 2.6.4
+(2026-10-28, the newest at least two weeks old) parses, formats and fails `ci` on an unformatted
+file; it refuses comments in `biome.json` (so `biome.jsonc`). **Fix:** (1) `renderedProblems`
+(`guards.ts`) renders the counted files with GitHub's renderer (`githubRender`: the REST API, never
+`gh`; CI's token; any failure throws) and requires, as TEXT nodes (an attribute is never text) not
+inside a collapsed `<details>`: the `v<version>` heading with both records under it, the notes'
+`## <version>` heading, the README status version in its quote, the State row as a table row —
+in `check-reviews.ts` (CI, `release.ts`) and `bump.ts release`; (2) every forbidden-construct rule
+of KI-31–KI-37 removed (only LF stays, owner's standard); the text side reads plain lines and ATX
+headings — eight lines of fence and setext reading were then seen by no test (the rendered check
+backs them) and were removed; (3) Biome: `biome.jsonc` (Markdown only, width 100, prose kept),
+`tools/md/biome.ts` (Biome 2.6.4 fetched from npm's `@biomejs/cli-linux-x64`, sha256
+`71d293b5…`, = the registry's sha512 integrity; a wrong hash installs nothing — RUN), a `checks`
+step and `release.ts`'s cold gate; all 46 `.md` reformatted (43 files changed: table padding,
+`_emphasis_`, list markers; one file needed a second pass). The reformat padded the State row
+(`| version   |`), which the old exact pattern refused — the place is now matched with any padding.
+**Test:** GitHub's own HTML for the eight cases (fixtures, verbatim); a stand-in renderer (Bun's
+md4c, which keeps comments and `<details>`) for records in a comment / `<details>` / a fence / an
+indented block, an entry heading in a fence, records under a later heading, two entry headings,
+the status version in alt text and outside its quote, the notes heading in a comment, the State
+row outside a table, the renderer's failures (non-200, no answer, a throwing renderer), the CLI
+refusing a record GitHub would not show; and a live test against GitHub (`ZILC_LIVE_RENDER=1`,
+off by default: 60 unauthenticated calls an hour) — PASSES. **Inversion 2026-11-15: 42 of 42
+mutants caught** on a passing baseline; `bun test tools/release/` 117/117 (+1 live, skipped by
+default). **Limit, recorded:** GitHub does not document that `/markdown` is the repository page's
+exact pipeline; every case measured agrees (its output carries the page's `notranslate` classes and
+`target="_blank"` links). `bump.ts`'s own render call and `tools/md/biome.ts` have no unit test
+(both RUN by hand, 2026-11-15).
+**Also:** Biome padded `Fil-C.md`'s table, and `zig build check-pins` (a Zig program that checks text pins, run by `zig build test`) matched the old spacing exactly and failed. For `.md` pins it now treats a run of spaces as one (`squeezeSpaces`, with its own unit test, wired into `zig build test`: 41/41); inverted — a `Fil-C.md` naming another release still fails. `zig fmt` formats the `.zig` files, Biome the `.md` files (owner, 2026-11-15: "zig fmt checks the zig format").

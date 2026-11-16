@@ -5,18 +5,18 @@
 Builds every example with the zilc driver and asserts each one **traps at the right source line**.
 This is the gate the whole project exists to keep green.
 
-| # | case | traps at | fault |
-| --- | --- | --- | --- |
-| 1 | interop: C allocates, Zig overflows | `bounds.zig:13:6` | `ptr >= upper` |
-| 2 | whole Zig program (generated entry shim) | `hello.zig:25:6` | `ptr >= upper` |
-| 3 | C out-of-bounds write | `oob_write.c:15` | `ptr >= upper` |
-| 4 | C use-after-free | `use_after_free.c:13` | `free object` |
+| #   | case                                     | traps at              | fault          |
+| --- | ---------------------------------------- | --------------------- | -------------- |
+| 1   | interop: C allocates, Zig overflows      | `bounds.zig:13:6`     | `ptr >= upper` |
+| 2   | whole Zig program (generated entry shim) | `hello.zig:25:6`      | `ptr >= upper` |
+| 3   | C out-of-bounds write                    | `oob_write.c:15`      | `ptr >= upper` |
+| 4   | C use-after-free                         | `use_after_free.c:13` | `free object`  |
 
 **Each case asserts four things**, because any one alone is fakeable: the process died on **SIGTRAP**;
 the output contains `filc safety error`; the `semantic origin` names **that file:line**; and the
-violation is of the expected **kind**. ⚠️ *Exit status alone accepts a crash for the wrong reason —
+violation is of the expected **kind**. ⚠️ _Exit status alone accepts a crash for the wrong reason —
 and a `-O0` link failure earlier in this very session produced an equally non-zero exit for a
-completely unrelated reason (a missing stack probe).*
+completely unrelated reason (a missing stack probe)._
 
 ✅ **Inversion-tested 2026-09-23:** with one expected origin changed to a line that does not exist,
 the gate **failed** and printed the real panic. A gate that cannot fail proves nothing.
@@ -27,8 +27,8 @@ ZILC_FILC=…/build/bin/clang ZILC_ZIG=…/zig zig build gate    # the same, by 
 ```
 
 ⚠️ **Where Fil-C is absent the gate SKIPS and exits 0**, printing what to set. A build that never had
-a chance to pass must not read as a failure — but that also means *a green `zig build gate` on
-Windows means nothing*. Read the first line.
+a chance to pass must not read as a failure — but that also means _a green `zig build gate` on
+Windows means nothing_. Read the first line.
 
 ## 🧪 `tests/basics`: 156 CORRECT programs (C + Zig), added 2026-09-30
 
@@ -36,20 +36,20 @@ The owner's "Basics of Coding" lessons, 78 in C and the same 78 in Zig (provenan
 change: `tests/basics/README.md`). The gate proves **bugs trap**. This corpus proves **correct
 programs don't**, and gives size numbers against plain Zig. Tools in `tools/basics/`.
 
-| check | C | Zig 0.15.2 |
-| --- | --- | --- |
-| compiles + links, plain Zig 0.15.2, `-lc`, musl | **78/78** (after 5 portability fixes) | **78/78** (after converting 60 files from 0.13/0.14) |
-| runs as designed, plain ReleaseSafe | **78/78** | **78/78** exit codes. ⚠️ Outputs were wrong when redirected until the stdio streaming fix (2026-09-30, `tests/basics/README.md`) |
-| **builds with zilc** | **78/78** | ReleaseSafe ~~50/78~~ → **77/78** after the KI-8 fix (only KI-9 left) · ReleaseSmall **77/78** (KI-9) |
-| **runs as designed under zilc** (ReleaseSafe) | **78/78** (`42_panic` traps via Fil-C, as designed) | ~~24~~ → 26 (KI-8) → 45 (KI-7) → 50 (panic handler + KI-9) → **71/78** (KI-13 overflow fold + `fromPage` patch, KI-14 `-fno-valgrind`). 65 clean exits plus 6 intentional (`42` panic, `66` exit 1 without a subcommand, `77` exit 3, three servers). Then the **unoptimized-IR route** (KI-17, the default since 2026-09-30) → **76/78**: the 5 thread joins pass, and `76_signals` now runs (it waits, as designed). **Left, 2:** the KI-18 Fil-C assertion (`22_strings-and-runes`, `69_http-client`) |
-| **every mode** (KI-16, default route) | same in every mode (C ignores `-O`) | ~~ReleaseSafe 76 · ReleaseFast 76 · ReleaseSmall 76 · Debug 63~~ → 2026-10-01: 78 · 78 · 78 · 65 (KI-18, KI-20) → **2026-10-01 (evening): 78/78 as designed in ALL FOUR MODES**, with the patched Fil-C clang (KI-22 colouring, KI-4 `indirectbr`) and Debug at `filc -O1` (fixes KI-19). Gate 4/4 with it. Tool: `tools/basics/all-modes.ts` (defaults to the patched clang) |
-| **on Fil-C 0.687** (2026-10-27; patched 0.687 clang, in WSL, on commit `b33b6eb`) | — | **Still 78/78 as designed in all four modes**: 71 OK + the designed 7 in every mode and both languages, by name (`42_panic` traps, `66` exit 1, `77_exit` exit 3, `70`–`72` and `76_signals` time out; `tests/basics/README.md`); KillUB's new defined results changed no output. Gate 8/8, tests 29/29. Output comparison: **0 unexplained** (`{same 500, expected 56, varies 68, variesBad 0, differs 0}`; 3 fewer "same" than 0.686 and 3 more "varies", the native side varying by itself) |
-| **on Fil-C 0.686** (2026-10-05; patched 0.686 clang, `ZILC_VERIFY_INTERFERENCE=1` + `ZILC_VERIFY_COLOURING=1`) | — | **Still 78/78 as designed in all four modes** (71 OK + the designed 7, C and Zig alike), **0 builds with a verification difference**, gate 8/8, tests **29/29**. `69` ReleaseSafe alone **38.0 s** cold (35.9 on 0.685). Output comparison re-run: 0 unexplained |
-| **+ dense interference graph, object cache** (KI-22 levers (b), (c); 2026-10-02, same load, `ZILC_JOBS=4`, `ZILC_CACHE=0`) | — | **Still 78/78 as designed in all four modes**, gate 4/4, tests **25/25** (26/26 with `--clean-cache`, same day). **Verified run:** the whole corpus in all four modes with `ZILC_VERIFY_INTERFERENCE=1` and `ZILC_VERIFY_COLOURING=1`: 78/78 as designed, **no graph or colouring difference** (verified `69` builds 154–431 s, so the original code really ran). `69` under load: Debug **56 s** (was 68), ReleaseSafe **58 s** (70), ReleaseFast **82 s** (97), ReleaseSmall **52 s** (61). Alone, through the driver: `69` ReleaseSafe **35.9 s** split (43.9 before (b)), 49.9 s at `-j 1`; rebuild unchanged, same output path: **2.3 s** (cache hit; `62` 0.5 s). Byte-identical to the prebuilt on every deterministic input (`compare-clangs.ts`) |
-| **build time, + parallel code generation** (KI-22 lever (a); 2026-10-02, same load, `ZILC_JOBS=4` per build) | — | **Still 78/78 as designed in all four modes** (71 OK + the designed 7: `42` panic, `66` exit 1, `77` exit 3, `70`/`71`/`72` servers, `76_signals`), gate 4/4, tests 24/24. Medians unchanged (Debug 4 s, ReleaseSafe 4 s, ReleaseFast 4 s, ReleaseSmall 3 s). `69`: Debug **68 s** (was 79), ReleaseSafe **70 s** (81), ReleaseFast **97 s** (107), ReleaseSmall **61 s** (70). Alone, through the driver: `69` ReleaseSafe **60.6 s → 43.9 s** (`-j 1` vs default 16 parts), `62` 7.0 → 5.0 s, same program output. Code identity: 2,840/2,840 functions of `69` identical to the unsplit compile of the same bitcode (`workarounds.md` KI-22) |
-| **build time, + overlay v5** (Debug-only KI-21 route guarded; 2026-10-01 late, same load) | — | Still 78/78 as designed in all four modes, gate 4/4. Medians: **Debug 4 s** (was 19), ReleaseSafe 4 s, ReleaseFast 3 s, ReleaseSmall 2 s. `69`: Debug 79 s, ReleaseSafe 81 s, ReleaseFast 107 s, ReleaseSmall 70 s. Alone: `04_constants` Debug 2.1 s (was 9.9; native Zig with LLVM 1.1 s), `69` ReleaseSafe 55.9 s (native 16.9 s) |
-| **build time with the patched clang** (2026-10-01 evening, same load) | — | `69`: ReleaseSafe **112 s**, ReleaseFast **154 s**, ReleaseSmall **87 s**, Debug **83 s** (was a 30-min timeout). Medians: Debug 19 s, ReleaseSafe 4 s, ReleaseFast 3 s, ReleaseSmall 2 s. Alone, Fil-C's clang on `69` (`-O1`): prebuilt 112 s, patched 54 s |
-| **build time** (2026-10-01, all 4 modes × 8 jobs at once, so inflated) | — | After KI-21: ReleaseSafe median **4 s**, `62` 19 s (was 92), `48_json` 30 s (was 86); `69` 214 s (ReleaseSafe), 754 s (ReleaseFast), timeout (Debug), all KI-22. Alone: `62` ReleaseSafe 8.0 s vs native 6.7 s; `69` 132 s vs native 20 s. `zilc-check.ts` now reports `BUILD-TIMEOUT` (`TBUILD`, default 1800 s) and writes `build seconds:` into each `build.log` |
+| check                                                                                                                      | C                                                   | Zig 0.15.2                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| -------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| compiles + links, plain Zig 0.15.2, `-lc`, musl                                                                            | **78/78** (after 5 portability fixes)               | **78/78** (after converting 60 files from 0.13/0.14)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| runs as designed, plain ReleaseSafe                                                                                        | **78/78**                                           | **78/78** exit codes. ⚠️ Outputs were wrong when redirected until the stdio streaming fix (2026-09-30, `tests/basics/README.md`)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| **builds with zilc**                                                                                                       | **78/78**                                           | ReleaseSafe ~~50/78~~ → **77/78** after the KI-8 fix (only KI-9 left) · ReleaseSmall **77/78** (KI-9)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| **runs as designed under zilc** (ReleaseSafe)                                                                              | **78/78** (`42_panic` traps via Fil-C, as designed) | ~~24~~ → 26 (KI-8) → 45 (KI-7) → 50 (panic handler + KI-9) → **71/78** (KI-13 overflow fold + `fromPage` patch, KI-14 `-fno-valgrind`). 65 clean exits plus 6 intentional (`42` panic, `66` exit 1 without a subcommand, `77` exit 3, three servers). Then the **unoptimized-IR route** (KI-17, the default since 2026-09-30) → **76/78**: the 5 thread joins pass, and `76_signals` now runs (it waits, as designed). **Left, 2:** the KI-18 Fil-C assertion (`22_strings-and-runes`, `69_http-client`)                                                                                                                                                                                                                                                  |
+| **every mode** (KI-16, default route)                                                                                      | same in every mode (C ignores `-O`)                 | ~~ReleaseSafe 76 · ReleaseFast 76 · ReleaseSmall 76 · Debug 63~~ → 2026-10-01: 78 · 78 · 78 · 65 (KI-18, KI-20) → **2026-10-01 (evening): 78/78 as designed in ALL FOUR MODES**, with the patched Fil-C clang (KI-22 colouring, KI-4 `indirectbr`) and Debug at `filc -O1` (fixes KI-19). Gate 4/4 with it. Tool: `tools/basics/all-modes.ts` (defaults to the patched clang)                                                                                                                                                                                                                                                                                                                                                                             |
+| **on Fil-C 0.687** (2026-10-27; patched 0.687 clang, in WSL, on commit `b33b6eb`)                                          | —                                                   | **Still 78/78 as designed in all four modes**: 71 OK + the designed 7 in every mode and both languages, by name (`42_panic` traps, `66` exit 1, `77_exit` exit 3, `70`–`72` and `76_signals` time out; `tests/basics/README.md`); KillUB's new defined results changed no output. Gate 8/8, tests 29/29. Output comparison: **0 unexplained** (`{same 500, expected 56, varies 68, variesBad 0, differs 0}`; 3 fewer "same" than 0.686 and 3 more "varies", the native side varying by itself)                                                                                                                                                                                                                                                            |
+| **on Fil-C 0.686** (2026-10-05; patched 0.686 clang, `ZILC_VERIFY_INTERFERENCE=1` + `ZILC_VERIFY_COLOURING=1`)             | —                                                   | **Still 78/78 as designed in all four modes** (71 OK + the designed 7, C and Zig alike), **0 builds with a verification difference**, gate 8/8, tests **29/29**. `69` ReleaseSafe alone **38.0 s** cold (35.9 on 0.685). Output comparison re-run: 0 unexplained                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| **+ dense interference graph, object cache** (KI-22 levers (b), (c); 2026-10-02, same load, `ZILC_JOBS=4`, `ZILC_CACHE=0`) | —                                                   | **Still 78/78 as designed in all four modes**, gate 4/4, tests **25/25** (26/26 with `--clean-cache`, same day). **Verified run:** the whole corpus in all four modes with `ZILC_VERIFY_INTERFERENCE=1` and `ZILC_VERIFY_COLOURING=1`: 78/78 as designed, **no graph or colouring difference** (verified `69` builds 154–431 s, so the original code really ran). `69` under load: Debug **56 s** (was 68), ReleaseSafe **58 s** (70), ReleaseFast **82 s** (97), ReleaseSmall **52 s** (61). Alone, through the driver: `69` ReleaseSafe **35.9 s** split (43.9 before (b)), 49.9 s at `-j 1`; rebuild unchanged, same output path: **2.3 s** (cache hit; `62` 0.5 s). Byte-identical to the prebuilt on every deterministic input (`compare-clangs.ts`) |
+| **build time, + parallel code generation** (KI-22 lever (a); 2026-10-02, same load, `ZILC_JOBS=4` per build)               | —                                                   | **Still 78/78 as designed in all four modes** (71 OK + the designed 7: `42` panic, `66` exit 1, `77` exit 3, `70`/`71`/`72` servers, `76_signals`), gate 4/4, tests 24/24. Medians unchanged (Debug 4 s, ReleaseSafe 4 s, ReleaseFast 4 s, ReleaseSmall 3 s). `69`: Debug **68 s** (was 79), ReleaseSafe **70 s** (81), ReleaseFast **97 s** (107), ReleaseSmall **61 s** (70). Alone, through the driver: `69` ReleaseSafe **60.6 s → 43.9 s** (`-j 1` vs default 16 parts), `62` 7.0 → 5.0 s, same program output. Code identity: 2,840/2,840 functions of `69` identical to the unsplit compile of the same bitcode (`workarounds.md` KI-22)                                                                                                           |
+| **build time, + overlay v5** (Debug-only KI-21 route guarded; 2026-10-01 late, same load)                                  | —                                                   | Still 78/78 as designed in all four modes, gate 4/4. Medians: **Debug 4 s** (was 19), ReleaseSafe 4 s, ReleaseFast 3 s, ReleaseSmall 2 s. `69`: Debug 79 s, ReleaseSafe 81 s, ReleaseFast 107 s, ReleaseSmall 70 s. Alone: `04_constants` Debug 2.1 s (was 9.9; native Zig with LLVM 1.1 s), `69` ReleaseSafe 55.9 s (native 16.9 s)                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| **build time with the patched clang** (2026-10-01 evening, same load)                                                      | —                                                   | `69`: ReleaseSafe **112 s**, ReleaseFast **154 s**, ReleaseSmall **87 s**, Debug **83 s** (was a 30-min timeout). Medians: Debug 19 s, ReleaseSafe 4 s, ReleaseFast 3 s, ReleaseSmall 2 s. Alone, Fil-C's clang on `69` (`-O1`): prebuilt 112 s, patched 54 s                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| **build time** (2026-10-01, all 4 modes × 8 jobs at once, so inflated)                                                     | —                                                   | After KI-21: ReleaseSafe median **4 s**, `62` 19 s (was 92), `48_json` 30 s (was 86); `69` 214 s (ReleaseSafe), 754 s (ReleaseFast), timeout (Debug), all KI-22. Alone: `62` ReleaseSafe 8.0 s vs native 6.7 s; `69` 132 s vs native 20 s. `zilc-check.ts` now reports `BUILD-TIMEOUT` (`TBUILD`, default 1800 s) and writes `build seconds:` into each `build.log`                                                                                                                                                                                                                                                                                                                                                                                       |
 
 **C already works under zilc across the whole corpus. Zig's gaps are all in std**, not the pipeline:
 raw system calls, stack probes, f128 helpers, thread handles. That is P4, now with a
@@ -61,12 +61,12 @@ Zig's musl binaries are **static**. zilc's are **dynamic** and load Fil-C's shar
 **`libc.so` 7.3 MB + `libpizlo.so` 9.1 MB + `libyoloc.so` 3.6 MB ≈ 20 MB**, installed once per
 machine, not per program. zilc passes `-g`, so stripped sizes are the fair comparison.
 
-| | Zig ReleaseSmall | Zig ReleaseSafe | zilc ReleaseSafe | zilc ReleaseSmall |
-| --- | --- | --- | --- | --- |
-| **C** (78), raw | 19,800 | 938,960 | 27,976 | n/a (C ignores `-O`) |
-| **C**, stripped | 19,800 | 20,536 | **18,592** | n/a |
-| **Zig** (the 50 all flavours built), raw | 16,832 | 2,330,200 | 565,624 | 89,632 |
-| **Zig**, stripped | 16,832 | 270,512 | 341,360 | 76,896 |
+|                                          | Zig ReleaseSmall | Zig ReleaseSafe | zilc ReleaseSafe | zilc ReleaseSmall    |
+| ---------------------------------------- | ---------------- | --------------- | ---------------- | -------------------- |
+| **C** (78), raw                          | 19,800           | 938,960         | 27,976           | n/a (C ignores `-O`) |
+| **C**, stripped                          | 19,800           | 20,536          | **18,592**       | n/a                  |
+| **Zig** (the 50 all flavours built), raw | 16,832           | 2,330,200       | 565,624          | 89,632               |
+| **Zig**, stripped                        | 16,832           | 270,512         | 341,360          | 76,896               |
 
 Per-program ratios (median): C zilc/ReleaseSmall **0.86** stripped (smaller, since libc is not
 inside). Zig zilc ReleaseSafe/ReleaseSafe **1.26** stripped; zilc ReleaseSmall/ReleaseSmall **4.36**
@@ -81,11 +81,11 @@ exact Zig 0.15.2 commands were recovered on 2026-10-05 and verified to reproduce
 (same code; only 3 debug-info lines differ: the build directory, and the hash of Zig's cache folder
 for `builtin.zig`):
 
-| file | made from | how |
-| --- | --- | --- |
-| `$WORK/p1/tiny.ll` | `tools/p1/tiny.zig` | `zig build-obj -target x86_64-linux-gnu -femit-llvm-ir=tiny.ll -fno-emit-bin tiny.zig` (in `$WORK/p1`) |
-| `$WORK/p1/zig_oob-x86_64-linux-gnu.ll` | `tools/p1/zig_oob.zig` | `zig build-exe -target x86_64-linux-gnu -lc -femit-llvm-ir=zig_oob-x86_64-linux-gnu.ll -fno-emit-bin zig_oob.zig` |
-| **`tiny-ni2.ll`** (`$WORK/p1`, copied to `$WORK/p2`) | `tiny.ll` | `bun tools/p1/zig-ir-spike.ts`; read by `tools/p2/dialect-probe.ts` part C. **The one input with no committed source of its own** |
+| file                                                 | made from              | how                                                                                                                               |
+| ---------------------------------------------------- | ---------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| `$WORK/p1/tiny.ll`                                   | `tools/p1/tiny.zig`    | `zig build-obj -target x86_64-linux-gnu -femit-llvm-ir=tiny.ll -fno-emit-bin tiny.zig` (in `$WORK/p1`)                            |
+| `$WORK/p1/zig_oob-x86_64-linux-gnu.ll`               | `tools/p1/zig_oob.zig` | `zig build-exe -target x86_64-linux-gnu -lc -femit-llvm-ir=zig_oob-x86_64-linux-gnu.ll -fno-emit-bin zig_oob.zig`                 |
+| **`tiny-ni2.ll`** (`$WORK/p1`, copied to `$WORK/p2`) | `tiny.ll`              | `bun tools/p1/zig-ir-spike.ts`; read by `tools/p2/dialect-probe.ts` part C. **The one input with no committed source of its own** |
 
 The full notes are in `tools/p1/README.md` and `tools/p2/README.md` ("Record: tiny-ni2.ll") and in
 both tools' headers. Found during the Deno conversion: two experiment scripts used to copy inputs
@@ -178,7 +178,7 @@ headers, kernel headers.
      fixes (2026-11-04, read 2026-11-05): `compare-chains.ts` 14/14** — suite 0 differences on
      7,269 vs stock and vs the GCC chain, gate 8/8 both, corpus and output comparison unchanged
      (CET's `endbr64` is a no-op where CET is not enforced, as expected).
-  3b. **Ubuntu GCC's other hardening defaults (found 2026-11-05 by a rescan; was misfiled under
+     3b. **Ubuntu GCC's other hardening defaults (found 2026-11-05 by a rescan; was misfiled under
      W-8)** — the release's compiler-rt: stack protector (9 `__stack_chk_fail` calls, 18 guard
      loads, 8 members) and fortify (`__fprintf_chk`); its yolo musl: 15 stack-clash probes. The
      zig chain: none (C-7b). The rescan (2026-11-05, after the CET and archive fixes): 61 → 52
@@ -290,18 +290,18 @@ inputs and the stress test, both assert on the KI-18 repro, `62` different: two 
 
 The 0.685 run, first:
 
-Owner: run upstream's tests *"to make sure we are not missing anything that upstream has already
-identified"*. **Result: stock Fil-C 0.685 clang and zilc's patched clang give the SAME result on
+Owner: run upstream's tests _"to make sure we are not missing anything that upstream has already
+identified"_. **Result: stock Fil-C 0.685 clang and zilc's patched clang give the SAME result on
 all 7,003 tests (0 differences).** So zilc's three pass patches (colouring, `indirectbr` lowering,
 dense interference graph) change nothing Fil-C's own suite checks.
 
-| | stock 0.685 | zilc patched |
-| --- | --- | --- |
-| run (x86_64 + SHA-NI, musl build) | 5,779 | 5,779 |
-| **pass** | **5,778** | **5,778** |
-| fail | 1: `inlineasm_rdpkru` | the same 1 |
-| skipped (cannot run here) | 1,224: 694 need AVX-512, 504 ARM-only, 24 glibc-build-only, 1 macOS-only, 1 marked skip | the same |
-| time, 24 jobs | ~6 min | ~6.5 min |
+|                                   | stock 0.685                                                                             | zilc patched |
+| --------------------------------- | --------------------------------------------------------------------------------------- | ------------ |
+| run (x86_64 + SHA-NI, musl build) | 5,779                                                                                   | 5,779        |
+| **pass**                          | **5,778**                                                                               | **5,778**    |
+| fail                              | 1: `inlineasm_rdpkru`                                                                   | the same 1   |
+| skipped (cannot run here)         | 1,224: 694 need AVX-512, 504 ARM-only, 24 glibc-build-only, 1 macOS-only, 1 marked skip | the same     |
+| time, 24 jobs                     | ~6 min                                                                                  | ~6.5 min     |
 
 - `inlineasm_rdpkru` executes `rdpkru` (memory protection keys); this CPU, under WSL2, has no
   `pku` flag: "Illegal instruction". A hardware/VM limit, the same for both compilers.
@@ -342,13 +342,13 @@ varies between two runs (times, random numbers, thread order), all with the same
 count, and the same lines once digits are masked); **60** in the short EXPECTED table, 8
 programs, each with its reason:
 
-| program | why it cannot match |
-| --- | --- |
-| `17_pointers`, `46_string-formatting` | print an address (native's is fixed: non-PIE) |
-| `27_goroutines`, `36_worker-pools` | thread scheduling decides the order (27 matched natively twice by chance, in C) |
-| `42_panic` | designed: under zilc the panic is reported by Fil-C (`zerror`) |
-| `64_command-line-arguments` | prints its own path, which differs between the harnesses |
-| `74_execing-processes`, `75_spawning-processes` | `ls -la` of the working directory, `date` |
+| program                                         | why it cannot match                                                             |
+| ----------------------------------------------- | ------------------------------------------------------------------------------- |
+| `17_pointers`, `46_string-formatting`           | print an address (native's is fixed: non-PIE)                                   |
+| `27_goroutines`, `36_worker-pools`              | thread scheduling decides the order (27 matched natively twice by chance, in C) |
+| `42_panic`                                      | designed: under zilc the panic is reported by Fil-C (`zerror`)                  |
+| `64_command-line-arguments`                     | prints its own path, which differs between the harnesses                        |
+| `74_execing-processes`, `75_spawning-processes` | `ls -la` of the working directory, `date`                                       |
 
 Also learned: the program's **environment** works under zilc (67 lists it and reads `FOO`),
 and so do `argv`, files, stdin, child processes and threads.
@@ -376,17 +376,17 @@ and so do `argv`, files, stdin, child processes and threads.
 
 **CI (since 2026-11-12; first run 43295657634 on `bba102f`, `checks` green):** `.github/workflows/release.yml` runs, on every
 push to `main`, the steps that need no Fil-C: `zig fmt --check`, `zig build test` (40/40 on a fresh
-clone with empty caches, rehearsed in WSL 2026-11-12), `bun test tools/release/` (182 since
-2026-11-15: 27 against a mock GitHub API, 155 for the release guards in `guards.test.ts`, KI-24–37),
+clone with empty caches, rehearsed in WSL 2026-11-12), `bun test tools/release/` (117 since
+2026-11-15: 27 against a mock GitHub API, 90 for the release guards in `guards.test.ts`, KI-24–38; +1 live render test, off by default), Biome's Markdown check,
 `bump.ts --check`, the privacy scan, and on a release `check-reviews.ts` (KI-25). The rows below that need Fil-C stay local;
 `tools/release/release.ts` runs the gate before it pushes (`release.md` § "What runs where").
 
-| Step | Checks | State |
-| --- | --- | --- |
-| `zig build gate` | Every bug example traps at the right line; the library-mode example runs (needs Fil-C) | **8/8** (2026-10-05 on Fil-C 0.686; 2026-10-02, KI-5 environ and library mode added; earlier 4/4 with the parallel code generation of KI-22 lever (a)) |
-| `zig build test` | Runtime module + CLI module + the IR rewrites (incl. the KI-18 three-byte-global wrap) + the std-overlay patches (incl. the KI-21 guards) + the runtime values (`filc` only; `zig` refused 2026-09-30, removed 2026-10-27) + the version round-trip + the object cache key and `--clean-cache` (KI-22 lever c) | **29/29** pass (2026-10-05, incl. `--clean-cache`, the KI-20 note, the version facts and the `0.15.2-0.686.1` scheme) |
-| `zig build capi-smoke` | `tests/capi_smoke.c` links `zilc_runtime` via `zilc.h` and calls it | pass |
-| `zig build baseline` | Builds `examples/*.c` with plain `zig cc` | builds. `baseline_oob_write` prints `a[3] = 3`, exit 0: **the undetected bug** |
+| Step                   | Checks                                                                                                                                                                                                                                                                                                         | State                                                                                                                                                  |
+| ---------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `zig build gate`       | Every bug example traps at the right line; the library-mode example runs (needs Fil-C)                                                                                                                                                                                                                         | **8/8** (2026-10-05 on Fil-C 0.686; 2026-10-02, KI-5 environ and library mode added; earlier 4/4 with the parallel code generation of KI-22 lever (a)) |
+| `zig build test`       | Runtime module + CLI module + the IR rewrites (incl. the KI-18 three-byte-global wrap) + the std-overlay patches (incl. the KI-21 guards) + the runtime values (`filc` only; `zig` refused 2026-09-30, removed 2026-10-27) + the version round-trip + the object cache key and `--clean-cache` (KI-22 lever c) | **29/29** pass (2026-10-05, incl. `--clean-cache`, the KI-20 note, the version facts and the `0.15.2-0.686.1` scheme)                                  |
+| `zig build capi-smoke` | `tests/capi_smoke.c` links `zilc_runtime` via `zilc.h` and calls it                                                                                                                                                                                                                                            | pass                                                                                                                                                   |
+| `zig build baseline`   | Builds `examples/*.c` with plain `zig cc`                                                                                                                                                                                                                                                                      | builds. `baseline_oob_write` prints `a[3] = 3`, exit 0: **the undetected bug**                                                                         |
 
 All gates were re-verified on **Zig 0.15.2** after the toolchain move (2026-09-18). Run them with
 that Zig, not the `zig` on PATH, **inside Linux** (a WSL shell here; owner, 2026-10-27), with the
@@ -409,10 +409,10 @@ commands ran with Windows' Zig, `C:\zig\0.15.2\zig.exe`, and the cache `C:\zig-c
 
 Measured in WSL with `build/bin/clang -O2 -g` (`roadmap.md` P1 step 2). **Both exit 133** (SIGTRAP):
 
-| example | fault line | Fil-C's message |
-| --- | --- | --- |
-| `oob_write.c:15:14` | store one past a 4-int allocation | `cannot write pointer with ptr >= upper.` / `expected 4 writable bytes.` |
-| `use_after_free.c:13:20` | read after `free` | `cannot access pointer to free object.` / `expected valid capability.` |
+| example                  | fault line                        | Fil-C's message                                                          |
+| ------------------------ | --------------------------------- | ------------------------------------------------------------------------ |
+| `oob_write.c:15:14`      | store one past a 4-int allocation | `cannot write pointer with ptr >= upper.` / `expected 4 writable bytes.` |
+| `use_after_free.c:13:20` | read after `free`                 | `cannot access pointer to free object.` / `expected valid capability.`   |
 
 Both end with `filc panic: thwarted a futile attempt to violate memory safety.` and print a
 `semantic origin` with **file:line:column** plus a stack of `check scheduled at:` frames.
@@ -438,27 +438,27 @@ assertion for the interop gate — it proves the capability crossed the language
 let **C own `main`** (KI-5); **Debug works but costs ~108× in size** (KI-4), so gates should run
 ReleaseSafe by default and Debug only where the size is acceptable.
 
-| optimize mode | binary | same panic? |
-| --- | --- | --- |
-| ReleaseSafe | 127,424 B | ✅ `bounds.zig:13:6` |
-| Debug (`filc -O0` + `-fno-stack-check`) | 13,766,024 B | ✅ identical |
+| optimize mode                           | binary       | same panic?          |
+| --------------------------------------- | ------------ | -------------------- |
+| ReleaseSafe                             | 127,424 B    | ✅ `bounds.zig:13:6` |
+| Debug (`filc -O0` + `-fno-stack-check`) | 13,766,024 B | ✅ identical         |
 
 ⚠️ **When scripting a gate, capture the exit status before piping.** `./prog | sed …` reports
-*sed's* status, and the exit code is half of what these tests assert. (Cost us one confusing
+_sed's_ status, and the exit code is half of what these tests assert. (Cost us one confusing
 "run exit=0" on a run that had clearly trapped.)
 
 ## The pure-Zig track's oracles (2026-10-27)
 
 Byte for byte against Fil-C's own build, for the release zilc is on (`roadmap.md` Z1), in WSL:
 
-| check | tool | 0.687 result |
-| --- | --- | --- |
-| forwarder generator = Ruby's `generate_pizlonated_forwarders.rb` | `bun tools/gen/verify-forwarders.ts` | both files SAME (45,695 B, 983,629 B) |
-| musl header install = `make install-headers` | `bun tools/gen/verify-musl-headers.ts` | 219 files identical |
-| the same bytes, pinned | `zig build test` (`src/gen/forwarders.zig`) | SHA-256 + size; **unit tests 40/40** (29 + the generators' 11) |
-| libpas's stock half, `filc_crt.o`, `filc_mincrt.o`, `libyolounwind.a` = the release tarball's | `bun tools/runtime/verify-libpas.ts` | **178/178 objects define exactly upstream's global symbols**; 1 known undefined difference (W-4); 16 assert-presence differences (budget 16); source paths in upstream's form; the three small pieces SAME |
-| yolo musl's static half = the release's | `bun tools/runtime/verify-yolomusl.ts` | **1,343 members in upstream's order**, each defining upstream's symbols, binding included; 28 with compiler-only undefined differences (budget 28, W-8); 1,342 compile-unit names equal + 1 empty TU (budget 1); crt objects, `libyolom.a` |
-| compiler-rt = the release's | `bun tools/runtime/verify-compiler-rt.ts` | **167 members in upstream's order**, exactly upstream's symbols, **0 departures** (`_Float16` off, as the release: W-10); 14 objects with compiler-only undefined differences (W-8) |
+| check                                                                                         | tool                                        | 0.687 result                                                                                                                                                                                                                               |
+| --------------------------------------------------------------------------------------------- | ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| forwarder generator = Ruby's `generate_pizlonated_forwarders.rb`                              | `bun tools/gen/verify-forwarders.ts`        | both files SAME (45,695 B, 983,629 B)                                                                                                                                                                                                      |
+| musl header install = `make install-headers`                                                  | `bun tools/gen/verify-musl-headers.ts`      | 219 files identical                                                                                                                                                                                                                        |
+| the same bytes, pinned                                                                        | `zig build test` (`src/gen/forwarders.zig`) | SHA-256 + size; **unit tests 40/40** (29 + the generators' 11)                                                                                                                                                                             |
+| libpas's stock half, `filc_crt.o`, `filc_mincrt.o`, `libyolounwind.a` = the release tarball's | `bun tools/runtime/verify-libpas.ts`        | **178/178 objects define exactly upstream's global symbols**; 1 known undefined difference (W-4); 16 assert-presence differences (budget 16); source paths in upstream's form; the three small pieces SAME                                 |
+| yolo musl's static half = the release's                                                       | `bun tools/runtime/verify-yolomusl.ts`      | **1,343 members in upstream's order**, each defining upstream's symbols, binding included; 28 with compiler-only undefined differences (budget 28, W-8); 1,342 compile-unit names equal + 1 empty TU (budget 1); crt objects, `libyolom.a` |
+| compiler-rt = the release's                                                                   | `bun tools/runtime/verify-compiler-rt.ts`   | **167 members in upstream's order**, exactly upstream's symbols, **0 departures** (`_Float16` off, as the release: W-10); 14 objects with compiler-only undefined differences (W-8)                                                        |
 
 The three tables these build from are regenerated per release (`bun tools/runtime/import-libpas-sources.ts`,
 `import-yolomusl-sources.ts`, `import-compiler-rt-sources.ts`; the last needs `ninja` on `PATH`:
@@ -538,8 +538,8 @@ modes**, C and Zig; output comparison **0 unexplained**, with the same totals as
    and a comparison of the two reports, not a new gate. Worth automating once it has been done by
    hand once.
 4. ✅ **Benchmark suite — BUILT 2026-11-06** (planned 2026-09-30 for upgrade stage C; owner
-   2026-11-05: *"upstream's plus our zig only ports of upstreams plus new ones that we write to
-   test the zig only version specifically"*). See "Benchmark suite" below.
+   2026-11-05: _"upstream's plus our zig only ports of upstreams plus new ones that we write to
+   test the zig only version specifically"_). See "Benchmark suite" below.
 
 ## Benchmark suite (`tools/bench/bench.ts`, `tests/bench/`; first baseline 2026-11-06)
 
@@ -581,4 +581,4 @@ plain ones static.
 compare <old>/results.json <new>/results.json` (stage C's first column).
 5. **Upstream test corpus.** `filc/tests` from Fil-C, adopted under the ledger.
 6. **ABI completeness.** As in wazmrt, a C file that takes the address of every function declared in
-   `zilc.h`, so a declared-but-undefined symbol breaks the build.
+`zilc.h`, so a declared-but-undefined symbol breaks the build.

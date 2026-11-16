@@ -26,9 +26,14 @@ named below. Method lessons are in [best-practices.md](best-practices.md), not h
 - **Every `.zig` file is formatted with the project's Zig (0.15.2 today), and `zig fmt --check
   build.zig build tools tests src` is clean before a commit** — the `tests/basics` copies of the
   owner's programs included, both the `zig-0.15.2` and `zig-0.16.0` folders (owner, 2026-11-06:
-  *"if we need to fix formatting, lets fix that first then commit and push"*; then *"they need to
-  be formatted for the version we are currently using in this project"*). Confirm the diff is
+  _"if we need to fix formatting, lets fix that first then commit and push"_; then _"they need to
+  be formatted for the version we are currently using in this project"_). Confirm the diff is
   layout only and rebuild what the file feeds.
+- **Every `.md` file is formatted by Biome, and `bun tools/md/biome.ts ci .` is clean before a
+  commit** (owner, 2026-11-15: "biome. I know it works correctly"; the tool the other projects
+  chose). `bun tools/md/biome.ts format --write .` formats; one pass may leave a file for a second.
+  Biome 2.6.4, pinned by version and sha256 in the tool; `biome.jsonc` holds the settings. Any
+  valid Markdown is allowed — nothing is forbidden for a guard's sake (owner, 2026-11-15).
 - Line endings are LF, pinned in `.gitattributes` wildcard-first (`* text=auto eol=lf`). Never
   "fix" a line-ending complaint with `git config`; check with `git check-attr`.
 - The exFAT `.git` recipe is KI-23's (`known-issues.md`); the workspace standard differs —

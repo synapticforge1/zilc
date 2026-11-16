@@ -12,10 +12,13 @@
  *   - cmem/release.md (at <commit>) has exactly one `### v<version>` entry, and it holds exactly
  *     one Security and one Hardening review record in the fixed form (guards.ts REVIEW_FORM);
  *   - each record starts at the previous release's tag and names a commit in the released history
- *     after which only `cmem/` and RELEASE-NOTES.md changed.
+ *     after which only `cmem/` and RELEASE-NOTES.md changed;
+ *   - GitHub's own renderer (`POST /markdown`, KI-38) shows every counted place: the entry heading
+ *     and both records, the notes heading, the README status line, the State row. CI passes its
+ *     GITHUB_TOKEN; `ZILC_GITHUB_API` points the renderer elsewhere (the tests' stand-in).
  * Exit 1 with the reasons otherwise; exit 2 when git itself fails (a failure is never a pass).
  */
-import { bumpSubject, findEntry, gitIn, reviewsCoverRelease, zonVersion } from "./guards.ts";
+import { bumpSubject, findEntry, gitIn, githubRender, renderedProblems, reviewRecords, reviewsCoverRelease, zonVersion } from "./guards.ts";
 import { join } from "node:path";
 
 const REPO = join(import.meta.dir, "..", "..");
@@ -47,7 +50,12 @@ try {
   if (!entry) fail(1, `cmem/release.md has no "### v${v.full}" entry`);
   const bad = await reviewsCoverRelease(git, entry, sha, true);
   if (bad.length) fail(1, `v${v.full} is not ready:\n  ${bad.join("\n  ")}`);
-  console.log(`check-reviews: v${v.full} at ${sha.slice(0, 7)} — the bump commit, both required reviews recorded and covering everything since the previous release`);
+  // What a reader of the GitHub page sees (KI-38): every counted place, rendered by GitHub itself.
+  // A render that fails throws, and is exit 2 below — never a pass.
+  const files = { release: await show("cmem/release.md"), notes: await show("RELEASE-NOTES.md"), readme: await show("README.md"), openWork: await show("cmem/open-work.md") };
+  const unseen = await renderedProblems(githubRender(), files, v, reviewRecords(entry).records);
+  if (unseen.length) fail(1, `v${v.full} is not ready — GitHub would not show:\n  ${unseen.join("\n  ")}`);
+  console.log(`check-reviews: v${v.full} at ${sha.slice(0, 7)} — the bump commit, both required reviews recorded and covering everything since the previous release, every counted place shown by GitHub's renderer`);
 } catch (e) {
   fail(2, (e as Error).message);
 }

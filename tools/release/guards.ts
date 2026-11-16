@@ -28,23 +28,23 @@ export function zonVersion(zon: string): Version | null {
 
 export type Places = { root: string; readme: string; notes: string; openWork: string; zon: string };
 
-/** A GFM table row's cell count: split on every `|` not escaped as `\|` — in code spans too, as GFM
- *  does — with one leading and one trailing pipe optional (KI-35). */
-export function cells(row: string): number {
-  // GFM trims only ASCII space, tab, VT and FF (KI-37) — never `trim()`, which also eats NBSP & co.
-  let s = row.replaceAll("\\|", "x").replace(/^[ \t\v\f]+|[ \t\v\f]+$/g, "");
-  if (s.startsWith("|")) s = s.slice(1);
-  if (s.endsWith("|")) s = s.slice(0, -1);
-  return s.split("|").length;
-}
-
 /** How many times `v` appears as a whole version (not as the start of `…1` in `…10`). */
 export const mentions = (text: string, v: string) => (text.match(new RegExp(`(?<![\\d.])${esc(v)}(?![\\d])`, "g")) ?? []).length;
 
 /** Lines of `text` that match `re` (anchored by the caller). */
 const lines = (text: string, re: RegExp) => text.split("\n").filter((l) => re.test(l));
 
-/** Each place's disagreement with `v`, or [] when the four files agree with build.zig.zon. */
+/** LF only (owner, 2026-10-01, `.gitattributes`; again 2026-11-15: "we should be using LF as the
+ *  standard not CRLF"): a CR is refused, never normalised away. */
+export const crProblems = (name: string, md: string) => (md.includes("\r") ? [`${name} holds a CR byte (the file must be LF only)`] : []);
+
+/**
+ * Each place's disagreement with `v`, or [] when the four files agree with build.zig.zon — as TEXT
+ * facts: the one line that carries each place, matched whole. Whether a reader of the GitHub page
+ * SEES the Markdown places is not decided here: `renderedProblems` asks GitHub's own renderer
+ * (KI-38; owner, 2026-11-15: valid Markdown is not forbidden; "a markdown record that is not
+ * rendered is an error"). Formatting is Biome's (`biome.jsonc`).
+ */
 export function disagreements(p: Places, v: Version): string[] {
   const bad: string[] = [];
   const one = (text: string, anyRe: RegExp, wantRe: RegExp, what: string) => {
@@ -58,49 +58,12 @@ export function disagreements(p: Places, v: Version): string[] {
   one(p.root, /^pub const release = /, new RegExp(`^pub const release = ${v.n};$`), `src/root.zig release is not ${v.n}`);
   // The test line itself, whole: code, not a comment beside other code.
   one(p.root, /^\s*try std\.testing\.expectEqualStrings\("[^"]*", version_string\)/, new RegExp(`^\\s*try std\\.testing\\.expectEqualStrings\\("${esc(v.full)}", version_string\\);$`), `src/root.zig's version test does not pin "${v.full}"`);
-  // The three Markdown places are read as a reader sees them, and only from files the guard can
-  // read without guessing at a renderer (KI-31): see `unreadable`.
-  const md = (name: string, text: string) => {
-    for (const u of unreadable(text)) bad.push(`${name}: ${u}`);
-    return visibleLines(text).join("\n");
-  };
-  // Before the version, plain characters only (KI-33, KI-34): no `<` (a tag's attribute), backtick,
-  // backslash, `~`, `$` (math), `!` / `[` / `]` (an image's alt text, a link), `*` / `_` past the
-  // fixed bold opener.
-  const readme = md("README.md", p.readme);
-  one(readme, /^> \*\*Status:/, new RegExp(`^> \\*\\*Status: [A-Za-z0-9 ,.:;/+'—-]*\\(v${esc(v.full)}: zilc release ${v.n} for Zig ${esc(v.zig)} and Fil-C ${esc(v.filc)}\\)`), `README.md's status line does not name v${v.full} (zilc release ${v.n}) as "(v${v.full}: zilc release ${v.n} for Zig ${v.zig} and Fil-C ${v.filc})", with only letters, digits, spaces and , . : ; / + ' — - before it`);
-  // The status line OPENS its paragraph (KI-34): a line before it in the same quote paragraph could
-  // open an attribute that runs over it. So the line before it is blank.
-  const rl = readme.split("\n");
-  const si = rl.findIndex((l) => /^> \*\*Status:/.test(l));
-  if (si > 0 && rl[si - 1] !== "") bad.push(`README.md's status line must follow a blank line (it opens its own paragraph)`);
-  one(md("RELEASE-NOTES.md", p.notes), new RegExp(`^## ${esc(v.full)}$`), /./, `RELEASE-NOTES.md has no "## ${v.full}" section`);
-  const ow = md("cmem/open-work.md", p.openWork);
-  one(ow, /^\| version \|/, new RegExp(`^\\| version \\| \\*\\*\`${esc(v.full)}\`\\*\\*`), `cmem/open-work.md's State row "| version |" does not begin with **\`${v.full}\`**`);
-  // The State row is a ROW of a real table (KI-34): a header, a delimiter row, then rows — a table
-  // cell cannot be reached by an attribute opened outside it, while a paragraph line can.
-  // On the RAW lines (KI-36): a fence between the table and the row splits the table on GitHub, and
-  // visible lines would hide that fence. The row is the first one outside a fence.
-  const ol = p.openWork.split("\n");
-  const owFence = fenceLines(p.openWork);
-  const ri = ol.findIndex((l, i) => !owFence[i] && /^\| version \|/.test(l));
-  if (ri >= 0) {
-    let s = ri;
-    while (s > 0 && ol[s - 1].startsWith("|")) s--;
-    if (!(ri >= s + 2 && /^\|(?:[ \t]*:?-+:?[ \t]*\|)+[ \t]*$/.test(ol[s + 1]))) bad.push(`cmem/open-work.md's State row is not a row of a table (a header and a delimiter row above it)`);
-    // The table starts a block of its own (KI-37): a quote or list line just above the header would
-    // take the header as its lazy continuation, and the "table" would be that paragraph.
-    else if (s > 0 && ol[s - 1] !== "" && !/^#{1,6}[ \t]/.test(ol[s - 1])) bad.push(`cmem/open-work.md's State table must follow a blank line or a heading`);
-    // GFM makes it a table only when the header and the delimiter row have the SAME number of
-    // cells, and drops a row's cells past that number (KI-35). The header may hold no `<`.
-    else {
-      const [h, d, r] = [cells(ol[s]), cells(ol[s + 1]), cells(ol[ri])];
-      if (h !== d || h < 2) bad.push(`cmem/open-work.md's State table has ${h} header cells and ${d} delimiter cells (GFM needs the same number, at least 2)`);
-      else if (r !== h) bad.push(`cmem/open-work.md's State row has ${r} cells in a ${h}-column table`);
-      // No `<` from the header down to the row (KI-35, KI-37): nothing above it can open an attribute.
-      if (ol.slice(s, ri).some((l) => l.includes("<"))) bad.push(`cmem/open-work.md's State table holds a "<" above the State row`);
-    }
-  }
+  for (const [name, text] of [["README.md", p.readme], ["RELEASE-NOTES.md", p.notes], ["cmem/open-work.md", p.openWork]] as const) bad.push(...crProblems(name, text));
+  // Raw lines: whether each is SHOWN (not in a fence, a comment …) is `renderedProblems`'s question.
+  one(p.readme, /^> \*\*Status:/, new RegExp(`^> \\*\\*Status: [^(]*\\(v${esc(v.full)}: zilc release ${v.n} for Zig ${esc(v.zig)} and Fil-C ${esc(v.filc)}\\)`), `README.md's status line does not name "(v${v.full}: zilc release ${v.n} for Zig ${v.zig} and Fil-C ${v.filc})"`);
+  one(p.notes, new RegExp(`^## ${esc(v.full)}$`), /./, `RELEASE-NOTES.md has no "## ${v.full}" section`);
+  // Biome pads table cells (KI-38), so the row is matched with any padding.
+  one(p.openWork, /^\|\s*version\s*\|/, new RegExp(`^\\|\\s*version\\s*\\|\\s*\\*\\*\`${esc(v.full)}\`\\*\\*`), `cmem/open-work.md's State row "| version |" does not begin with **\`${v.full}\`**`);
   // The bump files name the version ONLY in their place (KI-30): a second mention is one the bump
   // would leave behind, stale, in the release.
   for (const [f, text] of [["src/root.zig", p.root], ["README.md", p.readme], ["build.zig.zon", p.zon]] as const) {
@@ -110,109 +73,23 @@ export function disagreements(p: Places, v: Version): string[] {
   return bad;
 }
 
-/** A BOM and the non-ASCII whitespace code points (KI-37), by number: no literal in this source. */
-const ODD_SPACE = new Set([0xa0, 0xfeff, 0x1680, 0x2028, 0x2029, 0x202f, 0x205f, 0x3000, ...Array.from({ length: 12 }, (_, k) => 0x2000 + k)]);
-
-/** A fence-like line that is NOT at column 0 — indented, or after a list marker or `>` (KI-32):
- *  inside a container a fence ends with the container, which the guard does not read. */
-const containerFence = (l: string) => /^(?:[ \t]|[>*+-]|\d{1,9}[.)])[ \t>*+\-\d.)]*?(`{3,}|~{3,})/.test(l);
+/** An ATX heading line. The text side reads lines only; where GitHub ends an entry (a setext
+ *  heading, a fence …) is the rendered check's to decide (KI-38): a record outside its entry on the
+ *  page is not shown under the entry's heading, and is refused there. */
+const headingLike = (l: string) => /^ {0,3}#{1,6}(?:[ \t]|$)/.test(l);
 
 /**
- * What makes a Markdown file one the guard will not read (KI-31). Four retests found four more ways
- * an emulation of GitHub's renderer could be made to disagree with it (comments that close fences,
- * processing instructions, CDATA, setext and indented headings …), so the guard stops emulating:
- * a file holding any construct whose rendering it would have to guess is REFUSED, by name. None
- * of zilc's three Markdown places holds one (measured 2026-11-15). Returns the reasons, or [].
- */
-export function unreadable(md: string): string[] {
-  const out: string[] = [];
-  // LF only (owner, 2026-10-01, `.gitattributes`; again 2026-11-15: "we should be using LF as the
-  // standard not CRLF"): a CR is refused, never normalised away.
-  if (md.includes("\r")) out.push("holds a CR byte (the file must be LF only)");
-  // A BOM or non-ASCII whitespace (KI-37): GFM treats them as text where `trim()` would not, and a
-  // leading BOM would hide front matter from the check below.
-  for (const ch of md) if (ODD_SPACE.has(ch.codePointAt(0)!)) {
-    out.push(`holds U+${ch.codePointAt(0)!.toString(16).toUpperCase().padStart(4, "0")} (a BOM or non-ASCII whitespace)`);
-    break;
-  }
-  // YAML front matter: GitHub renders it as a table, not as Markdown (KI-35).
-  if (/^---[ \t]*(?:\n|$)/.test(md)) out.push("starts with a --- line (front matter, which GitHub renders as a table)");
-  const inFence = fenceLines(md);
-  md.split("\n").forEach((l, i) => {
-    if (inFence[i]) return; // inside a fence nothing is markup — the SAME fence reading as visibleLines
-    if (containerFence(l)) {
-      out.push(`line ${i + 1} is a fence inside a list, quote or indent; a fence must start at column 0`);
-      return;
-    }
-    // The RAW line (KI-33): no code span is subtracted first, because which backticks pair is the
-    // renderer's call (a tag's attribute, or a backslash inside a span, decides it — retest 6).
-    // `<!--` even inside backticks is refused: zilc's files hold none (measured 2026-11-15).
-    if (/<!--|<\?|<!\[|<![A-Za-z]/.test(l)) out.push(`line ${i + 1} holds an HTML comment, declaration or processing instruction`);
-    // An autolink (`<https://…>`) at a line start is a link, not an HTML block (KI-37).
-    else if (/^ {0,3}<\/?[A-Za-z]/.test(l) && !/^ {0,3}<[A-Za-z][A-Za-z0-9+.-]{1,31}:[^\s<>]*>/.test(l)) out.push(`line ${i + 1} starts an HTML block`);
-    // A `$$` math block (KI-36): GitHub renders its content as math, not Markdown.
-    // Anywhere on the line (KI-37): `> $$` or `- $$` opens one inside a container too.
-    else if (/\$\$/.test(l)) out.push(`line ${i + 1} holds $$ (math)`);
-    // Elements that collapse what follows them on GitHub (an unclosed one, everything after it).
-    else if (/<\/?(?:details|summary)(?:[\s/>]|$)/i.test(l)) out.push(`line ${i + 1} holds a <details>/<summary> tag, which can collapse what follows`);
-  });
-  return out;
-}
-
-/** Is `l` a heading line, in any form CommonMark knows (ATX with up to three spaces, a bare
- *  `#`…, a tab after the hashes; or a setext underline)? Ends an entry; refused inside one. */
-const headingLike = (l: string) => /^ {0,3}#{1,6}(?:[ \t]|$)/.test(l) || /^ {0,3}(?:=+|-+)[ \t]*$/.test(l);
-
-/**
- * The lines of a Markdown text outside fenced code blocks, as CommonMark reads fences (a closer is
- * the opener's character, at least as long, nothing after it; an unclosed fence runs to the end).
- * Meant for text that `unreadable` passed: no comments or HTML blocks are left to hide anything.
- */
-export function visibleLines(md: string): string[] {
-  const inFence = fenceLines(md);
-  return md.split("\n").filter((_, i) => !inFence[i]);
-}
-
-/** For each line: is it a fence line or inside a fenced code block? The one fence reader that
- *  `unreadable` and `visibleLines` share, so they can never disagree about what is code. */
-function fenceLines(md: string): boolean[] {
-  const out: boolean[] = [];
-  let fence: { ch: string; len: number } | null = null;
-  for (const l of md.split("\n")) {
-    if (fence !== null) {
-      const c = l.match(/^ {0,3}(`+|~+)[ \t]*$/);
-      if (c && c[1][0] === fence.ch && c[1].length >= fence.len) fence = null;
-      out.push(true);
-      continue;
-    }
-    // Openers at column 0 only (KI-32): an indented one may belong to a list item, whose end the
-    // guard does not read — `unreadable` refuses it instead (`containerFence`).
-    const o = l.match(/^(`{3,}|~{3,})(.*)$/);
-    if (o && !(o[1][0] === "`" && o[2].includes("`"))) {
-      fence = { ch: o[1][0], len: o[1].length };
-      out.push(true);
-      continue;
-    }
-    out.push(false);
-  }
-  return out;
-}
-
-/**
- * The `### v<version>` entry of cmem/release.md: from its heading to the next heading-like line,
- * inside the file's one `## Release History` section. null when there is none; throws when the
- * file is unreadable (`unreadable`), has no or two such sections, two entries for the version, or
- * a fence anywhere in the section (an entry is plain text: nothing in it can be hidden).
+ * The `### v<version>` entry of cmem/release.md, as text: from its heading to the next heading,
+ * inside the file's one `## Release History` section. null when there is none; throws on a CR, no
+ * or two such sections, or two entries for the version. That the entry and its records are SHOWN
+ * is `renderedProblems`'s check.
  */
 export function findEntry(releaseMd: string, version: string): string | null {
-  const u = unreadable(releaseMd);
-  if (u.length) throw new Error(`cmem/release.md cannot be read without guessing: ${u.join("; ")}`);
-  const ls = visibleLines(releaseMd);
+  const cr = crProblems("cmem/release.md", releaseMd);
+  if (cr.length) throw new Error(cr[0]);
+  const ls = releaseMd.split("\n");
   const sections = ls.flatMap((l, i) => (/^## Release History(?: |$)/.test(l) ? [i] : []));
   if (sections.length !== 1) throw new Error(`cmem/release.md has ${sections.length} "## Release History" sections`);
-  const raw = releaseMd.split("\n");
-  const rawStart = raw.findIndex((l) => /^## Release History(?: |$)/.test(l));
-  if (raw.slice(rawStart).some((l) => /^ {0,3}(`{3,}|~{3,})/.test(l))) throw new Error(`cmem/release.md's Release History section holds a code fence; an entry is plain text`);
   // The section ends at the next heading of level 1 or 2 (KI-36): an entry below that is elsewhere.
   let sectionEnd = sections[0] + 1;
   while (sectionEnd < ls.length && !/^ {0,3}#{1,2}(?:[ \t]|$)/.test(ls[sectionEnd])) sectionEnd++;
@@ -234,7 +111,8 @@ export type ReviewRecord = { kind: "Security" | "Hardening"; rounds: number; dat
  *   - **Hardening review:** 2 rounds, empty round 2026-11-21, reviewed `v1.2.3-4.5.6..0123abc`
  *
  * Text may follow on the line. Anything else that mentions a review ("security review: not run",
- * a heading, a placeholder) is not a record.
+ * a heading, a placeholder) is not a record. That a record is SEEN on the page is
+ * `renderedProblems`'s check.
  */
 export const REVIEW_FORM = "- **<Security|Hardening> review:** <n> rounds, empty round <YYYY-MM-DD>, reviewed `<previous tag>..<commit>`";
 const RECORD = /^- \*\*(Security|Hardening) review:\*\* ([1-9]\d*) rounds?, empty round (\d{4}-\d{2}-\d{2}), reviewed `(v\d+\.\d+\.\d+-\d+\.\d+\.\d+)\.\.([0-9a-f]{7,40})`(?:[ ,.;:—-].*)?$/;
@@ -242,14 +120,7 @@ const RECORD = /^- \*\*(Security|Hardening) review:\*\* ([1-9]\d*) rounds?, empt
 /** The two records of an entry, or the reasons there are not exactly one of each. */
 export function reviewRecords(entry: string): { records: ReviewRecord[]; bad: string[] } {
   const records: ReviewRecord[] = [];
-  const bad: string[] = [];
-  // An entry is plain text (KI-31): nothing in it may hide a line from a reader, so a record can
-  // never be one the page does not show. Refused, by name, rather than interpreted.
-  for (const u of unreadable(entry)) bad.push(`the entry ${u}`);
-  entry.split("\n").forEach((l, i) => {
-    if (/^ {0,3}(`{3,}|~{3,})/.test(l)) bad.push(`the entry's line ${i + 1} is a code fence; an entry is plain text`);
-    else if (i > 0 && headingLike(l)) bad.push(`the entry's line ${i + 1} is heading-like; an entry ends at its next heading`);
-  });
+  const bad: string[] = [...crProblems("the entry", entry)];
   for (const l of entry.split("\n")) {
     const m = l.match(RECORD);
     if (m) records.push({ kind: m[1] as ReviewRecord["kind"], rounds: Number(m[2]), date: m[3], base: m[4], reviewed: m[5] });
@@ -263,6 +134,137 @@ export function reviewRecords(entry: string): { records: ReviewRecord[]; bad: st
     if (Number.isNaN(d.getTime()) || d.toISOString().slice(0, 10) !== r.date) bad.push(`the ${r.kind.toLowerCase()} review's date ${r.date} is not a date`);
   }
   return { records, bad };
+}
+
+// ---- What a reader of the GitHub page sees (KI-38) -------------------------------------------
+
+/** Markdown in, HTML out — GitHub's own renderer in use (`githubRender`); a stand-in in tests. */
+export type Render = (markdown: string) => Promise<string>;
+
+/**
+ * GitHub's renderer: `POST /markdown`, mode `gfm` (the REST API; never `gh`, Tooling rule 9).
+ * Measured 2026-11-15 on the reviewers' hiding cases: comments removed, attribute and alt text kept
+ * out of the text, `<details>` kept (collapsed), a list item's fence ending with the item — the
+ * repository page's reading. With `token` (CI's GITHUB_TOKEN) the rate limit is the authenticated
+ * one; without, 60 an hour. Any failure throws: a render that did not happen is never a pass.
+ */
+export function githubRender(token = process.env.GITHUB_TOKEN, api = process.env.ZILC_GITHUB_API ?? "https://api.github.com"): Render {
+  return async (markdown) => {
+    const headers: Record<string, string> = { Accept: "application/vnd.github+json", "Content-Type": "application/json", "User-Agent": "zilc-release-guard", "X-GitHub-Api-Version": "2022-11-28" };
+    if (token) headers.Authorization = `Bearer ${token}`;
+    let r: Response;
+    try {
+      r = await fetch(`${api}/markdown`, { method: "POST", headers, body: JSON.stringify({ text: markdown, mode: "gfm" }), signal: AbortSignal.timeout(30_000) });
+    } catch (e) {
+      throw new Error(`GitHub's Markdown renderer did not answer: ${(e as Error).message}`);
+    }
+    if (r.status !== 200) throw new Error(`GitHub's Markdown renderer answered HTTP ${r.status}: ${(await r.text()).slice(0, 200)}`);
+    return await r.text();
+  };
+}
+
+/** One block of rendered text: a heading, paragraph, list item or table cell, with what holds it. */
+export type Block = { tag: string; text: string; hidden: boolean; quoted: boolean; row: number | null };
+
+const VOID = new Set(["area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "source", "track", "wbr"]);
+const BLOCKS = new Set(["h1", "h2", "h3", "h4", "h5", "h6", "p", "li", "td", "th", "pre", "summary"]);
+const decode = (s: string) => s.replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&amp;/g, "&");
+const norm = (s: string) => s.replace(/\s+/g, " ").trim();
+
+/**
+ * The visible text of rendered HTML, block by block, in document order. Only TEXT nodes count —
+ * an attribute (`title`, `alt`) is never text, and a comment is no node at all. A block inside a
+ * `<details>` (but not its `<summary>`) is `hidden`: collapsed on the page.
+ */
+export async function renderedBlocks(html: string): Promise<Block[]> {
+  type Open = { tag: string; block: Block | null; row: number | null };
+  const stack: Open[] = [];
+  const blocks: Block[] = [];
+  let rows = 0;
+  const rw = new HTMLRewriter()
+    .on("*", {
+      element(el) {
+        const tag = el.tagName.toLowerCase();
+        if (VOID.has(tag) || el.selfClosing) return;
+        const parent = stack[stack.length - 1];
+        const row = tag === "tr" ? ++rows : (parent?.row ?? null);
+        let block: Block | null = parent?.block ?? null;
+        if (BLOCKS.has(tag)) {
+          const inDetails = stack.some((o) => o.tag === "details");
+          block = { tag, text: "", hidden: inDetails && tag !== "summary" && !stack.some((o) => o.tag === "summary"), quoted: stack.some((o) => o.tag === "blockquote"), row };
+          blocks.push(block);
+        }
+        const open: Open = { tag, block, row };
+        stack.push(open);
+        el.onEndTag(() => {
+          const i = stack.lastIndexOf(open);
+          if (i >= 0) stack.length = i;
+        });
+      },
+    })
+    .onDocument({
+      text(t) {
+        const b = stack[stack.length - 1]?.block;
+        if (b) b.text += t.text;
+      },
+    });
+  await rw.transform(new Response(html)).text();
+  for (const b of blocks) b.text = norm(decode(b.text));
+  return blocks;
+}
+
+export type Rendered = { release?: string; notes?: string; readme?: string; openWork?: string };
+
+/**
+ * What a reader of the GitHub page does NOT see of the counted places (KI-38): each given file is
+ * rendered by `render`, and its place must be visible text there — the entry's `v<version>` heading
+ * with both records as list items under it, the notes' `## <version>` heading, the README's
+ * status version in a quote, the State row as a table row. Returns the problems, or [].
+ */
+export async function renderedProblems(render: Render, files: Rendered, v: Version, records: ReviewRecord[]): Promise<string[]> {
+  const out: string[] = [];
+  const blocksOf = async (name: string, md: string) => {
+    try {
+      return await renderedBlocks(await render(md));
+    } catch (e) {
+      throw new Error(`${name}: ${(e as Error).message}`);
+    }
+  };
+  const seen = (b: Block) => !b.hidden;
+  if (files.release !== undefined) {
+    const bs = await blocksOf("cmem/release.md", files.release);
+    const heads = bs.filter((b) => b.tag === "h3" && seen(b) && (b.text === `v${v.full}` || b.text.startsWith(`v${v.full} `)));
+    if (heads.length !== 1) out.push(`cmem/release.md: GitHub shows ${heads.length} "v${v.full}" entry headings (one is required)`);
+    else {
+      const start = bs.indexOf(heads[0]);
+      let end = start + 1;
+      while (end < bs.length && !/^h[1-3]$/.test(bs[end].tag)) end++;
+      // The record's own text, rendered (bold and code applied), shown under the heading. Exact text
+      // only renders from list Markdown, so the block's tag needs no test of its own.
+      const items = bs.slice(start + 1, end).filter(seen);
+      for (const r of records) {
+        const want = `${r.kind} review: ${r.rounds} round${r.rounds === 1 ? "" : "s"}, empty round ${r.date}, reviewed ${r.base}..${r.reviewed}`;
+        if (!items.some((b) => b.text === want || b.text.startsWith(`${want} `) || b.text.startsWith(`${want},`) || b.text.startsWith(`${want}.`) || b.text.startsWith(`${want};`) || b.text.startsWith(`${want}:`) || b.text.startsWith(`${want}—`) || b.text.startsWith(`${want}-`))) out.push(`cmem/release.md: GitHub does not show the ${r.kind.toLowerCase()} review record as a list item under "v${v.full}" (a record that is not rendered is an error)`);
+      }
+    }
+  }
+  if (files.notes !== undefined) {
+    const bs = await blocksOf("RELEASE-NOTES.md", files.notes);
+    if (!bs.some((b) => b.tag === "h2" && seen(b) && b.text === v.full)) out.push(`RELEASE-NOTES.md: GitHub does not show a "${v.full}" heading`);
+  }
+  if (files.readme !== undefined) {
+    const bs = await blocksOf("README.md", files.readme);
+    const want = `(v${v.full}: zilc release ${v.n} for Zig ${v.zig} and Fil-C ${v.filc})`;
+    if (!bs.some((b) => b.tag === "p" && b.quoted && seen(b) && b.text.startsWith("Status:") && b.text.includes(want))) out.push(`README.md: GitHub does not show the status line naming ${want}`);
+  }
+  if (files.openWork !== undefined) {
+    const bs = await blocksOf("cmem/open-work.md", files.openWork);
+    const byRow = new Map<number, Block[]>();
+    for (const b of bs) if ((b.tag === "td" || b.tag === "th") && b.row !== null) byRow.set(b.row, [...(byRow.get(b.row) ?? []), b]);
+    const ok = [...byRow.values()].some((cs) => cs.length >= 2 && cs.every(seen) && cs[0].tag === "td" && cs[0].text === "version" && (cs[1].text === v.full || cs[1].text.startsWith(`${v.full} `)));
+    if (!ok) out.push(`cmem/open-work.md: GitHub does not show the State row "version | ${v.full} …" as a table row`);
+  }
+  return out;
 }
 
 /** What may change after the reviewed commit and before the bump: memory and the release notes. */

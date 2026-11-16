@@ -6,7 +6,7 @@ import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { chmodSync, cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { BUMP_FILES, bumpEdits, cells, disagreements, findEntry, gitIn, mentions, tagsDifferFrom, reviewRecords, reviewsCoverRelease, unreadable, zonVersion, type Git, type Places } from "./guards.ts";
+import { BUMP_FILES, bumpEdits, disagreements, findEntry, gitIn, githubRender, mentions, renderedBlocks, renderedProblems, tagsDifferFrom, reviewRecords, reviewsCoverRelease, zonVersion, type Git, type Places, type Render } from "./guards.ts";
 import { run } from "../lib/tool.ts";
 
 const REPO = join(import.meta.dir, "..", "..");
@@ -20,9 +20,14 @@ describe("the five places", () => {
     expect(disagreements(real(), cur)).toEqual([]);
   });
 
-  test("the repository's own cmem/release.md is readable by the guard (KI-33: a record of the rule once broke it)", () => {
-    expect(unreadable(read("cmem/release.md"))).toEqual([]);
+  test("the repository's own cmem/release.md is read without error", () => {
     expect(() => findEntry(read("cmem/release.md"), cur.full)).not.toThrow();
+  });
+
+  test("a State row padded by Biome is still the row (KI-38)", () => {
+    const p = real();
+    p.openWork = p.openWork.replace(/^\|\s*version\s*\|/m, "|   version     |");
+    expect(disagreements(p, cur)).toEqual([]);
   });
 
   test("the version test pinning another version, the right one only in a comment, is refused", () => {
@@ -41,7 +46,9 @@ describe("the five places", () => {
 
   test("a State row naming the version only as 'previous' is refused", () => {
     const p = real();
-    p.openWork = p.openWork.replace(/^\| version \|.*$/m, `| version | **\`9.9.9-9.9.9\`** (previous: \`${cur.full}\`) |`);
+    const before = p.openWork;
+    p.openWork = p.openWork.replace(/^\|\s*version\s*\|.*$/m, `| version | **\`9.9.9-9.9.9\`** (previous: \`${cur.full}\`) |`);
+    expect(p.openWork).not.toBe(before); // the edit applied (Biome pads the row, KI-38)
     expect(disagreements(p, cur).join("\n")).toContain("State row");
   });
 
@@ -65,166 +72,10 @@ describe("the five places", () => {
     }
   });
 
-  // Retest 4 (KI-31): a place a reader cannot see is not the place.
-  test("a RELEASE-NOTES heading inside a comment is refused", () => {
-    const p = real();
-    p.notes = p.notes.replace(`## ${cur.full}\n`, `<!--\n## ${cur.full}\n-->\n`);
-    expect(disagreements(p, cur).join("\n")).toContain("RELEASE-NOTES.md: line");
-  });
-  test("a RELEASE-NOTES heading inside a fence is not the section", () => {
-    const p = real();
-    p.notes = p.notes.replace(`## ${cur.full}\n`, `~~~\n## ${cur.full}\n~~~\n`);
-    expect(disagreements(p, cur).join("\n")).toContain(`RELEASE-NOTES.md has no "## ${cur.full}" section`);
-  });
-  test("a State row inside a fence is not the row", () => {
-    const p = real();
-    p.openWork = p.openWork.replace(/^(\| version \|.*)$/m, "```\n$1\n```");
-    expect(disagreements(p, cur).join("\n")).toContain("State row");
-  });
-  test("a comment INSIDE a fence is code, not markup: the notes stay readable", () => {
-    const p = real();
-    p.notes = p.notes.replace(`## ${cur.full}\n`, `## ${cur.full}\n\n\`\`\`html\n<!-- an example -->\n<pre>x</pre>\n\`\`\`\n`);
-    expect(disagreements(p, cur)).toEqual([]);
-  });
-  test("a notes heading after a shorter fence line inside a longer fence is still code", () => {
-    const p = real();
-    p.notes = p.notes.replace(`## ${cur.full}\n`, `\`\`\`\`\n\`\`\`\n## ${cur.full}\n\`\`\`\`\n`);
-    expect(disagreements(p, cur).join("\n")).toContain(`RELEASE-NOTES.md has no "## ${cur.full}" section`);
-  });
-  test("the list-item fence trap that split the README status line is refused (retest 5, KI-32)", () => {
-    const p = real();
-    p.readme = p.readme.replace(/^(> \*\*Status:.*)$/m, "- x\n  ```\n> **Status: stale\n<!--\n```\n$1\n-->");
-    expect(disagreements(p, cur).join("\n")).toContain("fence inside a list, quote or indent");
-  });
-  for (const [name, wrap] of [
-    ["in a tag attribute", (s: string) => s.replace("(v", '<a title="(v').replace(/\)/, ')">')],
-    ["struck through", (s: string) => s.replace("(v", "~~(v").replace(/\)/, ")~~")],
-    ["inside a code span", (s: string) => s.replace("(v", "`(v").replace(/\)/, ")`")],
-  ] as const) {
-    test(`a README status version ${name} is not the status (retest 6, KI-33)`, () => {
-      const p = real();
-      p.readme = p.readme.replace(/^> \*\*Status:.*$/m, (l) => wrap(l));
-      expect(disagreements(p, cur).join("\n")).toContain("README.md's status line does not name");
-    });
-  }
-  // Retest 7 (KI-34), each rendered by the reviewer with Bun.markdown.
-  test("a README status version inside an image's alt text is not the status", () => {
-    const p = real();
-    p.readme = p.readme.replace(/^> \*\*Status: ([^(]*)\((v[^)]*)\)/m, "> **Status: $1![logo ($2)](docs/logo.svg)");
-    expect(disagreements(p, cur).join("\n")).toContain("README.md's status line does not name");
-  });
-  for (const ch of ["[", "]", "!", "$", "*", "_"]) {
-    test(`a README status line with ${ch} before the version is not the status`, () => {
-      const p = real();
-      p.readme = p.readme.replace(/^> \*\*Status: /m, `> **Status: x${ch} `);
-      expect(disagreements(p, cur).join("\n")).toContain("README.md's status line does not name");
-    });
-  }
-  test("a README status line continuing a quote paragraph is refused", () => {
-    const p = real();
-    p.readme = p.readme.replace(/^(> \*\*Status:.*)$/m, '> see <span title="\n$1');
-    expect(disagreements(p, cur).join("\n")).toContain("must follow a blank line");
-  });
-  test("a State row that is not in a table is refused", () => {
-    const p = real();
-    p.openWork = p.openWork.replace(/^\| what \| value \|\n\| --- \| --- \|\n/m, 'text <a title="\n');
-    expect(disagreements(p, cur).join("\n")).toContain("not a row of a table");
-  });
-  test("a State row under a header with no delimiter row is refused", () => {
-    const p = real();
-    p.openWork = p.openWork.replace(/^\| --- \| --- \|\n/m, "");
-    expect(disagreements(p, cur).join("\n")).toContain("not a row of a table");
-  });
-  // Retest 8 (KI-35): GFM's table rules — the same cell count in header and delimiter, excess dropped.
-  test("the reviewer's shape A, header and delimiter of different widths (not a table), is refused", () => {
-    const p = real();
-    p.openWork = p.openWork.replace(/^\| what \| value \|\n\| --- \| --- \|$/m, '| what <a title=" | value |\n| --- | --- | --- |');
-    const d = disagreements(p, cur).join("\n");
-    expect(d).toContain("2 header cells and 3 delimiter cells");
-    expect(d).toContain('holds a "<" above the State row');
-  });
-  test("the reviewer's shape B, a one-column table that drops the version cell, is refused", () => {
-    const p = real();
-    p.openWork = p.openWork.replace(/^\| what \| value \|\n\| --- \| --- \|$/m, "| what |\n| --- |");
-    expect(disagreements(p, cur).join("\n")).toContain("1 header cells and 1 delimiter cells");
-  });
-  test("a State row with more cells than its table is refused", () => {
-    const p = real();
-    p.openWork = p.openWork.replace(/^(\| version \|)/m, "$1 extra |");
-    expect(disagreements(p, cur).join("\n")).toContain("cells in a 2-column table");
-  });
-  test("cells are split on every unescaped pipe, in code spans too (GFM)", () => {
-    expect(cells("| a | `b | c` |")).toBe(3);
-    expect(cells("| a | b \\| c |")).toBe(2);
-    expect(cells("a | b")).toBe(2);
-  });
-  test("front matter at the top of a counted file is refused", () => {
-    const p = real();
-    p.readme = `---\nk: v\n---\n${p.readme}`;
-    expect(disagreements(p, cur).join("\n")).toContain("front matter");
-  });
-  test("an em dash or an apostrophe before the status version is allowed", () => {
-    const p = real();
-    p.readme = p.readme.replace(/^> \*\*Status: /m, "> **Status: zilc's prototype — ");
-    expect(disagreements(p, cur)).toEqual([]);
-  });
-  // Retest 9 (KI-36).
-  for (const [where, re] of [
-    ["between the table and the State row", /^(\| version \|)/m],
-    ["between the header and the delimiter", /^(\| --- \| --- \|)$/m],
-  ] as const) {
-    test(`a fence ${where} splits the table and is refused`, () => {
-      const p = real();
-      p.openWork = p.openWork.replace(re, "```\nx\n```\n$1");
-      expect(disagreements(p, cur).join("\n")).toMatch(/not a row of a table|header cells/);
-    });
-  }
-  test("$$ is refused at a line start, in a quote, in a list and mid-line (KI-36, KI-37)", () => {
-    for (const l of ["$$", "> $$", "- $$", "a $$ b"]) expect(unreadable(`text\n\n${l}\n`).join("\n")).toContain("$$");
-  });
-
-  // Retest 10 (KI-37).
-  for (const lead of ["> <a title=\"", "- <a title=\"", "1. <a title=\"", "some text"]) {
-    test(`a State table right after "${lead}" (a lazy continuation) is refused`, () => {
-      const p = real();
-      p.openWork = p.openWork.replace(/^(\| what \| value \|)$/m, `${lead}\n$1`);
-      expect(disagreements(p, cur).join("\n")).toContain("must follow a blank line or a heading");
-    });
-  }
-  for (const cp of [0xa0, 0xfeff, 0x3000, 0x2003]) {
-    test(`U+${cp.toString(16).toUpperCase().padStart(4, "0")} in a counted file is refused`, () => {
-      const p = real();
-      p.openWork = p.openWork.replace(/^(\| what \| value \|)$/m, `$1${String.fromCodePoint(cp)}`);
-      expect(disagreements(p, cur).join("\n")).toContain("a BOM or non-ASCII whitespace");
-    });
-  }
-  test("cells() trims ASCII whitespace only, as GFM does", () => {
-    expect(cells(`| a | b |${String.fromCodePoint(0xa0)}`)).toBe(3);
-    expect(cells("\t| a | b | \f")).toBe(2);
-  });
-  test("a leading BOM before front matter is refused", () => {
-    const p = real();
-    p.readme = `${String.fromCodePoint(0xfeff)}---\na: b\n---\n${p.readme}`;
-    expect(disagreements(p, cur).join("\n")).toContain("U+FEFF");
-  });
-  test("a < in a State table row above the State row is refused", () => {
-    const p = real();
-    p.openWork = p.openWork.replace(/^(\| --- \| --- \|)$/m, '$1\n| note | <a title=" |');
-    expect(disagreements(p, cur).join("\n")).toContain('holds a "<" above the State row');
-  });
-  test("a one-dash delimiter row is a delimiter (GFM accepts it)", () => {
-    const p = real();
-    p.openWork = p.openWork.replace(/^\| --- \| --- \|$/m, "|-|-|");
-    expect(disagreements(p, cur)).toEqual([]);
-  });
-  test("an autolink at a line start is a link, not an HTML block", () => {
-    expect(unreadable("<https://example.com/x>\n")).toEqual([]);
-    expect(unreadable("<div>\n").join("\n")).toContain("HTML block");
-  });
   test("a README with a CR byte is refused (LF only)", () => {
     const p = real();
     p.readme = p.readme.replace("\n", "\r\n");
-    expect(disagreements(p, cur).join("\n")).toContain("README.md: holds a CR byte");
+    expect(disagreements(p, cur).join("\n")).toContain("README.md holds a CR byte");
   });
 
   test("a longer version is not a mention (…1 in …10)", () => {
@@ -263,91 +114,6 @@ describe("the release entry", () => {
     expect(() => findEntry("## Release History\n## Release History\n", "1.2.3-4.5.6")).toThrow("2");
   });
 
-  // Retests 3–4 (KI-30, KI-31): what could hide an entry heading is refused, not interpreted.
-  for (const [name, md] of [
-    ["inside a ~~~ fence", "## Release History\n~~~\n### v1.2.3-4.5.6 — x\nbody\n~~~\n"],
-    ["inside an HTML comment", "## Release History\n<!--\n### v1.2.3-4.5.6 — x\nbody\n-->\n"],
-    ["inside a <pre> block", "## Release History\n<pre>\n### v1.2.3-4.5.6 — x\n</pre>\n"],
-    ["after a CR byte", "## Release History\r\n### v1.2.3-4.5.6 — x\r\n"],
-    ["after a processing instruction", "## Release History\n<?x\n### v1.2.3-4.5.6 — x\n?>\n"],
-    ["after CDATA", "## Release History\n<![CDATA[\n### v1.2.3-4.5.6 — x\n]]>\n"],
-  ] as const) {
-    test(`a file with an entry heading ${name} is refused`, () => {
-      expect(() => findEntry(md, "1.2.3-4.5.6")).toThrow();
-    });
-  }
-
-  // Retest 5 (KI-32): a fence inside a container, which ends with the container on GitHub.
-  const trap = "- item\n  ```\n  x\n<!-- the rest of the file\n```\n";
-  test("the reviewer's list-item fence trap above the section is refused", () => {
-    expect(() => findEntry(`# r\n\n${trap}\n## Release History\n\n### v1.2.3-4.5.6 — x\nbody\n`, "1.2.3-4.5.6")).toThrow("fence inside a list, quote or indent");
-  });
-  for (const [name, l] of [
-    ["indented one space", " ```"],
-    ["indented three spaces", "   ~~~"],
-    ["in a blockquote", "> ```"],
-    ["in a nested quote", "> > ~~~"],
-    ["after a list marker", "- ```"],
-    ["after a numbered marker", "1. ```"],
-    ["after a tab", "\t```"],
-  ] as const) {
-    test(`a fence ${name} is refused`, () => {
-      expect(unreadable(`text\n${l}\ncode\n\`\`\`\n`).join("\n")).toContain("fence inside a list, quote or indent");
-    });
-  }
-  test("an indented closer of a column-0 fence is still a closer (CommonMark allows three spaces)", () => {
-    expect(unreadable("```\ncode\n   ```\nafter\n")).toEqual([]);
-  });
-
-  test("the entry ends at a one-dash setext underline (retest 5, KI-32)", () => {
-    const e = findEntry("## Release History\n\n### v1.2.3-4.5.6 — x\nNote\n-\nlater\n", "1.2.3-4.5.6")!;
-    expect(e).not.toContain("later");
-  });
-
-  test("an escaped backtick never opens a code span (retest 5, KI-32)", () => {
-    expect(unreadable("text \\`<!-- x \\` more\n").join("\n")).toContain("HTML comment");
-  });
-  test("backtick runs of different lengths are not a code span (retest 5, KI-32)", () => {
-    expect(unreadable("text `<!-- x `` more\n").join("\n")).toContain("HTML comment");
-  });
-
-  test("a placeholder tag mid-line is allowed; `<!--` is refused even in backticks (KI-33)", () => {
-    expect(findEntry("## Release History\n\n### v1.2.3-4.5.6 — x\nuse `<Zig>-<Fil-C>.<N>` and <n> here\n", "1.2.3-4.5.6")).toContain("<Zig>");
-    expect(() => findEntry("## Release History\n\n### v1.2.3-4.5.6 — x\nuse `<!--` here\n", "1.2.3-4.5.6")).toThrow("HTML comment");
-  });
-
-  // Retest 6 (KI-33): which backticks pair is the renderer's call — the guard no longer guesses.
-  for (const [name, l] of [
-    ["a backtick in a tag attribute before a comment", '> **Status: ok <b title="`"> <!-- (v1) ` -->'],
-    ["a backslash inside a span before a comment", "> **Status: ok `a\\` <!-- (v1) `"],
-    ["<details> mid-line", "text <details>"],
-    ["<details> indented", "para\n    <details>"],
-    ["<details> in a quote", "> <details>"],
-    ["<details> in a list", "- <details>"],
-    ["</summary> anywhere", "a </summary> b"],
-  ] as const) {
-    test(`${name} is refused`, () => {
-      expect(unreadable(`${l}\n`).length).toBeGreaterThan(0);
-    });
-  }
-
-  test("a fence ABOVE the section is allowed (the review form's own example lives there)", () => {
-    expect(findEntry("# r\n```\nexample\n```\n## Release History\n\n### v1.2.3-4.5.6 — x\nbody\n", "1.2.3-4.5.6")).toContain("body");
-  });
-
-  for (const [name, after] of [
-    ["a setext heading", "Other\n====="],
-    ["an indented heading", "  ## Other"],
-    ["a bare ###", "###"],
-    ["a heading after a tab", "#\tOther"],
-  ] as const) {
-    test(`the entry ends at ${name} (retest 4, KI-31)`, () => {
-      const e = findEntry(`## Release History\n\n### v1.2.3-4.5.6 — x\nbody\n${after}\nlater\n`, "1.2.3-4.5.6")!;
-      expect(e).toContain("body");
-      expect(e).not.toContain("later");
-    });
-  }
-
   test("an entry under a later section is not the entry (retest 9, KI-36)", () => {
     expect(findEntry("## Release History\n\n### v1.0.0-1.0.1 — x\nold\n\n## Scratch\n\n### v1.2.3-4.5.6 — x\nbody\n", "1.2.3-4.5.6")).toBeNull();
     expect(findEntry("## Release History\n\n# Other\n\n### v1.2.3-4.5.6 — x\nbody\n", "1.2.3-4.5.6")).toBeNull();
@@ -369,15 +135,6 @@ describe("the review records' form", () => {
     expect(reviewRecords(ok).bad).toEqual([]);
   });
 
-  test("a fence in an entry is refused even when properly closed: an entry is plain text (KI-31)", () => {
-    expect(reviewRecords(`\`\`\`\ncode\n\`\`\`\n${ok}`).bad.join("\n")).toContain("code fence");
-    expect(reviewRecords(`~~~~\ncode\n~~~~~\n${ok}`).bad.join("\n")).toContain("code fence");
-  });
-
-  test("placeholders and tags mid-line are allowed beside records (only hiding forms are refused)", () => {
-    expect(reviewRecords(`${ok}\nnote: \`<pre>\`, <n> and \`<commit>\` are text here`).bad).toEqual([]);
-  });
-
   for (const [name, text] of [
     ["a negation", "security review: not run. hardening review: skipped."],
     ["placeholders", "- **Security review:** TODO\n- **Hardening review:** TODO"],
@@ -386,28 +143,146 @@ describe("the review records' form", () => {
     ["zero rounds", ok.replace("3 rounds", "0 rounds")],
     ["a date that is not one", ok.replace("2026-11-20", "2026-02-31")],
     ["one kind twice", `${ok}\n- **Security review:** 4 rounds, empty round 2026-11-22, reviewed \`v0.15.2-0.687.1..0123abc\``],
-    ["records inside an HTML comment (retest 2, KI-29)", `<!--\n${ok}\n-->`],
-    ["one record inside an unclosed HTML comment (retest 2, KI-29)", ok.replace("\n", "\n<!-- \n")],
-    ["records inside a ``` fence (retest 2, KI-29)", `\`\`\`\n${ok}\n\`\`\``],
-    ["records inside a ~~~ fence (retest 2, KI-29)", `~~~\n${ok}\n~~~`],
-    ["records after a shorter, non-closing ``` inside a ```` fence (retest 3, KI-30)", `\`\`\`\`\ncode\n\`\`\`\n${ok}\n\`\`\`\``],
-    ["records after a ``` x line, which does not close (retest 3, KI-30)", `\`\`\`\ncode\n\`\`\` x\n${ok}\n\`\`\``],
-    ["records after a ~~~ line inside a ``` fence (retest 3, KI-30)", `\`\`\`\ncode\n~~~\n${ok}\n\`\`\``],
-    ["records inside an unclosed fence (retest 3, KI-30)", `\`\`\`\n${ok}`],
-    ["records inside a <script> block (retest 3, KI-30)", `<script>\n${ok}\n</script>`],
-    ["records inside a <style> block (retest 3, KI-30)", `<style type="x">\n${ok}\n</style>`],
-    ["records inside a <pre> block (retest 3, KI-30)", `<pre>\n${ok}\n</pre>`],
-    ["records inside a <textarea> block (retest 3, KI-30)", `<textarea>\n${ok}\n</textarea>`],
-    ["records after a comment that makes a fence line look closed (retest 4, KI-31)", `\`\`\`\n<!-- -->\`\`\`\n${ok}\n\`\`\``],
-    ["records inside a processing instruction (retest 4, KI-31)", `<?x\n${ok}\n?>`],
-    ["records inside CDATA (retest 4, KI-31)", `<![CDATA[\n${ok}\n]]>`],
-    ["records after a heading-like line (retest 4, KI-31)", `x\n=====\n${ok}`],
     ["records with a CR byte (LF only)", ok.replaceAll("\n", "\r\n")],
   ] as const) {
     test(`${name} is not a record`, () => {
       expect(reviewRecords(text).bad.length).toBeGreaterThan(0);
     });
   }
+});
+
+// ---- What a reader of the GitHub page sees (KI-38) --------------------------------------------
+// The guard asks GitHub's own renderer. These tests use (a) HTML that GitHub's POST /markdown
+// returned on 2026-11-15 for the reviewers' hiding cases, verbatim, and (b) a stand-in renderer,
+// Bun's md4c (`Bun.markdown.html`), which keeps comments and <details> as they are written — so the
+// guard's reading of rendered HTML is tested without calling GitHub per test.
+const md4c: Render = async (md) => Bun.markdown.html(md);
+let standIn: ReturnType<typeof Bun.serve>;
+beforeAll(() => {
+  standIn = Bun.serve({ port: 0, async fetch(req) {
+    const { text } = (await req.json()) as { text: string };
+    return new Response(Bun.markdown.html(text), { headers: { "Content-Type": "text/html" } });
+  } });
+});
+afterAll(() => standIn?.stop(true));
+
+const GITHUB = {
+  plain: '<h3>v1.2.3-4.5.6 — 2026-01-01</h3>\n<ul>\n<li><strong>Security review:</strong> 1 round, empty round 2026-01-01, reviewed <code class="notranslate">v1.2.3-4.5.5..abcdef1</code></li>\n</ul>',
+  comment: "<p>after</p>",
+  attribute: '<p>see &lt;span title="</p>\n<ul>\n<li><strong>Security review:</strong> HIDDEN-ATTR<br>\n"&gt;x</li>\n</ul>',
+  quoteAttr: '<blockquote>\n<p>see <span title="\n**Status: HIDDEN-QUOTE-ATTR**\n">x</span></p>\n</blockquote>',
+  imageAlt: '<blockquote>\n<p><strong>Status: ok <a target="_blank" rel="noopener noreferrer" href="logo.svg"><img src="logo.svg" alt="logo (HIDDEN-ALT)" style="max-width: 100%;"></a></strong></p>\n</blockquote>',
+  details: "<details><summary>Details</summary>\n<ul>\n<li><strong>Security review:</strong> HIDDEN-DETAILS</li>\n</ul>\n</details>",
+  listFence: '<ul>\n<li>item\n<pre class="notranslate"><code class="notranslate">x\n</code></pre>\n</li>\n</ul>',
+  tableMismatch: "<p>| a  |</p>",
+};
+const visibleText = async (html: string) => (await renderedBlocks(html)).filter((b) => !b.hidden).map((b) => b.text).join("\n");
+
+describe("what GitHub shows (KI-38)", () => {
+  test("a plain record is a visible list item under its heading (GitHub's own HTML)", async () => {
+    const bs = await renderedBlocks(GITHUB.plain);
+    expect(bs.find((b) => b.tag === "h3")?.text).toBe("v1.2.3-4.5.6 — 2026-01-01");
+    const li = bs.find((b) => b.tag === "li")!;
+    expect(li.text).toBe("Security review: 1 round, empty round 2026-01-01, reviewed v1.2.3-4.5.5..abcdef1");
+    expect(li.hidden).toBe(false);
+  });
+  for (const [name, mark] of [["comment", "HIDDEN-COMMENT"], ["quoteAttr", "HIDDEN-QUOTE-ATTR"], ["imageAlt", "HIDDEN-ALT"], ["listFence", "HIDDEN-LISTFENCE"], ["tableMismatch", "HIDDEN-TABLE"]] as const) {
+    test(`GitHub's ${name} case: the hidden text is not visible text`, async () => {
+      expect(await visibleText(GITHUB[name])).not.toContain(mark);
+    });
+  }
+  test("GitHub's details case: the record is there but collapsed (hidden)", async () => {
+    const li = (await renderedBlocks(GITHUB.details)).find((b) => b.tag === "li")!;
+    expect(li.text).toContain("HIDDEN-DETAILS");
+    expect(li.hidden).toBe(true);
+    expect((await renderedBlocks(GITHUB.details)).find((b) => b.tag === "summary")!.hidden).toBe(false);
+  });
+  test("GitHub's attribute case: GitHub escaped the tag, so the record IS visible", async () => {
+    expect(await visibleText(GITHUB.attribute)).toContain("Security review: HIDDEN-ATTR");
+  });
+
+  const recs = reviewRecords("- **Security review:** 2 rounds, empty round 2026-11-20, reviewed `v0.15.2-0.687.0..0123abc`\n- **Hardening review:** 1 round, empty round 2026-11-21, reviewed `v0.15.2-0.687.0..0123abc`").records;
+  const entry = (body: string) => `# r\n\n## Release History\n\n### v${cur.full} — 2026-11-21\n\n${body}\n`;
+  const both = "- **Security review:** 2 rounds, empty round 2026-11-20, reviewed `v0.15.2-0.687.0..0123abc`\n- **Hardening review:** 1 round, empty round 2026-11-21, reviewed `v0.15.2-0.687.0..0123abc`";
+
+  test("the repository's notes, README and State row are shown (stand-in renderer)", async () => {
+    expect(await renderedProblems(md4c, { notes: read("RELEASE-NOTES.md"), readme: read("README.md"), openWork: read("cmem/open-work.md") }, cur, [])).toEqual([]);
+  });
+  test("an entry with both records, in any valid Markdown around them, is shown", async () => {
+    const md = entry(`Some *emphasis*, a [link](https://example.com), \`code\`, a table:\n\n| a | b |\n| - | - |\n| 1 | 2 |\n\n${both}\n\n> a quote`);
+    expect(await renderedProblems(md4c, { release: md }, cur, recs)).toEqual([]);
+  });
+  for (const [name, body] of [
+    ["inside an HTML comment", `<!--\n${both}\n-->`],
+    ["inside <details>", `<details>\n\n${both}\n\n</details>`],
+    ["inside a code fence", `\`\`\`\n${both}\n\`\`\``],
+    ["inside an indented code block", both.split("\n").map((l) => `    ${l}`).join("\n")],
+  ] as const) {
+    test(`records ${name} are not shown, and that is an error`, async () => {
+      expect((await renderedProblems(md4c, { release: entry(body) }, cur, recs)).join("\n")).toContain("does not show the security review record");
+    });
+  }
+  test("an entry heading inside a fence is not shown", async () => {
+    const md = `# r\n\n## Release History\n\n\`\`\`\n### v${cur.full}\n\`\`\`\n\n${both}\n`;
+    expect((await renderedProblems(md4c, { release: md }, cur, recs)).join("\n")).toContain('"v' + cur.full + '" entry headings');
+  });
+  test("records under a later heading are not the entry's", async () => {
+    const md = entry(`text\n\n### other\n\n${both}`);
+    expect((await renderedProblems(md4c, { release: md }, cur, recs)).join("\n")).toContain("does not show the security review record");
+  });
+  test("a README status version in an image's alt text is not shown", async () => {
+    const readme = read("README.md").replace(/^> \*\*Status: ([^(]*)\((v[^)]*)\)/m, "> **Status: $1![logo ($2)](logo.svg)");
+    expect((await renderedProblems(md4c, { readme }, cur, [])).join("\n")).toContain("README.md: GitHub does not show the status line");
+  });
+  test("a README status line outside its quote is not the status line", async () => {
+    const readme = read("README.md").replace(/^> (\*\*Status:)/m, "$1");
+    expect((await renderedProblems(md4c, { readme }, cur, [])).join("\n")).toContain("README.md: GitHub does not show the status line");
+  });
+  test("two entry headings for the version are refused", async () => {
+    const md = entry(`${both}\n\n### v${cur.full} — again\n\n${both}`);
+    expect((await renderedProblems(md4c, { release: md }, cur, recs)).join("\n")).toContain("shows 2");
+  });
+  test("a notes heading inside a comment is not shown", async () => {
+    const notes = read("RELEASE-NOTES.md").replace(`## ${cur.full}\n`, `<!--\n## ${cur.full}\n-->\n`);
+    expect((await renderedProblems(md4c, { notes }, cur, [])).join("\n")).toContain(`RELEASE-NOTES.md: GitHub does not show a "${cur.full}" heading`);
+  });
+  test("a State row that is not a table row is not shown as one", async () => {
+    const openWork = read("cmem/open-work.md").replace(/^\|\s*what\s*\|\s*value\s*\|\n\|[\s|:-]*\|\n/m, "");
+    expect((await renderedProblems(md4c, { openWork }, cur, [])).join("\n")).toContain("as a table row");
+  });
+
+  // The renderer itself: a render that did not happen is never a pass.
+  test("githubRender sends gfm, the token, and throws on a non-200 answer or no answer", async () => {
+    let seen: { auth: string | null; body: unknown } | null = null;
+    const s = Bun.serve({ port: 0, async fetch(req) {
+      seen = { auth: req.headers.get("authorization"), body: await req.json() };
+      return new Response("nope", { status: 500 });
+    } });
+    try {
+      const e = await githubRender("t0ken", s.url.origin)("# x").then(() => "no error", (x: Error) => x.message);
+      expect(e).toContain("HTTP 500");
+      expect(seen!.auth).toBe("Bearer t0ken");
+      expect(seen!.body).toEqual({ text: "# x", mode: "gfm" });
+    } finally {
+      s.stop(true);
+    }
+    const gone = await githubRender(undefined, "http://127.0.0.1:9")("# x").then(() => "no error", (x: Error) => x.message);
+    expect(gone).toContain("did not answer");
+  });
+  test("renderedProblems throws when the renderer fails (never an empty list)", async () => {
+    const broken: Render = async () => {
+      throw new Error("down");
+    };
+    await expect(renderedProblems(broken, { notes: "x" }, cur, [])).rejects.toThrow("down");
+  });
+
+  // Against GitHub itself, on demand (ZILC_LIVE_RENDER=1): the repository's places are shown, and
+  // a record in a comment is not. Off by default: 60 unauthenticated calls an hour.
+  test.skipIf(!process.env.ZILC_LIVE_RENDER)("live: GitHub shows the repository's places and hides a commented record", async () => {
+    const gh = githubRender();
+    expect(await renderedProblems(gh, { notes: read("RELEASE-NOTES.md"), readme: read("README.md"), openWork: read("cmem/open-work.md") }, cur, [])).toEqual([]);
+    expect((await renderedProblems(gh, { release: entry(`<!--\n${both}\n-->`) }, cur, recs)).length).toBeGreaterThan(0);
+  }, 60000);
 });
 
 // ---- against a real history: a throwaway repository
@@ -440,7 +315,8 @@ beforeAll(() => {
   // checked as exactly bumpEdits of its parent.
   for (const f of BUMP_FILES) put(f, readFileSync(join(REPO, f), "utf8"));
   // The other counted Markdown files, which must be ordinary files at the commit (KI-36).
-  put("cmem/open-work.md", "# open work\n");
+  // The State row names the version being released (check-reviews renders it, KI-38).
+  put("cmem/open-work.md", "# open work\n\n| what | value |\n| --- | --- |\n| version | **`0.15.2-0.687.2`** |\n");
   put("RELEASE-NOTES.md", "# notes\n");
   for (const f of ["guards.ts", "check-reviews.ts"]) cpSync(join(import.meta.dir, f), join(dir, "tools/release", f));
   before = commit("start");
@@ -489,16 +365,19 @@ function release(entry: string, opts: Opts = {}) {
   return commit("bump to v0.15.2-0.687.2");
 }
 const check = async (head: string) => reviewsCoverRelease(gitIn(dir), findEntry(readFileSync(join(dir, "cmem/release.md"), "utf8"), "0.15.2-0.687.2")!, head, true);
-const cli = (head: string) => {
-  const p = Bun.spawnSync(["bun", join(dir, "tools/release/check-reviews.ts"), head], { stdout: "pipe", stderr: "pipe" });
-  return { code: p.exitCode, out: p.stdout.toString() + p.stderr.toString() };
+const cli = async (head: string) => {
+  // GitHub's renderer stood in by the local one (`standIn`): the CLI must not call GitHub per test.
+  // Asynchronous: a blocking spawn would stop this process, and with it the stand-in it calls.
+  const p = Bun.spawn(["bun", join(dir, "tools/release/check-reviews.ts"), head], { stdout: "pipe", stderr: "pipe", env: { ...process.env, ZILC_GITHUB_API: standIn.url.origin } });
+  const [o, e, code] = await Promise.all([new Response(p.stdout).text(), new Response(p.stderr).text(), p.exited]);
+  return { code, out: o + e };
 };
 
 describe("the review records against the history", () => {
   test("records covering everything since the previous release pass (library and CLI)", async () => {
     const h = release(entryFor("v0.15.2-0.687.1", reviewed));
     expect(await check(h)).toEqual([]);
-    const r = cli(h);
+    const r = await cli(h);
     expect(r.out).toContain("both required reviews recorded");
     expect(r.code).toBe(0);
   });
@@ -506,7 +385,7 @@ describe("the review records against the history", () => {
   test("code changed after the reviewed commit is refused", async () => {
     const h = release(entryFor("v0.15.2-0.687.1", reviewed), { codeAfterReview: true });
     expect((await check(h)).join("\n")).toContain("src/code.zig");
-    expect(cli(h).code).toBe(1);
+    expect((await cli(h)).code).toBe(1);
   });
 
   test("a review that starts at the wrong release is refused", async () => {
@@ -533,20 +412,20 @@ describe("the review records against the history", () => {
     test(`a bump commit whose ${f} carries more than the bump is refused (retest 1, KI-28)`, async () => {
       const h = release(entryFor("v0.15.2-0.687.1", reviewed), { bumpSmuggle: f });
       expect((await check(h)).join("\n")).toContain(`the bump commit's ${f} is not exactly the bump`);
-      expect(cli(h).code).toBe(1);
+      expect((await cli(h)).code).toBe(1);
     });
   }
 
   test("reviewed code moved into cmem/ after the review is refused (a rename, retest 1, KI-28)", async () => {
     const h = release(entryFor("v0.15.2-0.687.1", reviewed), { afterReview: () => sh("mv", "src/code.zig", "cmem/code.zig.txt") });
     expect((await check(h)).join("\n")).toContain("src/code.zig");
-    expect(cli(h).code).toBe(1);
+    expect((await cli(h)).code).toBe(1);
   });
 
   test("a non-ASCII memory file after the review is allowed (retest 1, KI-28)", async () => {
     const h = release(entryFor("v0.15.2-0.687.1", reviewed), { afterReview: () => put("cmem/café.md", "x\n") });
     expect(await check(h)).toEqual([]);
-    expect(cli(h).code).toBe(0);
+    expect((await cli(h)).code).toBe(0);
   });
 
   // Retest 2 (KI-29): the bump commit compared as git objects, not decoded text.
@@ -791,24 +670,31 @@ describe("the review records against the history", () => {
     }
   }, 30000); // two 2 s limits and run()'s 2 s grace: past bun's default 5 s per test
 
-  test("the negation the first guard accepted is refused by the CLI", () => {
+  test("records GitHub would not show are refused by the CLI (KI-38)", async () => {
+    const h = release(`### v0.15.2-0.687.2 — 2026-11-21\n\n<!--\n${rec("Security", "v0.15.2-0.687.1", reviewed)}\n${rec("Hardening", "v0.15.2-0.687.1", reviewed)}\n-->\n`);
+    const r = await cli(h);
+    expect(r.code).toBe(1);
+    expect(r.out).toContain("GitHub would not show");
+  });
+
+  test("the negation the first guard accepted is refused by the CLI", async () => {
     const h = release("### v0.15.2-0.687.2 — x\n\nsecurity review: not run. hardening review: skipped.\n");
-    const r = cli(h);
+    const r = await cli(h);
     expect(r.code).toBe(1);
     expect(r.out).toContain("no security review record");
   });
 
-  test("a commit that is not the bump commit is refused by the CLI", () => {
+  test("a commit that is not the bump commit is refused by the CLI", async () => {
     release(entryFor("v0.15.2-0.687.1", reviewed));
     put("cmem/x.md", "memory after the bump\n");
     const h = commit("memory: after the bump");
-    const r = cli(h);
+    const r = await cli(h);
     expect(r.code).toBe(1);
     expect(r.out).toContain("is not the bump commit");
   });
 
-  test("a git failure is exit 2, never a pass", () => {
-    const r = cli("no-such-commit");
+  test("a git failure is exit 2, never a pass", async () => {
+    const r = await cli("no-such-commit");
     expect(r.code).toBe(2);
   });
 });

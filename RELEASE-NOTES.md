@@ -12,13 +12,13 @@ new Fil-C release. There is no 1.0: breaking changes are announced here, not in 
 
 ## 0.15.2-0.687.1
 
-| | |
-| --- | --- |
-| **Line** | reference (built with Zig 0.15.2 and checked directly against Fil-C) |
-| **Your Zig code is compiled with** | Zig 0.15.2 |
-| **Built on** | Fil-C 0.687 (compiler pass, runtime and its checked musl libc), released 2026-10-23 |
-| **Basis** | none: this is the reference line |
-| **Platform** | Linux x86_64 only, by design (on Windows, inside WSL) |
+|                                    |                                                                                     |
+| ---------------------------------- | ----------------------------------------------------------------------------------- |
+| **Line**                           | reference (built with Zig 0.15.2 and checked directly against Fil-C)                |
+| **Your Zig code is compiled with** | Zig 0.15.2                                                                          |
+| **Built on**                       | Fil-C 0.687 (compiler pass, runtime and its checked musl libc), released 2026-10-23 |
+| **Basis**                          | none: this is the reference line                                                    |
+| **Platform**                       | Linux x86_64 only, by design (on Windows, inside WSL)                               |
 
 zilc moves to Fil-C 0.687. Fil-C stays on LLVM 20.1.8, so your code is still compiled with Zig
 0.15.2.
@@ -57,13 +57,13 @@ optimize modes, and its output matches plain Zig's with no unexplained differenc
 
 ## 0.15.2-0.686.1
 
-| | |
-| --- | --- |
-| **Line** | reference (built with Zig 0.15.2 and checked directly against Fil-C) |
-| **Your Zig code is compiled with** | Zig 0.15.2 |
-| **Built on** | Fil-C 0.686 (compiler pass, runtime and its checked musl libc), released 2026-10-04 |
-| **Basis** | none: this is the reference line |
-| **Platform** | Linux x86_64, the platform Fil-C supports (on Windows, through WSL2) |
+|                                    |                                                                                     |
+| ---------------------------------- | ----------------------------------------------------------------------------------- |
+| **Line**                           | reference (built with Zig 0.15.2 and checked directly against Fil-C)                |
+| **Your Zig code is compiled with** | Zig 0.15.2                                                                          |
+| **Built on**                       | Fil-C 0.686 (compiler pass, runtime and its checked musl libc), released 2026-10-04 |
+| **Basis**                          | none: this is the reference line                                                    |
+| **Platform**                       | Linux x86_64, the platform Fil-C supports (on Windows, through WSL2)                |
 
 The first published release. zilc compiles Zig, C and C++ into one memory-safe program through
 Fil-C: out-of-bounds accesses, use-after-free and pointers forged from integers stop the program

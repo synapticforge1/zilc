@@ -9,11 +9,11 @@ file's and is not copied here; this file fills its **[project]** slots for zilc 
 
 ## The owner's words (beside "commit" / "push" / "release", `working-rules.md` § Owner commands)
 
-| the owner says | it is | none of them commits, pushes or releases |
-| --- | --- | --- |
-| **"review"** | a targeted agent code review, workspace § 2 | |
-| **"security review"** | a security review, workspace § 3 | |
-| **"hardening review"** | a hardening review, workspace § 4 | |
+| the owner says         | it is                                       | none of them commits, pushes or releases |
+| ---------------------- | ------------------------------------------- | ---------------------------------------- |
+| **"review"**           | a targeted agent code review, workspace § 2 |                                          |
+| **"security review"**  | a security review, workspace § 3            |                                          |
+| **"hardening review"** | a hardening review, workspace § 4           |                                          |
 
 ## The slots
 
@@ -32,15 +32,15 @@ test passes. Both rank above any crash.
 **The reference results that must still hold (§ 1.3.4)** — each a dated count in `testing.md` /
 `open-work.md`, re-derived before quoting:
 
-| set | command | holds at |
-| --- | --- | --- |
-| the safety gate | `bun tools/run-gate.ts` (Fil-C in WSL) | **8/8**, every case trapping at its file:line |
-| unit tests | `zig build test --summary all` | **40/40** (2026-11-07) |
-| the corpus | `testing.md` "corpus" | **78/78 as designed in all four modes** |
-| the output comparison | `testing.md` | **0 unexplained** |
-| Fil-C's own suite | `tools/filc/run-filc-tests.ts`, stock vs zilc's clang | **0 differences** on 7,269 |
-| the pure-Zig chain | `tools/filc/compare-chains.ts` | **14/14** |
-| the sarcasm port | `bun tools/sarcasm/check-stages.ts` | **every stage 0 differ** |
+| set                   | command                                               | holds at                                             |
+| --------------------- | ----------------------------------------------------- | ---------------------------------------------------- |
+| the safety gate       | `bun tools/run-gate.ts` (Fil-C in WSL)                | **8/8**, every case trapping at its file:line        |
+| unit tests            | `zig build test --summary all`                        | **41/41** (2026-11-15; +check-pins' own test, KI-38) |
+| the corpus            | `testing.md` "corpus"                                 | **78/78 as designed in all four modes**              |
+| the output comparison | `testing.md`                                          | **0 unexplained**                                    |
+| Fil-C's own suite     | `tools/filc/run-filc-tests.ts`, stock vs zilc's clang | **0 differences** on 7,269                           |
+| the pure-Zig chain    | `tools/filc/compare-chains.ts`                        | **14/14**                                            |
+| the sarcasm port      | `bun tools/sarcasm/check-stages.ts`                   | **every stage 0 differ**                             |
 
 **CI jobs (§ 1.5):** `.github/workflows/release.yml` on every push to `main`, `ubuntu-latest`
 (Linux x86_64): `checks` (zig fmt, `zig build test`, the release scripts' tests, the five version

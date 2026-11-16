@@ -1,10 +1,10 @@
 # Workarounds — what we work around, and WHY
 
-**Owner rule (2026-10-01):** *"When we create a work around for something, take copious notes for
+**Owner rule (2026-10-01):** _"When we create a work around for something, take copious notes for
 the why part so we can refer back to it in the future. Whether it is an upstream defect or a system
 limitation we need to know the why of these issues so that when we run into similar issues we can
 quickly identify those past problems and their resolutions, and investigate and surmise potential
-similar resolutions."*
+similar resolutions."_
 
 So this file is the **lookup table for new failures**. A new symptom goes here first: find its row
 in the symptom index, read the family, and try that family's resolution before starting from zero.
@@ -17,60 +17,60 @@ in the symptom index, read the family, and try that family's resolution before s
 
 Every workaround gets an entry **when it is made**, not later. Use these headings:
 
-| heading | what goes in it |
-| --- | --- |
-| **Symptom** | The exact text a user or the corpus sees (assertion, trap message, linker error), so a text search finds it |
-| **Class** | Upstream defect (Fil-C / Zig / LLVM) · system limitation (by design, will not change) · std behaviour (legal natively, unsafe under Fil-C) · zilc's own gap |
-| **Root cause (the why)** | The mechanism, as far as it is **known**. Mark what is **measured** and what is **surmised**, separately |
-| **Why the workaround is correct** | Which invariant it preserves (same bytes, same value, same checks), and why it cannot hide a real safety error |
-| **Ruled out** | Hypotheses that were tested and failed, with the test. These save the most time later |
-| **How it was found** | The method and tools (reducer, probes), so the next one is quicker |
-| **Recognising a relative** | What a similar problem would look like, and the first thing to try |
-| **Cost and exit** | What it costs (speed, size, lost diagnostics), and the condition for removing it (e.g. "Fil-C fixes X") |
-| **Where** | Code (function, driver step), tests, repro files, KI number |
+| heading                           | what goes in it                                                                                                                                             |
+| --------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Symptom**                       | The exact text a user or the corpus sees (assertion, trap message, linker error), so a text search finds it                                                 |
+| **Class**                         | Upstream defect (Fil-C / Zig / LLVM) · system limitation (by design, will not change) · std behaviour (legal natively, unsafe under Fil-C) · zilc's own gap |
+| **Root cause (the why)**          | The mechanism, as far as it is **known**. Mark what is **measured** and what is **surmised**, separately                                                    |
+| **Why the workaround is correct** | Which invariant it preserves (same bytes, same value, same checks), and why it cannot hide a real safety error                                              |
+| **Ruled out**                     | Hypotheses that were tested and failed, with the test. These save the most time later                                                                       |
+| **How it was found**              | The method and tools (reducer, probes), so the next one is quicker                                                                                          |
+| **Recognising a relative**        | What a similar problem would look like, and the first thing to try                                                                                          |
+| **Cost and exit**                 | What it costs (speed, size, lost diagnostics), and the condition for removing it (e.g. "Fil-C fixes X")                                                     |
+| **Where**                         | Code (function, driver step), tests, repro files, KI number                                                                                                 |
 
 ---
 
 ## Families: the patterns seen so far
 
-| family | the shape | members | first thing to try |
-| --- | --- | --- | --- |
-| **F1. Fil-C's pass rejects a valid IR shape** | An assertion or crash inside `FilPizlonatorPass` on IR that stock LLVM accepts | KI-4 (Debug `-O1` segfault), **KI-18** (3-byte globals) | Reduce with `tools/p2/llreduce.ts` (functions **and** globals), then probe the minimal shape's neighbours (sizes, wrappers, positions) by hand. Rewrite the IR into an equivalent shape the pass accepts |
-| **F2. A capability lost through an integer** | `cannot read/write pointer with null object` | KI-5, KI-13, KI-17, KI-19, KI-10 | Find where the pointer became an integer (`ptrtoint`, a call result, `extractvalue`, a parameter, a stack slot). Fil-C recovers a capability only through plain same-function integer arithmetic |
-| **F3. Inline asm** | `cannot handle inline asm …` | KI-7 (syscall), KI-14 (Valgrind), KI-15/Z-4 (frame walks) | Route through checked libc (`zilc_syscall`), or turn the feature off with a Zig flag (`-fno-valgrind`) |
-| **F4. Code that never goes through the pass** | `undefined reference to pizlonated_…` | KI-6 (glibc names), KI-8 (stack probe), KI-9 (f128 helpers) | Either stop emitting the call (a flag) or compile the provider through the pass |
-| **F6. Build time far above native Zig** | a zilc build several times slower than `zig build-exe` | KI-21 (dead std code compiled), KI-22 (cubic frame-slot colouring in the pass) | Time each stage (Zig IR, Fil-C `-ftime-report`, link) against native and stock-clang baselines; list IR lines by namespace; for time inside the pass, scale a synthetic test and sample with gdb, then read the pass |
-| **F5. std code that is legal natively but stopped by Fil-C** | `cannot read N bytes when upper - ptr = M`, `ptr >= upper`, `unrecognized … advice` | KI-11 (sentinel over-read), KI-12 (`mmap` hint), KI-20 (`madvise` probe) | std hook if one exists (`root.os.heap.page_allocator`); otherwise the std overlay (`src/stdpatch.zig`), backporting upstream first |
+| family                                                       | the shape                                                                           | members                                                                        | first thing to try                                                                                                                                                                                                   |
+| ------------------------------------------------------------ | ----------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **F1. Fil-C's pass rejects a valid IR shape**                | An assertion or crash inside `FilPizlonatorPass` on IR that stock LLVM accepts      | KI-4 (Debug `-O1` segfault), **KI-18** (3-byte globals)                        | Reduce with `tools/p2/llreduce.ts` (functions **and** globals), then probe the minimal shape's neighbours (sizes, wrappers, positions) by hand. Rewrite the IR into an equivalent shape the pass accepts             |
+| **F2. A capability lost through an integer**                 | `cannot read/write pointer with null object`                                        | KI-5, KI-13, KI-17, KI-19, KI-10                                               | Find where the pointer became an integer (`ptrtoint`, a call result, `extractvalue`, a parameter, a stack slot). Fil-C recovers a capability only through plain same-function integer arithmetic                     |
+| **F3. Inline asm**                                           | `cannot handle inline asm …`                                                        | KI-7 (syscall), KI-14 (Valgrind), KI-15/Z-4 (frame walks)                      | Route through checked libc (`zilc_syscall`), or turn the feature off with a Zig flag (`-fno-valgrind`)                                                                                                               |
+| **F4. Code that never goes through the pass**                | `undefined reference to pizlonated_…`                                               | KI-6 (glibc names), KI-8 (stack probe), KI-9 (f128 helpers)                    | Either stop emitting the call (a flag) or compile the provider through the pass                                                                                                                                      |
+| **F6. Build time far above native Zig**                      | a zilc build several times slower than `zig build-exe`                              | KI-21 (dead std code compiled), KI-22 (cubic frame-slot colouring in the pass) | Time each stage (Zig IR, Fil-C `-ftime-report`, link) against native and stock-clang baselines; list IR lines by namespace; for time inside the pass, scale a synthetic test and sample with gdb, then read the pass |
+| **F5. std code that is legal natively but stopped by Fil-C** | `cannot read N bytes when upper - ptr = M`, `ptr >= upper`, `unrecognized … advice` | KI-11 (sentinel over-read), KI-12 (`mmap` hint), KI-20 (`madvise` probe)       | std hook if one exists (`root.os.heap.page_allocator`); otherwise the std overlay (`src/stdpatch.zig`), backporting upstream first                                                                                   |
 
 ---
 
 ## Symptom index
 
-| symptom text (search for it) | entry |
-| --- | --- |
-| `Assertion '!(CSize % WordSize)' failed` (`FilPizlonator.cpp:16714`) | [KI-18](#ki-18--globals-with-a-3-byte-value-type) |
-| segfault in `FilPizlonatorPass` on Debug IR at `-O1` (`SplitKnownCriticalEdge`, `PHINode::setIncomingBlock`) | [KI-4](#ki-4--fil-cs-pass-segfaults-on-debug-ir-at--o1-and-why-debug-was-at--o0) |
-| `cannot handle inline asm (unsupported mnemonic for safe inline asm: syscall)` | KI-7 |
-| `literal register %rdi not covered` (Valgrind sequence) | KI-14 |
-| `undefined reference to pizlonated___zig_probe_stack` | KI-8 |
-| `undefined reference to pizlonated___multf3` / `roundq` | KI-9 |
-| `undefined reference to pizlonated_getrlimit64` / `mmap64` | KI-6 |
-| `cannot write pointer with null object` in `DebugAllocator` | KI-13 |
-| `cannot read pointer with null object` after a syscall, Debug only | KI-19 (open) |
-| `unsupported syscall: 310` | KI-15 |
-| `cannot read 16 bytes when upper - ptr = 12` at `mem.zig` | KI-11 |
-| `cannot write pointer with ptr >= upper` inside `zsys_mmap` | KI-12 |
-| Zig `start.zig` trap reading the aux vector | KI-5 |
-| a zilc build many times slower than native Zig; IR full of `debug.Dwarf` / `compress.flate` | [KI-21](#ki-21--stds-stack-trace-code-compiled-into-every-program-build-time) |
-| build time dominated by `FilPizlonatorPass` on one huge function; Debug builds that never finish | [KI-22](#ki-22--fil-cs-frame-slot-colouring-is-cubic-on-big-zig-functions-build-time-open) |
-| `attempting to use unrecognized madvise advice -1` (from `tlcsprng.zig`) | [KI-20](#ki-20--stdcryptorandom-probes-madvise-with-an-invalid-advice) |
-| `Can't create a MachineFunction using a Module with a Target-incompatible DataLayout` (a module split before Fil-C's pass) | KI-22, lever (a): `datalayout_after_filc` lost |
-| `TLS reference in … mismatches non-TLS reference in …` (joining split parts) | KI-22, lever (a): unused hidden declarations |
-| `multiple definition of 'main'` … `filc_crt.o` / `filc_mincrt.o` after `clang -r` | KI-22, lever (a): Fil-C's driver adds its crt even to `-r -nostdlib` |
-| `filc safety error: stack overflow` on a Zig `@panic`, or the KI-12 / KI-20 traps, in a program whose `main` is C | the Zig file was compiled without zilc's generated root, so std's hooks were missing: fixed 2026-10-02 by the library root (`library_shim`, KI-5 short form below; gate cases 6–8) |
-| `fatal error: 'asm/types.h' file not found` (from `pizfix/os-include/linux/types.h`) | the Fil-C tree's `os-include/asm` link points at headers this machine lacks: `tools/filc/fix-os-include.ts <tree>` (see "Machine setup" below) |
-| `patch-pass.ts` / `patch-split.ts`: `original found 0 times, expected 1` | an edit's original text no longer matches: upstream changed it (`check-upstream.ts`), or an editor trimmed a whitespace-only line in it (KI-22, lever (b)) |
-| `zilc (KI-22): interference graph differs from the original` / `frame-slot colouring differs` | only with `ZILC_VERIFY_INTERFERENCE=1` / `ZILC_VERIFY_COLOURING=1`: the patched pass disagrees with the original; KI-22 levers (b) and the colouring fix |
+| symptom text (search for it)                                                                                               | entry                                                                                                                                                                              |
+| -------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Assertion '!(CSize % WordSize)' failed` (`FilPizlonator.cpp:16714`)                                                       | [KI-18](#ki-18--globals-with-a-3-byte-value-type)                                                                                                                                  |
+| segfault in `FilPizlonatorPass` on Debug IR at `-O1` (`SplitKnownCriticalEdge`, `PHINode::setIncomingBlock`)               | [KI-4](#ki-4--fil-cs-pass-segfaults-on-debug-ir-at--o1-and-why-debug-was-at--o0)                                                                                                   |
+| `cannot handle inline asm (unsupported mnemonic for safe inline asm: syscall)`                                             | KI-7                                                                                                                                                                               |
+| `literal register %rdi not covered` (Valgrind sequence)                                                                    | KI-14                                                                                                                                                                              |
+| `undefined reference to pizlonated___zig_probe_stack`                                                                      | KI-8                                                                                                                                                                               |
+| `undefined reference to pizlonated___multf3` / `roundq`                                                                    | KI-9                                                                                                                                                                               |
+| `undefined reference to pizlonated_getrlimit64` / `mmap64`                                                                 | KI-6                                                                                                                                                                               |
+| `cannot write pointer with null object` in `DebugAllocator`                                                                | KI-13                                                                                                                                                                              |
+| `cannot read pointer with null object` after a syscall, Debug only                                                         | KI-19 (open)                                                                                                                                                                       |
+| `unsupported syscall: 310`                                                                                                 | KI-15                                                                                                                                                                              |
+| `cannot read 16 bytes when upper - ptr = 12` at `mem.zig`                                                                  | KI-11                                                                                                                                                                              |
+| `cannot write pointer with ptr >= upper` inside `zsys_mmap`                                                                | KI-12                                                                                                                                                                              |
+| Zig `start.zig` trap reading the aux vector                                                                                | KI-5                                                                                                                                                                               |
+| a zilc build many times slower than native Zig; IR full of `debug.Dwarf` / `compress.flate`                                | [KI-21](#ki-21--stds-stack-trace-code-compiled-into-every-program-build-time)                                                                                                      |
+| build time dominated by `FilPizlonatorPass` on one huge function; Debug builds that never finish                           | [KI-22](#ki-22--fil-cs-frame-slot-colouring-is-cubic-on-big-zig-functions-build-time-open)                                                                                         |
+| `attempting to use unrecognized madvise advice -1` (from `tlcsprng.zig`)                                                   | [KI-20](#ki-20--stdcryptorandom-probes-madvise-with-an-invalid-advice)                                                                                                             |
+| `Can't create a MachineFunction using a Module with a Target-incompatible DataLayout` (a module split before Fil-C's pass) | KI-22, lever (a): `datalayout_after_filc` lost                                                                                                                                     |
+| `TLS reference in … mismatches non-TLS reference in …` (joining split parts)                                               | KI-22, lever (a): unused hidden declarations                                                                                                                                       |
+| `multiple definition of 'main'` … `filc_crt.o` / `filc_mincrt.o` after `clang -r`                                          | KI-22, lever (a): Fil-C's driver adds its crt even to `-r -nostdlib`                                                                                                               |
+| `filc safety error: stack overflow` on a Zig `@panic`, or the KI-12 / KI-20 traps, in a program whose `main` is C          | the Zig file was compiled without zilc's generated root, so std's hooks were missing: fixed 2026-10-02 by the library root (`library_shim`, KI-5 short form below; gate cases 6–8) |
+| `fatal error: 'asm/types.h' file not found` (from `pizfix/os-include/linux/types.h`)                                       | the Fil-C tree's `os-include/asm` link points at headers this machine lacks: `tools/filc/fix-os-include.ts <tree>` (see "Machine setup" below)                                     |
+| `patch-pass.ts` / `patch-split.ts`: `original found 0 times, expected 1`                                                   | an edit's original text no longer matches: upstream changed it (`check-upstream.ts`), or an editor trimmed a whitespace-only line in it (KI-22, lever (b))                         |
+| `zilc (KI-22): interference graph differs from the original` / `frame-slot colouring differs`                              | only with `ZILC_VERIFY_INTERFERENCE=1` / `ZILC_VERIFY_COLOURING=1`: the patched pass disagrees with the original; KI-22 levers (b) and the colouring fix                           |
 
 ---
 
@@ -188,8 +188,8 @@ either side**, so not for `UPSTREAM-ISSUES.md`.
   (`MADV_WIPEONFORK = 18`, Linux 4.14+).
 - Before using it, std checks for **QEMU user-mode emulation**, which accepts any `madvise` hint:
   it calls `posix.madvise(ptr, 0, 0xffffffff)` **on purpose** and expects `EINVAL` (`:97`–`:102`).
-  The Zig comment says so: *"Check if this is the case by passing bogus parameters, we expect
-  EINVAL as result."*
+  The Zig comment says so: _"Check if this is the case by passing bogus parameters, we expect
+  EINVAL as result."_
 - Fil-C's `zsys_madvise` does not pass an unknown advice through to the kernel to get `EINVAL`. It
   **stops the program**, which is its general rule for arguments it cannot vet.
 - musl has no `arc4random`, so `os_has_arc4random` is false and this path is the default under zilc.
@@ -489,8 +489,8 @@ option 2).**
 - ❌ **Split BEFORE the pass (rejected by the owner, 2026-10-02: bloat).** Measured first: stock
   `llvm-split -j 16` on the Fil-C-dialect IR, then the full clang on each part: clang stage 55 s →
   ~24 s, but the stripped binary **+37%** (6.5 → 8.9 MB), because the optimizer can no longer
-  inline across parts (each part is a separate C file, in effect). Owner: *"What is another option
-  that doesn't bloat the resulting binary, is reasonably speedy and maintains fidelity?"*
+  inline across parts (each part is a separate C file, in effect). Owner: _"What is another option
+  that doesn't bloat the resulting binary, is reasonably speedy and maintains fidelity?"_
 - **`datalayout_after_filc` (seen only on the rejected route, kept for the record).** Stock
   llvm-split drops Fil-C's second data layout: `CloneModule` does not copy the Fil-C-only
   `Module` field, and bitcode has no record for it (the line exists only in Fil-C's text printer
@@ -666,35 +666,35 @@ source"; `platforms.md`) runs upstream's own `build_base_cosmo.sh`, unmodified, 
 (`Dockerfile-build-env`, Ubuntu 25.04) plus `cosmo.txt`'s aarch64 package list. This machine is
 Ubuntu 26.04 in WSL2, so five things differ. None of them changes what Fil-C produces.
 
-1. **`libstdc++-15-dev-arm64-cross` instead of `-13`.** *Why:* `cosmo.txt` itself says to install
+1. **`libstdc++-15-dev-arm64-cross` instead of `-13`.** _Why:_ `cosmo.txt` itself says to install
    the libstdc++ cross headers matching the cross GCC's version (it gives GCC 12 → `-12` as the
    example), and 26.04's `gcc-aarch64-linux-gnu` is GCC 15. They are the headers the aarch64
    compiler-rt/libpas cross builds compile against.
-2. **`libblake3-dev` 1.8.2 from apt instead of BLAKE3 1.8.7 built into `/usr/local`.** *Why:* the
+2. **`libblake3-dev` 1.8.2 from apt instead of BLAKE3 1.8.7 built into `/usr/local`.** _Why:_ the
    Dockerfile builds it by hand only because its base image lacks the package; it is a
    dependency of Fil-C's BUILD tooling, never compiled into the compiler's output or a user
-   program. *Revisit* if the build fails on a BLAKE3 API newer than 1.8.2: then build 1.8.7 from
+   program. _Revisit_ if the build fails on a BLAKE3 API newer than 1.8.2: then build 1.8.7 from
    `projects/BLAKE3-1.8.7.tar.gz` as the Dockerfile does. (First run, 2026-10-05: `projeny`, the
    first build step, compiles its OWN bundled BLAKE3 (`projects/projeny/src/blake3`), so it does
    not use this one at all.)
-4. **`libcurl4-openssl-dev` added** (not in upstream's Dockerfile, which installs only the `curl`
-   program). *Why:* `projeny` links `-lcurl` and includes `<curl/curl.h>`; the first run stopped
+3. **`libcurl4-openssl-dev` added** (not in upstream's Dockerfile, which installs only the `curl`
+   program). _Why:_ `projeny` links `-lcurl` and includes `<curl/curl.h>`; the first run stopped
    there (`fatal error: curl/curl.h: No such file or directory`, 2026-10-05). Upstream's image
    presumably gets the headers some other way; the build only needs them to compile its tool.
-5. **Cosmo's APE loader registered with binfmt_misc (WSL only).** *Symptom:* clang built fine
+4. **Cosmo's APE loader registered with binfmt_misc (WSL only).** _Symptom:_ clang built fine
    (~20 min at 12 jobs), then `build_yolocosmo.sh` failed at once: every cosmo compile ended in
-   make's `Error 5` with no message. *Root cause, measured:* cosmo's build tools (`cocmd`,
+   make's `Error 5` with no message. _Root cause, measured:_ cosmo's build tools (`cocmd`,
    `tlscc`, `compile.ape`, …) are APE binaries starting with `MZqFpD`; WSL's `WSLInterop`
    binfmt_misc entry claims every file starting with `MZ` and runs it as a WINDOWS program, so the
    tools never ran (run directly: nothing; through `build/bootstrap/ape.elf`: they work). Not a
-   Fil-C or cosmo defect, and upstream's Linux hosts have no WSLInterop. *Fix (cosmo's documented
-   one):* install cosmo's own loader (`projects/yolocosmo/build/bootstrap/ape.elf`, the version
+   Fil-C or cosmo defect, and upstream's Linux hosts have no WSLInterop. _Fix (cosmo's documented
+   one):_ install cosmo's own loader (`projects/yolocosmo/build/bootstrap/ape.elf`, the version
    Fil-C's tree ships) as `/usr/bin/ape` and register it for `MZqFpD` and `jartsr`;
    binfmt_misc tries the newest entry first, so it wins over WSLInterop. Root-only, so the
    owner runs it; `build-cosmo.ts` detects the missing `APE` entry and prints the commands.
-   *Side effect:* none for Windows `.exe` files (they start `MZ` but not `MZqFpD`). Lost on a WSL
+   _Side effect:_ none for Windows `.exe` files (they start `MZ` but not `MZqFpD`). Lost on a WSL
    restart unless `/etc/binfmt.d/cosmo-ape.conf` is written (the tool prints that too).
-   *Bears on the evaluation itself:* a zilc user on WSL would need the same registration to run
+   _Bears on the evaluation itself:_ a zilc user on WSL would need the same registration to run
    cosmo-mode (APE) programs there.
    ⚠️ **Not reliable on WSL (measured 2026-10-05, ~10 minutes later).** With `APE` registered and
    enabled, cosmo's libc built (18:29); at 18:40 the next step (`make filcapetools`) failed the same
@@ -712,10 +712,10 @@ Ubuntu 26.04 in WSL2, so five things differ. None of them changes what Fil-C pro
    binfmt_misc does not let a new file be created there. Harmless.) Consequence: Windows `.exe`
    files cannot be started from inside WSL on this machine; zilc's tools only go the other way
    (Windows → WSL).
-3. **Parallelism capped at 12 jobs** (`JOBS`). *Why:* upstream uses every core (`NCPU=$(nproc)` in
+5. **Parallelism capped at 12 jobs** (`JOBS`). _Why:_ upstream uses every core (`NCPU=$(nproc)` in
    `libpas/common.sh`, ninja's default for clang); on this 32-core, 31 GB WSL VM, 32 parallel
-   RelWithDebInfo clang compiles crashed the WSL service twice (2026-10-01). *How, without editing
-   upstream:* GNU `nproc` honours `OMP_NUM_THREADS`, and `build_clang.sh`/`build_compiler_rt.sh`
+   RelWithDebInfo clang compiles crashed the WSL service twice (2026-10-01). _How, without editing
+   upstream:_ GNU `nproc` honours `OMP_NUM_THREADS`, and `build_clang.sh`/`build_compiler_rt.sh`
    source an optional `clang-build-overrides.sh` (written by the tool) for `NINJAFLAGS`. The job
    count changes build speed only.
 
@@ -742,7 +742,7 @@ SentinelOne (2026-10-08).
 **Class.** System limitation (a managed EDR, by design; it will not change). Not a Fil-C, cosmo or
 zilc defect.
 
-**Root cause (the why).** *Measured*, from the Windows Application log (Event IDs 1000/1001):
+**Root cause (the why).** _Measured_, from the Windows Application log (Event IDs 1000/1001):
 - 18:38:32–18:38:57: cosmo's build tools `cocmd` and `compile.ape` ran as WINDOWS processes from
   `\\wsl.localhost\Ubuntu\...\filc-cosmo\...` (WSL interop sent them there; see the entry above)
   and crashed with `0xC0000005`, five times.
@@ -751,12 +751,12 @@ zilc defect.
   `31_timers.exe`, `chello.exe`, `plain.exe`) and ran them on real Windows, seven times. Each died
   as WER event `BEX64` with `P9 = 0000000000000008`: a DEP violation (execute from non-executable
   memory), "faulting module: unknown", no version resource, no signature.
-*Surmised, consistent with how SentinelOne's behavioral engine is documented:* unsigned, versionless
-binaries in a Temp folder, launched by a `node.exe` process tree (Claude Code), repeatedly faulting
-on execute-from-data, is the profile it classifies as a loader/injector. Its mitigation kills the
-whole process tree (which includes Claude Code) and quarantines the files; the "cut off Claude
-access" was that, or the network-quarantine policy, which we cannot see from here (the agent's
-console is IT's).
+  _Surmised, consistent with how SentinelOne's behavioral engine is documented:_ unsigned, versionless
+  binaries in a Temp folder, launched by a `node.exe` process tree (Claude Code), repeatedly faulting
+  on execute-from-data, is the profile it classifies as a loader/injector. Its mitigation kills the
+  whole process tree (which includes Claude Code) and quarantines the files; the "cut off Claude
+  access" was that, or the network-quarantine policy, which we cannot see from here (the agent's
+  console is IT's).
 
 **Why the rule is correct.** Nothing in the cosmo evaluation NEEDS the Windows host. The Linux half
 of an APE runs in WSL through cosmo's own `ape` binfmt entry; the Windows (PE) half runs under
@@ -775,7 +775,7 @@ with DEP enforcement around a loader that maps and jumps into its own image. It 
 EDR-induced. It is therefore recorded as **unverified**, not as an upstream defect, and left to
 upstream's "next person with a Windows box".
 
-**Ruled out.** That the Windows *build* side was involved: nothing from the Windows side compiled or
+**Ruled out.** That the Windows _build_ side was involved: nothing from the Windows side compiled or
 linked anything; all faulting images are APE files. That WSL itself was flagged: the WSL distro,
 work tree, Wine prefix and cosmo `pizfix/` are intact (checked 2026-10-08), and the checklist runs
 there without incident.
@@ -794,38 +794,38 @@ machine-local memory `no-windows-host-execution`.
 
 ## Earlier workarounds (short form; expand to the full template when next touched)
 
-- ~~**KI-4, Debug compiled at `filc -O0`.**~~ **Superseded 2026-10-01** by the KI-4 patch (full entry above); Debug is now at `-O1`. *Original why:* Fil-C's pass segfaults on Zig's Debug IR at
+- ~~**KI-4, Debug compiled at `filc -O0`.**~~ **Superseded 2026-10-01** by the KI-4 patch (full entry above); Debug is now at `-O1`. _Original why:_ Fil-C's pass segfaults on Zig's Debug IR at
   `-O1`/`-O2` (reduced to 8 `std.compress.flate` functions, `tools/p2/repro/`). Upstream defect, F1.
-  *Cost:* no inlining in Debug, which also exposes KI-13 #2 and KI-19. *Exit:* the repro compiles at
+  _Cost:_ no inlining in Debug, which also exposes KI-13 #2 and KI-19. _Exit:_ the repro compiles at
   `-O1`.
-- **KI-4, the two-line data-layout rewrite** (`ir.toFilCDialect`). *Why:* Fil-C's LLVM is a dialect:
+- **KI-4, the two-line data-layout rewrite** (`ir.toFilCDialect`). _Why:_ Fil-C's LLVM is a dialect:
   `ni:0` on address space 0 plus `datalayout_after_filc`. Stock IR lacks both. System limitation.
-- **KI-5, generated C-ABI entry shim.** *Why:* `start.zig` forges pointers from integers
+- **KI-5, generated C-ABI entry shim.** _Why:_ `start.zig` forges pointers from integers
   (`@ptrFromInt(getauxval(AT_PHDR))`), which InvisiCap forbids by design. F2. Also hosts the panic
   handler and the `page_allocator` hook. Since 2026-10-02 the hooks live in `shim_hooks`, shared with a LIBRARY root for C-owns-`main` builds, and a user file's own `panic`/`os`/`std_options` are honoured (only `crypto_always_getrandom` is forced).
-- **KI-6, target `x86_64-linux-musl`.** *Why:* Fil-C's libc is musl; gnu-target Zig emits `*64`
+- **KI-6, target `x86_64-linux-musl`.** _Why:_ Fil-C's libc is musl; gnu-target Zig emits `*64`
   glibc names. F4.
-- **KI-7, raw `syscall` asm → `zilc_syscall`** (`ir.rewriteSyscalls`). *Why:* std makes raw syscalls
+- **KI-7, raw `syscall` asm → `zilc_syscall`** (`ir.rewriteSyscalls`). _Why:_ std makes raw syscalls
   even with `-lc`; Fil-C refuses inline asm, and a raw blocking syscall would also stall the GC
   (FUGC needs an exit before blocking). The helper goes through Fil-C's checked `syscall()`. F3.
-- **KI-8, `-fno-stack-check` in every mode.** *Why:* `__zig_probe_stack` lives in compiler-rt, which
+- **KI-8, `-fno-stack-check` in every mode.** _Why:_ `__zig_probe_stack` lives in compiler-rt, which
   never goes through the pass. Safe because Fil-C checks the stack at every function entry. F4.
-- **KI-9, f128 compiler-rt through the pass.** *Why:* the helpers are not in Fil-C's libc; they are
+- **KI-9, f128 compiler-rt through the pass.** _Why:_ the helpers are not in Fil-C's libc; they are
   compiled as checked code, with every other export internalized so they cannot replace Fil-C's
   libm. F4.
-- **KI-11, std overlay backport of 0.16.0 `findSentinel`.** *Why:* 0.15.2's SIMD scan reads past the
+- **KI-11, std overlay backport of 0.16.0 `findSentinel`.** _Why:_ 0.15.2's SIMD scan reads past the
   object (legal natively within a page). std has no hook for it. F5.
-- **KI-12, `root.os.heap.page_allocator = c_allocator`.** *Why:* `PageAllocator`'s `mmap` hint is a
+- **KI-12, `root.os.heap.page_allocator = c_allocator`.** _Why:_ `PageAllocator`'s `mmap` hint is a
   pointer at an object's upper bound. F5.
-- **KI-13, overflow fold + `fromPage` patch.** *Why:* Fil-C recovers capabilities only through plain
+- **KI-13, overflow fold + `fromPage` patch.** _Why:_ Fil-C recovers capabilities only through plain
   integer instructions; `extractvalue` of `*.with.overflow` and integer parameters start at BOTTOM.
   Field 0 is the identical value, and the overflow branch is untouched. F2.
-- **KI-14, `-fno-valgrind`.** *Why:* Valgrind client requests are inline asm; they are no-ops unless
+- **KI-14, `-fno-valgrind`.** _Why:_ Valgrind client requests are inline asm; they are no-ops unless
   run under Valgrind. F3.
-- **KI-15, `sys_can_stack_trace = false` in the overlay.** *Why:* native stack walking reads raw
+- **KI-15, `sys_can_stack_trace = false` in the overlay.** _Why:_ native stack walking reads raw
   frame pointers and probes with `process_vm_readv`; it can never carry capabilities. Fil-C gives
   its own traces. F3/F2.
-- **KI-17, Zig's unoptimized IR** (`--verbose-llvm-ir -fllvm`). *Why:* `-femit-llvm-ir` is
+- **KI-17, Zig's unoptimized IR** (`--verbose-llvm-ir -fllvm`). _Why:_ `-femit-llvm-ir` is
   post-optimisation under an integral layout, so LLVM had already turned pointer loads into
   integers. F2. Side effect: exposed KI-18 (globals no longer folded away).
 
@@ -838,7 +838,7 @@ numbers, so they live here too, condensed. zailc's `cmem/workarounds.md` keeps t
 
 - **W-1. The generated banner still names the Ruby script.** `filc_native.h` and
   `filc_native_forwarders.c` from `zilc-gen` begin `/* Generated by generate_pizlonated_forwarders.rb */`.
-  *Why:* the proof of the port is byte-identity with Ruby's output, and the banner is part of the
+  _Why:_ the proof of the port is byte-identity with Ruby's output, and the banner is part of the
   bytes; no consumer reads it. Exit: when zilc stops comparing against Ruby.
 - **W-2. Zig's caches stay out of the repo.** The checkout is on exFAT under `/mnt/d`;
   `tools/lib/tool.ts` `zigCacheArgs()` puts both caches in the Linux home (zilc's KI-2 rule).
@@ -891,20 +891,20 @@ numbers, so they live here too, condensed. zailc's `cmem/workarounds.md` keeps t
   exactly the two definitions — the oracle catching the departure it exists to catch.
 - **W-11. Linking `libyoloc.so` (the loader) with Zig's LLD instead of GCC's driver and GNU ld**
   (zilc's own, 2026-10-27; zailc never built the shared half). Three parts:
-  1. *`zig cc` refuses two of musl's link flags.* Symptom: `unsupported linker arg:
+  1. _`zig cc` refuses two of musl's link flags._ Symptom: `unsupported linker arg:
      --exclude-libs` / `--dynamic-list`. These are two of configure's seven `LDFLAGS_AUTO`, which
      `import-yolomusl-sources.ts` reads into `ld_args`. Fix: `build/pure_zig.zig` runs `zig ld.lld`
      (Zig's LLD) directly with upstream's link rule spelled out (`-shared -e _dlstart`, plus
      `--build-id=sha1 --eh-frame-hdr -z relro`, which GCC's driver adds). Ruled out: dropping the
      flags, which would change the export set.
-  2. *`--exclude-libs=ALL` means something else here.* Symptom (measured): the first link exported
+  2. _`--exclude-libs=ALL` means something else here._ Symptom (measured): the first link exported
      **8** symbols where the release exports 1,653, and so every program's link listed every libc
      symbol as undefined (that output then crashed the gate with `StderrStreamTooLong`, fixed by
      raising its capture limit). Root cause (measured): upstream links the `.lo` objects loose, so
      its only archive is `$(LIBCC)` and `ALL` hides only the compiler runtime; zilc links yolo musl
      as `--whole-archive libyoloc.a`, so `ALL` hid libc too. Fix: `--exclude-libs=libyolort.a`,
      upstream's effect named exactly. Proof: 1,653 exports equal by name and type, 0 undefined.
-  3. *Two segment kinds differ, allowed by name in `verify-yolomusl.ts`.* Measured: zilc's has a
+  3. _Two segment kinds differ, allowed by name in `verify-yolomusl.ts`._ Measured: zilc's has a
      `PHDR` segment, which LLD gives a shared object and GNU ld does not; the release has
      `GNU_PROPERTY`, which GNU ld makes from `.note.gnu.property`, carried by all 1,343 of the
      release archive's GCC-built members (x86 ISA-used notes) and by none of Zig's clang's. The
@@ -950,6 +950,6 @@ numbers, so they live here too, condensed. zailc's `cmem/workarounds.md` keeps t
   zig chain's objects linked by GNU ld equal the GCC chain's library exactly (`testing.md`). No
   behaviour difference: both resolve to the same definition (yolo musl's loader binds at load).
   Fix, if parity is wanted: link with GNU ld (scope in `open-work.md`); LLD 20 has no option for it.
-  **Owner, 2026-11-05: not wanted — keep LLD** (*"We are looking for the end result being the same.
-  Not specifically that the end compilation product is the same."*; `design-decisions.md`).
+  **Owner, 2026-11-05: not wanted — keep LLD** (_"We are looking for the end result being the same.
+  Not specifically that the end compilation product is the same."_; `design-decisions.md`).
   A relative: W-11 part 3 (`PHDR`), another LLD-vs-GNU-ld layout difference.

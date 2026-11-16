@@ -20,7 +20,7 @@
  *     review record (guards.ts REVIEW_FORM), each from the previous release's tag to a commit after
  *     which only `cmem/` and RELEASE-NOTES.md changed (H35);
  *   - the privacy scan (cmem/working-rules.md § Privacy) finds nothing in the tree;
- *   - the cold gate: `zig fmt --check`, `zig build test`, the release scripts' tests, and
+ *   - the cold gate: `zig fmt --check`, Biome's Markdown check, `zig build test`, the release scripts' tests, and
  *     `bun tools/run-gate.ts` (the Fil-C safety gate, 8/8 — the half CI cannot run: a runner has
  *     no Fil-C toolchain; cmem/release.md § "What runs where").
  * Then `git push origin main` (no tags, no force) and a read-back of `refs/heads/main`.
@@ -79,6 +79,7 @@ for (const flag of ["-I", "-a"]) {
 // ---- the cold gate
 const steps: [string, string[], RegExp | null][] = [
   ["zig fmt --check", [ZIG, "fmt", "--check", "build.zig", "build", "tools", "tests", "src"], null],
+  ["Markdown formatting (Biome)", ["bun", "tools/md/biome.ts", "ci", "--colors=off", "."], null],
   ["zig build test", [ZIG, "build", "test", "--summary", "all"], /Build Summary: (\d+)\/\1 steps succeeded/],
   ["release scripts' tests", ["bun", "test", "tools/release/"], / 0 fail/],
   ["the Fil-C gate", ["bun", "tools/run-gate.ts"], /gate: (\d+)\/\1 cases passed/],

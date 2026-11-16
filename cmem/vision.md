@@ -2,15 +2,15 @@
 
 ## 📊 Scoreboard — what the vision claimed vs. what was measured (2026-09-23)
 
-| the claim | status |
-| --- | --- |
-| One toolchain compiles safe Zig **and** safe C | ✅ **done** — `zilc build a.c b.zig` links them into one checked binary |
-| A Zig ⇄ C pointer keeps its bounds across the call | ✅ **done** — C allocates, Zig overflows, the panic names `bounds.zig:13:6` under `c_caller.c:26:5` |
-| No heavyweight custom toolchain needed | ✅ **better than hoped** — stock Zig + a **two-line IR rewrite**; no Zig fork, no LLVM build |
-| Safe C++ | ◻️ untried (Fil-C does it; zilc has not) |
-| The runtime written in Zig | ◻️ not started — today the program links **Fil-C's** C runtime (P3) |
-| "Safe calls into ordinary, uninstrumented C libraries" | ❌ **false as stated** — the pass renames every symbol; both sides must be compiled by it |
-| 1.5×–4× slowdown | ✅ **measured 2026-11-06** (`tools/bench/bench.ts`, `testing.md` "Benchmark suite"; one machine, i9-13980HX, idle, 5 runs after a warm-up, noise ≤ 2 % for most programs): **zilc's Zig programs about 1.7× (ReleaseFast: 1.68× for the four ports of upstream's benchmarks, 1.66× for zilc's own five) and about 1.8× (ReleaseSafe: 1.82× / 1.85×), geometric means; every Zig pair 1.29×–3.04×**; Fil-C on upstream's C/C++ benchmarks 2.07× (range 1.04×–5.06×). So Fil-C's 1.5×–4× holds here, and Zig through zilc sits at its low end. A claim with a date: re-measure before quoting |
+| the claim                                              | status                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| ------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| One toolchain compiles safe Zig **and** safe C         | ✅ **done** — `zilc build a.c b.zig` links them into one checked binary                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| A Zig ⇄ C pointer keeps its bounds across the call     | ✅ **done** — C allocates, Zig overflows, the panic names `bounds.zig:13:6` under `c_caller.c:26:5`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| No heavyweight custom toolchain needed                 | ✅ **better than hoped** — stock Zig + a **two-line IR rewrite**; no Zig fork, no LLVM build                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| Safe C++                                               | ◻️ untried (Fil-C does it; zilc has not)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| The runtime written in Zig                             | ◻️ not started — today the program links **Fil-C's** C runtime (P3)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| "Safe calls into ordinary, uninstrumented C libraries" | ❌ **false as stated** — the pass renames every symbol; both sides must be compiled by it                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| 1.5×–4× slowdown                                       | ✅ **measured 2026-11-06** (`tools/bench/bench.ts`, `testing.md` "Benchmark suite"; one machine, i9-13980HX, idle, 5 runs after a warm-up, noise ≤ 2 % for most programs): **zilc's Zig programs about 1.7× (ReleaseFast: 1.68× for the four ports of upstream's benchmarks, 1.66× for zilc's own five) and about 1.8× (ReleaseSafe: 1.82× / 1.85×), geometric means; every Zig pair 1.29×–3.04×**; Fil-C on upstream's C/C++ benchmarks 2.07× (range 1.04×–5.06×). So Fil-C's 1.5×–4× holds here, and Zig through zilc sits at its low end. A claim with a date: re-measure before quoting |
 
 ## The primary goal (owner, 2026-09-18)
 
@@ -22,7 +22,7 @@ target inside the Zig toolchain would therefore cover all three languages from *
 instead of Fil-C's separate, heavyweight clang fork (`filcc` / `fil++`).
 
 The owner's framing came from a design discussion with Gemini. Its content is recorded below,
-separated into what that discussion *proposed* and what has since been *checked against upstream*.
+separated into what that discussion _proposed_ and what has since been _checked against upstream_.
 
 ## The proposed pipeline
 
@@ -59,22 +59,22 @@ memory-safe machine code
 
 ## ⚠️ Claims NOT yet verified, which must be checked before being relied on
 
-- *"Community proposals within the Zig ecosystem have explored a safe, Fil-C-like target."*
+- _"Community proposals within the Zig ecosystem have explored a safe, Fil-C-like target."_
   No source was given. Find the issue/proposal (Codeberg `ziglang/zig`, since Zig moved off GitHub)
   or drop the claim.
-- *"100% exploit-proof memory safety."* Fil-C's own claim is narrower and precise: GIMSO
+- _"100% exploit-proof memory safety."_ Fil-C's own claim is narrower and precise: GIMSO
   semantics (see upstream `gimso_semantics.md`, `invisicap.txt`). Use Fil-C's wording, not the
   marketing summary.
-- *"A single binary (`zig`)"*. This implies **patching the Zig compiler**. Two other options are a
+- _"A single binary (`zig`)"_. This implies **patching the Zig compiler**. Two other options are a
   pass plugin loaded into an unmodified Zig, or a wrapper driver. That is the biggest open
   question; see `design-decisions.md`.
-- *"Passing a Zig slice into a C function preserves its capability."* ◐ **Checked against upstream
+- _"Passing a Zig slice into a C function preserves its capability."_ ◐ **Checked against upstream
   2026-09-18: true only if BOTH sides are compiled with the pass.** FilPizlonator renames every
   symbol to `pizlonated_<name>` (`FilPizlonator.cpp:1904`), so instrumented code cannot call
   uninstrumented C directly. The goal still holds (one safe world for Zig, C and C++), but it does
   not extend to calling ordinary, uninstrumented C libraries.
-- ✅ *"The pass can apply to Zig."* **Supported by upstream's own framing** (2026-09-18): Fil-C's
-  pass is "garbage in, memory safety out" (GIMSO), with memory-safe semantics for *any* LLVM
+- ✅ _"The pass can apply to Zig."_ **Supported by upstream's own framing** (2026-09-18): Fil-C's
+  pass is "garbage in, memory safety out" (GIMSO), with memory-safe semantics for _any_ LLVM
   module, including adversarial ones (`gimso_semantics.md`). Nothing in principle is C-specific.
   The P1 spike tests this in practice.
 - Zig-language support is **not** equivalent to C support. Zig has slices, optionals, error unions,
@@ -83,7 +83,7 @@ memory-safe machine code
 
 ## Guiding decisions (so far)
 
-- **Track Fil-C, don't fork blindly.** Upstream is actively developed. Take its *pass* and its
-  *semantics*; reconsider its runtime (see `upstream.md`).
+- **Track Fil-C, don't fork blindly.** Upstream is actively developed. Take its _pass_ and its
+  _semantics_; reconsider its runtime (see `upstream.md`).
 - **Safety over speed.** The target exists to trade throughput for absolute runtime resilience.
 - **Permissive, upstream-compatible licensing** (`licensing.md`).

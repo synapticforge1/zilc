@@ -12,8 +12,9 @@ name: release
 #   tag yet AND the commit is its bump commit `bump to v<version>` (or, on a re-run, its tag is
 #   already on THIS commit). It runs what a runner CAN run: zig fmt, `zig build test` (needs no
 #   Fil-C — rehearsed 2026-11-12 on a fresh clone with empty caches), the release scripts' tests,
-#   the five-places check, the privacy scan, and on a release the review check
-#   (tools/release/check-reviews.ts). The Fil-C
+#   the five-places check, the privacy scan, Biome's Markdown check (tools/md/biome.ts), and on a
+#   release the review check (tools/release/check-reviews.ts, which also asks GitHub's renderer
+#   that every counted place is shown). The Fil-C
 #   safety gate needs a Fil-C toolchain a runner does not have; `bun tools/release/release.ts`
 #   runs it on the owner's machine before it pushes (cmem/release.md § "What runs where").
 # - `tag` creates the annotated tag v<Zig>-<Fil-C>.<N> on that commit through the REST API
@@ -132,6 +133,15 @@ jobs:
       - name: The required reviews (a release only)
         if: steps.decide.outputs.release == 'true'
         run: bun tools/release/check-reviews.ts "$GITHUB_SHA"
+        # GitHub's own renderer checks that every counted place is shown (KI-38); the job's read-only
+        # token lifts the unauthenticated rate limit. A render that fails is a refusal.
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+
+      # Markdown formatting is Biome's (owner, 2026-11-15; biome.jsonc), pinned by version and sha256
+      # in tools/md/biome.ts; `ci` fails on any .md not formatted as Biome would.
+      - name: Markdown formatting (Biome)
+        run: bun tools/md/biome.ts ci --colors=off .
 
       # A scan STOPS a push (workspace review-process.md § 3.1, item 7; cmem/working-rules.md
       # § Privacy). The one permitted hit is the rule's own text in cmem/working-rules.md.

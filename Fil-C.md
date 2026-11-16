@@ -21,34 +21,34 @@ reasoning behind each workaround is in `cmem/workarounds.md` (KI and W numbers);
 
 ## 1. The base
 
-| | |
-| --- | --- |
-| **Fil-C release** | **0.687** (released 2026-10-23), the musl flavour, Linux x86_64 |
-| **Compiler commit** | `e7947f079c976fb167108f7407c20240bca0ca89`, the one 0.687's clang names in `clang --version` (5 commits under the `v0.687` tag, with no compiler change between them) |
-| **LLVM** | 20.1.8. This pins the Zig version (see [Zig.md](Zig.md)) |
-| **Prebuilt** | `filc-0.687-linux-x86_64.tar.xz`, SHA-256 `aab538401f78a47ab261ee79afed8c6b99e1d4848e263ae159a75b03c1288da1` (Fil-C publishes none; recorded at download) |
-| **Installed at** | `~/zilc-work/tools/filc-0.687-linux-x86_64` by `tools/p1/setup-wsl.ts` ([tools/README.md](tools/README.md) "First-time setup") |
-| **Source tree** | `~/zilc-work/filc-src/repo`, a sparse, partial clone of Fil-C's LLVM fork at the compiler commit (`git@github.com:pizlonator/llvm-project-deluge.git` for 0.687; 0.686 named `fil-c.git`, same history) |
-| **zilc release** | `0.15.2-0.687.<N>`: the version names the Fil-C release (`<Zig>-<Fil-C>.<zilc release>`); the current `N` is `build.zig.zon`'s `.version` (the five version places, `cmem/releasing.md`) |
-| **Platform** | **Linux x86_64 only**, by design (on Windows, inside WSL). Cross-platform work belongs to the sibling project zailc |
+|                     |                                                                                                                                                                                                         |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Fil-C release**   | **0.687** (released 2026-10-23), the musl flavour, Linux x86_64                                                                                                                                         |
+| **Compiler commit** | `e7947f079c976fb167108f7407c20240bca0ca89`, the one 0.687's clang names in `clang --version` (5 commits under the `v0.687` tag, with no compiler change between them)                                   |
+| **LLVM**            | 20.1.8. This pins the Zig version (see [Zig.md](Zig.md))                                                                                                                                                |
+| **Prebuilt**        | `filc-0.687-linux-x86_64.tar.xz`, SHA-256 `aab538401f78a47ab261ee79afed8c6b99e1d4848e263ae159a75b03c1288da1` (Fil-C publishes none; recorded at download)                                               |
+| **Installed at**    | `~/zilc-work/tools/filc-0.687-linux-x86_64` by `tools/p1/setup-wsl.ts` ([tools/README.md](tools/README.md) "First-time setup")                                                                          |
+| **Source tree**     | `~/zilc-work/filc-src/repo`, a sparse, partial clone of Fil-C's LLVM fork at the compiler commit (`git@github.com:pizlonator/llvm-project-deluge.git` for 0.687; 0.686 named `fil-c.git`, same history) |
+| **zilc release**    | `0.15.2-0.687.<N>`: the version names the Fil-C release (`<Zig>-<Fil-C>.<zilc release>`); the current `N` is `build.zig.zon`'s `.version` (the five version places, `cmem/releasing.md`)                |
+| **Platform**        | **Linux x86_64 only**, by design (on Windows, inside WSL). Cross-platform work belongs to the sibling project zailc                                                                                     |
 
 ### What the base is made of
 
 The release tarball is the oracle for every piece on the route. Who built each piece, and with
 which compiler, decides which differences a Zig build may show (§ 3).
 
-| piece | what it is | upstream builds it with |
-| --- | --- | --- |
-| clang + `FilPizlonator` pass | the compiler; the pass turns every pointer into a checked capability | LLVM's CMake |
-| `libpizlo.so` | the capability runtime and the FUGC collector. Its **stock half** (libpas, the yolo side) is plain C, and its **Fil-C half** (`filc/src`) is compiled by Fil-C | make with clang, then Fil-C's clang |
-| `libyoloc.so` = `ld-fil1-x86_64.so` | the runtime's own libc ("yolo musl"), **also the dynamic loader** | musl's make, **GCC 12.3** |
-| `libyoloc.a`, `libyolom.a`, `crt1.o`/`Scrt1.o`/`rcrt1.o`/`crti.o`/`crtn.o` | yolo musl's static half | musl's make, GCC 12.3 |
-| `libyolort.a`, `crtbegin.o`, `crtend.o` | compiler-rt, the runtime side | compiler-rt's CMake, **GCC 11.4** |
-| `libyolounwind.a`, `filc_crt.o`, `filc_mincrt.o` | unwinder and Fil-C's crt objects | make with clang |
-| `libc.so` | the user libc: a patched musl **compiled by Fil-C** | Fil-C's clang |
-| libc++, libc++abi | C++, compiled by Fil-C | Fil-C's clang |
-| `filc_native.h`, `filc_native_forwarders.c` | the native ↔ user forwarders | a Ruby generator |
-| musl's installed headers, `stdfil.h`, `pizfix/os-include` | headers; `os-include` links to the machine's kernel headers | `make install-headers`, `setup.sh` |
+| piece                                                                      | what it is                                                                                                                                                     | upstream builds it with             |
+| -------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------- |
+| clang + `FilPizlonator` pass                                               | the compiler; the pass turns every pointer into a checked capability                                                                                           | LLVM's CMake                        |
+| `libpizlo.so`                                                              | the capability runtime and the FUGC collector. Its **stock half** (libpas, the yolo side) is plain C, and its **Fil-C half** (`filc/src`) is compiled by Fil-C | make with clang, then Fil-C's clang |
+| `libyoloc.so` = `ld-fil1-x86_64.so`                                        | the runtime's own libc ("yolo musl"), **also the dynamic loader**                                                                                              | musl's make, **GCC 12.3**           |
+| `libyoloc.a`, `libyolom.a`, `crt1.o`/`Scrt1.o`/`rcrt1.o`/`crti.o`/`crtn.o` | yolo musl's static half                                                                                                                                        | musl's make, GCC 12.3               |
+| `libyolort.a`, `crtbegin.o`, `crtend.o`                                    | compiler-rt, the runtime side                                                                                                                                  | compiler-rt's CMake, **GCC 11.4**   |
+| `libyolounwind.a`, `filc_crt.o`, `filc_mincrt.o`                           | unwinder and Fil-C's crt objects                                                                                                                               | make with clang                     |
+| `libc.so`                                                                  | the user libc: a patched musl **compiled by Fil-C**                                                                                                            | Fil-C's clang                       |
+| libc++, libc++abi                                                          | C++, compiled by Fil-C                                                                                                                                         | Fil-C's clang                       |
+| `filc_native.h`, `filc_native_forwarders.c`                                | the native ↔ user forwarders                                                                                                                                   | a Ruby generator                    |
+| musl's installed headers, `stdfil.h`, `pizfix/os-include`                  | headers; `os-include` links to the machine's kernel headers                                                                                                    | `make install-headers`, `setup.sh`  |
 
 Fil-C's link is dynamic by default, so a program loads `libpizlo.so`, `libc.so` and `libyoloc.so`
 (the loader).
@@ -80,11 +80,11 @@ rebuilt from the same commit with three changes to Fil-C's code**. The edit scri
 anything the stock clang already compiled: Fil-C's own suite gives the same result with both
 clangs on all 7,269 tests (0.687).
 
-| change | why | record |
-| --- | --- | --- |
-| `indirectbr` lowering: one `switch` per `indirectbr` when a function has several | the stock pass crashes at `-O1` on Zig's Debug IR (computed gotos) | KI-4 |
-| frame-slot colouring in linear time (+ a dense interference graph) | the stock colouring is cubic in function size, so large Zig programs took minutes | KI-22 levers (b) |
-| a `--zilc-part` mode for `llvm-split` | parallel code generation after the pass has run on the whole module, so the code stays the same | KI-22 lever (a) |
+| change                                                                           | why                                                                                             | record           |
+| -------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- | ---------------- |
+| `indirectbr` lowering: one `switch` per `indirectbr` when a function has several | the stock pass crashes at `-O1` on Zig's Debug IR (computed gotos)                              | KI-4             |
+| frame-slot colouring in linear time (+ a dense interference graph)               | the stock colouring is cubic in function size, so large Zig programs took minutes               | KI-22 levers (b) |
+| a `--zilc-part` mode for `llvm-split`                                            | parallel code generation after the pass has run on the whole module, so the code stays the same | KI-22 lever (a)  |
 
 `zig build patched-clang` builds it from the Fil-C sources the build fetches (since 2026-10-30;
 `build/patched_clang.zig`, `tools/patched-clang.zig`: the patch is applied without git, each file
@@ -98,18 +98,18 @@ and `tools/filc/restore-patched-clang.ts` restores it.
 
 ### Workarounds zilc applies for Fil-C
 
-| what zilc does | why (Fil-C's side) | record |
-| --- | --- | --- |
-| Rewrites the two `target datalayout` lines of Zig's IR into Fil-C's dialect (`ni:0` on address space 0, plus `datalayout_after_filc`) | Fil-C's IR is a patched-LLVM dialect, and the pass refuses stock IR | KI-4, `src/ir.zig` |
-| Wraps globals whose value type has a 3-byte store size (`i21`, `<3 x i8>`, …) in a one-field struct | the pass asserts `!(CSize % WordSize)` on them | KI-18 (upstream issue 1) |
-| Compiles Debug builds at `filc -O1`, not `-O0` | at `-O0`, syscall pointer arguments arrived without a capability; `-O1` needs the patched clang (KI-4) | KI-19 |
-| Generates the program's entry (a C-ABI `main` calling Zig's) instead of Zig's `start.zig` | `start.zig` forges a pointer from an integer (`getauxval(AT_PHDR)`), which InvisiCap forbids | KI-5 |
-| Rewrites raw `syscall` inline asm into a call to a checked helper, `zilc_syscall` | Fil-C refuses inline asm, and a raw syscall would also skip the GC's safepoint protocol | KI-7 |
-| Compiles the 128-bit float helpers (26 compiler-rt files) through the pass when a module uses `fp128` | Fil-C's user side does not provide them: `__multf3`, `roundq`, … are undefined at link time | KI-9 |
-| Targets `x86_64-linux-musl` by default | Fil-C's libc is musl; a gnu target fails to link on the `*64` symbols | KI-6 |
-| Passes `-fno-stack-check` to Zig | Fil-C checks the stack at every function entry itself, and `__zig_probe_stack` would be undefined | KI-8 |
-| Splits big modules after the pass and generates their code in parallel; caches Fil-C's objects | instrumented code takes long to build | KI-22 levers (a), (c) |
-| Never byte-compares two Fil-C builds without fixing ASLR | Fil-C's output is not reproducible under ASLR, so compare inside one run (`ZILC_VERIFY_COLOURING`) | KI-22 |
+| what zilc does                                                                                                                        | why (Fil-C's side)                                                                                     | record                   |
+| ------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ | ------------------------ |
+| Rewrites the two `target datalayout` lines of Zig's IR into Fil-C's dialect (`ni:0` on address space 0, plus `datalayout_after_filc`) | Fil-C's IR is a patched-LLVM dialect, and the pass refuses stock IR                                    | KI-4, `src/ir.zig`       |
+| Wraps globals whose value type has a 3-byte store size (`i21`, `<3 x i8>`, …) in a one-field struct                                   | the pass asserts `!(CSize % WordSize)` on them                                                         | KI-18 (upstream issue 1) |
+| Compiles Debug builds at `filc -O1`, not `-O0`                                                                                        | at `-O0`, syscall pointer arguments arrived without a capability; `-O1` needs the patched clang (KI-4) | KI-19                    |
+| Generates the program's entry (a C-ABI `main` calling Zig's) instead of Zig's `start.zig`                                             | `start.zig` forges a pointer from an integer (`getauxval(AT_PHDR)`), which InvisiCap forbids           | KI-5                     |
+| Rewrites raw `syscall` inline asm into a call to a checked helper, `zilc_syscall`                                                     | Fil-C refuses inline asm, and a raw syscall would also skip the GC's safepoint protocol                | KI-7                     |
+| Compiles the 128-bit float helpers (26 compiler-rt files) through the pass when a module uses `fp128`                                 | Fil-C's user side does not provide them: `__multf3`, `roundq`, … are undefined at link time            | KI-9                     |
+| Targets `x86_64-linux-musl` by default                                                                                                | Fil-C's libc is musl; a gnu target fails to link on the `*64` symbols                                  | KI-6                     |
+| Passes `-fno-stack-check` to Zig                                                                                                      | Fil-C checks the stack at every function entry itself, and `__zig_probe_stack` would be undefined      | KI-8                     |
+| Splits big modules after the pass and generates their code in parallel; caches Fil-C's objects                                        | instrumented code takes long to build                                                                  | KI-22 levers (a), (c)    |
+| Never byte-compares two Fil-C builds without fixing ASLR                                                                              | Fil-C's output is not reproducible under ASLR, so compare inside one run (`ZILC_VERIFY_COLOURING`)     | KI-22                    |
 
 The hooks zilc puts into Zig's std concern Zig code under Fil-C's rules; they are in
 [Zig.md](Zig.md).
@@ -149,18 +149,18 @@ re-checked against every new release:
 
 ### Piece by piece (Fil-C 0.687, 2026-10-27)
 
-| piece | upstream's recipe → imported by | Zig build | proof | allowed differences | status |
-| --- | --- | --- | --- | --- | --- |
-| forwarder generator | `generate_pizlonated_forwarders.rb` → ported to Zig, signatures by `tools/gen/import-signatures.ts` | `zilc-gen` (`src/gen/`), `zig build gen` | `tools/gen/verify-forwarders.ts`: **byte-identical** to Ruby's (456 native + 13 user signatures); SHA-256 pinned in `zig build test` | the banner names the Ruby script (W-1) | ✅ |
-| musl header install | `make install-headers` → `src/gen/musl_headers.zig` | `zilc-gen` | `tools/gen/verify-musl-headers.ts`: **byte-identical**, 219 files | none | ✅ |
-| libpas stock half, `filc_crt.o`, `filc_mincrt.o`, `libyolounwind.a` | `libpas/common.mk` `PASSRCS` → `import-libpas-sources.ts` | `zig build libpas` | `verify-libpas.ts`: the release's defined symbols, object by object | `pas_panic` undefined in one object (W-4) | ✅ |
-| yolo musl, static half | musl's Makefile + configure → `import-yolomusl-sources.ts` | `zig build yolomusl` | `verify-yolomusl.ts`: the release's members (`.lo`, 1,343) and their symbols | GCC/clang libcall and helper differences (W-8) | ✅ |
-| compiler-rt (`libyolort.a`, `crtbegin.o`, `crtend.o`) | `build_compiler_rt.sh`'s CMake options, run once under `zig cc` → `build.ninja` read by `import-compiler-rt-sources.ts` | `zig build compiler-rt` | `verify-compiler-rt.ts`: the release's members and symbols, **no extra definition** | W-8; the `_Float16` defect kept (W-10) | ✅ |
-| yolo musl, shared half (`libyoloc.so`, the loader) | musl's `lib/libyoloc.so` rule and configure's `LDFLAGS_AUTO` → `import-yolomusl-sources.ts` | `zig build yolomusl`, linked by `zig ld.lld` | `verify-yolomusl.ts`: the release's 1,653 exports (name and type), no undefined symbols, the same dynamic tags, segment kinds, entry at `_dlstart` | `PHDR` (LLD) against `GNU_PROPERTY` (GCC's notes) (W-11) | ✅ |
-| the rest of `libpizlo`: `filc/src`, the four `libpizlo.so`, `libpizlo.a` (2026-10-30) | `libpas/Makefile`'s FILCC, SHLD and `ar` rules | `zig build libpas -Dfilc-clang=<Fil-C clang>`; linked by `zig ld.lld` | the release's exports, all five artifacts (2,504 / 2,504 / 2,512 / 2,512 / 2,546); same dynamic properties | self-binding relocations 2,139 vs the release's 2,133 (being judged by the functional comparison) (W-12) | ✅ |
-| the user libc, libc++ | compiled by Fil-C's clang | upstream's own scripts with the Zig-built clang (`build-filc-from-source.ts`); not yet in `zig build` | the release's exports; Fil-C's suite 0 differences | none | 🟡 |
-| a program linked only from Zig's outputs, then Fil-C's suite on it | | | | | ⬜ |
-| **Z2:** the pass itself (`FilPizlonator`, KillUB, DeleteRedundantPollchecks) in Zig | | not started (zailc has not started it either) | the same module through both passes, compared as IR and as behaviour | | ⬜ |
+| piece                                                                                 | upstream's recipe → imported by                                                                                         | Zig build                                                                                             | proof                                                                                                                                              | allowed differences                                                                                      | status |
+| ------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- | ------ |
+| forwarder generator                                                                   | `generate_pizlonated_forwarders.rb` → ported to Zig, signatures by `tools/gen/import-signatures.ts`                     | `zilc-gen` (`src/gen/`), `zig build gen`                                                              | `tools/gen/verify-forwarders.ts`: **byte-identical** to Ruby's (456 native + 13 user signatures); SHA-256 pinned in `zig build test`               | the banner names the Ruby script (W-1)                                                                   | ✅     |
+| musl header install                                                                   | `make install-headers` → `src/gen/musl_headers.zig`                                                                     | `zilc-gen`                                                                                            | `tools/gen/verify-musl-headers.ts`: **byte-identical**, 219 files                                                                                  | none                                                                                                     | ✅     |
+| libpas stock half, `filc_crt.o`, `filc_mincrt.o`, `libyolounwind.a`                   | `libpas/common.mk` `PASSRCS` → `import-libpas-sources.ts`                                                               | `zig build libpas`                                                                                    | `verify-libpas.ts`: the release's defined symbols, object by object                                                                                | `pas_panic` undefined in one object (W-4)                                                                | ✅     |
+| yolo musl, static half                                                                | musl's Makefile + configure → `import-yolomusl-sources.ts`                                                              | `zig build yolomusl`                                                                                  | `verify-yolomusl.ts`: the release's members (`.lo`, 1,343) and their symbols                                                                       | GCC/clang libcall and helper differences (W-8)                                                           | ✅     |
+| compiler-rt (`libyolort.a`, `crtbegin.o`, `crtend.o`)                                 | `build_compiler_rt.sh`'s CMake options, run once under `zig cc` → `build.ninja` read by `import-compiler-rt-sources.ts` | `zig build compiler-rt`                                                                               | `verify-compiler-rt.ts`: the release's members and symbols, **no extra definition**                                                                | W-8; the `_Float16` defect kept (W-10)                                                                   | ✅     |
+| yolo musl, shared half (`libyoloc.so`, the loader)                                    | musl's `lib/libyoloc.so` rule and configure's `LDFLAGS_AUTO` → `import-yolomusl-sources.ts`                             | `zig build yolomusl`, linked by `zig ld.lld`                                                          | `verify-yolomusl.ts`: the release's 1,653 exports (name and type), no undefined symbols, the same dynamic tags, segment kinds, entry at `_dlstart` | `PHDR` (LLD) against `GNU_PROPERTY` (GCC's notes) (W-11)                                                 | ✅     |
+| the rest of `libpizlo`: `filc/src`, the four `libpizlo.so`, `libpizlo.a` (2026-10-30) | `libpas/Makefile`'s FILCC, SHLD and `ar` rules                                                                          | `zig build libpas -Dfilc-clang=<Fil-C clang>`; linked by `zig ld.lld`                                 | the release's exports, all five artifacts (2,504 / 2,504 / 2,512 / 2,512 / 2,546); same dynamic properties                                         | self-binding relocations 2,139 vs the release's 2,133 (being judged by the functional comparison) (W-12) | ✅     |
+| the user libc, libc++                                                                 | compiled by Fil-C's clang                                                                                               | upstream's own scripts with the Zig-built clang (`build-filc-from-source.ts`); not yet in `zig build` | the release's exports; Fil-C's suite 0 differences                                                                                                 | none                                                                                                     | 🟡     |
+| a program linked only from Zig's outputs, then Fil-C's suite on it                    |                                                                                                                         |                                                                                                       |                                                                                                                                                    |                                                                                                          | ⬜     |
+| **Z2:** the pass itself (`FilPizlonator`, KillUB, DeleteRedundantPollchecks) in Zig   |                                                                                                                         | not started (zailc has not started it either)                                                         | the same module through both passes, compared as IR and as behaviour                                                                               |                                                                                                          | ⬜     |
 
 The forwarder generator and the header install are generated output, so they match byte for byte.
 The other built pieces match by symbol, because upstream's compilers (GCC 12.3, GCC 11.4, clang

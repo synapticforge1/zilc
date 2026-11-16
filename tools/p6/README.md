@@ -1,7 +1,7 @@
 # tools/p6: platforms (roadmap.md P6)
 
-| tool | what it measures |
-| --- | --- |
+| tool            | what it measures                                                                                                                                                                                                                                                                                                                  |
+| --------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `os-surface.ts` | For each target (Linux musl/Android, macOS, iOS, Windows; x86_64 and aarch64), compiles every `tests/basics` Zig program with plain Zig 0.15.2 to its unoptimized IR and counts the external OS functions, raw `syscall`/`svc` asm sites, and functions that build a pointer from a runtime integer. Results: `cmem/platforms.md` |
 
 Run from a WSL or Linux shell: `bun tools/p6/os-surface.ts` (~10 minutes

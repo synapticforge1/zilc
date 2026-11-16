@@ -3,9 +3,9 @@
 zilc's own original code is licensed **`Apache-2.0 WITH LLVM-exception OR MIT`**. Code incorporated
 or adapted from another project stays under **its own original license**, and every such use is
 recorded in the [Component Ledger](#component-ledger) below. This file is the single source of truth
-for license compliance. The *why* behind the choices lives in `cmem/licensing.md`.
+for license compliance. The _why_ behind the choices lives in `cmem/licensing.md`.
 
-> **Rule of thumb:** you may *look at* any project freely. Before you *copy or adapt* even a few
+> **Rule of thumb:** you may _look at_ any project freely. Before you _copy or adapt_ even a few
 > lines, complete the [Adoption Checklist](#adoption-checklist) and add a ledger entry.
 > "I reimplemented the idea from scratch without looking at their code" needs no entry;
 > "I ported their function" always needs one.
@@ -14,14 +14,14 @@ for license compliance. The *why* behind the choices lives in `cmem/licensing.md
 
 ## License obligations at a glance
 
-| License | To reuse code you MUST | Patent grant | Reaches user binaries? |
-|---|---|---|---|
-| **MIT** (Zig, musl) | Preserve the copyright + permission notice in source; reproduce it in binary distributions' docs. | No | **Yes** — notice must accompany binaries |
-| **BSD-2-Clause** (Fil-C runtime / libpas) | Retain notice in source; **reproduce notice in binary distributions' docs**. | No | **Yes** — notice must accompany binaries |
-| **BSD-3-Clause** (OpenSSH `setproctitle` inside libpas) | As BSD-2, plus no use of contributors' names for endorsement. | No | Yes |
-| **Apache-2.0** | Preserve notices; include the license; **propagate NOTICE**; **mark changes** in modified files (§4). | **Yes** (§3) | Yes |
-| **Apache-2.0 WITH LLVM-exception** (LLVM, Fil-C compiler) | As Apache-2.0, **except** §4(a)(b)(d) are waived for portions embedded into compiled/object output. | Yes | **No** (the exception covers it) |
-| **LGPL-2.1-or-later** (glibc, *Fil-C's `/opt/fil` distribution only*) | Copyleft. **Not adopted — see below.** | — | — |
+| License                                                               | To reuse code you MUST                                                                                | Patent grant | Reaches user binaries?                   |
+| --------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- | ------------ | ---------------------------------------- |
+| **MIT** (Zig, musl)                                                   | Preserve the copyright + permission notice in source; reproduce it in binary distributions' docs.     | No           | **Yes** — notice must accompany binaries |
+| **BSD-2-Clause** (Fil-C runtime / libpas)                             | Retain notice in source; **reproduce notice in binary distributions' docs**.                          | No           | **Yes** — notice must accompany binaries |
+| **BSD-3-Clause** (OpenSSH `setproctitle` inside libpas)               | As BSD-2, plus no use of contributors' names for endorsement.                                         | No           | Yes                                      |
+| **Apache-2.0**                                                        | Preserve notices; include the license; **propagate NOTICE**; **mark changes** in modified files (§4). | **Yes** (§3) | Yes                                      |
+| **Apache-2.0 WITH LLVM-exception** (LLVM, Fil-C compiler)             | As Apache-2.0, **except** §4(a)(b)(d) are waived for portions embedded into compiled/object output.   | Yes          | **No** (the exception covers it)         |
+| **LGPL-2.1-or-later** (glibc, _Fil-C's `/opt/fil` distribution only_) | Copyleft. **Not adopted — see below.**                                                                | —            | —                                        |
 
 **Practical rules for this repo:**
 
@@ -30,7 +30,7 @@ for license compliance. The *why* behind the choices lives in `cmem/licensing.md
    (None of the three currently do.)
 3. In any source file adapted from third-party code, add a header change-note, e.g.
    `// Adapted from Fil-C FilPizlonator.cpp (Apache-2.0 WITH LLVM-exception); modified by zilc — see third_party/LICENSES.md`.
-4. Keep an **SPDX tag** at the top of every such file — the *upstream's* identifier, not ours:
+4. Keep an **SPDX tag** at the top of every such file — the _upstream's_ identifier, not ours:
    - LLVM / Fil-C compiler code → `// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception`
    - Fil-C runtime / libpas code → `// SPDX-License-Identifier: BSD-2-Clause`
    - Zig std/compiler code → `// SPDX-License-Identifier: MIT`
@@ -42,13 +42,13 @@ zilc produces **two kinds of artifact** with different license exposure:
 
 - **The toolchain** (compiler pass, driver) — only the zilc distribution ships it.
 - **The runtime** (`zilc_runtime`: GC, capability tables, syscall shims) — **gets linked into every
-  program a user compiles.** Whatever license the runtime's code carries, *the user's binary* carries.
+  program a user compiles.** Whatever license the runtime's code carries, _the user's binary_ carries.
 
 LLVM-derived code is fine in the runtime (the LLVM exception waives attribution in object output).
 **BSD-2-Clause (libpas) and MIT (Zig, musl) are not** — each requires its notice to accompany binary
 distributions. So: **porting libpas/filc-runtime code into `zilc_runtime` imposes an attribution
 obligation on every downstream program.** That is an acceptable trade (Fil-C itself works this way),
-but it must be a *decision*, recorded in the ledger entry — not an accident. **Owner decision
+but it must be a _decision_, recorded in the ledger entry — not an accident. **Owner decision
 2026-10-01: comply rather than avoid.** Fil-C's source may be read, and each adaptation into the
 runtime is ledgered here, with the BSD-2-Clause notice carried with user binaries. See
 `cmem/licensing.md`.
@@ -67,12 +67,12 @@ owner decision first.
 Run this **before** incorporating code from any project.
 
 - [ ] **Benefit vs. drawback** documented: what it buys (correctness, coverage, time) vs. cost
-      (complexity, deps, maintenance, portability, **runtime-license exposure**).
+  (complexity, deps, maintenance, portability, **runtime-license exposure**).
 - [ ] **License identified per FILE** and confirmed against the upstream file header / `LICENSE`
-      (not the GitHub badge — GitHub reports Fil-C as `NOASSERTION`; its tree is multi-licensed).
+  (not the GitHub badge — GitHub reports Fil-C as `NOASSERTION`; its tree is multi-licensed).
 - [ ] **Compatible** with `Apache-2.0 WITH LLVM-exception OR MIT` distribution. Copyleft → stop.
 - [ ] **Artifact destination recorded:** toolchain-only, or linked into user programs? If the latter
-      and the license is BSD/MIT, the runtime-linking rule above applies.
+  and the license is BSD/MIT, the runtime-linking rule above applies.
 - [ ] Upstream `LICENSE`/`NOTICE` present in `third_party/<component>/`.
 - [ ] **Ledger entry added** below with source, pinned commit, files, and obligation actions taken.
 - [ ] Change-notes + SPDX headers added to the adapting source files.
@@ -90,6 +90,7 @@ third-party runtime code in zilc.**
 Newest first. Copy the template for each adopted component.
 
 ### filc-pass-fixes (local patches to Fil-C's compiler pass; LOCAL USE ONLY)
+
 - **Source:** https://github.com/pizlonator/fil-c (Fil-C's LLVM fork; named `llvm-project-deluge`
   until 0.685, same history)
 - **Version / commit:** `e7947f079c976fb167108f7407c20240bca0ca89`, the commit the Fil-C **0.687**
@@ -137,15 +138,16 @@ Newest first. Copy the template for each adopted component.
   compile aborts on any difference (off by default); and `zilcVerifyInterference()`, the same for
   the interference graph with `ZILC_VERIFY_INTERFERENCE=1` (2026-10-02)
 - **Obligations satisfied:** [n/a] while local: Apache-2.0 §4 applies only on redistribution.
-  **If the patched clang is ever distributed:** [ ] include the Apache-2.0 + LLVM-exception licence
-  [ ] carry Fil-C's NOTICE/attribution files [ ] keep the `zilc (KI-…)` change marks (§4(b)
-  prominent notice of modification) [ ] state the base commit
+  **If the patched clang is ever distributed:** [] include the Apache-2.0 + LLVM-exception licence
+  [] carry Fil-C's NOTICE/attribution files [] keep the `zilc (KI-…)` change marks (§4(b)
+  prominent notice of modification) [] state the base commit
 - **Benefit / drawback note:** removes the cubic cost that made big Zig functions (TLS, crypto) and
   Debug builds impractically slow, and lets Debug compile at `-O1`, which fixed KI-19's 12 Debug
   programs. Drawback: zilc must rebuild the patched clang at every Fil-C upgrade until upstream
   changes both (`cmem/upstream.md` stage A)
 
 ### zig-std-backports (Zig standard-library backports applied by `src/stdpatch.zig`)
+
 - **Source:** https://codeberg.org/ziglang/zig (the Zig 0.16.0 release, as installed: `lib/std/mem.zig`)
 - **Version / commit:** Zig **0.16.0** release tarball (the backport source), applied to Zig **0.15.2**
 - **Upstream path(s):** `lib/std/mem.zig`, `findSentinel` (0.16.0), the body of the scalar loop
@@ -161,14 +163,15 @@ Newest first. Copy the template for each adopted component.
   which is already MIT. Zig's notice obligations for binaries are unchanged by the backport
 - **Modifications:** a `zilc:` comment naming the backport and its reason; otherwise verbatim. Each
   patch verifies the exact original before replacing it, and fails the build if it differs
-- **Obligations satisfied:** [x] license present  [x] change-notes (comment in the patched function)
-  [x] SPDX on `stdpatch.zig`  [n/a] NOTICE (no new licence; Zig's MIT already applies to every Zig
+- **Obligations satisfied:** [x] license present [x] change-notes (comment in the patched function)
+  [x] SPDX on `stdpatch.zig` [n/a] NOTICE (no new licence; Zig's MIT already applies to every Zig
   program)
 - **Benefit / drawback note:** removes an out-of-bounds read in 0.15.2's std that Fil-C rightly
   rejects (`getenv`, every C-string span), by adopting **upstream's own fix**, not an invention.
   Drawback: each Zig version needs its patch set re-checked (`cmem/ports/`).
 
 ### filc-test-runner-port (Fil-C's test runner, ported from Ruby to Deno 2026-10-05, moved to Bun 2026-10-22; a TEST TOOL)
+
 - **Source:** https://github.com/pizlonator/fil-c (`deluge` branch)
 - **Version / commit:** `163fae598eaf249b74065b0156f3a7e7ba8c0e5a` (tag `v0.686`), the commit zilc's
   patched Fil-C clang is built from since 2026-10-05. (First recorded as `bb0d0a64`/0.685 by
@@ -192,14 +195,15 @@ Newest first. Copy the template for each adopted component.
 - **Modifications:** a worker pool (Deno, then Bun from 2026-10-22) with a per-test timeout instead of `make -k -j`; CPU
   features read from `/proc/cpuinfo` instead of compiled probes; duplicate YAML keys accepted (last
   wins) as Ruby's parser does. Listed in the file's header
-- **Obligations satisfied:** [x] licence and copyright notice retained (file header)  [x] change-notes
-  (file header)  [x] SPDX header  [n/a] binary-distribution notice (a source-only test tool)
+- **Obligations satisfied:** [x] licence and copyright notice retained (file header) [x] change-notes
+  (file header) [x] SPDX header [n/a] binary-distribution notice (a source-only test tool)
 - **Benefit / drawback note:** runs upstream's 7,003 tests against zilc's patched clang without Ruby
   (owner, 2026-10-05: "to make sure we are not missing anything that upstream has already
   identified"). Cost: the port can drift from upstream's runner, guarded by running the stock clang
   as the baseline, so only differences between the two compilers count
 
 ### basics-of-coding (C and Zig example programs, used as TESTS)
+
 - **Source:** https://github.com/jrmarcum/BasicsOfCodingC and https://github.com/jrmarcum/BasicsOfCodingZig
   (the owner's own repositories)
 - **Version / commit:** C `0503871a87ef7d5f80f1ade1e5d653fe7bae1299`; Zig `d85cc5f7ac19232b240bf890dcd1b915449de789`
@@ -209,14 +213,14 @@ Newest first. Copy the template for each adopted component.
   **"Go by Example" by Mark McGranaghan**; `CC0-1.0` for the owner's original contributions
 - **License file:** `tests/basics/c/LICENSE` + `NOTICE`, `tests/basics/zig-0.15.2/` and `zig-0.16.0/` `LICENSE` + `NOTICE`
   (copied verbatim; each NOTICE carries the CC BY 3.0 attribution)
-- **What we reused:** the example programs, as a corpus of *correct* programs that zilc must build
+- **What we reused:** the example programs, as a corpus of _correct_ programs that zilc must build
   and run without false traps
 - **Where it lives in zilc:** `tests/basics/c/`, `tests/basics/zig-0.15.2/` (converted to Zig 0.15.2),
   `tests/basics/zig-0.16.0/` (converted to Zig 0.16.0)
 - **Artifact destination:** **test-only.** Never linked into zilc, its runtime or user programs
 - **Modifications:** yes. Each non-obvious change is marked with a `// zilc:` or `/* zilc: */`
   comment; the full list is in `tests/basics/README.md`
-- **Obligations satisfied:** [x] license present  [x] NOTICE (attribution) present  [x] change-notes
+- **Obligations satisfied:** [x] license present [x] NOTICE (attribution) present [x] change-notes
   [n/a] SPDX headers (upstream uses none; attribution is centralised in NOTICE, as upstream does)
   [n/a] binary-distribution notice (test-only)
 - **Benefit / drawback note:** 156 paired C/Zig programs covering most of each language's standard
@@ -224,6 +228,7 @@ Newest first. Copy the template for each adopted component.
   files provide.
 
 ### forwarder-generator (Fil-C's forwarder generator, ported to Zig; a BUILD TOOL, the pure-Zig track)
+
 - **Source:** https://github.com/pizlonator/fil-c (as `llvm-project-deluge.git`, the URL 0.687's clang names)
 - **Version / commit:** `e7947f079c976fb167108f7407c20240bca0ca89` (Fil-C **0.687**'s compiler commit)
   since 2026-10-27. First ported in zailc for v0.686 (`163fae5`, 2026-10-08) by the same author and
@@ -245,10 +250,11 @@ Newest first. Copy the template for each adopted component.
   the tool (`share/licenses/zilc/`)
 - **Modifications:** none in behaviour (byte-identical output); Ruby's data structures become Zig
   tables. Listed in the files' headers
-- **Obligations satisfied:** [x] licence present  [x] NOTICE updated  [x] change-notes  [x] SPDX
-  headers  [x] notice installed with the binary (`share/licenses/zilc/`)
+- **Obligations satisfied:** [x] licence present [x] NOTICE updated [x] change-notes [x] SPDX
+  headers [x] notice installed with the binary (`share/licenses/zilc/`)
 
 ### musl-header-install (musl's header install, ported to Zig; a BUILD TOOL, the pure-Zig track)
+
 - **Source:** Fil-C's patched musl 1.2.4, `projects/yolomusl` (same repository and commit as above)
 - **Version / commit:** `e7947f0` (Fil-C 0.687) since 2026-10-27; first ported in zailc for v0.686
 - **Upstream path(s):** `projects/yolomusl/Makefile` (the `install-headers` rules) and
@@ -261,10 +267,11 @@ Newest first. Copy the template for each adopted component.
 - **Where it lives in zilc:** `src/gen/musl_headers.zig` (MIT as a whole)
 - **Artifact destination:** **toolchain-only** (part of `zilc-gen`)
 - **Modifications:** none in behaviour
-- **Obligations satisfied:** [x] licence present  [x] NOTICE updated  [x] SPDX header  [x] notice
+- **Obligations satisfied:** [x] licence present [x] NOTICE updated [x] SPDX header [x] notice
   installed with the binary
 
 ### libpas-recipe, yolomusl-recipe, compiler-rt-recipe, usermusl-recipe, libcxx-recipe (Fil-C's runtime build rules, as data; the pure-Zig track)
+
 - **Source:** Fil-C at `e7947f0` (0.687), the same checkout as above; first written in zailc for
   v0.686 (2026-10-08/09), brought here 2026-10-27
 - **Upstream path(s) and license (SPDX):**
@@ -318,11 +325,12 @@ Newest first. Copy the template for each adopted component.
   exactly as for Fil-C's own prebuilt runtime
 - **Modifications:** none in behaviour (faithful to the release; zailc's `_Float16` departure W-10
   is not taken: `cmem/workarounds.md` W-10). Build-side adaptations only: W-3, W-6
-- **Obligations satisfied:** [x] licences present  [x] SPDX headers on the generated tables
-  [x] NOTICE (Fil-C runtime, musl, LLVM already listed)  [ ] binary-distribution notice: not
+- **Obligations satisfied:** [x] licences present [x] SPDX headers on the generated tables
+  [x] NOTICE (Fil-C runtime, musl, LLVM already listed) [] binary-distribution notice: not
   needed while the libraries are not distributed
 
 ### gcc-reference (GCC 11.4.0 / 12.3.0 with GMP, MPFR, MPC; a MAINTAINER BUILD TOOL, built and used locally only)
+
 - **Source:** GNU's signed release tarballs, pinned by hash in `build.zig.zon` (signatures checked
   2026-11-04); fetched only by `zig build gcc-reference`
 - **License:** GCC `GPL-3.0-or-later WITH GCC-exception-3.1`; GMP, MPFR, MPC `LGPL-3.0-or-later`
@@ -340,9 +348,10 @@ Newest first. Copy the template for each adopted component.
 - **Obligations satisfied:** none arise while nothing is distributed
 
 ### filc-benchmarks (Fil-C's `filc/benchmarks` programs, run as BENCHMARKS; nothing copied)
+
 - **Source:** Fil-C's sources at zilc's pinned commit, the lazy `filc` package `zig build` already
   fetches (`build.zig.zon`); `tools/bench/bench.ts` READS the files there (2026-11-06; owner: the
-  suite runs *"upstream's plus our zig only ports of upstreams plus new ones"*)
+  suite runs _"upstream's plus our zig only ports of upstreams plus new ones"_)
 - **License:** each file's own header (the Benchmarks Game programs and the others carry their
   authors' notices; the Makefile is Epic Games' BSD-2-Clause). zilc does not restate them because
   it holds no copy
@@ -376,16 +385,16 @@ Newest first. Copy the template for each adopted component.
 
 Verified against each upstream's license file **and** representative source headers on 2026-09-18.
 
-| Component | Upstream path | License (SPDX) | Staged text | Status |
-|---|---|---|---|---|
-| Fil-C compiler (clang/LLVM fork, `FilPizlonator.cpp` pass) | `pizlonator/fil-c@deluge` `llvm/`, `clang/` | `Apache-2.0 WITH LLVM-exception` | `fil-c/LLVM-LICENSE.txt` | Evaluating |
-| Fil-C runtime (libpas, `filc_runtime.c`, `stdfil.h`) | `libpas/`, `filc/include/` | `BSD-2-Clause` (+ `BSD-3-Clause` setproctitle) | `fil-c/PAS-LICENSE.txt` | Evaluating |
-| Fil-C musl (`usermusl`, `yolomusl`) | `projects/usermusl`, `projects/yolomusl` | `MIT` | `fil-c/MUSL-LICENSE.txt` | Evaluating |
-| Fil-C libc++ / libc++abi | `libcxx/`, `libcxxabi/` | `Apache-2.0 WITH LLVM-exception` | `fil-c/LLVM-LICENSE.txt` | Evaluating |
-| Fil-C glibc variant | `/opt/fil` build | `LGPL-2.1-or-later` | — | **Excluded** (copyleft) |
-| Fil-C `projects/`, `pizlix/` ports | various | mixed, some GPL | — | **Excluded** |
-| LLVM Project | `llvm/llvm-project` | `Apache-2.0 WITH LLVM-exception` | `llvm/LICENSE.TXT` | Evaluating |
-| Zig | `codeberg.org/ziglang/zig` | `MIT` | `zig/LICENSE` | Evaluating |
+| Component                                                  | Upstream path                               | License (SPDX)                                 | Staged text              | Status                  |
+| ---------------------------------------------------------- | ------------------------------------------- | ---------------------------------------------- | ------------------------ | ----------------------- |
+| Fil-C compiler (clang/LLVM fork, `FilPizlonator.cpp` pass) | `pizlonator/fil-c@deluge` `llvm/`, `clang/` | `Apache-2.0 WITH LLVM-exception`               | `fil-c/LLVM-LICENSE.txt` | Evaluating              |
+| Fil-C runtime (libpas, `filc_runtime.c`, `stdfil.h`)       | `libpas/`, `filc/include/`                  | `BSD-2-Clause` (+ `BSD-3-Clause` setproctitle) | `fil-c/PAS-LICENSE.txt`  | Evaluating              |
+| Fil-C musl (`usermusl`, `yolomusl`)                        | `projects/usermusl`, `projects/yolomusl`    | `MIT`                                          | `fil-c/MUSL-LICENSE.txt` | Evaluating              |
+| Fil-C libc++ / libc++abi                                   | `libcxx/`, `libcxxabi/`                     | `Apache-2.0 WITH LLVM-exception`               | `fil-c/LLVM-LICENSE.txt` | Evaluating              |
+| Fil-C glibc variant                                        | `/opt/fil` build                            | `LGPL-2.1-or-later`                            | —                        | **Excluded** (copyleft) |
+| Fil-C `projects/`, `pizlix/` ports                         | various                                     | mixed, some GPL                                | —                        | **Excluded**            |
+| LLVM Project                                               | `llvm/llvm-project`                         | `Apache-2.0 WITH LLVM-exception`               | `llvm/LICENSE.TXT`       | Evaluating              |
+| Zig                                                        | `codeberg.org/ziglang/zig`                  | `MIT`                                          | `zig/LICENSE`            | Evaluating              |
 
 Pinned at verification: Fil-C `deluge` @ `cd830ff67170486aaa74c253ae6ba665a2a601b5`;
 LLVM `main` @ `b65f5aca2ba2ca10611c9b5fb6f80bc34619362d` (license text byte-identical to Fil-C's copy).
