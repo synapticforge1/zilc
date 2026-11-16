@@ -376,8 +376,8 @@ and so do `argv`, files, stdin, child processes and threads.
 
 **CI (since 2026-11-12; first run 43295657634 on `bba102f`, `checks` green):** `.github/workflows/release.yml` runs, on every
 push to `main`, the steps that need no Fil-C: `zig fmt --check`, `zig build test` (40/40 on a fresh
-clone with empty caches, rehearsed in WSL 2026-11-12), `bun test tools/release/` (168 since
-2026-11-15: 27 against a mock GitHub API, 141 for the release guards in `guards.test.ts`, KI-24–36),
+clone with empty caches, rehearsed in WSL 2026-11-12), `bun test tools/release/` (182 since
+2026-11-15: 27 against a mock GitHub API, 155 for the release guards in `guards.test.ts`, KI-24–37),
 `bump.ts --check`, the privacy scan, and on a release `check-reviews.ts` (KI-25). The rows below that need Fil-C stay local;
 `tools/release/release.ts` runs the gate before it pushes (`release.md` § "What runs where").
 

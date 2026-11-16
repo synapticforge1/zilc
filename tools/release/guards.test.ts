@@ -141,7 +141,7 @@ describe("the five places", () => {
     p.openWork = p.openWork.replace(/^\| what \| value \|\n\| --- \| --- \|$/m, '| what <a title=" | value |\n| --- | --- | --- |');
     const d = disagreements(p, cur).join("\n");
     expect(d).toContain("2 header cells and 3 delimiter cells");
-    expect(d).toContain('header holds a "<"');
+    expect(d).toContain('holds a "<" above the State row');
   });
   test("the reviewer's shape B, a one-column table that drops the version cell, is refused", () => {
     const p = real();
@@ -179,8 +179,47 @@ describe("the five places", () => {
       expect(disagreements(p, cur).join("\n")).toMatch(/not a row of a table|header cells/);
     });
   }
-  test("a $$ math block is refused", () => {
-    expect(unreadable("text\n\n$$\n## 1.2.3\n$$\n").join("\n")).toContain("math block");
+  test("$$ is refused at a line start, in a quote, in a list and mid-line (KI-36, KI-37)", () => {
+    for (const l of ["$$", "> $$", "- $$", "a $$ b"]) expect(unreadable(`text\n\n${l}\n`).join("\n")).toContain("$$");
+  });
+
+  // Retest 10 (KI-37).
+  for (const lead of ["> <a title=\"", "- <a title=\"", "1. <a title=\"", "some text"]) {
+    test(`a State table right after "${lead}" (a lazy continuation) is refused`, () => {
+      const p = real();
+      p.openWork = p.openWork.replace(/^(\| what \| value \|)$/m, `${lead}\n$1`);
+      expect(disagreements(p, cur).join("\n")).toContain("must follow a blank line or a heading");
+    });
+  }
+  for (const cp of [0xa0, 0xfeff, 0x3000, 0x2003]) {
+    test(`U+${cp.toString(16).toUpperCase().padStart(4, "0")} in a counted file is refused`, () => {
+      const p = real();
+      p.openWork = p.openWork.replace(/^(\| what \| value \|)$/m, `$1${String.fromCodePoint(cp)}`);
+      expect(disagreements(p, cur).join("\n")).toContain("a BOM or non-ASCII whitespace");
+    });
+  }
+  test("cells() trims ASCII whitespace only, as GFM does", () => {
+    expect(cells(`| a | b |${String.fromCodePoint(0xa0)}`)).toBe(3);
+    expect(cells("\t| a | b | \f")).toBe(2);
+  });
+  test("a leading BOM before front matter is refused", () => {
+    const p = real();
+    p.readme = `${String.fromCodePoint(0xfeff)}---\na: b\n---\n${p.readme}`;
+    expect(disagreements(p, cur).join("\n")).toContain("U+FEFF");
+  });
+  test("a < in a State table row above the State row is refused", () => {
+    const p = real();
+    p.openWork = p.openWork.replace(/^(\| --- \| --- \|)$/m, '$1\n| note | <a title=" |');
+    expect(disagreements(p, cur).join("\n")).toContain('holds a "<" above the State row');
+  });
+  test("a one-dash delimiter row is a delimiter (GFM accepts it)", () => {
+    const p = real();
+    p.openWork = p.openWork.replace(/^\| --- \| --- \|$/m, "|-|-|");
+    expect(disagreements(p, cur)).toEqual([]);
+  });
+  test("an autolink at a line start is a link, not an HTML block", () => {
+    expect(unreadable("<https://example.com/x>\n")).toEqual([]);
+    expect(unreadable("<div>\n").join("\n")).toContain("HTML block");
   });
   test("a README with a CR byte is refused (LF only)", () => {
     const p = real();
@@ -661,6 +700,11 @@ describe("the review records against the history", () => {
       expect((await check(h)).join("\n")).toContain(`${f} is not an ordinary file (mode 100644)`);
     });
   }
+
+  test("a .github/README.md, which GitHub shows instead of README.md, is refused (retest 10, KI-37)", async () => {
+    const h = release(entryFor("v0.15.2-0.687.1", reviewed), { afterReview: () => put(".github/README.md", "# other\n") });
+    expect((await check(h)).join("\n")).toContain(".github/README.md exists");
+  });
 
   // CI's review step is present and gated as designed (retest 9: no test tied the YAML to it).
   test("release.yml runs check-reviews.ts on a release, and tag needs checks", () => {

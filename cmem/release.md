@@ -38,8 +38,8 @@ zilc publishes to **no registry** (release-process.md § 6, "no registry"): a re
 - **First real CI run: 2026-11-12, run 43295657634 on `bba102f`** — `checks` green, every step;
   `tag` and `release` skipped (`v0.15.2-0.687.1` already tagged elsewhere, so "not a release"), as
   designed. Before it, rehearsed (best-practices 7.22): the scripts against a mock API (27 cases,
-  3 mutants), `checks` on a fresh clone. Since 2026-11-15: `guards.test.ts` (141 cases, 64 mutants
-  caught; review round 1, KI-24–KI-36) — `bun test tools/release/` is 168 tests. Still unproven on GitHub: `tag` and `release` — the first
+  3 mutants), `checks` on a fresh clone. Since 2026-11-15: `guards.test.ts` (155 cases, 72 mutants
+  caught; review round 1, KI-24–KI-37) — `bun test tools/release/` is 182 tests. Still unproven on GitHub: `tag` and `release` — the first
   release proves them.
 
 ## Review records (the two lines a release entry must hold — since 2026-11-15, KI-24)

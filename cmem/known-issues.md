@@ -960,3 +960,25 @@ under a later section (two forms), the section's last entry ending at the next s
 two files as a symlink at the commit, the workflow's review step. **Inversion 2026-11-15: 64 of 64
 mutants caught** on a passing baseline; `bun test tools/release/` 168/168; the scratch end-to-end
 release passes.
+
+## ✅ KI-37 — A paragraph line above the State table, GFM's ASCII-only trim, and smaller (class 1 retest 10; 2026-11-15, FIXED)
+
+**Same class, found by the class's tenth retest (fresh reviewer, on the committed `2e557d5`; 1–2
+RUN, rendered with md4c; a 20,000-mutation fuzz found 2 independently):** (1) the State table was
+not required to start a block: a quote or list line (`> <a title="`) just above the header takes it
+as a lazy continuation, and the "table" is that paragraph, the version row inside an attribute;
+(2) `cells()` used `trim()`, which strips Unicode whitespace (NBSP, BOM, U+3000 …) where GFM trims
+only space, tab, VT and FF — a header ending in NBSP is 3 cells to GitHub, 2 to the guard. Smaller:
+a leading BOM hid front matter from its check; `.github/README*` (which GitHub shows instead of
+`README.md`) was not refused; `$$` was refused only at a line start; the `<` ban covered only the
+header (and its delimiter half was dead code); an autolink at a line start and a one-dash delimiter
+row (`|-|`, valid GFM) were refused. **Fix:** the State table follows a blank line or a heading; no
+`<` from its header to the State row; `cells()` trims ASCII only; a BOM or non-ASCII whitespace
+anywhere in a counted file is refused (`ODD_SPACE`, built from code points so the source holds no
+invisible character); `$$` anywhere; `.github/README*` refused at the commit; autolinks and `-+`
+delimiters allowed. Measured first: none of the four files holds a BOM, Unicode whitespace or `$$`
+(the round record in `open-work.md` mentioned `$$` mid-line — reworded). **Test:** the lazy
+continuation (four leads), four code points, the ASCII-only trim, a BOM before front matter, `<` in
+a row above, a one-dash delimiter allowed, an autolink allowed and `<div>` refused, `$$` in four
+positions, `.github/README.md`. **Inversion 2026-11-15: 72 of 72 mutants caught** on a passing
+baseline; `bun test tools/release/` 182/182; the scratch end-to-end release passes.

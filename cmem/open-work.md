@@ -43,11 +43,13 @@ free-text places (README status line: image alt text, an attribute from the line
 row outside a table) → KI-34; 154/154, 54 of 54 mutants. Class retest 8: the State table's cell
 counts (GFM: same width or no table; excess cells dropped) + 3 small → KI-35; 160/160, 60 of 60
 mutants; the non-Markdown core held. Class retest 9: a fence splitting the State table (walked on
-visible lines), symlinked counted files, an entry past its section, `$$` math, the workflow's
+visible lines), symlinked counted files, an entry past its section, dollar-sign math blocks, the workflow's
 review step untested → KI-36; 168/168, 64 of 64 mutants; the non-Markdown core held.
 **Committed 2026-11-15 on `work-2026-11-15` (owner: "commit"), class 1 NOT yet clear.** Before
 the commit: gate 8/8, `zig build test` 40/40, zig fmt clean, privacy scan = the one permitted
-hit. **Next: class retest 10**; class 1 is clear only when a retest finds nothing; then class 2.
+hit. Class retest 10 (on `2e557d5`): a paragraph line above the State table, `trim()` vs GFM's
+ASCII trim + 5 small → KI-37 (uncommitted); 182/182, 72 of 72 mutants. **Next: class retest 11**;
+class 1 is clear only when a retest finds nothing; then class 2.
 Since retest 3 no retest has found a way for unreviewed code through: every finding since is the
 narrower property "what the guard counts is what a reader of the GitHub page sees", each round a
 narrower corner of the State table or the README status line. The owner may choose to accept the

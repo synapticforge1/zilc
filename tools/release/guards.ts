@@ -31,7 +31,8 @@ export type Places = { root: string; readme: string; notes: string; openWork: st
 /** A GFM table row's cell count: split on every `|` not escaped as `\|` — in code spans too, as GFM
  *  does — with one leading and one trailing pipe optional (KI-35). */
 export function cells(row: string): number {
-  let s = row.replaceAll("\\|", "x").trim();
+  // GFM trims only ASCII space, tab, VT and FF (KI-37) — never `trim()`, which also eats NBSP & co.
+  let s = row.replaceAll("\\|", "x").replace(/^[ \t\v\f]+|[ \t\v\f]+$/g, "");
   if (s.startsWith("|")) s = s.slice(1);
   if (s.endsWith("|")) s = s.slice(0, -1);
   return s.split("|").length;
@@ -86,14 +87,18 @@ export function disagreements(p: Places, v: Version): string[] {
   if (ri >= 0) {
     let s = ri;
     while (s > 0 && ol[s - 1].startsWith("|")) s--;
-    if (!(ri >= s + 2 && /^\|(?:[ \t]*:?-{3,}:?[ \t]*\|)+[ \t]*$/.test(ol[s + 1]))) bad.push(`cmem/open-work.md's State row is not a row of a table (a header and a delimiter row above it)`);
+    if (!(ri >= s + 2 && /^\|(?:[ \t]*:?-+:?[ \t]*\|)+[ \t]*$/.test(ol[s + 1]))) bad.push(`cmem/open-work.md's State row is not a row of a table (a header and a delimiter row above it)`);
+    // The table starts a block of its own (KI-37): a quote or list line just above the header would
+    // take the header as its lazy continuation, and the "table" would be that paragraph.
+    else if (s > 0 && ol[s - 1] !== "" && !/^#{1,6}[ \t]/.test(ol[s - 1])) bad.push(`cmem/open-work.md's State table must follow a blank line or a heading`);
     // GFM makes it a table only when the header and the delimiter row have the SAME number of
     // cells, and drops a row's cells past that number (KI-35). The header may hold no `<`.
     else {
       const [h, d, r] = [cells(ol[s]), cells(ol[s + 1]), cells(ol[ri])];
       if (h !== d || h < 2) bad.push(`cmem/open-work.md's State table has ${h} header cells and ${d} delimiter cells (GFM needs the same number, at least 2)`);
       else if (r !== h) bad.push(`cmem/open-work.md's State row has ${r} cells in a ${h}-column table`);
-      if (/</.test(ol[s]) || /</.test(ol[s + 1])) bad.push(`cmem/open-work.md's State table header holds a "<"`);
+      // No `<` from the header down to the row (KI-35, KI-37): nothing above it can open an attribute.
+      if (ol.slice(s, ri).some((l) => l.includes("<"))) bad.push(`cmem/open-work.md's State table holds a "<" above the State row`);
     }
   }
   // The bump files name the version ONLY in their place (KI-30): a second mention is one the bump
@@ -104,6 +109,9 @@ export function disagreements(p: Places, v: Version): string[] {
   }
   return bad;
 }
+
+/** A BOM and the non-ASCII whitespace code points (KI-37), by number: no literal in this source. */
+const ODD_SPACE = new Set([0xa0, 0xfeff, 0x1680, 0x2028, 0x2029, 0x202f, 0x205f, 0x3000, ...Array.from({ length: 12 }, (_, k) => 0x2000 + k)]);
 
 /** A fence-like line that is NOT at column 0 — indented, or after a list marker or `>` (KI-32):
  *  inside a container a fence ends with the container, which the guard does not read. */
@@ -121,6 +129,12 @@ export function unreadable(md: string): string[] {
   // LF only (owner, 2026-10-01, `.gitattributes`; again 2026-11-15: "we should be using LF as the
   // standard not CRLF"): a CR is refused, never normalised away.
   if (md.includes("\r")) out.push("holds a CR byte (the file must be LF only)");
+  // A BOM or non-ASCII whitespace (KI-37): GFM treats them as text where `trim()` would not, and a
+  // leading BOM would hide front matter from the check below.
+  for (const ch of md) if (ODD_SPACE.has(ch.codePointAt(0)!)) {
+    out.push(`holds U+${ch.codePointAt(0)!.toString(16).toUpperCase().padStart(4, "0")} (a BOM or non-ASCII whitespace)`);
+    break;
+  }
   // YAML front matter: GitHub renders it as a table, not as Markdown (KI-35).
   if (/^---[ \t]*(?:\n|$)/.test(md)) out.push("starts with a --- line (front matter, which GitHub renders as a table)");
   const inFence = fenceLines(md);
@@ -134,9 +148,11 @@ export function unreadable(md: string): string[] {
     // renderer's call (a tag's attribute, or a backslash inside a span, decides it — retest 6).
     // `<!--` even inside backticks is refused: zilc's files hold none (measured 2026-11-15).
     if (/<!--|<\?|<!\[|<![A-Za-z]/.test(l)) out.push(`line ${i + 1} holds an HTML comment, declaration or processing instruction`);
-    else if (/^ {0,3}<\/?[A-Za-z]/.test(l)) out.push(`line ${i + 1} starts an HTML block`);
+    // An autolink (`<https://…>`) at a line start is a link, not an HTML block (KI-37).
+    else if (/^ {0,3}<\/?[A-Za-z]/.test(l) && !/^ {0,3}<[A-Za-z][A-Za-z0-9+.-]{1,31}:[^\s<>]*>/.test(l)) out.push(`line ${i + 1} starts an HTML block`);
     // A `$$` math block (KI-36): GitHub renders its content as math, not Markdown.
-    else if (/^ {0,3}\$\$/.test(l)) out.push(`line ${i + 1} starts a $$ math block`);
+    // Anywhere on the line (KI-37): `> $$` or `- $$` opens one inside a container too.
+    else if (/\$\$/.test(l)) out.push(`line ${i + 1} holds $$ (math)`);
     // Elements that collapse what follows them on GitHub (an unclosed one, everything after it).
     else if (/<\/?(?:details|summary)(?:[\s/>]|$)/i.test(l)) out.push(`line ${i + 1} holds a <details>/<summary> tag, which can collapse what follows`);
   });
@@ -382,6 +398,11 @@ export async function reviewsCoverRelease(git: Git, entry: string, head: string,
     const mode = r.out.match(/^(\d{6}) /)?.[1];
     if (mode !== "100644") out.push(`${f} is not an ordinary file (mode 100644) at ${head}: ${mode ?? "absent"}`);
   }
+  // GitHub shows `.github/README*` in place of the root README (KI-37): the status line counted
+  // there would not be the one on the page.
+  const gh = await git("ls-tree", "-z", "--name-only", head, "--", ".github/");
+  if (gh.code !== 0) throw new Error(`git ls-tree ${head} .github failed (exit ${gh.code}): ${gh.out.trim()}`);
+  for (const p of gh.out.split("\0").filter(Boolean)) if (/^\.github\/readme(?:\.|$)/i.test(p)) out.push(`${p} exists at ${head}; GitHub would show it instead of README.md`);
   let tip = head;
   if (bumped) {
     tip = `${head}^`;
