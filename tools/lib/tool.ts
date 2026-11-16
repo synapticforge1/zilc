@@ -181,7 +181,11 @@ export async function run(argv: string[], o: RunOptions = {}): Promise<RunResult
     throw e;
   }
   let timedOut = false;
-  const timer = o.timeout ? setTimeout(() => { timedOut = true; try { child.kill("SIGKILL"); } catch { /* gone */ } }, o.timeout * 1000) : undefined;
+  // After the kill, wait at most 2 s more, then stop waiting (KI-32): killing the program does not
+  // close the pipes while a child it started (git's remote helper, a shell's job) still holds them.
+  let giveUp: () => void = () => {};
+  const gaveUp = new Promise<number>((res) => (giveUp = () => res(124)));
+  const timer = o.timeout ? setTimeout(() => { timedOut = true; try { child.kill("SIGKILL"); } catch { /* gone */ } setTimeout(giveUp, 2000); }, o.timeout * 1000) : undefined;
   const chunks: Uint8Array[] = [];
   const sink = async (s: ReadableStream<Uint8Array> | number | undefined) => {
     if (!s || typeof s === "number") return;
@@ -190,9 +194,14 @@ export async function run(argv: string[], o: RunOptions = {}): Promise<RunResult
       else chunks.push(c);
     }
   };
-  if (!o.inherit) await Promise.all([sink(child.stdout), sink(child.stderr)]);
-  // A signal reads as 128 + its number (SIGSEGV 139), as Deno reported it and as a shell does.
-  const code = await child.exited;
+  const work = (async () => {
+    if (!o.inherit) await Promise.all([sink(child.stdout), sink(child.stderr)]);
+    // A signal reads as 128 + its number (SIGSEGV 139), as Deno reported it and as a shell does.
+    return await child.exited;
+  })();
+  // A late failure of `work` after the give-up must not become an unhandled rejection (KI-35).
+  if (o.timeout) work.catch(() => {});
+  const code = o.timeout ? await Promise.race([work, gaveUp]) : await work;
   if (timer) clearTimeout(timer);
   await file?.close();
   const out = capture ? new TextDecoder().decode(concat(chunks)) : "";

@@ -29,7 +29,7 @@ reasoning behind each workaround is in `cmem/workarounds.md` (KI and W numbers);
 | **Prebuilt** | `filc-0.687-linux-x86_64.tar.xz`, SHA-256 `aab538401f78a47ab261ee79afed8c6b99e1d4848e263ae159a75b03c1288da1` (Fil-C publishes none; recorded at download) |
 | **Installed at** | `~/zilc-work/tools/filc-0.687-linux-x86_64` by `tools/p1/setup-wsl.ts` ([tools/README.md](tools/README.md) "First-time setup") |
 | **Source tree** | `~/zilc-work/filc-src/repo`, a sparse, partial clone of Fil-C's LLVM fork at the compiler commit (`git@github.com:pizlonator/llvm-project-deluge.git` for 0.687; 0.686 named `fil-c.git`, same history) |
-| **zilc release** | `0.15.2-0.687.1`. The version names the Fil-C release (`<Zig>-<Fil-C>.<zilc release>`) |
+| **zilc release** | `0.15.2-0.687.<N>`: the version names the Fil-C release (`<Zig>-<Fil-C>.<zilc release>`); the current `N` is `build.zig.zon`'s `.version` (the five version places, `cmem/releasing.md`) |
 | **Platform** | **Linux x86_64 only**, by design (on Windows, inside WSL). Cross-platform work belongs to the sibling project zailc |
 
 ### What the base is made of

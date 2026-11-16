@@ -14,8 +14,11 @@
  *   - a clean tree (untracked files count), on `main`, HEAD is the bump commit `bump to v<version>`;
  *   - `origin/main` (fetched) is an ancestor of `main`: the push is a fast-forward;
  *   - the tag `v<version>` is absent locally and on origin (`git ls-remote`);
- *   - `bump.ts --check`: the five places agree; cmem/release.md's entry records both required
- *     reviews (security, hardening — H35);
+ *   - `bump.ts --check`: the five places agree;
+ *   - `check-reviews.ts HEAD` (CI runs the same before it tags): HEAD is the bump commit and
+ *     changes only the bump's files; cmem/release.md's entry holds one security and one hardening
+ *     review record (guards.ts REVIEW_FORM), each from the previous release's tag to a commit after
+ *     which only `cmem/` and RELEASE-NOTES.md changed (H35);
  *   - the privacy scan (cmem/working-rules.md § Privacy) finds nothing in the tree;
  *   - the cold gate: `zig fmt --check`, `zig build test`, the release scripts' tests, and
  *     `bun tools/run-gate.ts` (the Fil-C safety gate, 8/8 — the half CI cannot run: a runner has
@@ -25,6 +28,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { ARGS, REPO, ZIG, linuxOnly, must, run } from "../lib/tool.ts";
+import { bumpSubject, gitIn, tagsDifferFrom, zonVersion } from "./guards.ts";
 
 await linuxOnly(import.meta);
 
@@ -35,18 +39,20 @@ function fail(msg: string): never {
 const dryRun = ARGS.includes("--dry-run");
 for (const a of ARGS) if (a !== "--dry-run") fail(`unknown argument "${a}" — use --dry-run or nothing`);
 
-const git = (...a: string[]) => must(["git", "-C", REPO, ...a]).then((s) => s.trim());
+// A time limit on every git call (KI-31): a hung remote is a refusal, never a wait forever.
+const git = (...a: string[]) => must(["git", "-C", REPO, ...a], { timeout: 120 }).then((s) => s.trim());
 
-const m = readFileSync(join(REPO, "build.zig.zon"), "utf8").match(/^\s*\.version = "(\d+\.\d+\.\d+-\d+\.\d+\.\d+)",$/m);
-if (!m) fail("cannot read build.zig.zon's .version");
-const version = m[1];
+const version = (zonVersion(readFileSync(join(REPO, "build.zig.zon"), "utf8")) ?? fail("cannot read build.zig.zon's .version")).full;
 const tag = `v${version}`;
 
 // ---- guards
 if (await git("status", "--porcelain", "--untracked-files=all")) fail("the tree is not clean (untracked files count)");
 if ((await git("rev-parse", "--abbrev-ref", "HEAD")) !== "main") fail("not on main");
-if ((await git("log", "-1", "--format=%s")) !== `bump to ${tag}`) fail(`HEAD is not the bump commit "bump to ${tag}" (run bun tools/release/bump.ts release)`);
-await git("fetch", "-q", "origin");
+if ((await git("log", "-1", "--format=%s")) !== bumpSubject(version)) fail(`HEAD is not the bump commit "${bumpSubject(version)}" (run bun tools/release/bump.ts release)`);
+await git("fetch", "-q", "--tags", "origin");
+// The previous release, as check-reviews reads it, must be the one CI will read (KI-30).
+const tagDiff = await tagsDifferFrom(gitIn(REPO));
+if (tagDiff.length) fail(`the release tags here and on origin differ:\n  ${tagDiff.join("\n  ")}`);
 if ((await run(["git", "-C", REPO, "merge-base", "--is-ancestor", "origin/main", "main"])).code !== 0) fail("origin/main is not an ancestor of main: the push would not be a fast-forward");
 if ((await run(["git", "-C", REPO, "rev-parse", "-q", "--verify", `refs/tags/${tag}`])).code === 0) fail(`tag ${tag} exists locally — a release never reuses a tag (CI makes the tag)`);
 if (await git("ls-remote", "--tags", "origin", `refs/tags/${tag}`)) fail(`tag ${tag} exists on origin — this version was released before`);
@@ -55,9 +61,10 @@ console.log(`release: ${tag} — guards pass; main ${(await git("rev-parse", "--
 // ---- the five places and the reviews
 const chk = await run(["bun", join(REPO, "tools/release/bump.ts"), "--check"], { cwd: REPO });
 if (chk.code !== 0) fail(`bump.ts --check:\n${chk.out.trimEnd()}`);
-const rel = readFileSync(join(REPO, "cmem/release.md"), "utf8");
-const entry = rel.split(/^### /m).find((s) => s.startsWith(tag) || s.startsWith(version));
-if (!entry || !/security review/i.test(entry) || !/hardening review/i.test(entry)) fail(`cmem/release.md has no ${tag} entry recording both required reviews (H35)`);
+// The same check CI's `checks` runs before it tags (check-reviews.ts): HEAD is the bump commit,
+// and the entry's two review records cover everything since the previous release (H35).
+const rev = await run(["bun", join(REPO, "tools/release/check-reviews.ts"), "HEAD"], { cwd: REPO });
+if (rev.code !== 0) fail(`the required reviews (H35):\n${rev.out.trimEnd()}`);
 
 // ---- privacy (a scan STOPS a push — workspace review-process.md § 3.1 item 7)
 const pattern = "[A-Za-z]:[\\\\/]+(Programs|Users|scoop|tools)[\\\\/]|/[a-z]/(Programs|Users)/";
@@ -91,7 +98,7 @@ if (dryRun) {
 }
 
 // ---- push main only, read it back
-await must(["git", "-C", REPO, "push", "origin", "main"]);
+await must(["git", "-C", REPO, "push", "origin", "main"], { timeout: 300 });
 const local = await git("rev-parse", "main");
 const remote = (await git("ls-remote", "origin", "refs/heads/main")).split(/\s+/)[0];
 if (remote !== local) fail(`read-back: origin's main is ${remote}, local main is ${local}`);

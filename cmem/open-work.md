@@ -17,6 +17,90 @@ them, with their dates.
 | branches | `main` carries the Bun port (`c2841dd`, was `44e0b1a`), merged `--no-ff` 2026-10-27 (owner: "we will merge all to bun tooling since deno is going away"), and the 2026-10-27 work since; `bun-port` (merged, never pushed) deleted 2026-10-27 (owner). Branches: `main`, `v0.15.2` |
 | sibling | **zailc** (`../zailc`, started 2026-10-08) translates Fil-C into Zig; zilc is its stable reference and test oracle and changes nothing for it (`design-decisions.md`) |
 
+## 🔎 Review, round 1 — 2026-11-15 (owner: "review"; owner agreed the fix order below the same day)
+
+**Progress (branch `work-2026-11-15`):** class 1 fixed (KI-24–KI-27: `tools/release/guards.ts`,
+`check-reviews.ts`, the workflow's decide step and review step; reviewer D's reproducer refuses).
+Class retest 1 (one fresh reviewer): **3 found**, all run (renames, bump content, quoted names) →
+fixed as KI-28. Class retest 2: **5 found** (decoded text, modes, submodule `ignore`, records in
+comments / fences, `Fil-C.md` a sixth version place), plus `bump.ts`'s own UTF-8 round trip →
+fixed as KI-29; `bun test tools/release/` 73/73, 26 of 26 mutants caught on a passing baseline.
+Class retest 3: **no way for unreviewed code through**; 5 smaller of the class found (stale second
+mentions, hidden entry headings, a lax fence parser, unfetched tags, no tests for bump.ts's path or
+the decide step) → fixed as KI-30; `bun test tools/release/` 90/90, 33 of 33 mutants caught.
+Class retest 4: **no way for unreviewed code through**; the Markdown emulation's corners again
+(comments closing fences, PI / CDATA, setext and indented headings, places read raw, no git time
+limit, CR) → KI-31 changed the approach: the guard REFUSES what it cannot read (LF only, no fence but at column 0, no
+comments / HTML blocks, no fence in the Release History section) instead of emulating GitHub;
+`bun test tools/release/` 120/120, 45 of 45 mutants caught. Class retest 5: **1 real hole** (a
+fence inside a list item hides a live comment on GitHub; run end to end) + 3 small (one-dash
+setext, backtick pairing, `run()`'s pipe wait) → KI-32: fences at column 0 only, container
+fences refused; 133/133, 51 of 51 mutants. Class retest 6: **the comment check subtracted code
+spans** (a renderer's call: a backtick in an attribute, a backslash in a span) + inline
+details/summary + the status version in an attribute → KI-33: raw-line checks, no span emulation;
+144/144, 51 of 51 mutants. Class retest 7: records, entry and notes heading HELD; the two
+free-text places (README status line: image alt text, an attribute from the line before; State
+row outside a table) → KI-34; 154/154, 54 of 54 mutants. Class retest 8: the State table's cell
+counts (GFM: same width or no table; excess cells dropped) + 3 small → KI-35; 160/160, 60 of 60
+mutants; the non-Markdown core held. Class retest 9: a fence splitting the State table (walked on
+visible lines), symlinked counted files, an entry past its section, `$$` math, the workflow's
+review step untested → KI-36; 168/168, 64 of 64 mutants; the non-Markdown core held.
+**Committed 2026-11-15 on `work-2026-11-15` (owner: "commit"), class 1 NOT yet clear.** Before
+the commit: gate 8/8, `zig build test` 40/40, zig fmt clean, privacy scan = the one permitted
+hit. **Next: class retest 10**; class 1 is clear only when a retest finds nothing; then class 2.
+Since retest 3 no retest has found a way for unreviewed code through: every finding since is the
+narrower property "what the guard counts is what a reader of the GitHub page sees", each round a
+narrower corner of the State table or the README status line. The owner may choose to accept the
+Markdown side as a documented limit and move on (offered 2026-11-15).
+The mutant harness (a one-off, not committed): each mutant puts one part of `guards.ts` /
+`check-reviews.ts` / `tool.ts`'s `run` back to an earlier round's behaviour; the run refuses to
+start unless the unmutated copy passes first.
+🔒 **Decided (owner, 2026-11-15: "c"), retest 3 item 5:** a Fil-C or Zig move cannot pass
+`check-reviews.ts` (the bump commit must be exactly `bumpEdits`: N + 1, three files; an upgrade moves
+every pin and resets N to 1). **Left as it is; decided at the next Fil-C move.** The options then:
+(a) an `upgrade` mode in the bump tool that recomputes the pin edits the same way; (b) the upgrade
+commit is the reviewed code and the bump commit only sets the version. Carried to `upstream.md`'s
+Fil-C update checklist so the next move meets it before the release, not at it. Queued, met on the way: D8 (`bump.ts`
+`putBack` not reached when a write or `run` throws) stays in class 8. Class 7 (C8) ✅ measured
+2026-11-15, NOT a defect: the Zig-built patched clang keeps its assertions (toolchain-quirks Z-cc-17).
+
+Scope: `v0.15.2-0.687.1..HEAD` (43 commits, the first review of any of it). Four fresh read-only
+reviewers, each in its own clone under `~/zilc-work/review-r1-<a..d>/`: A `src/sarcasm/`; B the
+`.ts` harnesses; C the pure-Zig build chain (`build/`, `src/runtime`, `src/gen`, the Zig tools);
+D `tools/release/` + `release.yml`. Counts: A 3 (all latent / cosmetic, none run; no silent
+wrong output found; isa / fp tables and detect, ir, prof, sarcasm.zig not read), B 9, C 8, D 10.
+Re-run by the session in `~/zilc-work/review-r1-verify/` (marked ✔) or confirmed by reading the
+code (📖); the rest are the reviewers' own and are re-run before their class is fixed.
+
+Classes, in the recommended order (one class at a time, workspace § 1.3):
+
+1. **A guard that passes on text, not on fact** (D1 📖 the two-reviews guard is two phrase
+   regexes, "security review: not run" passes; D5 ✔ `bump --check` passes with the version only in
+   a comment; D6 📖 `startsWith` entry lookup, unbounded last entry; D2 📖 CI never reads the
+   reviews and tags any push to `main` with an untagged version).
+2. **A scan or check that reads a failed tool as clean** (D3 ✔ `git grep` exit 128 = clean in
+   `release.ts` and the workflow; D4 the privacy pattern's coverage and the whole-file exception;
+   B6 `nm` exit ignored in `compare-chains.ts`).
+3. **A harness that passes on nothing** (B2 ✔ `check-stages.ts <unknown stage>` and
+   `ONLY=<no match> compare-sarcasm.ts` print OK, exit 0; empty corpus; `PARTS=typo`; gate regex
+   accepts 0/0; B3 / B4 `bench.ts` build failures exit 0, only the warm-up run validated).
+4. **Coverage a count overstates** (B1 ✔ detect's whole AT&T-evidence block disabled: still
+   "1431 inputs, 0 differ"; B7 echoed F / P / O lines counted as compared; B5 UTF-8 decoding in
+   `compare-sarcasm.ts`; B8, B9; D10 `bump.ts` / `release.ts` / the scan have no tests).
+5. **A pin or cache key that does not cover its input** (C1 usermusl / libc++ compiles not keyed
+   on the clang binary; C2 📖 `check-pins` lacks the usermusl and libc++ tables; C3 `-Dfilc-src`
+   unchecked against the pinned commit; C4 📖 `.paths` omits `build/` and `tools/`; C5 📖
+   `catch null` truncates the libpizlo source list; C6, C7).
+6. **Port divergences, latent** (A1 `ptrflow.zig` `base()` mnemonic fallback, bites when the
+   transform is ported; A2 a different refusal message for a jump to a trailing label; A3 smap
+   dead keys, known).
+7. **Unverified claim to measure** (C8: does the Zig-built patched clang keep the pass's
+   assertions — `NDEBUG` under `zig c++ -O2`; one run of the KI-18 repro settles it).
+8. Low / docs: D7, D8, D9 (`tools/README.md` has no `tools/release/` rows).
+
+Next: the owner chooses scope and order; then each class is fixed, tested with an inversion, and
+retested by fresh reviewers until clear, before the next; then round 2 on the fixes.
+
 ## ▶️ PICK UP HERE — paused 2026-11-07 evening (owner: "need to pause here for today. please note where we are in the fix list")
 
 **Committed 2026-11-12 on branch `work-2026-11-12`** (owner: "commit"; two commits — `2b9c44c` the

@@ -77,5 +77,6 @@ Nothing else is a target here; other platforms are zailc's.
 
 **Records (§ 6):** findings → [known-issues.md](known-issues.md) (one `KI-n` row each; the WHY of
 any workaround in [workarounds.md](workarounds.md)); the round → [open-work.md](open-work.md); a
-release's two reviews → that release's entry in [release.md](release.md), before the bump
-(`bump.ts` and `release.ts` refuse without both).
+release's two reviews → that release's entry in [release.md](release.md), before the bump, as the
+two lines of its § "Review records" (`bump.ts`, `release.ts` and CI's `check-reviews.ts` refuse
+without both, and check the range against the history — KI-24).
