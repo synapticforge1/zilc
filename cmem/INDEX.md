@@ -1,12 +1,13 @@
 # cmem — Portable Project Memory for zilc
 
-**At session start, read `../cmem/workspace-correspondence.md` (then `../cmem/handoffs.md`) for
-items addressed to this repo** — the workspace pull line (letter H26). zilc has no `CLAUDE.md`, so
-the line lives here.
+**At session start, read `../workspace/cmem/workspace-correspondence.md`, then the files in
+`../workspace/cmem/letters/` of the items addressed to this repo** — the workspace pull line
+(letters H26, H41, H42); answering: `working-rules.md` § Before starting work. zilc has no
+`CLAUDE.md`, so the line lives here.
 
 The **authoritative, portable project memory** for `zilc`, committed with the project; one
 topic file per domain, modeled on wazmrt's (`../wazmrt/cmem`). The workspace floor
-(`../cmem/working-rules.md`) as it applies here: [working-rules.md](working-rules.md).
+(`../workspace/cmem/working-rules.md`) as it applies here: [working-rules.md](working-rules.md).
 
 **State and everything outstanding: [open-work.md](open-work.md)**, the one status line (the dated
 log this file held until 2026-10-27: `git show c2841dd:cmem/INDEX.md`). Commit ids written before
@@ -112,7 +113,7 @@ the runtime-linking rule checked.
 ### Workspace triggers
 
 "look for code issues", "coordinate", "divergence" and the regression gate are defined in
-`../cmem/INDEX.md` § Triggers and bind here too.
+`../workspace/cmem/INDEX.md` § Triggers and bind here too.
 
 ---
 

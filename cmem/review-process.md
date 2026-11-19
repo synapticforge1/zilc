@@ -1,7 +1,7 @@
 # review-process.md — zilc's slots in the workspace review standard
 
 🔒 **Owner, 2026-11-12 (workspace letter H35):** one review process everywhere —
-`../cmem/review-process.md`, from S3D-ReportCompiler. "review", "security review", "hardening
+`../workspace/cmem/review-process.md`, from S3D-ReportCompiler. "review", "security review", "hardening
 review" each run in rounds by fresh, read-only reviewers and **stop when a round's reviewers find
 nothing**; **a security review and a hardening review are required before every release**, recorded
 in that release's entry in [release.md](release.md) before the bump. The PROCESS is the workspace
@@ -20,7 +20,10 @@ file's and is not copied here; this file fills its **[project]** slots for zilc 
 **Private data a reviewer never reads (§ 1.1, § 5):** `cmem/local/` (gitignored, machine facts);
 `.claude/`; anything outside the clone except the read-only siblings it is pointed at. A reviewer
 works in its own scratch folder; in WSL that is under `~/zilc-work/` (WSL's `/tmp` was seen
-emptied between invocations, 2026-11-12). 🛑 It never executes anything built by Fil-C, cosmo or zilc on
+emptied between invocations, 2026-11-12). **The brief says:** work only in the folder you are
+given, under the main session's scratchpad or `~/zilc-work/review-<n>/`; the main session deletes
+it — clones, mutants, planted inputs — when the round is triaged (`working-rules.md` § Scratch
+space, letter H43). 🛑 It never executes anything built by Fil-C, cosmo or zilc on
 the Windows host (`workarounds.md`): every run is in WSL or Linux.
 
 **The worst silent case (§ 1.2):** **a memory-unsafe program that zilc compiles and that runs

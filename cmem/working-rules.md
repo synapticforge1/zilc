@@ -1,16 +1,23 @@
 # working-rules.md — the checklist for every increment in zilc
 
-zilc sits in a workspace of sibling repos whose common floor is `../cmem/working-rules.md` (since
-2026-10-26, workspace letter H26). This file records that floor as it applies here, plus zilc's own
+zilc sits in a workspace of sibling repos whose common floor is `../workspace/cmem/working-rules.md`
+(since 2026-10-26, workspace letter H26; the workspace memory is the `workspace` repo since
+2026-11-19, letter H42; its Tooling rules are in `../workspace/cmem/tooling-rules.md`). This file records that floor as it applies here, plus zilc's own
 rules. **zilc's own rules govern inside zilc**; where they differ from the floor, the difference is
 named below. Method lessons are in [best-practices.md](best-practices.md), not here.
 
 ## Before starting work
 
-- Read `../cmem/workspace-correspondence.md` for every open row addressed to zilc, or touching what
-  you will change (owner, 2026-10-26, binding on every repo), and `../cmem/handoffs.md` for the
-  letters' full text. zilc answers in its own memory, then writes the commit into its row of the
-  ledger; the creator of a row verifies and closes it.
+- Read `../workspace/cmem/workspace-correspondence.md` (one line per open item) for every item
+  addressed to zilc, or touching what you will change (owner, 2026-10-26, binding on every repo),
+  then only those items' files in `../workspace/cmem/letters/<ID>.md` (letter H41). zilc answers in
+  its own memory, then appends ONE bullet under `## Answers` in the item's file —
+  `- **zilc, <date>:** <what was done, the commit, the check>`, lines under 200 characters — and
+  changes neither the index line nor the status; the creator verifies and closes. That bullet is
+  the one write zilc makes outside its own repo (the workspace session commits it), and the
+  workspace repo is PUBLIC: no machine paths, credentials or personal facts in it (letter H42).
+  An old pointer to `handoffs.md H<n>` or a ledger row resolves by searching
+  `../workspace/cmem/archive/` for the ID.
 - **Never write into a sibling repo** (zailc, wazmrt, …) from a zilc session, unless the owner
   directs that specific write; draft the note here and hand it over. zailc reads zilc as its
   oracle; zilc changes nothing for it.
@@ -85,6 +92,37 @@ named below. Method lessons are in [best-practices.md](best-practices.md), not h
 - When the exit code IS the measurement, do not pipe: redirect to a file, then read the code.
 - Never run a formatter on `cmem/` or on `tests/basics/`.
 
+## Scratch space (🔒 owner, 2026-11-19; workspace Tooling rule 15, letter H43)
+
+The rule is the workspace's (`../workspace/cmem/tooling-rules.md` rule 15); as it applies here:
+
+- **Every scratch and cache location counts:** the session scratchpad, the system temp folder,
+  WSL's home and `/tmp`, `~/zilc-work/`, and any folder a tool or session makes for throwaway work.
+- **Throwaway files go in this session's own scratchpad folder only**, never another session's;
+  its path is a machine fact and is never written into a tracked file.
+- **Project data lives in the project:** notes, decisions, results and state go in `cmem/`
+  (private ones in `cmem/local/`), never only in scratch, a temp folder or the assistant's own
+  per-project memory folder. A fact found outside is copied in and the outside copy removed.
+- **Delete when the item is cleared:** a one-time script after its run; a reproducer, clone or
+  build output when its finding is fixed and verified; a reviewer's folder (clones, mutants,
+  planted inputs) when its round is triaged.
+- **Budget: 200 MB per session scratchpad folder.** Anything larger is announced before it is
+  made and removed when its step is done.
+- 🗓️ **`~/zilc-work/` is zilc's named cache outside the repository**, not scratch: Fil-C and
+  Zig work in WSL needs a Linux filesystem (WSL's `/tmp` was seen emptied, 2026-11-12), and
+  it holds the toolchains the tools use (`~/zilc-work/tools/`, `patched-clang/`). Its folders,
+  why each exists, its size limit and the command that clears each are recorded in
+  `cmem/local/`. Measured 2026-11-19: **232 GB**. The limit and what to remove are the owner's
+  call (`open-work.md`, workspace letters, H43).
+- 🔒 **zilc cleans only zilc's items** (owner, 2026-11-19: "any items from a different project
+  is that project's responsibility"). What another project left — in WSL's home (`~/zailc-work/`,
+  a wazmrt folder, …), the system temp folder or anywhere else — is neither measured for removal
+  nor touched from a zilc session; the owning project manages it.
+- **Sub-agents** work in a folder under the main session's scratchpad; the main session removes
+  it, and the brief says so.
+- **Session end, and before the owner's "commit":** delete what this session wrote to scratch,
+  then do the memory update; `open-work.md` never points at a scratch file.
+
 ## Privacy (🔒 owner, 2026-10-22, clarified 2026-10-23 and 2026-10-26)
 
 Everything committed is public (zilc's GitHub repo is public), `cmem/` included. Never in a
@@ -126,6 +164,11 @@ force-push is `open-work.md` owner call 1.
 
 ## Records
 
+- 🔒 **Do not guess: test and verify** (owner, 2026-11-07: "please do not guess. just test and
+  verify." — said after a guessed Zig path failed). Paths, commands, tool locations and whether a
+  port matches upstream are looked up (`tools/lib/tool.ts`, `testing.md`, `which`) or run, never
+  assumed. A "0 differ" is proven real: outputs non-empty, coverage counted, a planted fault caught.
+  Say what was not tested.
 - A written number is a claim with a date; re-derive it before quoting or acting on it.
 - Owner calls stay owner calls: where a record says 🗓️, gather the evidence and stop.
 - Retired siblings: wabt-ts and binaryen-ts (2026-10-26) are cited only as history, never as a
@@ -134,7 +177,7 @@ force-push is `open-work.md` owner call 1.
   2026-11-12): `tests/` (the `basics` copies, the corpus, `tests/sarcasm/`), `examples/`, the gate
   cases, and the dated results in `testing.md` / `sarcasm-port.md`. **A move, rename or removal of
   any of them is announced** — in that release's entry in `release.md`, or, between releases, as a
-  row to zailc in `../cmem/workspace-correspondence.md` — before or with the commit. zilc still
+  letter to zailc in `../workspace/cmem/letters/` — before or with the commit. zilc still
   changes nothing FOR zailc; it only says what moved.
 
 ## Owner commands: "commit", "push", "release" (owner, 2026-11-10)

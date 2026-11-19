@@ -1022,3 +1022,22 @@ exact pipeline; every case measured agrees (its output carries the page's `notra
 `target="_blank"` links). `bump.ts`'s own render call and `tools/md/biome.ts` have no unit test
 (both RUN by hand, 2026-11-15).
 **Also:** Biome padded `Fil-C.md`'s table, and `zig build check-pins` (a Zig program that checks text pins, run by `zig build test`) matched the old spacing exactly and failed. For `.md` pins it now treats a run of spaces as one (`squeezeSpaces`, with its own unit test, wired into `zig build test`: 41/41); inverted — a `Fil-C.md` naming another release still fails. `zig fmt` formats the `.zig` files, Biome the `.md` files (owner, 2026-11-15: "zig fmt checks the zig format").
+
+## ⏹️ KI-39 — Render-design retest: hidden blocks GitHub does not show (class 1 retest 11; 2026-11-15; SUPERSEDED 2026-11-19)
+
+**Found (retest 11, all RUN against GitHub's `/markdown`):** a `<details>` nested in a list item
+or paragraph, a summary inside an outer collapsed `<details>`, struck-through records and status
+version, and a visible code-block copy while the counted line is hidden — each let the guard count
+a place the reader does not see. Accepted, not fixed: a decoy HTML table row showing the State
+row's facts while the real row is not a table (the reader sees the right version). Loud refusals
+noted: `/markdown`'s 400 KB limit (`open-work.md` is about 60 KB); 60 unauthenticated renders an
+hour locally, about 11 per release cycle (CI uses its token).
+**Fix, committed in `cdbb031` (owner, 2026-11-19):** `renderedBlocks` (`tools/release/guards.ts`)
+keeps text inside a collapsed `<details>` at any depth, or inside `<del>` / `<s>` / `<strike>`, out
+of its block; `<details open>` is shown; numeric and `&nbsp;` references are decoded; records must
+be list items again; the redundant `seen` filter is gone. `bun test tools/release/` 128/128, Biome
+clean, `bump --check` ok, the live render passes (2026-11-15). **Not done:** the mutant run (in
+flight at the pause, its harness lost with the scratchpad) and the fresh class 1 retest.
+**Superseded (owner, 2026-11-19):** letter H37 replaces the record-paragraph check this guards
+with a run of the review set, and takes the tests out of CI; review round 1 stopped
+(`open-work.md`, top). The code stays until H37 (d) / (e) remove or reshape it.

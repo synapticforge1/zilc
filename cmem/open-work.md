@@ -17,30 +17,28 @@ them, with their dates.
 | branches  | `main` carries the Bun port (`c2841dd`, was `44e0b1a`), merged `--no-ff` 2026-10-27 (owner: "we will merge all to bun tooling since deno is going away"), and the 2026-10-27 work since; `bun-port` (merged, never pushed) deleted 2026-10-27 (owner). Branches: `main`, `v0.15.2`                                                                                                                                                                                                                                                                                                                                                                                                                         |
 | sibling   | **zailc** (`../zailc`, started 2026-10-08) translates Fil-C into Zig; zilc is its stable reference and test oracle and changes nothing for it (`design-decisions.md`)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 
-## ⏸️ PAUSED 2026-11-15 evening (owner: "I need to pause here for today") — pick up here
+## ⏹️ Review round 1 STOPPED 2026-11-19 — superseded by the final review standard (letter H37)
 
-- **Committed on `work-2026-11-15`** (not pushed; `main` is untouched): `2e557d5` (KI-24–36),
-  `be52302` (KI-37), `0a43dc4` (KI-38: GitHub's renderer decides what is shown, Biome formats).
-- **UNCOMMITTED in the working tree: KI-39**, the fixes from the render-design retest —
-  `tools/release/guards.ts` (`renderedBlocks`: text inside a collapsed `<details>` at any depth or
-  inside `<del>`/`<s>`/`<strike>` never joins its block; `<details open>` shown; numeric and `&nbsp;`
-  references decoded; records must be list items again; the redundant `seen` filter removed) and
-  `tools/release/guards.test.ts`. Verified before the pause: `bun test tools/release/` 128/128,
-  Biome clean, `bump --check` ok, the live render against GitHub passes. **A mutant run was in
-  flight at the pause — re-run it first** (the one-off harness lives in the session scratchpad and
-  is gone; rebuild it: each mutant puts one part back, the run refuses to start unless the
-  unmutated copy passes). The KI-39 ledger row is NOT written yet.
-- **Then:** write KI-39 in `known-issues.md` (the retest's findings: details nested in a list item
-  or paragraph, a summary inside an outer collapsed details, struck-through records and status
-  version, a visible code-block copy while the counted line is hidden — all RUN against GitHub;
-  accepted, not fixed: a decoy HTML table row showing the State row's facts while the real row is
-  not a table, since the reader sees the right version; loud refusals noted: `/markdown`'s 400 KB
-  limit, `open-work.md` ~60 KB; 60 unauthenticated renders an hour locally, ~11 per release
-  cycle, CI uses its token), Biome-format, gate if a gate-run tool changed, commit, then **one
-  fresh class 1 retest on the render design**. Class 1 clears only on an empty retest; then
-  class 2 (`§ Review` below).
+🔒 **Owner, 2026-11-19 ("yes", to stopping round 1 rather than finishing KI-39):** round 1 ran
+under the 11-12 standard (letter H35). Its class 1 hardened `tools/release/check-reviews.ts` and
+CI's review step — the check that a release entry carries the Security and Hardening record
+paragraphs and that GitHub shows them. The final standard (H37, 2026-11-17) REMOVES both: (d) the
+release script runs the review set as its first step instead of checking record paragraphs; (e)
+the tests leave CI, which only verifies the version, tags and makes the page. Finishing class 1
+would harden code that H37 deletes.
 
-## 🔎 Review, round 1 — 2026-11-15 (owner: "review"; owner agreed the fix order below the same day)
+- **Where it stopped:** KI-24–KI-38 committed (`2e557d5`, `be52302`, `0a43dc4`); KI-39's code
+  committed in `cdbb031` (owner, 2026-11-19), all on `work-2026-11-15` (pushed to its own branch;
+  `main` untouched). KI-39's mutant run was NOT re-run; its row records it as superseded.
+- **What carries over:** the lessons (KI-31, KI-38: a guard never forbids valid Markdown; GitHub's
+  renderer decides what is shown) and Biome for `.md`, which stays (`working-rules.md` § Git).
+- **Next:** H42 / H41 / H43 (done this session, workspace letters table below); then the memory
+  guide's steps 1–3 (H38); then H37 (a)–(g), which rewrites `review-process.md`, `release.ts`,
+  `release.yml` and `platforms.md`; then H38 steps 4–7; then ONE full first review under H37's
+  five classes (basic, hardening, licensing, security, privacy).
+- **Not touched:** the sarcasm port waits at x86_64_frame checkpoint 3 (`sarcasm-port.md`).
+
+## 🔎 Review, round 1 — 2026-11-15 (owner: "review"; owner agreed the fix order below the same day) — STOPPED 2026-11-19 (above)
 
 **Progress (branch `work-2026-11-15`):** class 1 fixed (KI-24–KI-27: `tools/release/guards.ts`,
 `check-reviews.ts`, the workflow's decide step and review step; reviewer D's reproducer refuses).
@@ -522,7 +520,27 @@ future reference"_.
   (`compile-check`, `check-toolchain` and `check-upstream` ran fully on 2026-10-27; so did `all-modes`, which runs
   `zilc-check` for every mode, and `compare-output`, against the swapped toolchain, `testing.md`.)
 
-## Workspace letters (`../cmem/workspace-correspondence.md`)
+## Workspace letters (`../workspace/cmem/workspace-correspondence.md`; each item in `letters/<ID>.md`)
+
+Open for zilc, 2026-11-19:
+
+- **H41** (correspondence one file per item) — read; session start and the answer bullet in
+  `working-rules.md` § Before starting work, `INDEX.md`'s pull line. Answer: one bullet, record-only.
+- **H42** (workspace memory in the `workspace` repo) — every `../cmem/` pointer in `cmem/` now names
+  `../workspace/cmem/` (`git grep '\.\./cmem/'` finds only this line).
+- **H43** (scratch space) — rule in `working-rules.md` § Scratch space; reviewer brief in
+  `review-process.md`; the four notes in the assistant's per-project memory folder checked against
+  `cmem/` ("test, don't guess" was missing: now `working-rules.md` § Records) and removed; session
+  scratchpad 0 bytes; WSL `/tmp` 0; 🗓️ **`~/zilc-work/` 232 GB — what to remove is the owner's
+  call** (inventory in `cmem/local/zilc-work.md`). Round 1's reviewer folders there (about 3 GB,
+  checked: nothing unique) are still to remove — the session's permission check refused the
+  deletion. Other projects' folders are theirs (`working-rules.md` § Scratch space).
+- **H38** (memory guide) — not started; `check-cmem --summary`: 470 problems (state-missing 1,
+  index-size 1, line-length 459, file-size 9). Steps 1–3 next.
+- **H37** (final review standard) — not started; (a)–(g) after H38 steps 1–3. It supersedes
+  review round 1 (top of this file).
+
+Answered earlier (rows below, kept as history until the workspace closes them):
 
 | letter               | asks zilc                                                                                                | state (2026-10-27)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
 | -------------------- | -------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |

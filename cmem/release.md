@@ -4,7 +4,7 @@
 letter H33): § "Release History" below, newest first,** one entry per version with a summary of
 what changed, the run, the read-backs and what was checked. The version scheme, its five places and
 the upgrade checklist stay in [releasing.md](releasing.md); the process is the workspace's
-`../cmem/release-process.md` §§ 5–8, mapped onto zilc here.
+`../workspace/cmem/release-process.md` §§ 5–8, mapped onto zilc here.
 
 ## How a release runs (the owner's word "release" — `working-rules.md` § Owner commands)
 
