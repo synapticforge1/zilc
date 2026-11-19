@@ -15,7 +15,7 @@
 //
 // Result: ~/zilc-work/tools/filc-<FILC_VERSION>-zilc/ = a copy of the prebuilt tree with build/bin/clang-20
 // replaced and build/bin/llvm-split added. Point zilc at it with
-// ZILC_FILC=…/filc-<FILC_VERSION>-zilc/build/bin/clang. Then (cmem/INDEX.md policy): run Fil-C's own test
+// ZILC_FILC=…/filc-<FILC_VERSION>-zilc/build/bin/clang. Then (cmem/working-rules.md § Memory policy): run Fil-C's own test
 // suite against it (run-filc-tests.ts) and re-archive (archive-patched-clang.ts).
 import { mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";

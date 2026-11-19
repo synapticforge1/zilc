@@ -331,5 +331,5 @@ ABI change) and `7d4ed7b` (symbol visibility) — for the next review.
 (`testing.md`), toolchain re-archived, **marked reviewed at `e7947f0`** (not upstream's head:
 `check-upstream.ts --mark-reviewed=<rev>`). Release `0.15.2-0.687.1`: tagging and pushing are the
 owner's.
-- **When to run it:** at every "update the project memory" (`INDEX.md` policy, step 5), and before
+- **When to run it:** at every "update the project memory" (`working-rules.md` § Memory policy, step 5), and before
   any Fil-C upgrade (stage A above).

@@ -1,7 +1,7 @@
 # open-work.md — the state of zilc and what is outstanding
 
-The ONE place for the status line (workspace `memory-conventions.md`: "the status narrative exists
-once"). Only open items live here; each points at its record. Completed work is summarized at the
+Where the project stands now is [STATE.md](STATE.md) (memory guide, letter H38, 2026-11-19); the
+State table below is the dated record behind it. Only open items live here; each points at its record. Completed work is summarized at the
 end with a pointer to where the full text lives. Counts are not copied here: `testing.md` holds
 them, with their dates.
 
@@ -525,7 +525,7 @@ future reference"_.
 Open for zilc, 2026-11-19:
 
 - **H41** (correspondence one file per item) — read; session start and the answer bullet in
-  `working-rules.md` § Before starting work, `INDEX.md`'s pull line. Answer: one bullet, record-only.
+  `working-rules.md` § Before starting work and § Session routine. Answer: one bullet, record-only.
 - **H42** (workspace memory in the `workspace` repo) — every `../cmem/` pointer in `cmem/` now names
   `../workspace/cmem/` (`git grep '\.\./cmem/'` finds only this line).
 - **H43** (scratch space) — rule in `working-rules.md` § Scratch space; reviewer brief in
@@ -537,8 +537,10 @@ Open for zilc, 2026-11-19:
   Kept: Fil-C 0.687's source and clang build tree, the toolchain, the pinned QC GCCs; gate 8/8 after.
   What stays and why: `cmem/local/zilc-work.md`. No size limit (owner): cleared as things stop
   being used (`working-rules.md` § Scratch space).
-- **H38** (memory guide) — not started; `check-cmem --summary`: 470 problems (state-missing 1,
-  index-size 1, line-length 459, file-size 9). Steps 1–3 next.
+- **H38** (memory guide) — before: `check-cmem --summary` 470 problems (state-missing 1,
+  index-size 1, line-length 459, file-size 9). **Steps 1–3 done 2026-11-19:** `STATE.md`; `INDEX.md`
+  20 KB → 2.4 KB router (rules to `working-rules.md`, history to `design-decisions.md`); the root
+  `CLAUDE.md` (gitignored) names the two. Steps 4–7 after H37 (a)–(g).
 - **H37** (final review standard) — not started; (a)–(g) after H38 steps 1–3. It supersedes
   review round 1 (top of this file).
 

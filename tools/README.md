@@ -91,5 +91,5 @@ starting elsewhere.
 - `linuxOnly(import.meta)` at the top of a tool that needs Fil-C is kept as a marker; it only
   asserts what the import already checked.
 - Keep the header comment: purpose, usage, environment variables, and the WHY of every setting
-  (`cmem/INDEX.md`, the workaround rule).
+  (`cmem/working-rules.md`, the workaround rule).
 - `sh()` exists for the rare Unix pipeline that is clearer as one (`xz | tar`); prefer `run`.
