@@ -1,0 +1,151 @@
+# Platforms: the P6 scope pass (pre-publish, ✅ 2026-10-05)
+
+Archived 2026-11-19 from `cmem/platforms.md` (letter H37 (g)), unchanged below this line; the live
+support matrix is `cmem/platforms.md`.
+
+> 🔒 **2026-10-27 (owner): zilc stays Fil-C on Linux x86_64 only, worked in WSL or Linux; the
+> cross-platform part is zailc's** (`design-decisions.md`, top row). This file is now the
+> measured record that zailc's platform work starts from; for zilc, only Linux x86_64 applies —
+> the Linux aarch64 gaps below are zailc's too.
+
+`roadmap.md` P6 asks, per platform, before publishing: confirm the processors; count the OS
+functions Zig's std references (the checked-wrapper workload); the libc story; the std code that
+builds pointers from integers (KI-5 family); and the host toolchain. This file holds the answers,
+measured on Zig 0.15.2 and Fil-C 0.686. The port efforts themselves come after publishing.
+
+## The answer in one table
+
+| platform    | processors              | what Fil-C 0.686 offers                                                           | OS functions (corpus)                                                                              | new int→ptr std functions                                                  | raw kernel asm                     | verdict                                                                                |
+| ----------- | ----------------------- | --------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | ---------------------------------- | -------------------------------------------------------------------------------------- |
+| **Linux**   | x86_64 ✅ · **aarch64** | both, prebuilt (`filc-0.686-linux-{x86_64,aarch64}`)                              | 75                                                                                                 | 0                                                                          | 468 sites (x86_64) / 390 (aarch64) | **x86_64 works. aarch64 is close: 4 concrete gaps (below)**                            |
+| **Android** | aarch64 · x86_64        | none (Bionic, not musl)                                                           | 72 (13 differ: `*64` variants, `arc4random_buf`, `__errno`)                                        | 0                                                                          | 390                                | Linux kernel, but needs a checked Bionic-compatible libc layer, or musl-on-Android     |
+| **macOS**   | aarch64 · x86_64        | **cosmo mode** (APE binaries; see below); no native port                          | 79 (22 differ: `__ulock_*`, `os_unfair_lock_*`, `_dyld_*`, `fcopyfile`, `getcontext`, `$NOCANCEL`) | 3, all stack-trace code (`lookupModuleDyld`, `unwindFrameMachO`)           | 0 (libSystem only)                 | via cosmo: plausible, not yet tried; natively: P3 runtime + libSystem layer            |
+| **iOS**     | aarch64                 | none (cosmo does not cover iOS)                                                   | 79 (as macOS)                                                                                      | 3 (as macOS)                                                               | 0                                  | macOS's work plus signing/no-exec-mmap; last                                           |
+| **Windows** | x86_64 · aarch64        | **cosmo mode, x86_64 only** (verified under Wine upstream; real Windows untested) | 86 (78 differ: kernel32, ntdll, ws2_32, crypt32)                                                   | 7: stack walking, `heap.PageAllocator.map/realloc`, DebugAllocator buckets | 0                                  | via cosmo: x86_64 plausible; aarch64 Windows has no route; natively: the biggest layer |
+
+"OS functions (corpus)" = the external functions (not LLVM intrinsics or compiler-rt) referenced
+by the 78 Zig programs of `tests/basics`, union over all programs, in Zig's unoptimized IR (the
+module zilc feeds Fil-C). Median per program: Linux 28, macOS 31, Windows 39. All 78 programs
+compile for all 9 targets with plain Zig 0.15.2. Tool: `tools/p6/os-surface.ts`.
+
+**Whole std, not just the corpus** (Zig 0.15.2 `lib/std`, `extern "<lib>" fn` declarations):
+`c` 554 (of which `c.zig` 313 shared, `c/darwin.zig` 80), `kernel32` 90, `ws2_32` 83, `ntdll` 49,
+`mswsock` 12, `advapi32` 6, `crypt32` 3. So a full Windows layer is ~245 functions before libc;
+the corpus touches 78 of them. `@ptrFromInt` sites: `os/linux` 221 (vDSO, auxv, syscall
+structures), `c.zig` 30, `debug` 32, `heap` 22, `posix.zig` 9, `os/windows` 1 (but `teb()` comes
+from a compiler-rt asm helper, `zig_x86_64_windows_teb`, a pointer Fil-C cannot vouch for: KI-5
+family).
+
+## 🔑 Finding 1: upstream Fil-C now has a COSMO mode (cross-OS binaries)
+
+Fil-C added a third libc flavour, **Cosmopolitan libc**, between 2026-09-20 and 2026-10-04 (in
+0.686; `upstream/fil-c/cosmo.txt`, 693 lines). A cosmo-mode link produces an **APE** ("actually
+portable executable"): one static file that runs on Linux, macOS and the BSDs (x86_64 + aarch64)
+and on **x86_64 Windows**; `--filc-fat-ape` puts both processors in one file. Facts from
+`cosmo.txt`:
+- The compiler is flavour-blind: the flavour is whatever is installed in `pizfix/` (marker:
+  `pizfix/lib/libyolocosmo.a`). **The released 0.686 tarballs are the musl flavour**; cosmo needs
+  Fil-C built from source (`build_all_fast_cosmo.sh`, ~1.2 GB cosmo toolchain download).
+- Static-only: no `-shared`, no PIE, no `dlopen`. zilc links dynamically today, so its link step
+  would change.
+- Windows: verified under Wine (threads, stdio, C++); real Windows, GC-heavy programs,
+  signals and fork "remain unproven". C/C++ `thread_local` still faults on Windows. No aarch64
+  Windows.
+- macOS: the APE loader for Apple silicon is compiled on first run and needs the macOS SDK
+  (`cc`); not run on real Mac hardware upstream.
+- Build host for cosmo mode: x86_64 Linux (`apelink`, `pecheck` are Linux host tools).
+
+**Why it matters for zilc: cosmo's C ABI is Linux x86_64's, as Zig's std expects it.** Checked
+in Fil-C's v0.686 tree (`projects/yolocosmo`, 2026-10-05): `O_CREAT` is `#define 0x40` (Linux's
+value, not a runtime variable); `ENOENT` 2, `EAGAIN` 11 (Linux's); and `struct stat` has musl
+x86_64's exact layout (cosmo's `st_flags` sits in musl's `__pad0`, its `st_birthtim` + `st_gen`
+in musl's `__unused[3]`; same 144 bytes). So Zig code compiled for `x86_64-linux-musl` would
+pass correct values to cosmo's libc on every OS, and **macOS + x86_64 Windows may be reachable
+without writing a Zig runtime per OS**. Open questions (to answer in the port effort, not now):
+1. What Fil-C's `syscall()` does in cosmo mode off Linux. zilc routes std's raw syscalls (468 asm
+   sites summed over the corpus, x86_64) through it (`zilc_syscall`, KI-7) by LINUX syscall number; on macOS/Windows those numbers mean
+   nothing unless cosmo translates them.
+2. aarch64: cosmo's ABI is the same on both processors, but Zig's `aarch64-linux-musl` uses
+   aarch64 Linux's own `struct stat` layout, which differs. The x86_64 half is the safe start.
+3. Zig's `-lc` Linux build assumes dynamic musl (`libc.so`); cosmo is static, non-PIE.
+
+## Finding 2: Linux aarch64, measured (2026-10-05)
+
+`zilc build --target aarch64-linux-musl` on `01_hello-world`, x86_64 host: Zig's IR is produced
+and the Fil-C pass RUNS; then clang aborts (`Target-incompatible DataLayout`). Four gaps, each
+concrete:
+1. **zilc's patched clang has no AArch64 backend.** `build-patched-clang.ts` configures
+   `-DLLVM_TARGETS_TO_BUILD=X86`; upstream's `configure_llvm.sh` builds `X86;AArch64` on an
+   x86_64 host, and the stock 0.686 clang lists both. (A departure from upstream: fix it on the
+   next rebuild; it changes nothing for x86_64.) Without it, clang compiled the aarch64 module
+   AS x86_64, hence the layout abort.
+2. **zilc derives the data layouts from Zig's, but Fil-C's LLVM fork adds `p270/p271/p272` to
+   its aarch64 layout too** (Zig's stock-LLVM aarch64 layout has none). With Fil-C's own aarch64
+   layouts written into the module by hand, the **stock 0.686 clang compiled it to an ARM64 ELF
+   object** (`--target=aarch64-unknown-linux-musl -O1`). Fix: take the layout from Fil-C's clang
+   for the target instead of deriving it from Zig's (`src/ir.zig`).
+3. **The KI-7 syscall rewrite is x86_64-only** (`ir.zig` matches `asm sideeffect "syscall"` and
+   `@os.linux.x86_64.syscallN`); aarch64 std uses `svc #0` in `os.linux.aarch64.syscallN`. Four
+   `svc #0` sites were left in hello-world's module. The C helper (`zilc_syscall`) is portable:
+   it uses the headers' `SYS_*` numbers.
+4. **Linking and running need Fil-C's aarch64 tree** (`filc-0.686-linux-aarch64.tar.xz`, 72 MB,
+   not downloaded) and `qemu-aarch64` on this x86_64 machine (or real ARM64 hardware).
+
+Plus: Zig passes aarch64 CPU features LLVM 20 does not know (`+ete`, `+fuse-aes`, …):
+"not a recognized feature, ignoring". Harmless, but noisy; probably `-mcpu=generic` or
+filtering.
+
+## Finding 3: the host toolchain
+
+- **Fil-C's clang ships for Linux x86_64 and Linux aarch64 hosts only** (0.686 release assets:
+  `filc-0.686-linux-{x86_64,aarch64}`, `optfil-…` the same). zilc on Windows already works
+  through WSL2. zilc's own code is portable Zig.
+- The Fil-C pass has **no OS conditionals**: it branches on processor only (x86_64, aarch64:
+  page size, stack-check asm, store fences; `FilPizlonator.cpp`), and has no ELF/Mach-O/COFF
+  code. The OS lives in the runtime (`libpas`, `filc/src`) and the libc. So a clang for another
+  HOST is an LLVM build question; the RUNTIME is the real per-OS cost.
+- Cosmo mode keeps the host on x86_64 Linux (its link tools are Linux binaries) while the
+  TARGETS become cross-OS. For a Windows or macOS developer that means WSL2 / a Linux VM or
+  container, as today.
+
+## Cosmo evaluation (owner, 2026-10-05: "evaluate cosmo mode by first building Fil-C from source")
+
+**Step 1, build Fil-C v0.686 in cosmo mode from source: ✅ DONE 2026-10-05 (18:48).** Clang (X86 + AArch64) built in ~20 min at 12 jobs; the whole cosmo flow (yolo cosmo x86_64 + aarch64, APE tools, libpizlo, the Fil-C-built cosmo libc `libc.a` 70 MB, libc++/libc++abi, minilute, sarcasm) completed. **First program:** a C hello world compiled by the cosmo-mode clang runs as a static ELF, and its `.com` twin is an APE (`MZqFpD`) that runs on Linux and passes `pecheck` (the Windows PE half). Took four stops for host setup, each recorded with its why in `workarounds.md` "Machine setup — building Fil-C from source in cosmo mode": libcurl headers (projeny), Ruby (libpas generators), and WSL's `WSLInterop` binfmt sending APE tools to Windows (owner disabled WSL interop in `/etc/wsl.conf`).
+- Tool: `tools/filc/build-cosmo.ts` (upstream's `build_base_cosmo.sh`, unmodified, STOCK Fil-C:
+  no zilc patches), tree `$WORK/filc-cosmo` (depth-1 clone of `v0.686`, checked against
+  `FILC_SHA`), log `$WORK/filc-cosmo/zilc-build.log`.
+- ⏸️ **Waiting on the owner:** host packages need `sudo` (password). The tool prints the line;
+  on 2026-10-05 it was:
+  `sudo apt-get update && sudo apt-get install -y clang lld ninja-build unzip patchelf bison flex
+  texinfo autoconf libtool pkg-config automake gettext gcc-aarch64-linux-gnu
+  binutils-aarch64-linux-gnu qemu-user libblake3-dev libc6-dev-arm64-cross
+  linux-libc-dev-arm64-cross libstdc++-15-dev-arm64-cross autotools-dev wine64`
+- Departures from upstream's build host, each with its why: `workarounds.md` "Machine setup —
+  building Fil-C from source in cosmo mode".
+
+**Step 2 ✅ 2026-10-05: Fil-C's suite in cosmo mode, 5,821 / 5,822 pass**; the 1 is `inlineasm_rdpkru` (CPU feature WSL lacks, as on musl). Skips beyond musl's: 108 `unsupportedOnCOSMO`, 39 shared-library tests (upstream's count too).
+
+**Step 3 ✅ 2026-10-05: ZIG through cosmo mode, with zilc as it is** (`zilc build --filc <cosmo clang>`):
+- **Open question 1 answered:** in cosmo mode Fil-C's `syscall()` takes the target's NATIVE LINUX numbers on every OS and hands them to the runtime's `zsys_syscall`, which implements them per host OS (`pizfix/include/sys/syscall.h` comment; ~26 numbers listed, others trap). So zilc's KI-7 routing by Linux number carries over. One fix: cosmo's header has no `SYS_clock_nanosleep`, so zilc's helper now defines it (230 / 115) when missing (`src/driver.zig`; musl unchanged, tests 29/29, gate 8/8).
+- **Results:** `01_hello-world` and `31_timers` (threads, sleep) build and run as static Linux ELFs AND as `.com` APEs; the same APE files **run as Windows programs under Wine**. `58_reading-files` stops: `filc internal error: statx not supported` (Zig's std uses `statx`; the cosmo runtime does not implement it). Question 3 (static linking) is moot: the cosmo clang links static by itself and zilc's link worked unchanged.
+- ⚠️ **Real Windows: UNVERIFIED, and not to be retried on this machine.** On 2026-10-05 every cosmo-mode program run on this Windows host crashed at start with 0xC0000005 (DEP violation, WER `BEX64`), the Zig ones AND a plain C hello world from Fil-C's own cosmo clang. Those runs were made with the machine's EDR (**SentinelOne**) injected into the processes, and they triggered it: the files were quarantined and Claude Code was cut off. So the crash may be EDR-induced rather than an upstream defect; upstream itself only verified Windows under Wine (`cosmo.txt` "Windows retest checklist"). **Rule (owner, 2026-10-08): nothing built by Fil-C, cosmo or zilc is ever executed on the Windows host; the Windows half of an APE is exercised only under Wine inside WSL.** The why, the event-log evidence and what was ruled out: `workarounds.md` "Nothing built by Fil-C or cosmo is ever EXECUTED on the Windows host".
+
+**Step 4 ✅ 2026-10-08: upstream's own `cosmo.txt` "Verification checklist", items 1 and 3–6, all pass, run entirely inside WSL** (item 2 is the suite, step 2 above; item 7 is macOS documentation only):
+1. flavour state: both `libyolocosmo.a` present, no `libc.so.6666`, `libexec/` has `apelink`, `pecheck`, `ape-m1.c`;
+2. x86_64: `hello` (static ELF) and `hello.com` (`MZqFpD`, `pecheck` exit 0) both print;
+3. aarch64: `--target=aarch64-linux-gnu` under `qemu-aarch64` prints;
+4. fat APE (`--filc-fat-ape`): x86_64 half native, `hellofat.aarch64.elf` under qemu, `pecheck` exit 0;
+5. C++ (`<iostream>` + 4 `std::thread`s, `std::atomic`) prints `threads sum 40`;
+   plus the fat APE's Windows half under `wine64` inside WSL: prints, exit 0.
+   Script: the session scratchpad's `cosmo-check.sh` (outputs in `~/zilc-work/cosmo-check/`).
+
+**Cosmo evaluation: CLOSED 2026-10-08.** Everything planned is done: Fil-C's suite in cosmo mode (step 2), the zilc questions (step 3: `syscall()` off Linux, static linking, Zig programs as ELF + APE + under Wine), upstream's checklist (step 4). What it leaves for the plan: (a) `statx` is missing from the cosmo runtime (Zig's std uses it: `58_reading-files`); (b) real Windows is unverified and stays so from this machine; (c) aarch64 Windows, iOS and Android are outside cosmo's reach (the native-runtime route, P3, stays for them).
+
+## What this changes in the plan (proposals, owner to decide after publish)
+
+- **Linux aarch64 first** (already tier 1, first in `roadmap.md`'s order): the four gaps above,
+  all small. Fidelity check: Fil-C's own aarch64 tree and its test suite under qemu.
+- **Evaluate cosmo mode before writing any macOS/Windows runtime.** If question 1 (syscalls)
+  has a good answer, x86_64 macOS/Windows/BSD may come from Fil-C itself, which also serves the
+  FIDELITY FIRST goal (upstream's own runtime, not a new one). The native per-OS runtime (P3)
+  stays the route for aarch64 Windows, iOS and Android, which cosmo does not cover.

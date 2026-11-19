@@ -67,7 +67,7 @@ first passing on the Zig that matches Fil-C.
    C++ at `-O1`; found on 0.686) against the new release; re-test KI-7's remainder (`getcontext`,
    `known-issues.md`) in case std or Fil-C moved. Each gets its result recorded where it lives.
 9. **How the upgrade is released — decide BEFORE the release** (owner, 2026-11-15: "c", review
-   round 1, KI-30): `tools/release/check-reviews.ts` (CI, `release.ts`) requires the bump commit to
+   round 1, KI-30): `tools/release/review-gate.ts` (`release.ts`) requires the bump commit to
    be exactly `bumpEdits` of its parent (N + 1, three files), which a Fil-C or Zig move (every pin,
    N back to 1) cannot be. Choose then: (a) an `upgrade` kind in `bump.ts` whose edits the check
    recomputes the same way, or (b) the upgrade commit reviewed as code and a bump commit that only

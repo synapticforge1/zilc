@@ -16,17 +16,17 @@
  *
  * Refuses: a dirty tree (untracked files count); places that disagree on the current version;
  * a missing `## <new>` section in RELEASE-NOTES.md, a State row in cmem/open-work.md that does not
- * begin with the new version, or a `cmem/release.md` entry for it that does not hold BOTH required
- * review records (security, hardening — workspace review-process.md § 0, letter H35) in the form
- * guards.ts REVIEW_FORM names, each covering the history from the previous release's tag to a
- * commit after which only `cmem/` and RELEASE-NOTES.md changed. Writes the
+ * begin with the new version, no `### v<new>` entry in `cmem/release.md`, or no completed review
+ * covering HEAD: the one `- Review complete: <commit>` line in cmem/review-process.md (guards.ts
+ * REVIEW_FORM; the workspace review standard, letter H37), naming a commit after which only `cmem/`
+ * and RELEASE-NOTES.md changed. Writes the
  * mechanical places (build.zig.zon, src/root.zig's `release` and its test literals, the README
  * status line), runs `zig build test` (and puts every file back if it fails), then commits.
  */
 import { lstatSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { ARGS, REPO, ZIG, linuxOnly, must, run } from "../lib/tool.ts";
-import { BUMP_FILES, bumpEdits, bumpSubject, findEntry, gitIn, githubRender, renderedProblems, reviewRecords, tagsDifferFrom, disagreements as placeDisagreements, reviewsCoverRelease, zonVersion, type Places, type Version } from "./guards.ts";
+import { BUMP_FILES, REVIEW_RECORD_FILE, bumpEdits, bumpSubject, findEntry, gitIn, githubRender, renderedProblems, tagsDifferFrom, disagreements as placeDisagreements, reviewCoversRelease, zonVersion, type Places, type Version } from "./guards.ts";
 
 await linuxOnly(import.meta);
 
@@ -71,8 +71,8 @@ const n2 = cur.n + 1;
 const next = `${cur.zig}-${cur.filc}.${n2}`;
 const nextV: Version = { full: next, zig: cur.zig, filc: cur.filc, n: n2 };
 
-// The prose places a person writes BEFORE the bump (U2: the notes are merged first), and the two
-// required reviews, recorded in the fixed form and checked against the history (guards.ts).
+// The prose places a person writes BEFORE the bump (U2: the notes are merged first), and the
+// completed review, recorded in the fixed form and checked against the history (guards.ts).
 const pre = placeDisagreements(places(), nextV).filter((b) => b.startsWith("RELEASE-NOTES") || b.startsWith("cmem/open-work"));
 let entry: string | null = null;
 try {
@@ -88,15 +88,15 @@ if (entry !== null) {
     if (f.code !== 0) fail(`git fetch --tags origin failed (exit ${f.code}): ${f.out.trim()}`);
     pre.push(...(await tagsDifferFrom(gitIn(REPO))));
     const head = (await must(["git", "-C", REPO, "rev-parse", "HEAD"])).trim();
-    pre.push(...(await reviewsCoverRelease(gitIn(REPO), entry, head, false)).map((b) => `${b} (required before every release — H35)`));
+    pre.push(...(await reviewCoversRelease(gitIn(REPO), read(REVIEW_RECORD_FILE), head, false)).map((b) => `${b} (required before every release — H37)`));
   } catch (e) {
-    fail(`git failed while checking the reviews: ${(e as Error).message}`);
+    fail(`git failed while checking the review: ${(e as Error).message}`);
   }
   // The places a person wrote, as GitHub would show them (KI-38). The README's status line is the
-  // bump's own edit, so check-reviews.ts renders it after the bump.
+  // bump's own edit, so review-gate.ts renders it after the bump.
   if (!pre.length) {
     try {
-      pre.push(...(await renderedProblems(githubRender(), { release: read("cmem/release.md"), notes: read("RELEASE-NOTES.md"), openWork: read("cmem/open-work.md") }, nextV, reviewRecords(entry).records)));
+      pre.push(...(await renderedProblems(githubRender(), { release: read("cmem/release.md"), notes: read("RELEASE-NOTES.md"), openWork: read("cmem/open-work.md") }, nextV)));
     } catch (e) {
       fail(`GitHub's renderer could not be asked (a render that did not happen is never a pass): ${(e as Error).message}`);
     }

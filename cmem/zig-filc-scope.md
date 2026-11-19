@@ -98,7 +98,7 @@ front-end differences above do not apply, though Zig's own `@cVaStart`/extern un
 hard: the practical end state may be "Zig code: only Zig; Fil-C's libc and C++ runtime: shipped
 precompiled", unless the C front-end differences are also solved.
 
-## Related findings the same day (cosmo evaluation, `platforms.md`)
+## Related findings the same day (cosmo evaluation, `archive/platforms-p6-cosmo-2026-10-08.md`)
 
 - Fil-C v0.686 builds from source in cosmo mode here; Fil-C's suite passes in cosmo mode
   (5,821/5,822; the one is the CPU-limit test).
@@ -109,7 +109,7 @@ precompiled", unless the C front-end differences are also solved.
   hello world, so the crash is in Fil-C's cosmo mode, not zilc.~~ **Corrected 2026-10-08:** those
   runs were made on the Windows host with the machine's EDR (SentinelOne) injected into the
   processes, and they triggered it; the finding is UNVERIFIED, not an upstream defect, and real
-  Windows is never tried on this machine again (`platforms.md`, `workarounds.md` "Nothing built by
+  Windows is never tried on this machine again (`archive/platforms-p6-cosmo-2026-10-08.md`, `workarounds.md` "Nothing built by
   Fil-C or cosmo is ever EXECUTED on the Windows host"). Upstream only verified Windows under Wine.
 
 **This brief became the starting brief of zailc** (`../zailc/cmem/scope.md`, 2026-10-08), where

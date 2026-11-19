@@ -104,11 +104,11 @@ The guide is `../workspace/cmem/memory-guide.md`. The root `CLAUDE.md` (gitignor
 
 - A change to `src/` (or to a tool a gate runs) triggers the full gate, run on the committed tree
   after the last edit, reading every exit code and diffing OUTPUT, not exit codes: `testing.md`.
-  `testing.md` is the gate's definition. Since 2026-11-12 CI (`.github/workflows/release.yml`,
-  every push to `main`) runs the half that needs no Fil-C — format, `zig build test`, the release
-  scripts' tests, the version places, the privacy scan; the Fil-C gate stays local
-  (`release.md` § "What runs where"). `zig build gate` prints `SKIPPED` and exits 0 without Fil-C
-  — read its first line.
+  `testing.md` is the gate's definition. 🔒 **Every gate and test runs locally; CI only publishes**
+  (owner, 2026-11-17, letter H37 (e)): `.github/workflows/release.yml` decides whether a push is a
+  release, verifies the version (`bump.ts --check`), tags and makes the page; `release.ts` runs
+  every gate before it pushes (`release.md` § "What runs where"). `zig build gate` prints
+  `SKIPPED` and exits 0 without Fil-C — read its first line.
 - 🛑 Nothing built by Fil-C, cosmo or zilc is ever executed on the Windows host
   (`workarounds.md`).
 
@@ -258,12 +258,22 @@ never pushes, a "push" never releases). This repo's own gate and merge rules app
 For zilc, "release" is [release.md](release.md): no registry, so CI's tag and page are the release,
 and the KIND (`release`, N + 1) replaces the level.
 
-## Owner commands: "review", "security review", "hardening review" (owner, 2026-11-12)
+## Owner commands: the seven review words (🔒 owner, 2026-11-17, letter H37)
 
-🔒 Workspace `cmem/review-process.md`, letter H35: a targeted agent code review, a security review,
-a hardening review — fresh read-only reviewers, rounds until a round finds nothing; **the security
-and hardening reviews are required before every release**. zilc's slots:
-[review-process.md](review-process.md). None of them commits, pushes or releases.
+The workspace review standard (`../workspace/cmem/review-process.md`); zilc's slots:
+[review-process.md](review-process.md). **Five reviews are required before every release, in this
+order: basic, hardening, licensing, security, privacy**; an efficiency review is optional and runs
+first when asked.
+
+- **"review"** — all five required classes, by the standard's loop (one agent per class, fixes per
+  class, re-reviews of the fixes only, until one is empty; then the full suite once per platform).
+- **"basic review"**, **"hardening review"**, **"licensing review"**, **"security review"**,
+  **"privacy review"** — that one class, by the same loop.
+- **"efficiency review"** — the optional class alone.
+
+None of them commits, pushes or releases. A completed review is recorded as one line
+`- Review complete: <commit>` in `review-process.md` § Last review; `release.ts` checks it first.
+(Until 2026-11-19: "review", "security review", "hardening review" — letter H35.)
 
 ## Memory policy and triggers (moved from `INDEX.md`, 2026-11-19; adopted from wazmrt 2026-09-18)
 

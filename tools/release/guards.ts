@@ -9,9 +9,11 @@
  *   - each version place is matched as the WHOLE line that carries it, so a comment, a second
  *     mention or a longer version (`…687.10` for `…687.1`) cannot satisfy it;
  *   - a release entry is found by its exact `### v<version>` heading and ends at the next heading;
- *   - the two required reviews are a RECORD in a fixed form, one line each, and the record is
- *     checked against the repository: the range it names starts at the previous release's tag and
- *     ends at a commit after which only memory and the release notes changed.
+ *   - the review is a RECORD, checked against the repository (since 2026-11-19, the final review
+ *     standard, letter H37 (d)): ONE line `- Review complete: <commit>` in cmem/review-process.md
+ *     § Last review, naming a commit in the released history after which only memory and the
+ *     release notes changed. (Until then: two records, security and hardening, in the release entry
+ *     — letter H35, retired.)
  */
 
 export const esc = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -102,38 +104,29 @@ export function findEntry(releaseMd: string, version: string): string | null {
   return ls.slice(starts[0], end).join("\n");
 }
 
-export type ReviewRecord = { kind: "Security" | "Hardening"; rounds: number; date: string; base: string; reviewed: string };
+/** Where the review record lives (the slot file's § Last review; workspace review standard § 9). */
+export const REVIEW_RECORD_FILE = "cmem/review-process.md";
+/** The record's form: written by the main session when the five required reviews end in an empty
+ *  re-review and the full suite has passed (cmem/review-process.md § The loop, as zilc runs it). */
+export const REVIEW_FORM = "- Review complete: <commit>";
+const RECORD = /^- Review complete: `?([0-9a-f]{7,40})`?\s*$/;
 
 /**
- * The form of a review record, one line each in the release's entry:
- *
- *   - **Security review:** 3 rounds, empty round 2026-11-20, reviewed `v1.2.3-4.5.6..0123abc`
- *   - **Hardening review:** 2 rounds, empty round 2026-11-21, reviewed `v1.2.3-4.5.6..0123abc`
- *
- * Text may follow on the line. Anything else that mentions a review ("security review: not run",
- * a heading, a placeholder) is not a record. That a record is SEEN on the page is
- * `renderedProblems`'s check.
+ * The commit named by the review record, or the reasons there is not exactly one. Text that only
+ * mentions a review ("Review complete: none", a heading, a placeholder) is not a record.
  */
-export const REVIEW_FORM = "- **<Security|Hardening> review:** <n> rounds, empty round <YYYY-MM-DD>, reviewed `<previous tag>..<commit>`";
-const RECORD = /^- \*\*(Security|Hardening) review:\*\* ([1-9]\d*) rounds?, empty round (\d{4}-\d{2}-\d{2}), reviewed `(v\d+\.\d+\.\d+-\d+\.\d+\.\d+)\.\.([0-9a-f]{7,40})`(?:[ ,.;:—-].*)?$/;
+export function reviewedCommit(text: string): { commit: string | null; bad: string[] } {
+  const bad = crProblems(REVIEW_RECORD_FILE, text);
+  const found = text.split("\n").flatMap((l) => l.match(RECORD)?.[1] ?? []);
+  if (found.length !== 1) bad.push(`${found.length === 0 ? "no" : found.length} review record${found.length > 1 ? "s" : ""} in ${REVIEW_RECORD_FILE} in the form "${REVIEW_FORM}" (exactly one: run "review" first — the five required reviews)`);
+  return { commit: found.length === 1 && bad.length === 0 ? found[0] : null, bad };
+}
 
-/** The two records of an entry, or the reasons there are not exactly one of each. */
-export function reviewRecords(entry: string): { records: ReviewRecord[]; bad: string[] } {
-  const records: ReviewRecord[] = [];
-  const bad: string[] = [...crProblems("the entry", entry)];
-  for (const l of entry.split("\n")) {
-    const m = l.match(RECORD);
-    if (m) records.push({ kind: m[1] as ReviewRecord["kind"], rounds: Number(m[2]), date: m[3], base: m[4], reviewed: m[5] });
-  }
-  for (const kind of ["Security", "Hardening"] as const) {
-    const n = records.filter((r) => r.kind === kind).length;
-    if (n !== 1) bad.push(`${n === 0 ? "no" : n} ${kind.toLowerCase()} review record${n > 1 ? "s" : ""} in the form: ${REVIEW_FORM}`);
-  }
-  for (const r of records) {
-    const d = new Date(`${r.date}T00:00:00Z`);
-    if (Number.isNaN(d.getTime()) || d.toISOString().slice(0, 10) !== r.date) bad.push(`the ${r.kind.toLowerCase()} review's date ${r.date} is not a date`);
-  }
-  return { records, bad };
+/** Files that must never be tracked (H37 (b); cmem/working-rules.md § Privacy): the review issues,
+ *  machine facts, the assistant's folder and the root CLAUDE.md. Each is gitignored, but
+ *  `git add -f` still commits it — and an issues file on GitHub publishes every open finding. */
+export function privateFilesTracked(tracked: readonly string[]): string[] {
+  return tracked.filter((f) => f === "cmem/review-issues.md" || f === "CLAUDE.md" || f.startsWith("cmem/local/") || f.startsWith(".claude/"));
 }
 
 // ---- What a reader of the GitHub page sees (KI-38) -------------------------------------------
@@ -229,11 +222,11 @@ export type Rendered = { release?: string; notes?: string; readme?: string; open
 
 /**
  * What a reader of the GitHub page does NOT see of the counted places (KI-38): each given file is
- * rendered by `render`, and its place must be visible text there — the entry's `v<version>` heading
- * with both records as list items under it, the notes' `## <version>` heading, the README's
- * status version in a quote, the State row as a table row. Returns the problems, or [].
+ * rendered by `render`, and its place must be visible text there — the entry's `v<version>` heading,
+ * the notes' `## <version>` heading, the README's status version in a quote, the State row as a
+ * table row. Returns the problems, or [].
  */
-export async function renderedProblems(render: Render, files: Rendered, v: Version, records: ReviewRecord[]): Promise<string[]> {
+export async function renderedProblems(render: Render, files: Rendered, v: Version): Promise<string[]> {
   const out: string[] = [];
   const blocksOf = async (name: string, md: string) => {
     try {
@@ -248,18 +241,6 @@ export async function renderedProblems(render: Render, files: Rendered, v: Versi
     const bs = await blocksOf("cmem/release.md", files.release);
     const heads = bs.filter((b) => b.tag === "h3" && (b.text === `v${v.full}` || b.text.startsWith(`v${v.full} `)));
     if (heads.length !== 1) out.push(`cmem/release.md: GitHub shows ${heads.length} "v${v.full}" entry headings (one is required)`);
-    else {
-      const start = bs.indexOf(heads[0]);
-      let end = start + 1;
-      while (end < bs.length && !/^h[1-3]$/.test(bs[end].tag)) end++;
-      // The record's own text, rendered (bold and code applied), shown as a LIST ITEM under the
-      // heading (KI-39: a visible copy in a code block while the counted line is hidden is not it).
-      const items = bs.slice(start + 1, end).filter((b) => b.tag === "li");
-      for (const r of records) {
-        const want = `${r.kind} review: ${r.rounds} round${r.rounds === 1 ? "" : "s"}, empty round ${r.date}, reviewed ${r.base}..${r.reviewed}`;
-        if (!items.some((b) => b.text === want || b.text.startsWith(`${want} `) || b.text.startsWith(`${want},`) || b.text.startsWith(`${want}.`) || b.text.startsWith(`${want};`) || b.text.startsWith(`${want}:`) || b.text.startsWith(`${want}—`) || b.text.startsWith(`${want}-`))) out.push(`cmem/release.md: GitHub does not show the ${r.kind.toLowerCase()} review record as a list item under "v${v.full}" (a record that is not rendered is an error)`);
-      }
-    }
   }
   if (files.notes !== undefined) {
     const bs = await blocksOf("RELEASE-NOTES.md", files.notes);
@@ -397,13 +378,13 @@ export async function tagsDifferFrom(git: Git, remote = "origin"): Promise<strin
 export const bumpSubject = (version: string) => `bump to v${version}`;
 
 /**
- * Checks a release entry's review records against the repository. `head` is the commit the release
- * is made from; with `bumped`, `head` is the bump commit and the reviewed code is what `head^` held.
- * Returns the reasons the release is not reviewed, or [].
+ * Checks the review record (`recordText`, cmem/review-process.md at `head`) against the repository.
+ * `head` is the commit the release is made from; with `bumped`, `head` is the bump commit and the
+ * reviewed code is what `head^` held. Returns the reasons the release is not reviewed, or [].
  */
-export async function reviewsCoverRelease(git: Git, entry: string, head: string, bumped: boolean): Promise<string[]> {
-  const { records, bad } = reviewRecords(entry);
-  if (bad.length) return bad;
+export async function reviewCoversRelease(git: Git, recordText: string, head: string, bumped: boolean): Promise<string[]> {
+  const { commit: reviewed, bad } = reviewedCommit(recordText);
+  if (!reviewed) return bad;
   const out: string[] = [];
   // The counted Markdown files are ordinary files at the commit (KI-36): GitHub shows a symlink's
   // target path, not the Markdown the guard read through it.
@@ -461,31 +442,15 @@ export async function reviewsCoverRelease(git: Git, entry: string, head: string,
       }
     }
   }
-  // The previous release: the nearest tag below the code being released.
-  const prev = await git("describe", "--tags", "--abbrev=0", "--match", "v*", tip);
-  if (prev.code !== 0) return [...out, `no release tag is reachable from ${tip}: ${prev.out.trim()}`];
-  const base = prev.out.trim();
-  for (const r of records) {
-    const what = `the ${r.kind.toLowerCase()} review`;
-    if (r.base !== base) {
-      out.push(`${what} starts at ${r.base}, but the previous release is ${base}`);
-      continue;
-    }
-    const sha = await git("rev-parse", "-q", "--verify", `${r.reviewed}^{commit}`);
-    if (sha.code !== 0) {
-      out.push(`${what} names ${r.reviewed}, which is not a commit here`);
-      continue;
-    }
-    const anc = await git("merge-base", "--is-ancestor", r.reviewed, tip);
-    if (anc.code === 1) {
-      out.push(`${what} names ${r.reviewed}, which is not in the history being released`);
-      continue;
-    }
-    if (anc.code !== 0) throw new Error(`git merge-base failed (exit ${anc.code}): ${anc.out.trim()}`);
-    // A commit from before `base` needs no check of its own: everything since it, the previous
-    // release included, shows up in the diff below.
-    const later = (await changedPaths(git, r.reviewed, tip)).filter((f) => !AFTER_REVIEW_OK(f));
-    if (later.length) out.push(`${what} ended at ${r.reviewed}, but these changed after it and were not reviewed: ${later.join(", ")}`);
-  }
+  const what = "the review";
+  const sha = await git("rev-parse", "-q", "--verify", `${reviewed}^{commit}`);
+  if (sha.code !== 0) return [...out, `${what} names ${reviewed}, which is not a commit here`];
+  const anc = await git("merge-base", "--is-ancestor", reviewed, tip);
+  if (anc.code === 1) return [...out, `${what} names ${reviewed}, which is not in the history being released`];
+  if (anc.code !== 0) throw new Error(`git merge-base failed (exit ${anc.code}): ${anc.out.trim()}`);
+  // A commit from before the previous release needs no check of its own: everything since it, the
+  // previous release included, shows up in the diff below.
+  const later = (await changedPaths(git, reviewed, tip)).filter((f) => !AFTER_REVIEW_OK(f));
+  if (later.length) out.push(`${what} ended at ${reviewed}, but these changed after it and were not reviewed: ${later.join(", ")}`);
   return out;
 }

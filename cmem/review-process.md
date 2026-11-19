@@ -1,85 +1,104 @@
-# review-process.md — zilc's slots in the workspace review standard
+# review-process.md — zilc's slots in the review standard
 
-🔒 **Owner, 2026-11-12 (workspace letter H35):** one review process everywhere —
-`../workspace/cmem/review-process.md`, from S3D-ReportCompiler. "review", "security review", "hardening
-review" each run in rounds by fresh, read-only reviewers and **stop when a round's reviewers find
-nothing**; **a security review and a hardening review are required before every release**, recorded
-in that release's entry in [release.md](release.md) before the bump. The PROCESS is the workspace
-file's and is not copied here; this file fills its **[project]** slots for zilc (§ 7 there).
+The standard is `../workspace/cmem/review-process.md` (🔒 owner, 2026-11-17, "Review standard —
+final", letter H37); this file fills only what differs for zilc (its § 12). Last verified
+2026-11-19. Briefs are the standard's item lists word for word plus the scope; they are not copied
+here. It replaced zilc's slots for the 2026-11-12 standard (letter H35: "review", "security
+review", "hardening review" and two record lines per release entry).
 
 ## The owner's words (beside "commit" / "push" / "release", `working-rules.md` § Owner commands)
 
-| the owner says         | it is                                       | none of them commits, pushes or releases |
-| ---------------------- | ------------------------------------------- | ---------------------------------------- |
-| **"review"**           | a targeted agent code review, workspace § 2 |                                          |
-| **"security review"**  | a security review, workspace § 3            |                                          |
-| **"hardening review"** | a hardening review, workspace § 4           |                                          |
+- **"review"** — all five required classes, in order: basic, hardening, licensing, security, privacy.
+- **"basic review"**, **"hardening review"**, **"licensing review"**, **"security review"**,
+  **"privacy review"** — that class alone, by the same loop.
+- **"efficiency review"** — optional; when asked, it runs first.
 
-## The slots
+None of them commits, pushes or releases.
 
-**Private data a reviewer never reads (§ 1.1, § 5):** `cmem/local/` (gitignored, machine facts);
-`.claude/`; anything outside the clone except the read-only siblings it is pointed at. A reviewer
-works in its own scratch folder; in WSL that is under `~/zilc-work/` (WSL's `/tmp` was seen
-emptied between invocations, 2026-11-12). **The brief says:** work only in the folder you are
-given, under the main session's scratchpad or `~/zilc-work/review-<n>/`; the main session deletes
-it — clones, mutants, planted inputs — when the round is triaged (`working-rules.md` § Scratch
-space, letter H43). 🛑 It never executes anything built by Fil-C, cosmo or zilc on
-the Windows host (`workarounds.md`): every run is in WSL or Linux.
+## The loop, as zilc runs it
 
-**The worst silent case (§ 1.2):** **a memory-unsafe program that zilc compiles and that runs
-without trapping** — an out-of-bounds, use-after-free or type-confused access Fil-C would have
-stopped, let through by zilc's driver, its pass patches or a pure-Zig piece. Next: a pure-Zig
-piece whose output differs from Fil-C's (a sarcasm stage, a runtime module, the link) while every
-test passes. Both rank above any crash.
+- The standard's § 9: one agent per class over the full scope since the last release
+  (`git diff v<last>..HEAD` and the code those changes reach); triage; all fixes of one class, then
+  the next, with targeted tests; a NEW agent per class re-reviews the fixes only; the first empty
+  re-review ends it; then the full suite once on every supported platform ([platforms.md](platforms.md)).
+- Fixes go on a local branch `review/<version>`, merged to `main` when the review completes.
+- Issues: `cmem/review-issues.md` — **gitignored**; `release.ts`'s privacy gate refuses it if
+  tracked. One item per issue: ID (`<class letter><n>`: B, H, L, S, P, E), the platform ID where it
+  is one, the finding, the state (rejections with their reason), the fix commit.
+- When the re-review is empty and the full suite passed, § Last review records ONE line
+  `- Review complete: <commit>` (the reviewed commit, replacing the previous one) in a memory-only
+  commit. `tools/release/review-gate.ts`, the FIRST step of `release.ts`, refuses a release unless
+  that commit is in the released history and only `cmem/` and `RELEASE-NOTES.md` changed since.
+- **Reviewer briefs say:** work only in the folder you are given — under the main session's
+  scratchpad, or `~/zilc-work/review-<n>/` in WSL (WSL's `/tmp` was seen emptied, 2026-11-12);
+  the main session deletes it (clones, mutants, planted inputs) at triage (`working-rules.md`
+  § Scratch space); 🛑 never execute anything built by Fil-C, cosmo or zilc on the Windows host —
+  every run is in WSL or Linux (`workarounds.md`); never commit, push or release.
 
-**The reference results that must still hold (§ 1.3.4)** — each a dated count in `testing.md` /
-`open-work.md`, re-derived before quoting:
+## Last review
 
-| set                   | command                                               | holds at                                             |
-| --------------------- | ----------------------------------------------------- | ---------------------------------------------------- |
-| the safety gate       | `bun tools/run-gate.ts` (Fil-C in WSL)                | **8/8**, every case trapping at its file:line        |
-| unit tests            | `zig build test --summary all`                        | **41/41** (2026-11-15; +check-pins' own test, KI-38) |
-| the corpus            | `testing.md` "corpus"                                 | **78/78 as designed in all four modes**              |
-| the output comparison | `testing.md`                                          | **0 unexplained**                                    |
-| Fil-C's own suite     | `tools/filc/run-filc-tests.ts`, stock vs zilc's clang | **0 differences** on 7,269                           |
-| the pure-Zig chain    | `tools/filc/compare-chains.ts`                        | **14/14**                                            |
-| the sarcasm port      | `bun tools/sarcasm/check-stages.ts`                   | **every stage 0 differ**                             |
+- None under this standard yet. Review round 1 (H35) stopped 2026-11-19; its open findings are in
+  `cmem/review-issues.md` (`open-work.md` § Review, round 1).
 
-**CI jobs (§ 1.5):** `.github/workflows/release.yml` on every push to `main`, `ubuntu-latest`
-(Linux x86_64): `checks` (zig fmt, `zig build test`, the release scripts' tests, the five version
-places, the privacy scan), then on a release `tag` and `release` ([release.md](release.md)). The
-Fil-C half (the gate, the suite, the corpus) has no runner and is the owner's machine's half, run
-by `tools/release/release.ts` and the per-release checklist.
+## Slots
 
-**Classes (§ 2.2):** none fixed yet; a class-by-class review takes its classes from
-`workarounds.md`'s failure families.
+- **Private-data paths:** `cmem/local/` (machine facts), `cmem/review-issues.md`, `.claude/`, the
+  root `CLAUDE.md` — all gitignored; anything outside the clone but the read-only siblings a
+  reviewer is pointed at.
+- **Reference results** (basic: "reference results hold"; each a dated count in `testing.md`,
+  re-derived before quoting; any change is a finding until explained):
+  - the safety gate, `bun tools/run-gate.ts` (Fil-C in WSL): **8/8**, each case trapping at its
+    file:line;
+  - `zig build test --summary all`: **41/41** (2026-11-15);
+  - `bun test tools/release/`: **124 pass, 1 skip** (the live GitHub render, opt-in; 2026-11-19);
+  - the corpus (`testing.md` "corpus"): **78/78 as designed in all four modes**;
+  - the output comparison (`testing.md`): **0 unexplained**;
+  - Fil-C's own suite, stock vs zilc's clang (`tools/filc/run-filc-tests.ts`): **0 differences on
+    7,269**;
+  - the pure-Zig chain (`tools/filc/compare-chains.ts`): **14/14**;
+  - the sarcasm port (`bun tools/sarcasm/check-stages.ts`): **every stage 0 differ**.
+- **Support matrix and platform notes:** [platforms.md](platforms.md).
+- **Licence inventory and notices:** `third_party/LICENSES.md` — the Component Ledger (every
+  adopted or ported component with its SPDX licence read from the source, the Adoption Checklist)
+  — and `licensing.md` (the why, the runtime-linking rule, the copyleft exclusion). zilc's own
+  licence is `Apache-2.0 WITH LLVM-exception OR MIT` (`LICENSE-APACHE`, `LICENSE-MIT`, `NOTICE`,
+  the SPDX header of each `.ts` / `.zig` file). A release is the tag's SOURCE archive; no Fil-C
+  distributable is ever committed (`toolchain/` is gitignored), and Fil-C's sources are fetched by
+  `zig build` from GitHub, pinned by hash. **Missing:** a licence inventory checked by a script
+  against an allowlist (the ledger is kept by hand).
+- **Outputs that can carry user facts:**
+  - the programs zilc compiles: Zig and Fil-C debug info holds the absolute source paths of the
+    user's files; a Fil-C trap or `zilc` panic prints the source file:line at run time;
+  - the caches and outputs: `.zig-cache/`, `zig-out/`, `~/.cache/zilc*`, `~/zilc-work/`
+    (`working-rules.md` § Scratch space);
+  - error messages, which print the user's paths;
+  - network, all requested by the user's own command: `zig build` fetches Fil-C's source archive
+    (and, with `-Dfetch-build-tools`, cmake and ninja); `check-upstream.ts` fetches upstream git;
+    the release scripts call GitHub's REST API. No telemetry.
+- **Gate scripts** (all local, run by `tools/release/release.ts`; CI only publishes, H37 (e)):
+  `review-gate.ts` (first); `bump.ts --check`; the privacy gate (no private file tracked, then the
+  path scan — `working-rules.md` § Privacy); `zig fmt --check`; Biome's Markdown check
+  (`tools/md/biome.ts ci`); `zig build test`; `bun test tools/release/`; `bun tools/run-gate.ts`.
+  The reference suites above run by the per-release checklist (`releasing.md`). **Missing:** a
+  credential scan (the path scan finds paths, not tokens), a vulnerability check, a licence
+  allowlist check, an API surface check.
 
-**The seven security surfaces (§ 3.1), for zilc:**
+## Items that do not apply, and why
 
-1. **Untrusted input:** the user's Zig / C / C++ source and build files, the Fil-C source archive
-   fetched by `zig build` (pinned by hash in `build.zig.zon`), upstream's sarcasm inputs. Building
-   a program runs its own `build.zig` by design (Zig's model); nothing else of the input runs.
-2. **Malformed input** is a compiler diagnostic or a named refusal of the tool, never a crash of
-   zilc's driver or tools, never a silently different program.
-3. **Paths:** `zig build` writes into the cache and `zig-out/` only; the tools write under
-   `~/zilc-work/` and the repo's ignored folders; nothing unpacks outside its folder.
-4. **Resources:** a time limit on every network request (the release scripts: 30 s); the long
-   builds (Fil-C's clang, its suite) are measured and dated in `testing.md`.
-5. **The release path:** [release.md](release.md) — only CI tags and makes the page; no registry;
-   no `uses:`; Zig and Bun pinned by sha256; `contents: write` only in the two write jobs, which
-   check out nothing; no `gh`.
-6. **Dependencies:** Fil-C (pinned release, hash), LLVM inside it, Zig 0.15.2, Bun; licences in
-   `third_party/LICENSES.md`, verified from the source; no Fil-C distributable committed, ever.
-7. **Privacy:** `working-rules.md` § Privacy — the scan, text and binaries; it STOPS a push
-   (`release.ts`, CI's `checks`).
+- **Sandbox boundary (runtimes)** (security): zilc is a compiler; it runs no guest. Memory safety
+  of the compiled program is Fil-C's, checked by the safety gate and the reference results.
+- **Native library loading (loaders)** (security): zilc loads no native library at run time.
 
-**The environment matrix (§ 4.1):** **Linux x86_64 only** (owner, 2026-10-27) — WSL2 Ubuntu on the
-owner's machine and a GitHub `ubuntu-latest` runner; Zig 0.15.2 (the Zig whose LLVM matches
-Fil-C's); Bun latest installed (1.4.4); a clean clone (`tools/README.md` "First-time setup").
-Nothing else is a target here; other platforms are zailc's.
+## Where the reviews look first
 
-**Records (§ 6):** findings → [known-issues.md](known-issues.md) (one `KI-n` row each; the WHY of
-any workaround in [workarounds.md](workarounds.md)); the round → [open-work.md](open-work.md); a
-release's two reviews → that release's entry in [release.md](release.md), before the bump, as the
-two lines of its § "Review records" (`bump.ts`, `release.ts` and CI's `check-reviews.ts` refuse
-without both, and check the range against the history — KI-24).
+- **The worst silent case:** a memory-unsafe program that zilc compiles and that runs without
+  trapping — an out-of-bounds, use-after-free or type-confused access Fil-C would have stopped, let
+  through by zilc's driver, its pass patches or a pure-Zig piece. Next: a pure-Zig piece whose
+  output differs from Fil-C's (a sarcasm stage, a runtime module, the link) while every test
+  passes. Both rank above any crash.
+- **Untrusted input:** the user's Zig / C / C++ source and build files, Fil-C's source archive
+  (pinned by hash in `build.zig.zon`), upstream's sarcasm inputs. Building a program runs its own
+  `build.zig` by design (Zig's model); nothing else of the input runs.
+- **The release path:** `release.md` — only CI tags and makes the page; no registry; no `uses:`;
+  Bun pinned by sha256; `contents: write` only in the two write jobs, which check out nothing; no
+  `gh`.

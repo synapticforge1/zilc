@@ -93,7 +93,7 @@ fn run(arena: std.mem.Allocator, args: []const []const u8) !u8 {
     var inputs: std.ArrayListUnmanaged([]const u8) = .{};
     var output: []const u8 = "a.out";
     var optimize: []const u8 = "ReleaseSafe";
-    var target: []const u8 = "x86_64-linux-musl";
+    var target: []const u8 = "x86_64-linux-musl"; // [linux-x64] the one target (cmem/platforms.md)
     var emit: @FieldType(driver.Options, "emit") = .exe;
     var entry: driver.Entry = .auto;
     var runtime: driver.Runtime = .filc;

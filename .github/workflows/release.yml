@@ -1,22 +1,19 @@
 name: release
 
 # zilc's release process (workspace release-process.md § 5, letters H32 / H33; cmem/release.md).
-# 🔒 Owner, 2026-11-10: "the CI to check first, then push the tag, and then create the release
-# page from the tag, then publish the package to the registry for the project in that order." So
-# this workflow runs on every push to `main`, and a release is ONE run:
+# 🔒 Owner, 2026-11-17 (the final review standard, letter H37 (e)): "We want the CI to verify the
+# version, then tag, create the release page and publish, and skip any version already published."
+# Every gate and test runs LOCALLY, in `bun tools/release/release.ts` (the review gate first), and
+# is not repeated here: CI only publishes. A release is ONE run on a push to `main`:
 #
-#   checks (U5) → tag (U6) → release (U7, the page from the tag)
+#   checks (U5: is this a release? the version) → tag (U6) → release (U7, the page from the tag)
 #
-# - `checks` runs everything that executes repository code with a read-only token on a token-less
-#   clone of the pushed commit, and decides "is this a release?": build.zig.zon's version has no
-#   tag yet AND the commit is its bump commit `bump to v<version>` (or, on a re-run, its tag is
-#   already on THIS commit). It runs what a runner CAN run: zig fmt, `zig build test` (needs no
-#   Fil-C — rehearsed 2026-11-12 on a fresh clone with empty caches), the release scripts' tests,
-#   the five-places check, the privacy scan, Biome's Markdown check (tools/md/biome.ts), and on a
-#   release the review check (tools/release/check-reviews.ts, which also asks GitHub's renderer
-#   that every counted place is shown). The Fil-C
-#   safety gate needs a Fil-C toolchain a runner does not have; `bun tools/release/release.ts`
-#   runs it on the owner's machine before it pushes (cmem/release.md § "What runs where").
+# - `checks` decides "is this a release?" on a token-less clone of the pushed commit:
+#   build.zig.zon's version has no tag yet AND the commit is its bump commit `bump to v<version>`
+#   (or, on a re-run, its tag is already on THIS commit); a version tagged elsewhere was released
+#   before and is skipped. On a release only, it verifies the version: `bump.ts --check`, the five
+#   places agree with build.zig.zon. It runs no build and no test (until 2026-11-19 it ran zig fmt,
+#   `zig build test`, the release scripts' tests, Biome, the privacy scan and the review check).
 # - `tag` creates the annotated tag v<Zig>-<Fil-C>.<N> on that commit through the REST API
 #   (tools/release/github-tag.ts). A tag pushed with the job's GITHUB_TOKEN starts no new run, so
 #   the page follows here, by `needs:`.
@@ -29,11 +26,9 @@ name: release
 # runs the GitHub CLI (H30). The write jobs check out nothing: each fetches its one script at the
 # tested commit (ledger C30). Re-runs are safe (U12): each job skips what is already done.
 #
-# No `uses:` steps (U9): Bun and Zig come from their official downloads, pinned by version AND
-# sha256 (measured 2026-11-12 at the source: Zig from https://ziglang.org/download/index.json,
-# Bun from the release's SHASUMS256.txt). Move a pin by changing both together. Zig is the
-# project's Zig (build.zig.zon minimum_zig_version); Bun is the latest installed Bun (workspace
-# Tooling rule 10, letter H31).
+# No `uses:` steps (U9): Bun comes from its official download, pinned by version AND sha256
+# (measured 2026-11-12 at the source, the release's SHASUMS256.txt). Move the pin by changing both
+# together; Bun is the latest installed Bun (workspace Tooling rule 10, letter H31).
 
 on:
   push:
@@ -50,8 +45,6 @@ concurrency:
 env:
   BUN_VERSION: 1.4.4
   BUN_SHA256_LINUX: bf8ccbfb2b0b80159e0f9a6d15c55317add8077534dbc6130a3edb52fccb395c
-  ZIG_VERSION: 0.15.2
-  ZIG_SHA256_LINUX: 02aa270f183da276e5b5920b1dac44a63f1a49e55050ebde3aecc9eb82f93239
 
 jobs:
   checks:
@@ -95,65 +88,21 @@ jobs:
           echo "release=$release" >> "$GITHUB_OUTPUT"
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
 
-      - name: Install Zig and Bun (pinned by sha256)
+      # Verify the version (a release only): the five places agree with build.zig.zon. This is the
+      # version check the owner kept in CI (H37 (e)); every test and gate ran in release.ts.
+      - name: Install Bun (pinned by sha256; a release only)
+        if: steps.decide.outputs.release == 'true'
         run: |
           set -euo pipefail
-          curl -fsSL --max-time 300 --retry 5 --retry-all-errors --retry-delay 5 -o "$RUNNER_TEMP/zig.tar.xz" \
-            "https://ziglang.org/download/${ZIG_VERSION}/zig-x86_64-linux-${ZIG_VERSION}.tar.xz"
-          echo "${ZIG_SHA256_LINUX}  $RUNNER_TEMP/zig.tar.xz" | sha256sum -c -
-          tar -xJf "$RUNNER_TEMP/zig.tar.xz" -C "$RUNNER_TEMP"
-          echo "$RUNNER_TEMP/zig-x86_64-linux-${ZIG_VERSION}" >> "$GITHUB_PATH"
           curl -fsSL --max-time 300 --retry 5 --retry-all-errors --retry-delay 5 -o "$RUNNER_TEMP/bun.zip" \
             "https://github.com/oven-sh/bun/releases/download/bun-v${BUN_VERSION}/bun-linux-x64.zip"
           echo "${BUN_SHA256_LINUX}  $RUNNER_TEMP/bun.zip" | sha256sum -c -
           unzip -q -d "$RUNNER_TEMP" "$RUNNER_TEMP/bun.zip"
           echo "$RUNNER_TEMP/bun-linux-x64" >> "$GITHUB_PATH"
 
-      - name: Versions
-        run: zig version && bun --version
-
-      - name: zig fmt --check (the whole repo, the project's Zig)
-        run: zig fmt --check build.zig build tools tests src
-
-      - name: zig build test
-        run: |
-          set -o pipefail
-          zig build test --summary all 2>&1 | tee test.log
-          grep -E 'Build Summary: ([0-9]+)/\1 steps succeeded' test.log
-
-      - name: Release scripts' tests (mock GitHub API)
-        run: bun test tools/release/
-
-      - name: The five places agree on the version
-        run: bun tools/release/bump.ts --check
-
-      # H35: a release needs a security and a hardening review recorded in its cmem/release.md
-      # entry, covering everything since the previous release. Checked here, not only on the
-      # owner's machine, so a plain `git push` cannot skip it (review round 1, 2026-11-15).
-      - name: The required reviews (a release only)
+      - name: The five places agree on the version (a release only)
         if: steps.decide.outputs.release == 'true'
-        run: bun tools/release/check-reviews.ts "$GITHUB_SHA"
-        # GitHub's own renderer checks that every counted place is shown (KI-38); the job's read-only
-        # token lifts the unauthenticated rate limit. A render that fails is a refusal.
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
-
-      # Markdown formatting is Biome's (owner, 2026-11-15; biome.jsonc), pinned by version and sha256
-      # in tools/md/biome.ts; `ci` fails on any .md not formatted as Biome would.
-      - name: Markdown formatting (Biome)
-        run: bun tools/md/biome.ts ci --colors=off .
-
-      # A scan STOPS a push (workspace review-process.md § 3.1, item 7; cmem/working-rules.md
-      # § Privacy). The one permitted hit is the rule's own text in cmem/working-rules.md.
-      - name: Privacy scan (text and binaries)
-        run: |
-          set -euo pipefail
-          p='[A-Za-z]:[\\/]+(Programs|Users|scoop|tools)[\\/]|/[a-z]/(Programs|Users)/'
-          for flag in -I -a; do
-            hits="$(git grep "$flag" -l -i -E "$p" | grep -vx 'cmem/working-rules.md' || true)"
-            if [ -n "$hits" ]; then echo "::error::privacy scan ($flag) found: $hits"; exit 1; fi
-          done
-          echo "privacy scan: clean"
+        run: bun tools/release/bump.ts --check
 
   tag:
     needs: checks

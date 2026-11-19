@@ -12,8 +12,9 @@ Read [STATE.md](STATE.md) first. Open another file only when the task matches it
 - [upstream.md](upstream.md): when Fil-C moves, or at the upstream check
 - [releasing.md](releasing.md): when the version number or a Zig line changes
 - [release.md](release.md): only when releasing; holds the Release History
-- [review-process.md](review-process.md): only during a review
-- [platforms.md](platforms.md): when a platform question comes up (zilc is Linux x86_64 only)
+- [review-process.md](review-process.md): only during a review; holds the review record
+- `review-issues.md`: gitignored; only during a review — the open issues
+- [platforms.md](platforms.md): the support matrix; when a platform question comes up
 - [sarcasm-port.md](sarcasm-port.md): before touching the sarcasm port
 - [roadmap.md](roadmap.md): when working on the pure-Zig track (Z1, Z2) or the toolchain pins
 - [overview.md](overview.md): when you need the repo layout or the build steps
@@ -28,4 +29,5 @@ Read [STATE.md](STATE.md) first. Open another file only when the task matches it
 - [ports/](ports/README.md): when moving to a new Zig line
 - [best-practices.md](best-practices.md): when recording a method lesson; holds the ★ block
 - [history-map-2026-10-27.md](history-map-2026-10-27.md): when a commit id is from before 2026-10-27
+- [archive/](archive/): do not read unless the owner asks about past work
 - `local/`: gitignored machine facts; never given to a reviewer

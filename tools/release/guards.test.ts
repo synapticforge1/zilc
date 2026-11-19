@@ -1,12 +1,15 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception OR MIT
-// Tests for tools/release/guards.ts and check-reviews.ts (`bun test tools/release/`, run by CI's
-// `checks`). Review round 1, class 1 (2026-11-15): each case below is a way the first version of the
-// guards passed on text, not on fact; the cases were run against that version first (inverted).
+// Tests for tools/release/guards.ts and review-gate.ts (`bun test tools/release/`, run locally by
+// release.ts; CI runs no tests since 2026-11-19, letter H37 (e)). Review round 1, class 1
+// (2026-11-15): each case below is a way the first version of the guards passed on text, not on
+// fact; the cases were run against that version first (inverted). The review record moved from two
+// lines in the release entry (H35) to ONE `- Review complete: <commit>` line in
+// cmem/review-process.md on 2026-11-19 (H37 (d)); the history cases carry over to it.
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { chmodSync, cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { BUMP_FILES, bumpEdits, disagreements, findEntry, gitIn, githubRender, mentions, renderedBlocks, renderedProblems, tagsDifferFrom, reviewRecords, reviewsCoverRelease, zonVersion, type Git, type Places, type Render } from "./guards.ts";
+import { BUMP_FILES, REVIEW_RECORD_FILE, bumpEdits, disagreements, findEntry, gitIn, githubRender, mentions, privateFilesTracked, renderedBlocks, renderedProblems, reviewCoversRelease, reviewedCommit, tagsDifferFrom, zonVersion, type Git, type Places, type Render } from "./guards.ts";
 import { run } from "../lib/tool.ts";
 
 const REPO = join(import.meta.dir, "..", "..");
@@ -128,27 +131,49 @@ describe("the release entry", () => {
   });
 });
 
-describe("the review records' form", () => {
-  const ok = "- **Security review:** 3 rounds, empty round 2026-11-20, reviewed `v0.15.2-0.687.1..0123abc`\n- **Hardening review:** 1 round, empty round 2026-11-21, reviewed `v0.15.2-0.687.1..0123abc`";
+describe("the review record's form (H37 (d))", () => {
+  const ok = "# review\n\n## Last review\n\n- Review complete: 0123abc\n";
 
-  test("the form is accepted", () => {
-    expect(reviewRecords(ok).bad).toEqual([]);
+  test("the form is accepted, with or without backticks", () => {
+    expect(reviewedCommit(ok)).toEqual({ commit: "0123abc", bad: [] });
+    expect(reviewedCommit(ok.replace("0123abc", "`0123abc`")).commit).toBe("0123abc");
+  });
+
+  test("the repository's own slot file is read without error", () => {
+    expect(() => reviewedCommit(read(REVIEW_RECORD_FILE))).not.toThrow();
   });
 
   for (const [name, text] of [
-    ["a negation", "security review: not run. hardening review: skipped."],
-    ["placeholders", "- **Security review:** TODO\n- **Hardening review:** TODO"],
-    ["a heading", "#### Security review and hardening review"],
-    ["only one kind", "- **Security review:** 3 rounds, empty round 2026-11-20, reviewed `v0.15.2-0.687.1..0123abc`"],
-    ["zero rounds", ok.replace("3 rounds", "0 rounds")],
-    ["a date that is not one", ok.replace("2026-11-20", "2026-02-31")],
-    ["one kind twice", `${ok}\n- **Security review:** 4 rounds, empty round 2026-11-22, reviewed \`v0.15.2-0.687.1..0123abc\``],
-    ["records with a CR byte (LF only)", ok.replaceAll("\n", "\r\n")],
+    ["no record", "# review\n\n## Last review\n\n- None under this standard yet.\n"],
+    ["a negation", "- Review complete: none\n"],
+    ["a placeholder", "- Review complete: <commit>\n"],
+    ["a heading", "### Review complete: 0123abc\n"],
+    ["two records", `${ok}- Review complete: 4567def\n`],
+    ["a record with a CR byte (LF only)", ok.replaceAll("\n", "\r\n")],
+    ["a record with text after the commit", "- Review complete: 0123abc (all five)\n"],
   ] as const) {
     test(`${name} is not a record`, () => {
-      expect(reviewRecords(text).bad.length).toBeGreaterThan(0);
+      const r = reviewedCommit(text);
+      expect(r.commit).toBeNull();
+      expect(r.bad.length).toBeGreaterThan(0);
     });
   }
+});
+
+describe("private files (H37 (b))", () => {
+  test("the review issues, machine facts, .claude/ and CLAUDE.md are refused when tracked", () => {
+    const tracked = ["README.md", "cmem/review-issues.md", "cmem/local/x.md", ".claude/settings.json", "CLAUDE.md", "cmem/review-process.md", "docs/CLAUDE.md"];
+    expect(privateFilesTracked(tracked)).toEqual(["cmem/review-issues.md", "cmem/local/x.md", ".claude/settings.json", "CLAUDE.md"]);
+  });
+  test("this repository tracks none of them", () => {
+    const p = Bun.spawnSync(["git", "-C", REPO, "ls-files", "-z"], { stdout: "pipe" });
+    expect(p.exitCode).toBe(0);
+    expect(privateFilesTracked(p.stdout.toString().split("\0").filter(Boolean))).toEqual([]);
+  });
+  test("each is gitignored", () => {
+    const p = Bun.spawnSync(["git", "-C", REPO, "check-ignore", "--no-index", "cmem/review-issues.md", "cmem/local/x.md", ".claude/x", "CLAUDE.md"], { stdout: "pipe" });
+    expect(p.stdout.toString().trim().split("\n")).toEqual(["cmem/review-issues.md", "cmem/local/x.md", ".claude/x", "CLAUDE.md"]);
+  });
 });
 
 // ---- What a reader of the GitHub page sees (KI-38) --------------------------------------------
@@ -228,69 +253,47 @@ describe("what GitHub shows (KI-38)", () => {
     expect(await visibleText(GITHUB.attribute)).toContain("Security review: HIDDEN-ATTR");
   });
 
-  const recs = reviewRecords("- **Security review:** 2 rounds, empty round 2026-11-20, reviewed `v0.15.2-0.687.0..0123abc`\n- **Hardening review:** 1 round, empty round 2026-11-21, reviewed `v0.15.2-0.687.0..0123abc`").records;
   const entry = (body: string) => `# r\n\n## Release History\n\n### v${cur.full} — 2026-11-21\n\n${body}\n`;
-  const both = "- **Security review:** 2 rounds, empty round 2026-11-20, reviewed `v0.15.2-0.687.0..0123abc`\n- **Hardening review:** 1 round, empty round 2026-11-21, reviewed `v0.15.2-0.687.0..0123abc`";
 
   test("the repository's notes, README and State row are shown (stand-in renderer)", async () => {
-    expect(await renderedProblems(md4c, { notes: read("RELEASE-NOTES.md"), readme: read("README.md"), openWork: read("cmem/open-work.md") }, cur, [])).toEqual([]);
+    expect(await renderedProblems(md4c, { notes: read("RELEASE-NOTES.md"), readme: read("README.md"), openWork: read("cmem/open-work.md") }, cur)).toEqual([]);
   });
-  test("an entry with both records, in any valid Markdown around them, is shown", async () => {
-    const md = entry(`Some *emphasis*, a [link](https://example.com), \`code\`, a table:\n\n| a | b |\n| - | - |\n| 1 | 2 |\n\n${both}\n\n> a quote`);
-    expect(await renderedProblems(md4c, { release: md }, cur, recs)).toEqual([]);
+  test("an entry heading, in any valid Markdown around it, is shown", async () => {
+    const md = entry("Some *emphasis*, a [link](https://example.com), `code`, a table:\n\n| a | b |\n| - | - |\n| 1 | 2 |\n\n> a quote");
+    expect(await renderedProblems(md4c, { release: md }, cur)).toEqual([]);
   });
-  for (const [name, body] of [
-    ["inside an HTML comment", `<!--\n${both}\n-->`],
-    ["inside <details>", `<details>\n\n${both}\n\n</details>`],
-    ["inside a code fence", `\`\`\`\n${both}\n\`\`\``],
-    ["inside an indented code block", both.split("\n").map((l) => `    ${l}`).join("\n")],
+  for (const [name, wrap] of [
+    ["inside an HTML comment", (h: string) => `<!--\n${h}\n-->`],
+    ["inside a code fence", (h: string) => `\`\`\`\n${h}\n\`\`\``],
   ] as const) {
-    test(`records ${name} are not shown, and that is an error`, async () => {
-      expect((await renderedProblems(md4c, { release: entry(body) }, cur, recs)).join("\n")).toContain("does not show the security review record");
+    test(`an entry heading ${name} is not shown, and that is an error`, async () => {
+      const md = `# r\n\n## Release History\n\n${wrap(`### v${cur.full}`)}\n`;
+      expect((await renderedProblems(md4c, { release: md }, cur)).join("\n")).toContain('"v' + cur.full + '" entry headings');
     });
   }
-  test("records each in a list item's own collapsed <details> are not shown (KI-39)", async () => {
-    const plain = both.replace(/\*\*/g, "").replace(/`/g, "").split("\n").map((l) => `- <details>${l.slice(2)}</details>`).join("\n");
-    expect((await renderedProblems(md4c, { release: entry(plain) }, cur, recs)).join("\n")).toContain("does not show the security review record");
-  });
-  test("struck-through records are not shown (KI-39)", async () => {
-    expect((await renderedProblems(md4c, { release: entry(`<del>\n\n${both}\n\n</del>`) }, cur, recs)).join("\n")).toContain("does not show the security review record");
-  });
-  test("a visible copy in a code block is not the record (KI-39)", async () => {
-    const copy = both.replace(/\*\*/g, "").replace(/`/g, "").replace(/^- /gm, "");
-    expect((await renderedProblems(md4c, { release: entry(`<!--\n${both}\n-->\n\n\`\`\`\n${copy}\n\`\`\``) }, cur, recs)).join("\n")).toContain("does not show the security review record");
-  });
   test("a struck-through README status version is not shown (KI-39)", async () => {
     const readme = read("README.md").replace(/^> \*\*Status: ([^(]*)(\(v[^)]*\))/m, "> **Status: $1<del>$2</del>");
-    expect((await renderedProblems(md4c, { readme }, cur, [])).join("\n")).toContain("README.md: GitHub does not show the status line");
-  });
-  test("an entry heading inside a fence is not shown", async () => {
-    const md = `# r\n\n## Release History\n\n\`\`\`\n### v${cur.full}\n\`\`\`\n\n${both}\n`;
-    expect((await renderedProblems(md4c, { release: md }, cur, recs)).join("\n")).toContain('"v' + cur.full + '" entry headings');
-  });
-  test("records under a later heading are not the entry's", async () => {
-    const md = entry(`text\n\n### other\n\n${both}`);
-    expect((await renderedProblems(md4c, { release: md }, cur, recs)).join("\n")).toContain("does not show the security review record");
+    expect((await renderedProblems(md4c, { readme }, cur)).join("\n")).toContain("README.md: GitHub does not show the status line");
   });
   test("a README status version in an image's alt text is not shown", async () => {
     const readme = read("README.md").replace(/^> \*\*Status: ([^(]*)\((v[^)]*)\)/m, "> **Status: $1![logo ($2)](logo.svg)");
-    expect((await renderedProblems(md4c, { readme }, cur, [])).join("\n")).toContain("README.md: GitHub does not show the status line");
+    expect((await renderedProblems(md4c, { readme }, cur)).join("\n")).toContain("README.md: GitHub does not show the status line");
   });
   test("a README status line outside its quote is not the status line", async () => {
     const readme = read("README.md").replace(/^> (\*\*Status:)/m, "$1");
-    expect((await renderedProblems(md4c, { readme }, cur, [])).join("\n")).toContain("README.md: GitHub does not show the status line");
+    expect((await renderedProblems(md4c, { readme }, cur)).join("\n")).toContain("README.md: GitHub does not show the status line");
   });
   test("two entry headings for the version are refused", async () => {
-    const md = entry(`${both}\n\n### v${cur.full} — again\n\n${both}`);
-    expect((await renderedProblems(md4c, { release: md }, cur, recs)).join("\n")).toContain("shows 2");
+    const md = entry(`text\n\n### v${cur.full} — again\n\ntext`);
+    expect((await renderedProblems(md4c, { release: md }, cur)).join("\n")).toContain("shows 2");
   });
   test("a notes heading inside a comment is not shown", async () => {
     const notes = read("RELEASE-NOTES.md").replace(`## ${cur.full}\n`, `<!--\n## ${cur.full}\n-->\n`);
-    expect((await renderedProblems(md4c, { notes }, cur, [])).join("\n")).toContain(`RELEASE-NOTES.md: GitHub does not show a "${cur.full}" heading`);
+    expect((await renderedProblems(md4c, { notes }, cur)).join("\n")).toContain(`RELEASE-NOTES.md: GitHub does not show a "${cur.full}" heading`);
   });
   test("a State row that is not a table row is not shown as one", async () => {
     const openWork = read("cmem/open-work.md").replace(/^\|\s*what\s*\|\s*value\s*\|\n\|[\s|:-]*\|\n/m, "");
-    expect((await renderedProblems(md4c, { openWork }, cur, [])).join("\n")).toContain("as a table row");
+    expect((await renderedProblems(md4c, { openWork }, cur)).join("\n")).toContain("as a table row");
   });
 
   // The renderer itself: a render that did not happen is never a pass.
@@ -315,15 +318,15 @@ describe("what GitHub shows (KI-38)", () => {
     const broken: Render = async () => {
       throw new Error("down");
     };
-    await expect(renderedProblems(broken, { notes: "x" }, cur, [])).rejects.toThrow("down");
+    await expect(renderedProblems(broken, { notes: "x" }, cur)).rejects.toThrow("down");
   });
 
   // Against GitHub itself, on demand (ZILC_LIVE_RENDER=1): the repository's places are shown, and
-  // a record in a comment is not. Off by default: 60 unauthenticated calls an hour.
-  test.skipIf(!process.env.ZILC_LIVE_RENDER)("live: GitHub shows the repository's places and hides a commented record", async () => {
+  // an entry heading in a comment is not. Off by default: 60 unauthenticated calls an hour.
+  test.skipIf(!process.env.ZILC_LIVE_RENDER)("live: GitHub shows the repository's places and hides a commented heading", async () => {
     const gh = githubRender();
-    expect(await renderedProblems(gh, { notes: read("RELEASE-NOTES.md"), readme: read("README.md"), openWork: read("cmem/open-work.md") }, cur, [])).toEqual([]);
-    expect((await renderedProblems(gh, { release: entry(`<!--\n${both}\n-->`) }, cur, recs)).length).toBeGreaterThan(0);
+    expect(await renderedProblems(gh, { notes: read("RELEASE-NOTES.md"), readme: read("README.md"), openWork: read("cmem/open-work.md") }, cur)).toEqual([]);
+    expect((await renderedProblems(gh, { release: `# r\n\n## Release History\n\n<!--\n### v${cur.full}\n-->\n` }, cur)).length).toBeGreaterThan(0);
   }, 60000);
 });
 
@@ -343,8 +346,11 @@ const commit = (msg: string) => {
   sh("commit", "-q", "-m", msg);
   return sh("rev-parse", "HEAD");
 };
-const rec = (kind: string, base: string, at: string) => `- **${kind} review:** 2 rounds, empty round 2026-11-20, reviewed \`${base}..${at.slice(0, 10)}\``;
-const entryFor = (base: string, at: string) => `### v0.15.2-0.687.2 — 2026-11-21\n\n${rec("Security", base, at)}\n${rec("Hardening", base, at)}\n`;
+/** A release: its entry in cmem/release.md and the review record in cmem/review-process.md. */
+type Rel = { entry: string; record: string };
+const recordFor = (at: string) => `# review\n\n## Last review\n\n- Review complete: ${at.slice(0, 10)}\n`;
+// `_base` (the previous release) is kept so the cases read as before; the record names no base now.
+const entryFor = (_base: string, at: string): Rel => ({ entry: "### v0.15.2-0.687.2 — 2026-11-21\n\nnotes\n", record: recordFor(at) });
 
 let before = "", reviewed = "", side = "";
 
@@ -353,14 +359,15 @@ beforeAll(() => {
   sh("init", "-q", "-b", "main");
   put("src/code.zig", "a\n");
   put("cmem/release.md", "# release\n\n## Release History\n");
+  put("cmem/review-process.md", "# review\n\n## Last review\n\n- None yet.\n");
   // The bump's three files are the real ones (version 0.15.2-0.687.1), so the bump commit can be
   // checked as exactly bumpEdits of its parent.
   for (const f of BUMP_FILES) put(f, readFileSync(join(REPO, f), "utf8"));
   // The other counted Markdown files, which must be ordinary files at the commit (KI-36).
-  // The State row names the version being released (check-reviews renders it, KI-38).
+  // The State row names the version being released (review-gate renders it, KI-38).
   put("cmem/open-work.md", "# open work\n\n| what | value |\n| --- | --- |\n| version | **`0.15.2-0.687.2`** |\n");
   put("RELEASE-NOTES.md", "# notes\n");
-  for (const f of ["guards.ts", "check-reviews.ts"]) cpSync(join(import.meta.dir, f), join(dir, "tools/release", f));
+  for (const f of ["guards.ts", "review-gate.ts"]) cpSync(join(import.meta.dir, f), join(dir, "tools/release", f));
   before = commit("start");
   sh("tag", "v0.15.2-0.687.1");
   put("src/code.zig", "b\n");
@@ -384,7 +391,9 @@ function reviewedWith(fn: () => void) {
 }
 const putBytes = (f: string, b: Uint8Array) => writeFileSync(join(dir, f), b);
 const getBytes = (f: string) => readFileSync(join(dir, f));
-function release(entry: string, opts: Opts = {}) {
+function release(rel: Rel | string, opts: Opts = {}) {
+  // A plain string is an entry with no review record at all.
+  const { entry, record } = typeof rel === "string" ? { entry: rel, record: "# review\n\n## Last review\n\n- None yet.\n" } : rel;
   sh("switch", "-q", "-C", `t${Math.random().toString(36).slice(2)}`, opts.from ?? reviewed);
   if (opts.codeAfterReview) {
     put("src/code.zig", "c\n");
@@ -395,8 +404,9 @@ function release(entry: string, opts: Opts = {}) {
     commit("after the review");
   }
   put("cmem/release.md", `# release\n\n## Release History\n\n${entry}`);
+  put("cmem/review-process.md", record);
   put("RELEASE-NOTES.md", "## 0.15.2-0.687.2\n");
-  commit("notes and the entry");
+  commit("notes, the entry and the review record");
   // As bump.ts writes it, byte for byte (latin1 is one character per byte).
   const now = Object.fromEntries(BUMP_FILES.map((f) => [f, getBytes(f).toString("latin1")]));
   const bumped = bumpEdits(now, zonVersion(now["build.zig.zon"])!);
@@ -406,21 +416,22 @@ function release(entry: string, opts: Opts = {}) {
   opts.bumpTamper?.();
   return commit("bump to v0.15.2-0.687.2");
 }
-const check = async (head: string) => reviewsCoverRelease(gitIn(dir), findEntry(readFileSync(join(dir, "cmem/release.md"), "utf8"), "0.15.2-0.687.2")!, head, true);
+const recordNow = () => readFileSync(join(dir, REVIEW_RECORD_FILE), "utf8");
+const check = async (head: string) => reviewCoversRelease(gitIn(dir), recordNow(), head, true);
 const cli = async (head: string) => {
   // GitHub's renderer stood in by the local one (`standIn`): the CLI must not call GitHub per test.
   // Asynchronous: a blocking spawn would stop this process, and with it the stand-in it calls.
-  const p = Bun.spawn(["bun", join(dir, "tools/release/check-reviews.ts"), head], { stdout: "pipe", stderr: "pipe", env: { ...process.env, ZILC_GITHUB_API: standIn.url.origin } });
+  const p = Bun.spawn(["bun", join(dir, "tools/release/review-gate.ts"), head], { stdout: "pipe", stderr: "pipe", env: { ...process.env, ZILC_GITHUB_API: standIn.url.origin } });
   const [o, e, code] = await Promise.all([new Response(p.stdout).text(), new Response(p.stderr).text(), p.exited]);
   return { code, out: o + e };
 };
 
-describe("the review records against the history", () => {
-  test("records covering everything since the previous release pass (library and CLI)", async () => {
+describe("the review record against the history", () => {
+  test("a record covering everything since the previous release passes (library and CLI)", async () => {
     const h = release(entryFor("v0.15.2-0.687.1", reviewed));
     expect(await check(h)).toEqual([]);
     const r = await cli(h);
-    expect(r.out).toContain("both required reviews recorded");
+    expect(r.out).toContain("covered by the completed review");
     expect(r.code).toBe(0);
   });
 
@@ -428,11 +439,6 @@ describe("the review records against the history", () => {
     const h = release(entryFor("v0.15.2-0.687.1", reviewed), { codeAfterReview: true });
     expect((await check(h)).join("\n")).toContain("src/code.zig");
     expect((await cli(h)).code).toBe(1);
-  });
-
-  test("a review that starts at the wrong release is refused", async () => {
-    const h = release(entryFor("v0.15.2-0.686.1", reviewed));
-    expect((await check(h)).join("\n")).toContain("previous release is v0.15.2-0.687.1");
   });
 
   test("a reviewed commit not in the released history is refused", async () => {
@@ -543,13 +549,13 @@ describe("the review records against the history", () => {
   });
 
   // bump.ts's own path: HEAD is the notes commit, BEFORE the bump (bumped = false; retest 3).
-  test("before the bump: records covering the history pass, code after the review is refused", async () => {
+  test("before the bump: a record covering the history passes, code after the review is refused", async () => {
     const g = gitIn(dir);
     const e = entryFor("v0.15.2-0.687.1", reviewed);
     const good = release(e);
-    expect(await reviewsCoverRelease(g, findEntry(readFileSync(join(dir, "cmem/release.md"), "utf8"), "0.15.2-0.687.2")!, `${good}^`, false)).toEqual([]);
+    expect(await reviewCoversRelease(g, recordNow(), `${good}^`, false)).toEqual([]);
     const bad = release(e, { codeAfterReview: true });
-    expect((await reviewsCoverRelease(g, findEntry(readFileSync(join(dir, "cmem/release.md"), "utf8"), "0.15.2-0.687.2")!, `${bad}^`, false)).join("\n")).toContain("src/code.zig");
+    expect((await reviewCoversRelease(g, recordNow(), `${bad}^`, false)).join("\n")).toContain("src/code.zig");
   });
 
   // The tags here against origin's (retest 3, KI-30): a bare clone stands in for origin.
@@ -627,13 +633,18 @@ describe("the review records against the history", () => {
     expect((await check(h)).join("\n")).toContain(".github/README.md exists");
   });
 
-  // CI's review step is present and gated as designed (retest 9: no test tied the YAML to it).
-  test("release.yml runs check-reviews.ts on a release, and tag needs checks", () => {
+  // CI only publishes (H37 (e)): it verifies the version on a release, then tags and makes the page.
+  test("release.yml runs no test or gate, verifies the version on a release, and tag needs checks", () => {
     const yml = readFileSync(join(REPO, ".github/workflows/release.yml"), "utf8");
-    const step = yml.match(/- name: The required reviews \(a release only\)\n {8}if: (.*)\n {8}run: (.*)\n/);
+    const runs = yml.split("\n").filter((l) => /^\s+(?:run|- run):/.test(l)).map((l) => l.trim());
+    for (const banned of ["zig ", "bun test", "biome", "review-gate", "check-reviews", "run-gate", "git grep"]) {
+      expect(runs.filter((l) => l.includes(banned))).toEqual([]);
+    }
+    expect(yml).not.toContain("ZIG_VERSION");
+    const step = yml.match(/- name: The five places agree on the version \(a release only\)\n {8}if: (.*)\n {8}run: (.*)\n/);
     expect(step).not.toBeNull();
     expect(step![1]).toBe("steps.decide.outputs.release == 'true'");
-    expect(step![2]).toBe('bun tools/release/check-reviews.ts "$GITHUB_SHA"');
+    expect(step![2]).toBe("bun tools/release/bump.ts --check");
     expect(yml).toMatch(/\n {2}tag:\n {4}needs: checks\n {4}if: needs\.checks\.outputs\.release == 'true'\n/);
     expect(yml).toMatch(/\n {2}release:\n {4}needs: \[checks, tag\]\n/);
   });
@@ -641,10 +652,15 @@ describe("the review records against the history", () => {
   // Retest 4: the branches no test reached.
   test("an empty bump commit is refused", async () => {
     sh("switch", "-q", "-C", `e${Math.random().toString(36).slice(2)}`, reviewed);
-    put("cmem/release.md", `# release\n\n## Release History\n\n${entryFor("v0.15.2-0.687.1", reviewed)}`);
+    put("cmem/release.md", `# release\n\n## Release History\n\n${entryFor("v0.15.2-0.687.1", reviewed).entry}`);
+    put(REVIEW_RECORD_FILE, recordFor(reviewed));
     commit("the entry");
     sh("commit", "-q", "--allow-empty", "-m", "bump to v0.15.2-0.687.2");
     expect((await check(sh("rev-parse", "HEAD"))).join("\n")).toContain("the bump commit changes nothing");
+  });
+  test("a record naming a commit not in the released history is refused (side branch)", async () => {
+    const h = release(entryFor("v0.15.2-0.687.1", side));
+    expect((await cli(h)).out).toContain("not in the history being released");
   });
   test("a record naming something that is not a commit is refused", async () => {
     const h = release(entryFor("v0.15.2-0.687.1", "deadbeef00"));
@@ -655,7 +671,8 @@ describe("the review records against the history", () => {
     sh("switch", "-q", "-C", `z${Math.random().toString(36).slice(2)}`, reviewed);
     put("build.zig.zon", ".{}\n");
     commit("the version gone");
-    put("cmem/release.md", `# release\n\n## Release History\n\n${entryFor("v0.15.2-0.687.1", reviewed)}`);
+    put("cmem/release.md", `# release\n\n## Release History\n\n${entryFor("v0.15.2-0.687.1", reviewed).entry}`);
+    put(REVIEW_RECORD_FILE, recordFor(reviewed));
     commit("the entry");
     put("build.zig.zon", '.{\n    .version = "0.15.2-0.687.2",\n}\n');
     const h = commit("bump to v0.15.2-0.687.2");
@@ -666,7 +683,8 @@ describe("the review records against the history", () => {
     sh("switch", "-q", "-C", `b${Math.random().toString(36).slice(2)}`, reviewed);
     put("src/root.zig", readFileSync(join(dir, "src/root.zig"), "utf8").replace("// next zilc release", ""));
     commit("an anchor gone");
-    put("cmem/release.md", `# release\n\n## Release History\n\n${entryFor("v0.15.2-0.687.1", reviewed)}`);
+    put("cmem/release.md", `# release\n\n## Release History\n\n${entryFor("v0.15.2-0.687.1", reviewed).entry}`);
+    put(REVIEW_RECORD_FILE, recordFor(reviewed));
     commit("the entry");
     put("build.zig.zon", readFileSync(join(dir, "build.zig.zon"), "utf8").replace('"0.15.2-0.687.1"', '"0.15.2-0.687.2"'));
     const h = commit("bump to v0.15.2-0.687.2");
@@ -677,12 +695,12 @@ describe("the review records against the history", () => {
     const h = release(entryFor("v0.15.2-0.687.1", r), { from: r });
     expect((await check(h)).join("\n")).toContain("src/root.zig is not an ordinary file (mode 100644) on both sides: 100755");
   });
-  test("a git failure in describe or merge-base is never a pass", async () => {
+  test("a git failure in rev-parse or merge-base is never a pass", async () => {
     const h = release(entryFor("v0.15.2-0.687.1", reviewed));
-    const entry = findEntry(readFileSync(join(dir, "cmem/release.md"), "utf8"), "0.15.2-0.687.2")!;
+    const record = recordNow();
     const failing = (cmd: string): Git => async (...a) => (a[0] === cmd ? { code: 128, out: "fatal: injected", raw: new Uint8Array() } : gitIn(dir)(...a));
-    expect((await reviewsCoverRelease(failing("describe"), entry, h, true)).join("\n")).toContain("no release tag is reachable");
-    await expect(reviewsCoverRelease(failing("merge-base"), entry, h, true)).rejects.toThrow("merge-base");
+    expect((await reviewCoversRelease(failing("rev-parse"), record, h, true)).join("\n")).toContain("which is not a commit here");
+    await expect(reviewCoversRelease(failing("merge-base"), record, h, true)).rejects.toThrow("merge-base");
   });
   test("a remote that never answers is a refusal within the time limit", async () => {
     const bin = mkdtempSync(join(tmpdir(), "zilc-hang-"));
@@ -712,18 +730,19 @@ describe("the review records against the history", () => {
     }
   }, 30000); // two 2 s limits and run()'s 2 s grace: past bun's default 5 s per test
 
-  test("records GitHub would not show are refused by the CLI (KI-38)", async () => {
-    const h = release(`### v0.15.2-0.687.2 — 2026-11-21\n\n<!--\n${rec("Security", "v0.15.2-0.687.1", reviewed)}\n${rec("Hardening", "v0.15.2-0.687.1", reviewed)}\n-->\n`);
+  test("an entry heading GitHub would not show is refused by the CLI (KI-38)", async () => {
+    const h = release({ entry: "<!--\n### v0.15.2-0.687.2 — 2026-11-21\n-->\n", record: recordFor(reviewed) });
     const r = await cli(h);
     expect(r.code).toBe(1);
+    // The text side reads the heading inside the comment; GitHub's renderer does not show it.
     expect(r.out).toContain("GitHub would not show");
   });
 
-  test("the negation the first guard accepted is refused by the CLI", async () => {
-    const h = release("### v0.15.2-0.687.2 — x\n\nsecurity review: not run. hardening review: skipped.\n");
+  test("no review record is refused by the CLI", async () => {
+    const h = release("### v0.15.2-0.687.2 — x\n\nreview: not run.\n");
     const r = await cli(h);
     expect(r.code).toBe(1);
-    expect(r.out).toContain("no security review record");
+    expect(r.out).toContain("no review record");
   });
 
   test("a commit that is not the bump commit is refused by the CLI", async () => {
