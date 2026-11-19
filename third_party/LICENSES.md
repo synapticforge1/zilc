@@ -129,7 +129,7 @@ Newest first. Copy the template for each adopted component.
   `restore-patched-clang.ts`. **It is gitignored, so pushing it is impossible by default, and it
   must stay that way:** pushing it would be a distribution of Fil-C
 - **Artifact destination:** **toolchain-only, and local only.** The patched clang lives in
-  `~/zilc-work/tools/filc-0.687-zilc/` (0.686's kept at `filc-0.686-zilc/`) and is **not distributed**. It is the default for zilc's
+  `~/zilc-work/tools/filc-0.687-zilc/` (only the latest is kept, 2026-11-19) and is **not distributed**. It is the default for zilc's
   scripts (owner, 2026-10-01); the prebuilt stays for comparison. The colouring fix emits the same
   code; the KI-4 fix only changes functions that crashed before. User binaries carry no new code
 - **Modifications:** each changed block is marked `// zilc (KI-22): …` or `// zilc (KI-4): …` in the

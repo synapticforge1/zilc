@@ -10,7 +10,7 @@ them, with their dates.
 | what      | value                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 | --------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | version   | **`0.15.2-0.687.1`** — `<Zig>-<Fil-C>.<zilc release>`, **published 2026-10-27** (tag `v0.15.2-0.687.1` on `be51808`; `releasing.md`); one of the five places the number lives. Before it: `0.15.2-0.686.1` (2026-10-05)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
-| toolchain | Zig **0.15.2** (user code and build), Fil-C **0.687** with zilc's patched clang (`workarounds.md` KI-22, KI-4) — **since 2026-10-30 compiled by Zig** (`zig build patched-clang`; the GCC-built one kept as `~/zilc-work/tools/filc-0.687-zilc-gcc` for rollback); 0.686's kept installed and archived (`toolchain/filc-0.686/`)                                                                                                                                                                                                                                                                                                                                                                           |
+| toolchain | Zig **0.15.2** (user code and build), Fil-C **0.687** with zilc's patched clang (`workarounds.md` KI-22, KI-4) — **since 2026-10-30 compiled by Zig** (`zig build patched-clang`); only the latest is kept (owner, 2026-11-19): the GCC-built rollback and the 0.685 / 0.686 toolchains, installed and archived, were deleted that day                                                                                                                                                                                                                                                                                                                                                                     |
 | pushed    | **2026-11-12:** `main` = `origin/main` = the merge of `work-2026-11-12` (pushed with the branch, read back with `ls-remote`; the first push the new `release.yml` runs on — run 43295657634: `checks` green, `tag` / `release` skipped as designed, `v0.15.2-0.687.1` being already tagged). Before it `79e8040` (2026-11-07), and `beaa4c3` (2026-11-06: `ec3d6da` the benchmark suite, the Zig-clang reference chain, the Bun re-runs; `94020ab` the user libc in `zig build` and the `zig fmt` cleanup of `src/`; `beaa4c3` the two `tests/basics` `50_time` copies formatted; before them `04ac719`, 2026-11-05; each push scanned for personal data first). No new tag: the version line did not move |
 | gates     | `zig build gate`, `zig build test`, Fil-C's suite, the corpus in four modes, the output comparison: all re-run 2026-10-27 on Fil-C 0.687, counts in `testing.md`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
 | remote    | `origin` = `github.com/synapticforge1/zilc` (since 2026-10-27; was `jrmarcum/zilc`, which GitHub redirects). **Purged history pushed 2026-10-27**: `main` = `origin/main`, `v0.15.2` = tag `v0.15.2-0.686.1` = `13ce96a` (was `19e7172`; map `history-map-2026-10-27.md`)                                                                                                                                                                                                                                                                                                                                                                                                                                  |
@@ -280,8 +280,8 @@ future reference"_.
    `~/zilc-work/patched-clang/filc-0.687/build-system` — measured **32 GB** (the 25 GB was an
    estimate), its `clang-20` `.comment` = GCC 15.2; `patched-clang/` 44 → 12 GB (`build-zig` 9.8 GB
    and the staged `src` stay). Kept: the system GCC (maintainer QC) and
-   `~/zilc-work/tools/filc-0.687-zilc-gcc`. `-Dclang-cc=system` would rebuild it from scratch
-   (~25 min).
+   `~/zilc-work/tools/filc-0.687-zilc-gcc` — that GCC-built clang deleted 2026-11-19 (owner: only
+   the latest is kept); `-Dclang-cc=system` would rebuild it from scratch (~25 min).
 5. ✅ **Maintainer-only: GCC pinned to upstream's versions (11.4, 12.3), built by Zig** — done
    2026-11-05 (NEXT SESSION C, `62be22d`; item under "Open work" below).
 6. ✅ **Documentation, done 2026-11-04** (owner: "proceed with 5, 6, and 7"): README "Building
@@ -462,8 +462,8 @@ future reference"_.
     `clang-20` and `llvm-split`; assembling the toolchain tree is still `build-patched-clang.ts`'s
     copy-and-replace, done by hand for the 2026-10-30 proofs), and as the oracle.
   - ✅ **zilc's installed patched toolchain is the Zig-built clang since 2026-10-30** (owner: "yes"):
-    `~/zilc-work/tools/filc-0.687-zilc` (the GCC build kept beside it as `filc-0.687-zilc-gcc` for
-    rollback), gate 8/8, re-archived in `toolchain/` (SHA256SUMS now names the compiler).
+    `~/zilc-work/tools/filc-0.687-zilc` (the GCC build kept beside it for rollback until
+    2026-11-19, then deleted: gate 8/8 again on the Zig-built one that day), gate 8/8, re-archived in `toolchain/` (SHA256SUMS now names the compiler).
     `check-toolchain` compares `git diff --full-index` (short blob ids grew 9 → 10 characters
     after 18 blobs were fetched into the clone; the patch file was regenerated with full ids,
     content unchanged). Rebuilt from the re-applied patch: clang-20 and llvm-split
@@ -531,10 +531,12 @@ Open for zilc, 2026-11-19:
 - **H43** (scratch space) — rule in `working-rules.md` § Scratch space; reviewer brief in
   `review-process.md`; the four notes in the assistant's per-project memory folder checked against
   `cmem/` ("test, don't guess" was missing: now `working-rules.md` § Records) and removed; session
-  scratchpad 0 bytes; WSL `/tmp` 0; 🗓️ **`~/zilc-work/` 232 GB — what to remove is the owner's
-  call** (inventory in `cmem/local/zilc-work.md`). Round 1's reviewer folders there (about 3 GB,
-  checked: nothing unique) are still to remove — the session's permission check refused the
-  deletion. Other projects' folders are theirs (`working-rules.md` § Scratch space).
+  scratchpad 0 bytes; WSL `/tmp` 0; `~/zilc-work/` 232 → **57 GB** (owner, 2026-11-19: only the
+  latest toolchain is kept, what is still necessary stays): old suite outputs, the cosmo build, the
+  0.685 / 0.686 toolchains and the GCC-built 0.687 rollback, run outputs recorded in `testing.md`.
+  Kept: Fil-C 0.687's source and clang build tree, the toolchain, the pinned QC GCCs; gate 8/8 after.
+  What stays and why: `cmem/local/zilc-work.md`. No size limit (owner): cleared as things stop
+  being used (`working-rules.md` § Scratch space).
 - **H38** (memory guide) — not started; `check-cmem --summary`: 470 problems (state-missing 1,
   index-size 1, line-length 459, file-size 9). Steps 1–3 next.
 - **H37** (final review standard) — not started; (a)–(g) after H38 steps 1–3. It supersedes

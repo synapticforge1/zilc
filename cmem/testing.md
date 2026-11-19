@@ -562,7 +562,8 @@ time: shared libraries warmed first, an empty local cache per build, zilc `--no-
 at a time. Startup floor measured: an empty program 0.10 ms static vs 1.36 ms with Fil-C's runtime
 (negligible beside the shortest program, 0.15 s). `compare` flags pairs whose input differs.
 
-**First baseline** (2026-11-06, `~/zilc-work/bench/0.15.2-0.687.1/`; i9-13980HX, 32 threads,
+**First baseline** (2026-11-06; its `results.json` and `summary.md`, the input of
+`bench.ts compare`, moved 2026-11-19 to the gitignored `cmem/local/bench/0.15.2-0.687.1/`; i9-13980HX, 32 threads,
 idle; 3 runs that day: upstream 2.25× / 2.11× / 2.07×, Zig ReleaseFast 1.67× / 1.66× / 1.66×; the
 first had parallel builds still loading the machine). Geometric-mean slowdown, zilc / plain:
 upstream C/C++ under Fil-C **2.07×** (9 programs; fannkuch-redux 1.04× … richards 5.06×, n-body-2

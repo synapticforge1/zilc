@@ -111,9 +111,13 @@ The rule is the workspace's (`../workspace/cmem/tooling-rules.md` rule 15); as i
 - 🗓️ **`~/zilc-work/` is zilc's named cache outside the repository**, not scratch: Fil-C and
   Zig work in WSL needs a Linux filesystem (WSL's `/tmp` was seen emptied, 2026-11-12), and
   it holds the toolchains the tools use (`~/zilc-work/tools/`, `patched-clang/`). Its folders,
-  why each exists, its size limit and the command that clears each are recorded in
-  `cmem/local/`. Measured 2026-11-19: **232 GB**. The limit and what to remove are the owner's
-  call (`open-work.md`, workspace letters, H43).
+  why each exists and the command that clears each are recorded in `cmem/local/zilc-work.md`.
+  🔒 **No size limit; it is cleared as things stop being used** (owner, 2026-11-19: "I do not
+  think a size limit is required as long as we are clearing things after they are not being
+  utilized anymore"): **only the latest toolchain is kept** (owner, same day) — at a Fil-C or Zig
+  move the old version's toolchain, archive, suite tree and build trees go once the new one passes
+  the gate; a run's output goes once its result is recorded in `cmem/`; a probe goes after its
+  run. Kept for the maintainer's GCC check: the two pinned GCCs, not their build tree.
 - 🔒 **zilc cleans only zilc's items** (owner, 2026-11-19: "any items from a different project
   is that project's responsibility"). What another project left — in WSL's home (`~/zailc-work/`,
   a wazmrt folder, …), the system temp folder or anywhere else — is neither measured for removal
