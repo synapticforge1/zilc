@@ -57,6 +57,25 @@ fn expand(gpa: std.mem.Allocator, text: []const u8, release: []const u8, commit:
     return out.items;
 }
 
+/// A run of spaces as one space. Used for Markdown pins only: Biome pads table cells (owner,
+/// 2026-11-15, KI-38), which changes the spacing of a pinned row but never its words.
+fn squeezeSpaces(gpa: std.mem.Allocator, s: []const u8) ![]const u8 {
+    var out: std.ArrayListUnmanaged(u8) = .{};
+    for (s, 0..) |c, i| {
+        if (c == ' ' and i > 0 and s[i - 1] == ' ') continue;
+        try out.append(gpa, c);
+    }
+    return out.items;
+}
+
+test "squeezeSpaces collapses runs of spaces only" {
+    var arena: std.heap.ArenaAllocator = .init(std.testing.allocator);
+    defer arena.deinit();
+    const a = arena.allocator();
+    try std.testing.expectEqualStrings("| **Fil-C release** | **0.687** x", try squeezeSpaces(a, "| **Fil-C release**   | **0.687**  x"));
+    try std.testing.expectEqualStrings("a\t\tb\n\nc", try squeezeSpaces(a, "a\t\tb\n\nc"));
+}
+
 pub fn main() !void {
     var arena_state: std.heap.ArenaAllocator = .init(std.heap.page_allocator);
     defer arena_state.deinit();
@@ -85,7 +104,10 @@ pub fn main() !void {
             failed += 1;
             continue;
         };
-        if (std.mem.indexOf(u8, body, want) == null) {
+        const md = std.mem.endsWith(u8, p.file, ".md");
+        const hay = if (md) try squeezeSpaces(gpa, body) else body;
+        const needle = if (md) try squeezeSpaces(gpa, want) else want;
+        if (std.mem.indexOf(u8, hay, needle) == null) {
             std.debug.print("check-pins: FAIL {s} does not contain: {s}\n", .{ p.file, want });
             failed += 1;
         }

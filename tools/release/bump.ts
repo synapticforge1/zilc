@@ -16,14 +16,17 @@
  *
  * Refuses: a dirty tree (untracked files count); places that disagree on the current version;
  * a missing `## <new>` section in RELEASE-NOTES.md, a State row in cmem/open-work.md that does not
- * name the new version, or a `cmem/release.md` entry for it that does not record BOTH required
- * reviews (security, hardening — workspace review-process.md § 0, letter H35). Writes the
+ * begin with the new version, or a `cmem/release.md` entry for it that does not hold BOTH required
+ * review records (security, hardening — workspace review-process.md § 0, letter H35) in the form
+ * guards.ts REVIEW_FORM names, each covering the history from the previous release's tag to a
+ * commit after which only `cmem/` and RELEASE-NOTES.md changed. Writes the
  * mechanical places (build.zig.zon, src/root.zig's `release` and its test literals, the README
  * status line), runs `zig build test` (and puts every file back if it fails), then commits.
  */
-import { readFileSync, writeFileSync } from "node:fs";
+import { lstatSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { ARGS, REPO, ZIG, linuxOnly, must, run } from "../lib/tool.ts";
+import { BUMP_FILES, bumpEdits, bumpSubject, findEntry, gitIn, githubRender, renderedProblems, reviewRecords, tagsDifferFrom, disagreements as placeDisagreements, reviewsCoverRelease, zonVersion, type Places, type Version } from "./guards.ts";
 
 await linuxOnly(import.meta);
 
@@ -41,36 +44,18 @@ if (kind === "filc" || kind === "zig") {
 }
 
 const P = (f: string) => join(REPO, f);
-const read = (f: string) => readFileSync(P(f), "utf8");
+// A counted file that is a symlink is not what GitHub shows at that path (KI-36): refused.
+const read = (f: string) => {
+  if (lstatSync(P(f)).isSymbolicLink()) fail(`${f} is a symlink; GitHub shows the link, not the file it points to`);
+  return readFileSync(P(f), "utf8");
+};
+const places = (): Places => ({ root: read("src/root.zig"), readme: read("README.md"), notes: read("RELEASE-NOTES.md"), openWork: read("cmem/open-work.md"), zon: read("build.zig.zon") });
+const disagreements = (v: Version) => placeDisagreements(places(), v);
 
-/** The version every place must agree on, read from build.zig.zon. */
-function zonVersion(): { full: string; zig: string; filc: string; n: number } {
-  const m = read("build.zig.zon").match(/^\s*\.version = "(\d+\.\d+\.\d+)-(\d+\.\d+)\.(\d+)",$/m);
-  if (!m) fail("cannot read build.zig.zon's .version as <Zig>-<Fil-C>.<N>");
-  return { full: `${m[1]}-${m[2]}.${m[3]}`, zig: m[1], filc: m[2], n: Number(m[3]) };
-}
-
-/** Each place's disagreement with `v`, or [] when all five agree. */
-function disagreements(v: string, zig: string, filc: string, n: number): string[] {
-  const bad: string[] = [];
-  const root = read("src/root.zig");
-  const zl = root.match(/^pub const zig_line = std\.SemanticVersion\{ \.major = (\d+), \.minor = (\d+), \.patch = (\d+) \};$/m);
-  if (!zl || `${zl[1]}.${zl[2]}.${zl[3]}` !== zig) bad.push(`src/root.zig zig_line is not ${zig}`);
-  if (!new RegExp(`^pub const filc_release = "${filc.replace(".", "\\.")}";$`, "m").test(root)) bad.push(`src/root.zig filc_release is not "${filc}"`);
-  if (!new RegExp(`^pub const release = ${n};$`, "m").test(root)) bad.push(`src/root.zig release is not ${n}`);
-  if (!root.includes(`expectEqualStrings("${v}", version_string)`)) bad.push(`src/root.zig's version test does not pin "${v}"`);
-  const status = read("README.md").split("\n").find((l) => l.startsWith("> **Status:"));
-  if (!status?.includes(`v${v}: zilc release ${n} for Zig ${zig} and Fil-C ${filc}`)) bad.push(`README.md's status line does not name v${v} (zilc release ${n})`);
-  if (!new RegExp(`^## ${v.replaceAll(".", "\\.")}$`, "m").test(read("RELEASE-NOTES.md"))) bad.push(`RELEASE-NOTES.md has no "## ${v}" section`);
-  const state = read("cmem/open-work.md").split("\n").find((l) => l.startsWith("| version |"));
-  if (!state?.includes(`\`${v}\``)) bad.push(`cmem/open-work.md's State row "| version |" does not name \`${v}\``);
-  return bad;
-}
-
-const cur = zonVersion();
+const cur = zonVersion(read("build.zig.zon")) ?? fail("cannot read build.zig.zon's .version as <Zig>-<Fil-C>.<N> (exactly one line)");
 
 if (kind === "--check") {
-  const bad = disagreements(cur.full, cur.zig, cur.filc, cur.n);
+  const bad = disagreements(cur);
   if (bad.length) fail(`the five places disagree on ${cur.full}:\n  ${bad.join("\n  ")}`);
   console.log(`bump --check: build.zig.zon, src/root.zig, README.md, RELEASE-NOTES.md and cmem/open-work.md agree on ${cur.full}`);
   process.exit(0);
@@ -79,60 +64,69 @@ if (kind === "--check") {
 // ---- kind === "release"
 const porcelain = await must(["git", "-C", REPO, "status", "--porcelain", "--untracked-files=all"]);
 if (porcelain.trim()) fail(`the tree is not clean (untracked files count):\n${porcelain.trimEnd()}`);
-const before = disagreements(cur.full, cur.zig, cur.filc, cur.n).filter((b) => !b.startsWith("RELEASE-NOTES") && !b.startsWith("cmem/open-work"));
+const before = disagreements(cur).filter((b) => !b.startsWith("RELEASE-NOTES") && !b.startsWith("cmem/open-work"));
 if (before.length) fail(`the current version ${cur.full} is not consistent before the bump:\n  ${before.join("\n  ")}`);
 
 const n2 = cur.n + 1;
 const next = `${cur.zig}-${cur.filc}.${n2}`;
-const after = `${cur.zig}-${cur.filc}.${n2 + 1}`;
+const nextV: Version = { full: next, zig: cur.zig, filc: cur.filc, n: n2 };
 
-// The prose places a person writes BEFORE the bump (U2: the notes are merged first).
-const pre: string[] = [];
-if (!new RegExp(`^## ${next.replaceAll(".", "\\.")}$`, "m").test(read("RELEASE-NOTES.md"))) pre.push(`RELEASE-NOTES.md has no "## ${next}" section — write the release notes first`);
-const stateRow = read("cmem/open-work.md").split("\n").find((l) => l.startsWith("| version |"));
-if (!stateRow?.includes(`\`${next}\``)) pre.push(`cmem/open-work.md's State row "| version |" does not name \`${next}\``);
-const rel = read("cmem/release.md");
-const entry = rel.split(/^### /m).find((s) => s.startsWith(`v${next}`) || s.startsWith(next));
-if (!entry) pre.push(`cmem/release.md § "Release History" has no "### v${next}" entry`);
-else {
-  if (!/security review/i.test(entry)) pre.push(`cmem/release.md's v${next} entry records no security review (required before every release — H35)`);
-  if (!/hardening review/i.test(entry)) pre.push(`cmem/release.md's v${next} entry records no hardening review (required before every release — H35)`);
+// The prose places a person writes BEFORE the bump (U2: the notes are merged first), and the two
+// required reviews, recorded in the fixed form and checked against the history (guards.ts).
+const pre = placeDisagreements(places(), nextV).filter((b) => b.startsWith("RELEASE-NOTES") || b.startsWith("cmem/open-work"));
+let entry: string | null = null;
+try {
+  entry = findEntry(read("cmem/release.md"), next);
+} catch (e) {
+  pre.push((e as Error).message);
+}
+if (entry === null && !pre.some((p) => p.startsWith("cmem/release.md has"))) pre.push(`cmem/release.md § "Release History" has no "### v${next}" entry`);
+if (entry !== null) {
+  try {
+    // The previous release is read from the tags; take origin's first, as CI will (KI-30).
+    const f = await run(["git", "-C", REPO, "fetch", "-q", "--tags", "origin"], { timeout: 120 });
+    if (f.code !== 0) fail(`git fetch --tags origin failed (exit ${f.code}): ${f.out.trim()}`);
+    pre.push(...(await tagsDifferFrom(gitIn(REPO))));
+    const head = (await must(["git", "-C", REPO, "rev-parse", "HEAD"])).trim();
+    pre.push(...(await reviewsCoverRelease(gitIn(REPO), entry, head, false)).map((b) => `${b} (required before every release — H35)`));
+  } catch (e) {
+    fail(`git failed while checking the reviews: ${(e as Error).message}`);
+  }
+  // The places a person wrote, as GitHub would show them (KI-38). The README's status line is the
+  // bump's own edit, so check-reviews.ts renders it after the bump.
+  if (!pre.length) {
+    try {
+      pre.push(...(await renderedProblems(githubRender(), { release: read("cmem/release.md"), notes: read("RELEASE-NOTES.md"), openWork: read("cmem/open-work.md") }, nextV, reviewRecords(entry).records)));
+    } catch (e) {
+      fail(`GitHub's renderer could not be asked (a render that did not happen is never a pass): ${(e as Error).message}`);
+    }
+  }
 }
 if (pre.length) fail(`not ready to bump to ${next}:\n  ${pre.join("\n  ")}`);
 
-/** Replace `from` with `to` in `file`, asserting exactly one match. */
-const edits = new Map<string, string>();
-function replaceOnce(file: string, from: string, to: string) {
-  const text = edits.get(file) ?? read(file);
-  const count = text.split(from).length - 1;
-  if (count !== 1) fail(`${file}: expected exactly one "${from}", found ${count}`);
-  edits.set(file, text.replace(from, to));
+// The edits themselves are guards.ts `bumpEdits`, so CI can recompute them and require the bump
+// commit to be exactly these (KI-28).
+// latin1 both ways: one character per byte, so every byte but the version text is kept exactly
+// (a UTF-8 round trip would turn an invalid byte into U+FFFD — KI-29).
+const readBytes = (f: string) => readFileSync(P(f), "latin1");
+let edits: Map<string, string>;
+try {
+  edits = new Map(Object.entries(bumpEdits(Object.fromEntries(BUMP_FILES.map((f) => [f, readBytes(f)])), cur)));
+} catch (e) {
+  fail((e as Error).message);
 }
-replaceOnce("build.zig.zon", `.version = "${cur.full}",`, `.version = "${next}",`);
-replaceOnce("src/root.zig", `pub const release = ${cur.n};`, `pub const release = ${n2};`);
-replaceOnce("src/root.zig", `expectEqualStrings("${cur.full}", version_string)`, `expectEqualStrings("${next}", version_string)`);
-replaceOnce("src/root.zig", `version_string)); // the release before`, `version_string)); // the release before`); // asserts the line exists
-{
-  const root = edits.get("src/root.zig")!;
-  const m = root.match(/order\("([^"]+)", version_string\)\); \/\/ the release before/);
-  const m2 = root.match(/order\(version_string, "([^"]+)"\)\); \/\/ next zilc release/);
-  if (!m || !m2) fail("src/root.zig: the ordering test's 'the release before' / 'next zilc release' lines are missing");
-  replaceOnce("src/root.zig", `order("${m[1]}", version_string)); // the release before`, `order("${cur.full}", version_string)); // the release before`);
-  replaceOnce("src/root.zig", `order(version_string, "${m2[1]}")); // next zilc release`, `order(version_string, "${after}")); // next zilc release`);
-}
-replaceOnce("README.md", `v${cur.full}: zilc release ${cur.n} for Zig`, `v${next}: zilc release ${n2} for Zig`);
 
 const originals = new Map<string, string>();
 for (const [f, t] of edits) {
-  originals.set(f, read(f));
-  writeFileSync(P(f), t);
+  originals.set(f, readBytes(f));
+  writeFileSync(P(f), t, "latin1");
 }
 for (const f of edits.keys()) console.log(`  wrote ${f}`);
 
 const putBack = () => {
-  for (const [f, t] of originals) writeFileSync(P(f), t);
+  for (const [f, t] of originals) writeFileSync(P(f), t, "latin1");
 };
-const left = disagreements(next, cur.zig, cur.filc, n2);
+const left = disagreements(nextV);
 if (left.length) {
   putBack();
   fail(`after the edits the places still disagree (every file put back):\n  ${left.join("\n  ")}`);
@@ -145,7 +139,7 @@ if (t.code !== 0 || !/Build Summary: (\d+)\/\1 steps succeeded/.test(t.out)) {
   fail(`zig build test failed on ${next} (exit ${t.code}); every file put back`);
 }
 const msgFile = join(REPO, ".git", "BUMP_MSG");
-writeFileSync(msgFile, `bump to v${next}\n`);
+writeFileSync(msgFile, `${bumpSubject(next)}\n`);
 await must(["git", "-C", REPO, "add", "--", ...edits.keys()]);
 await must(["git", "-C", REPO, "commit", "-q", "-F", msgFile]);
 console.log(`bump: committed "bump to v${next}" (${(await must(["git", "-C", REPO, "rev-parse", "--short", "HEAD"])).trim()}). Next: bun tools/release/release.ts`);

@@ -12,10 +12,10 @@ citation to the incident.
 ## 1. Verifying a change
 
 - **Diff the OUTPUT, not the exit code.** A gate that exits 0 while silently doing less is a
-  regression. For zilc: a "safe" build of a bug example must panic *with the right fault*, not just
+  regression. For zilc: a "safe" build of a bug example must panic _with the right fault_, not just
   exit non-zero.
 - **An inversion that does not compile looks exactly like an inversion nothing caught.** When
-  proving a check works by breaking it, first assert that the broken build *built*. (wazmrt, three
+  proving a check works by breaking it, first assert that the broken build _built_. (wazmrt, three
   sessions running.)
 - **A single run that matches a recorded number to two decimals is a coincidence you can afford to
   check.** Performance claims need repeats and a stated noise floor. (wazmrt, 2026-08-19.)
@@ -93,7 +93,7 @@ citation to the incident.
   label against the latest corpus results. (2026-10-01.)
 - **Write the WHY of a workaround when you make it** (`workarounds.md`), keeping measured facts and
   surmises apart, and listing what was ruled out. (Owner rule, 2026-10-01.)
-- **A reopen condition is not self-checking.** Re-test it when you *price* the entry, not just when
+- **A reopen condition is not self-checking.** Re-test it when you _price_ the entry, not just when
   it was written.
 
 ## 3. Upstreams and claims
@@ -105,7 +105,7 @@ citation to the incident.
 - **Run the cheapest experiment that can KILL the plan, first.** One afternoon of shell scripts
   falsified two of three integration routes for zilc and found the real constraint (KI-4). Reading
   the pass source had suggested the opposite — that "GIMSO accepts any LLVM module" meant any
-  *producer's* module. It means any module **in Fil-C's dialect**. (zilc P1, 2026-09-23.)
+  _producer's_ module. It means any module **in Fil-C's dialect**. (zilc P1, 2026-09-23.)
 - **⚠️ A function's NAME is not its mechanism — open it.** zilc wrote "Zig walks off the end of
   `envp` to find auxv" into a known-issues entry, inferred from the name `expandStackSize`. The code
   does `@ptrFromInt(getauxval(AT_PHDR))`: it **forges a pointer from an integer**, which is a
@@ -118,13 +118,13 @@ citation to the incident.
 - **Automate the reduction; a 189,740-line crash is not a bug report.** Delta debugging took zilc's
   crash to 8 functions in 1,648 runs, unattended, and named the guilty subsystem
   (`std.compress.flate`) — something no amount of reading would have found. ⚠️ **Check the
-  interestingness test first:** the first run reported "nothing to reduce" because clang's *driver*
+  interestingness test first:** the first run reported "nothing to reduce" because clang's _driver_
   exits 1 when its frontend dies on a signal, so the 139 never reached the reducer. A reducer with a
   broken oracle fails silently and convincingly. (zilc P2, 2026-09-23.)
 - **Exonerate the prime suspect before building the case on it.** zilc named inline asm as the cause
   of the Debug-IR crash in a written-up entry; two three-line probes showed Fil-C compiles inline asm
   fine in both C and IR. The real cause was an optimizer interaction, found by varying `-O` on the
-  *consumer* side. (zilc P2, 2026-09-23.)
+  _consumer_ side. (zilc P2, 2026-09-23.)
 - **In a pipeline, `$?` is the LAST command's status.** `./prog | sed …` reports sed's exit code, so
   a test that asserts on the exit status silently asserts nothing. Redirect to a file, check the
   status, then format. (zilc, 2026-09-23.)
@@ -139,7 +139,7 @@ citation to the incident.
   download confirmed clang 20.1.2 before the repo moved to it. A version match is what keeps IR
   readable across the Zig → Fil-C boundary, so neither check alone is enough. (zilc KI-3,
   2026-09-18.)
-- **A minimum-version field is not a pin.** `minimum_zig_version` only rejects *older* Zigs. A
+- **A minimum-version field is not a pin.** `minimum_zig_version` only rejects _older_ Zigs. A
   newer one runs and fails with ordinary compile errors that look like code bugs. Name the required
   toolchain wherever build commands appear. (zilc, 2026-09-18.)
 - **Measure the contract before planning the port.** Running `nm` over the prebuilt runtime
@@ -169,7 +169,7 @@ citation to the incident.
 - **Verify licenses per file, not per badge.** (Fil-C = `NOASSERTION` on GitHub, three licenses in
   practice; wasmtime's badge omitted its LLVM exception.)
 - **Ask where the artifact goes, not where the file sits.** License obligations attach to what you
-  distribute. For zilc, the runtime is distributed *inside users' binaries* (`licensing.md`).
+  distribute. For zilc, the runtime is distributed _inside users' binaries_ (`licensing.md`).
 
 ## 4. Tests and gates
 

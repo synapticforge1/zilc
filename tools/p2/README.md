@@ -7,12 +7,12 @@ Same conventions as `../p1`: Deno tools since 2026-10-05, Bun tools since 2026-1
 `bun tools/p2/<tool>.ts` from a WSL or Linux shell. Four more tools beyond the table record later steps: `debug-mode.ts`,
 `driver-milestone.ts`, `whole-program.ts` (the zilc driver and its entry shim, P2).
 
-| script | what it establishes |
-| --- | --- |
-| `dialect-probe.ts` + `minimal-dialect.ll` | A **hand-written** module carrying Fil-C's two layout lines is accepted. The pass does not care which frontend produced the IR |
-| `optmode-matrix.ts` | Zig IR passes in **ReleaseSmall / ReleaseFast / ReleaseSafe** and crashes only in **Debug**. This is the run that overturned the previous day's conclusion |
-| `milestone.ts` + `c_caller.c` | 🎯 **The milestone.** C allocates, a Zig function overflows, Fil-C panics naming `tiny.zig:4:6` under `c_caller.c:15:5` |
-| `whole-zig-program.ts` | A whole Zig program links and runs (musl target, KI-6) and then traps in Zig's start code walking the aux vector (KI-5) |
+| script                                    | what it establishes                                                                                                                                        |
+| ----------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `dialect-probe.ts` + `minimal-dialect.ll` | A **hand-written** module carrying Fil-C's two layout lines is accepted. The pass does not care which frontend produced the IR                             |
+| `optmode-matrix.ts`                       | Zig IR passes in **ReleaseSmall / ReleaseFast / ReleaseSafe** and crashes only in **Debug**. This is the run that overturned the previous day's conclusion |
+| `milestone.ts` + `c_caller.c`             | 🎯 **The milestone.** C allocates, a Zig function overflows, Fil-C panics naming `tiny.zig:4:6` under `c_caller.c:15:5`                                    |
+| `whole-zig-program.ts`                    | A whole Zig program links and runs (musl target, KI-6) and then traps in Zig's start code walking the aux vector (KI-5)                                    |
 
 The layout rewrite each script performs:
 

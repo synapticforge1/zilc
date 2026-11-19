@@ -1,6 +1,6 @@
 # sarcasm-port.md — porting Fil-C's assembler from Luau to Zig
 
-Owner, 2026-11-06: *"Port sarcasm to Zig"* (`design-decisions.md` top row; plan stages S0–S2 in
+Owner, 2026-11-06: _"Port sarcasm to Zig"_ (`design-decisions.md` top row; plan stages S0–S2 in
 `roadmap.md` Z1). This file is the PORTING MAP: what sarcasm is, how it is put together, and what a
 byte-identical port has to reproduce. Measured from Fil-C 0.687's `projects/sarcasm` (paths below
 relative to it) on 2026-11-06; a claim with a date, re-check when the pin moves.

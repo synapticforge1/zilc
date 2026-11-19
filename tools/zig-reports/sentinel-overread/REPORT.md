@@ -29,20 +29,20 @@ as Fil-C, CHERI-style capabilities, ASan-like checkers, or Valgrind on a build w
 `repro.zig` (beside this file): a `"FOO=hello world"` entry in a 16-byte `malloc` object, and a
 `[*:0]` pointer to the value, 4 bytes in, which is the shape `getenv` produces. Then `std.mem.span`.
 
-| run | result |
-| --- | --- |
-| native, Zig 0.15.2 `-O ReleaseSafe -lc -target x86_64-linux-musl` | prints `len = 11`, **no error** (the over-read is silent) |
-| zilc (Fil-C 0.685) | `filc safety error: cannot read 16 bytes when upper - ptr = 12.` at **`mem.zig:1118:48: mem.indexOfSentinel`** ← `mem.len` ← `mem.span` ← `repro.zig:24:30` |
-| Valgrind memcheck on the native ReleaseSafe build | expected `Invalid read of size 16` (not run here: no Valgrind in this WSL) |
+| run                                                               | result                                                                                                                                                      |
+| ----------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| native, Zig 0.15.2 `-O ReleaseSafe -lc -target x86_64-linux-musl` | prints `len = 11`, **no error** (the over-read is silent)                                                                                                   |
+| zilc (Fil-C 0.685)                                                | `filc safety error: cannot read 16 bytes when upper - ptr = 12.` at **`mem.zig:1118:48: mem.indexOfSentinel`** ← `mem.len` ← `mem.span` ← `repro.zig:24:30` |
+| Valgrind memcheck on the native ReleaseSafe build                 | expected `Invalid read of size 16` (not run here: no Valgrind in this WSL)                                                                                  |
 
 First seen in the wild: `tests/basics/zig-0.15.2/67_environment-variables` under zilc,
 `std.process.getEnvVarOwned` → `posix.getenv` → `mem.sliceTo` → `indexOfSentinel`.
 
 ## Versions
 
-| Zig | behaviour |
-| --- | --- |
-| 0.15.2 | vectorised, reads past the end (`mem.zig:1092`–`1140`) |
+| Zig        | behaviour                                                                                                                                                                                                                                    |
+| ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 0.15.2     | vectorised, reads past the end (`mem.zig:1092`–`1140`)                                                                                                                                                                                       |
 | **0.16.0** | **scalar:** `pub fn findSentinel(...) { var i: usize = 0; while (p[i] != sentinel) i += 1; return i; }`, with `indexOfSentinel` kept as a deprecated alias. A test named "findSentinel vector paths" remains, now exercising the scalar loop |
 
 ## If it ever needs filing

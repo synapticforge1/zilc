@@ -222,6 +222,8 @@ pub fn build(b: *std.Build) void {
     const exe_tests = b.addTest(.{ .root_module = exe.root_module });
     const test_step = b.step("test", "Run unit tests");
     test_step.dependOn(&run_pins.step);
+    // check-pins' own unit test (its Markdown spacing rule, KI-38).
+    test_step.dependOn(&b.addRunArtifact(b.addTest(.{ .root_module = b.createModule(.{ .root_source_file = b.path("tools/check-pins.zig"), .target = b.graph.host }) })).step);
     test_step.dependOn(&b.addRunArtifact(mod_tests).step);
     test_step.dependOn(&b.addRunArtifact(exe_tests).step);
     // The generators: byte-identity with Ruby's output (SHA-256 pinned per Fil-C release) and the

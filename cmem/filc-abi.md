@@ -14,10 +14,10 @@ Legend: ✅ observed directly · 🔸 inferred, **verify before building on it**
 
 ## 1. Pointers in flight
 
-| type (from the IR) | layout | meaning |
-| --- | --- | --- |
-| `%filc_flight_ptr` | `{ ptr, ptr }` | ✅ a pointer **plus its capability**: `{ ptr, lower }`. Two machine words, in `rax:rdx` when returned |
-| `%filc_object` | `{ ptr, ptr }`, 16 bytes **before** `lower` | ✅ the object header. `lower = &header + 16` |
+| type (from the IR) | layout                                      | meaning                                                                                               |
+| ------------------ | ------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| `%filc_flight_ptr` | `{ ptr, ptr }`                              | ✅ a pointer **plus its capability**: `{ ptr, lower }`. Two machine words, in `rax:rdx` when returned |
+| `%filc_object`     | `{ ptr, ptr }`, 16 bytes **before** `lower` | ✅ the object header. `lower = &header + 16`                                                          |
 
 **The header is `struct filc_object { size_t size; uintptr_t aux; }`**, 16 bytes immediately
 before `lower` (📄 `invisicap.txt`; matches the IR):
@@ -59,27 +59,27 @@ emits (✅), but treat details it alone states as likely rather than certain.
 
 ### `inttoptr`: where capabilities are lost (📄 `gimso_semantics.md`) 🔑 for P4
 
-An integer turned into a pointer gets a **null capability**, *unless* a simple abstract interpreter
+An integer turned into a pointer gets a **null capability**, _unless_ a simple abstract interpreter
 proves, **within one function**, that it came from exactly one pointer via `ptrtoint` (through
 arithmetic, `phi` and `select`). **Integers that come from a call or a load are always BOTTOM, so
 they get a null capability.** A pointer that crosses a function boundary or passes through memory
-*as an integer* is therefore dead. That explains KI-10 (a `pthread_t` held as an integer) and every
+_as an integer_ is therefore dead. That explains KI-10 (a `pthread_t` held as an integer) and every
 `@ptrFromInt` in std (KI-5).
 
 ## 2. Functions
 
-| symbol | what it is |
-| --- | --- |
-| `pizlonated_<name>` | ✅ **a GETTER, not the function.** `(thread, ptr) -> filc_flight_ptr`, returning a capability to the function object. In `libpizlo`, `pizlonated_zsys_write` is literally `lea function_object_zsys_write+16, rax; mov rax, rdx; ret` |
-| `pizlonatedFO_<name>` | ✅ the **function object**: a `%filc_object` header, then `%filc_function` |
-| `%filc_function` | ✅ `{ fast_entry, generic_entry, signature_hash: i64 }` at `lower + 0 / 8 / 16` |
-| `pizlonatedFI<hash>_<name>` | ✅ the caller-side stub, weak and hidden, emitted per call signature (`write` → hash **27932**) |
-| `pizlonatedFIP<n>_<name>` | ✅ a defined function's fast entry (`main` → `FIP2`) |
-| `pizlonatedGP_` / `GS_` / `DO_` | ✅ global pointer / global slow-path initialiser / data object |
+| symbol                          | what it is                                                                                                                                                                                                                            |
+| ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `pizlonated_<name>`             | ✅ **a GETTER, not the function.** `(thread, ptr) -> filc_flight_ptr`, returning a capability to the function object. In `libpizlo`, `pizlonated_zsys_write` is literally `lea function_object_zsys_write+16, rax; mov rax, rdx; ret` |
+| `pizlonatedFO_<name>`           | ✅ the **function object**: a `%filc_object` header, then `%filc_function`                                                                                                                                                            |
+| `%filc_function`                | ✅ `{ fast_entry, generic_entry, signature_hash: i64 }` at `lower + 0 / 8 / 16`                                                                                                                                                       |
+| `pizlonatedFI<hash>_<name>`     | ✅ the caller-side stub, weak and hidden, emitted per call signature (`write` → hash **27932**)                                                                                                                                       |
+| `pizlonatedFIP<n>_<name>`       | ✅ a defined function's fast entry (`main` → `FIP2`)                                                                                                                                                                                  |
+| `pizlonatedGP_` / `GS_` / `DO_` | ✅ global pointer / global slow-path initialiser / data object                                                                                                                                                                        |
 
 **A call, step by step** (✅ from `pizlonatedFI27932_write`):
 1. Call the getter to get `{ptr, lower}`. Null lower → `filc_check_function_call_fail`.
-2. Check that the header's kind is *function* and its aux pointer equals `ptr`. Otherwise fail.
+2. Check that the header's kind is _function_ and its aux pointer equals `ptr`. Otherwise fail.
 3. If **`signature_hash` equals the caller's expectation** → **fast call**:
    `fast_entry(thread, lower, <args in registers, typed per signature>) -> { i1 exception, i64 ret }`.
 4. Otherwise → **generic call**: marshal the arguments into the thread's **cc buffers**, then
@@ -93,13 +93,13 @@ hash is accepted.
 
 ## 3. The thread (every function's first argument)
 
-| offset | field |
-| --- | --- |
-| `+0` | ✅ **stack limit**. Every function entry does `cmp rsp, [thread]; jae filc_stack_overflow_failure` |
-| `+8` | ✅ **state byte**. Every loop's **pollcheck** loads it and tests the mask **`0x0E`** (bits 1–3: GC work pending), calling **`filc_pollcheck_slow(thread, origin)`** if set. The runtime's own `filc_pollcheck_outline` is literally `testb $0xe, 8(%rdi); jne → filc_pollcheck_slow` (probed 2026-09-30, `tools/p3/gc-probe.ts`) |
-| `+16` | ✅ **top frame**. Each function pushes a frame `{ parent, origin, [0 x ptr] }` and pops it on return: a **shadow stack, which is how FUGC finds roots precisely**. `origin` is the source location used in panic traces |
-| `+128` | ✅ **cc payload buffer**: arguments/results, 8 bytes per word |
-| `+384` | ✅ **cc aux buffer**: one capability (`lower`) per payload word, 0 for a non-pointer; 64-byte aligned |
+| offset | field                                                                                                                                                                                                                                                                                                                            |
+| ------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `+0`   | ✅ **stack limit**. Every function entry does `cmp rsp, [thread]; jae filc_stack_overflow_failure`                                                                                                                                                                                                                               |
+| `+8`   | ✅ **state byte**. Every loop's **pollcheck** loads it and tests the mask **`0x0E`** (bits 1–3: GC work pending), calling **`filc_pollcheck_slow(thread, origin)`** if set. The runtime's own `filc_pollcheck_outline` is literally `testb $0xe, 8(%rdi); jne → filc_pollcheck_slow` (probed 2026-09-30, `tools/p3/gc-probe.ts`) |
+| `+16`  | ✅ **top frame**. Each function pushes a frame `{ parent, origin, [0 x ptr] }` and pops it on return: a **shadow stack, which is how FUGC finds roots precisely**. `origin` is the source location used in panic traces                                                                                                          |
+| `+128` | ✅ **cc payload buffer**: arguments/results, 8 bytes per word                                                                                                                                                                                                                                                                    |
+| `+384` | ✅ **cc aux buffer**: one capability (`lower`) per payload word, 0 for a non-pointer; 64-byte aligned                                                                                                                                                                                                                            |
 
 Example (✅): `write(1, s, 3)` through the generic path stores `1, s.ptr, 3` at `+128/+136/+144`
 and `0, s.lower, 0` at `+384/+392/+400`, then calls with `arg_bytes = 24`.
@@ -111,12 +111,12 @@ and `0, s.lower, 0` at `+384/+392/+400`, then calls with `arg_bytes = 24`.
 
 ## 5. Linking and loading
 
-| fact | detail |
-| --- | --- |
-| ✅ **dynamic by default** | a program NEEDs `libc.so`, `libpizlo.so` and `libyoloc.so`, with RUNPATH to `pizfix/lib` |
-| ✅ **Fil-C's own loader** | interpreter `pizfix/lib/ld-fil1-x86_64.so` |
-| ✅ link order | `crt… filc_crt.o <objects> -lc -lpizlo -lyolort -lyoloc -lyolom -lyolort -lyolounwind crt…` |
-| ✅ **overridable** | `pizlonated_zsys_write` is `GLOBAL DEFAULT` in `libpizlo.so`, with no `DT_SYMBOLIC`. `libc.so` imports it by name (`UND`) |
+| fact                      | detail                                                                                                                    |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| ✅ **dynamic by default** | a program NEEDs `libc.so`, `libpizlo.so` and `libyoloc.so`, with RUNPATH to `pizfix/lib`                                  |
+| ✅ **Fil-C's own loader** | interpreter `pizfix/lib/ld-fil1-x86_64.so`                                                                                |
+| ✅ link order             | `crt… filc_crt.o <objects> -lc -lpizlo -lyolort -lyoloc -lyolom -lyolort -lyolounwind crt…`                               |
+| ✅ **overridable**        | `pizlonated_zsys_write` is `GLOBAL DEFAULT` in `libpizlo.so`, with no `DT_SYMBOLIC`. `libc.so` imports it by name (`UND`) |
 
 ~~🔑 So `--runtime zig` should work by putting a `libzilc_rt.so` before `-lpizlo`.~~
 **Superseded 2026-09-30 by the fidelity rule** (`roadmap.md` P3): an extra library changes the
@@ -131,27 +131,27 @@ presumably musl's loader).
 FUGC is **parallel, concurrent, on-the-fly, grey-stack, Dijkstra, accurate, non-moving**. What that
 demands from a runtime and from compiled code:
 
-| piece | what it is |
-| --- | --- |
-| **pollchecks** | emitted by the pass often enough to bound progress between them. Fast path: load and branch. Slow path: run the **pollcheck callback** (GC work, such as scanning this thread's shadow stack, §3) |
-| **soft handshakes** | the collector asks every thread to run the callback and waits. **No stop-the-world**, except for `fork(2)` and the `FUGC_STW=1` debug mode |
+| piece                                         | what it is                                                                                                                                                                                                                                                                      |
+| --------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **pollchecks**                                | emitted by the pass often enough to bound progress between them. Fast path: load and branch. Slow path: run the **pollcheck callback** (GC work, such as scanning this thread's shadow stack, §3)                                                                               |
+| **soft handshakes**                           | the collector asks every thread to run the callback and waits. **No stop-the-world**, except for `fork(2)` and the `FUGC_STW=1` debug mode                                                                                                                                      |
 | **enter / exit** ✅ answers the open question | **a thread that blocks must EXIT first** (a system call or a long runtime function). While exited, the collector runs that thread's callbacks itself. **The only ways to block** are looping while entered (a pollcheck each iteration) or calling into the runtime and exiting |
-| **store barrier** | Dijkstra: while marking, storing a pointer to an unmarked object marks it (a relaxed CAS on the slow path). **No load barrier**, because stacks are rescanned to a fixpoint |
-| **black allocation** | objects allocated during a collection are pre-marked |
-| **safe signal delivery** | signals are delivered at safepoints (see `zincrement_signal_deferral_depth` in `pizlonated_runtime.h`) |
-| **safepoint guarantee** | a pointer loaded from the heap is safe to use until the next pollcheck or exit, so it only has to be visible to stack scanning by then |
+| **store barrier**                             | Dijkstra: while marking, storing a pointer to an unmarked object marks it (a relaxed CAS on the slow path). **No load barrier**, because stacks are rescanned to a fixpoint                                                                                                     |
+| **black allocation**                          | objects allocated during a collection are pre-marked                                                                                                                                                                                                                            |
+| **safe signal delivery**                      | signals are delivered at safepoints (see `zincrement_signal_deferral_depth` in `pizlonated_runtime.h`)                                                                                                                                                                          |
+| **safepoint guarantee**                       | a pointer loaded from the heap is safe to use until the next pollcheck or exit, so it only has to be visible to stack scanning by then                                                                                                                                          |
 
 **Observed entry points (2026-09-30, `tools/p3/gc-probe.ts`, `nm`/`objdump` of `libpizlo.so`):**
 
-| export | role |
-| --- | --- |
-| `filc_pollcheck_slow(thread, origin)` | the pollcheck slow path, called from compiled loops. It finds the current thread through a pthread key (`filc_thread_key`) |
-| `filc_pollcheck_outline` | out-of-line pollcheck: `testb $0xe, 8(%rdi)`, then the slow path |
-| **`filc_exit` / `filc_enter`** (+ `_with_allocation_root`, `filc_exit_on_panic`) | **leave and re-enter managed code.** ✅ `filc_native_zsys_read` calls **`filc_exit` → libc `read` → `filc_enter`**, then sets errno through `filc_set_errno`. **Every blocking `zsys_*` follows this shape** |
-| `filc_memcpy_with_exit`, `filc_memmove_with_exit`, `filc_memset_with_exit`, `filc_low_level_ptr_safe_bzero_with_exit` | long copies that exit, so a big `memcpy` doesn't stall a handshake |
-| `filc_soft_handshake`, `filc_handshake_lock*`, `filc_runtime_threads_handshake`, `fugc_handshake` | soft handshakes |
-| `filc_stop_the_world`, `fugc_should_stop_the_world` | stop-the-world (`fork`, `FUGC_STW=1`) |
-| `filc_thread_participates_in_pollchecks` / `…_in_handshakes` | per-thread participation |
+| export                                                                                                                | role                                                                                                                                                                                                         |
+| --------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `filc_pollcheck_slow(thread, origin)`                                                                                 | the pollcheck slow path, called from compiled loops. It finds the current thread through a pthread key (`filc_thread_key`)                                                                                   |
+| `filc_pollcheck_outline`                                                                                              | out-of-line pollcheck: `testb $0xe, 8(%rdi)`, then the slow path                                                                                                                                             |
+| **`filc_exit` / `filc_enter`** (+ `_with_allocation_root`, `filc_exit_on_panic`)                                      | **leave and re-enter managed code.** ✅ `filc_native_zsys_read` calls **`filc_exit` → libc `read` → `filc_enter`**, then sets errno through `filc_set_errno`. **Every blocking `zsys_*` follows this shape** |
+| `filc_memcpy_with_exit`, `filc_memmove_with_exit`, `filc_memset_with_exit`, `filc_low_level_ptr_safe_bzero_with_exit` | long copies that exit, so a big `memcpy` doesn't stall a handshake                                                                                                                                           |
+| `filc_soft_handshake`, `filc_handshake_lock*`, `filc_runtime_threads_handshake`, `fugc_handshake`                     | soft handshakes                                                                                                                                                                                              |
+| `filc_stop_the_world`, `fugc_should_stop_the_world`                                                                   | stop-the-world (`fork`, `FUGC_STW=1`)                                                                                                                                                                        |
+| `filc_thread_participates_in_pollchecks` / `…_in_handshakes`                                                          | per-thread participation                                                                                                                                                                                     |
 
 ⚠️ **KI-7 is a GC problem, not only a policy one:** a raw `futex` or `clock_nanosleep` blocks without
 exiting, so every soft handshake would wait on that thread forever. Routing those calls through
@@ -172,5 +172,5 @@ libc's `syscall()` (which exits) is **required**, not a workaround.
   output, public headers, binaries, `invisicap.txt`, `gimso_semantics.md` and `Manifesto.md`. It is
   evidence that a **clean-room runtime is feasible** (open question #3). ✅ **The pollcheck word
   (thread + 8, mask `0x0E`) and the exit/enter entry points were observed 2026-09-30** (§3, §5b).
-  **Still unspecified:** the exact **flag-bit** values besides *function* and READONLY, the meaning
+  **Still unspecified:** the exact **flag-bit** values besides _function_ and READONLY, the meaning
   of each state bit, and the rest of the thread layout beyond +0/+8/+16/+128/+384.

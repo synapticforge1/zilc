@@ -12,13 +12,13 @@ measured on Zig 0.15.2 and Fil-C 0.686. The port efforts themselves come after p
 
 ## The answer in one table
 
-| platform | processors | what Fil-C 0.686 offers | OS functions (corpus) | new int→ptr std functions | raw kernel asm | verdict |
-| --- | --- | --- | --- | --- | --- | --- |
-| **Linux** | x86_64 ✅ · **aarch64** | both, prebuilt (`filc-0.686-linux-{x86_64,aarch64}`) | 75 | 0 | 468 sites (x86_64) / 390 (aarch64) | **x86_64 works. aarch64 is close: 4 concrete gaps (below)** |
-| **Android** | aarch64 · x86_64 | none (Bionic, not musl) | 72 (13 differ: `*64` variants, `arc4random_buf`, `__errno`) | 0 | 390 | Linux kernel, but needs a checked Bionic-compatible libc layer, or musl-on-Android |
-| **macOS** | aarch64 · x86_64 | **cosmo mode** (APE binaries; see below); no native port | 79 (22 differ: `__ulock_*`, `os_unfair_lock_*`, `_dyld_*`, `fcopyfile`, `getcontext`, `$NOCANCEL`) | 3, all stack-trace code (`lookupModuleDyld`, `unwindFrameMachO`) | 0 (libSystem only) | via cosmo: plausible, not yet tried; natively: P3 runtime + libSystem layer |
-| **iOS** | aarch64 | none (cosmo does not cover iOS) | 79 (as macOS) | 3 (as macOS) | 0 | macOS's work plus signing/no-exec-mmap; last |
-| **Windows** | x86_64 · aarch64 | **cosmo mode, x86_64 only** (verified under Wine upstream; real Windows untested) | 86 (78 differ: kernel32, ntdll, ws2_32, crypt32) | 7: stack walking, `heap.PageAllocator.map/realloc`, DebugAllocator buckets | 0 | via cosmo: x86_64 plausible; aarch64 Windows has no route; natively: the biggest layer |
+| platform    | processors              | what Fil-C 0.686 offers                                                           | OS functions (corpus)                                                                              | new int→ptr std functions                                                  | raw kernel asm                     | verdict                                                                                |
+| ----------- | ----------------------- | --------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | ---------------------------------- | -------------------------------------------------------------------------------------- |
+| **Linux**   | x86_64 ✅ · **aarch64** | both, prebuilt (`filc-0.686-linux-{x86_64,aarch64}`)                              | 75                                                                                                 | 0                                                                          | 468 sites (x86_64) / 390 (aarch64) | **x86_64 works. aarch64 is close: 4 concrete gaps (below)**                            |
+| **Android** | aarch64 · x86_64        | none (Bionic, not musl)                                                           | 72 (13 differ: `*64` variants, `arc4random_buf`, `__errno`)                                        | 0                                                                          | 390                                | Linux kernel, but needs a checked Bionic-compatible libc layer, or musl-on-Android     |
+| **macOS**   | aarch64 · x86_64        | **cosmo mode** (APE binaries; see below); no native port                          | 79 (22 differ: `__ulock_*`, `os_unfair_lock_*`, `_dyld_*`, `fcopyfile`, `getcontext`, `$NOCANCEL`) | 3, all stack-trace code (`lookupModuleDyld`, `unwindFrameMachO`)           | 0 (libSystem only)                 | via cosmo: plausible, not yet tried; natively: P3 runtime + libSystem layer            |
+| **iOS**     | aarch64                 | none (cosmo does not cover iOS)                                                   | 79 (as macOS)                                                                                      | 3 (as macOS)                                                               | 0                                  | macOS's work plus signing/no-exec-mmap; last                                           |
+| **Windows** | x86_64 · aarch64        | **cosmo mode, x86_64 only** (verified under Wine upstream; real Windows untested) | 86 (78 differ: kernel32, ntdll, ws2_32, crypt32)                                                   | 7: stack walking, `heap.PageAllocator.map/realloc`, DebugAllocator buckets | 0                                  | via cosmo: x86_64 plausible; aarch64 Windows has no route; natively: the biggest layer |
 
 "OS functions (corpus)" = the external functions (not LLVM intrinsics or compiler-rt) referenced
 by the 78 Zig programs of `tests/basics`, union over all programs, in Zig's unoptimized IR (the
@@ -129,12 +129,12 @@ filtering.
 
 **Step 4 ✅ 2026-10-08: upstream's own `cosmo.txt` "Verification checklist", items 1 and 3–6, all pass, run entirely inside WSL** (item 2 is the suite, step 2 above; item 7 is macOS documentation only):
 1. flavour state: both `libyolocosmo.a` present, no `libc.so.6666`, `libexec/` has `apelink`, `pecheck`, `ape-m1.c`;
-3. x86_64: `hello` (static ELF) and `hello.com` (`MZqFpD`, `pecheck` exit 0) both print;
-4. aarch64: `--target=aarch64-linux-gnu` under `qemu-aarch64` prints;
-5. fat APE (`--filc-fat-ape`): x86_64 half native, `hellofat.aarch64.elf` under qemu, `pecheck` exit 0;
-6. C++ (`<iostream>` + 4 `std::thread`s, `std::atomic`) prints `threads sum 40`;
-plus the fat APE's Windows half under `wine64` inside WSL: prints, exit 0.
-Script: the session scratchpad's `cosmo-check.sh` (outputs in `~/zilc-work/cosmo-check/`).
+2. x86_64: `hello` (static ELF) and `hello.com` (`MZqFpD`, `pecheck` exit 0) both print;
+3. aarch64: `--target=aarch64-linux-gnu` under `qemu-aarch64` prints;
+4. fat APE (`--filc-fat-ape`): x86_64 half native, `hellofat.aarch64.elf` under qemu, `pecheck` exit 0;
+5. C++ (`<iostream>` + 4 `std::thread`s, `std::atomic`) prints `threads sum 40`;
+   plus the fat APE's Windows half under `wine64` inside WSL: prints, exit 0.
+   Script: the session scratchpad's `cosmo-check.sh` (outputs in `~/zilc-work/cosmo-check/`).
 
 **Cosmo evaluation: CLOSED 2026-10-08.** Everything planned is done: Fil-C's suite in cosmo mode (step 2), the zilc questions (step 3: `syscall()` off Linux, static linking, Zig programs as ELF + APE + under Wine), upstream's checklist (step 4). What it leaves for the plan: (a) `statx` is missing from the cosmo runtime (Zig's std uses it: `58_reading-files`); (b) real Windows is unverified and stays so from this machine; (c) aarch64 Windows, iOS and Android are outside cosmo's reach (the native-runtime route, P3, stays for them).
 

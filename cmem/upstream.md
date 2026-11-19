@@ -10,18 +10,18 @@ multi-licensed (see `licensing.md`).
 
 ## Files that matter to zilc
 
-| Upstream path | What it is | License |
-| --- | --- | --- |
-| `llvm/lib/Transforms/Instrumentation/FilPizlonator.cpp` | **The pass.** "Apply GIMSO semantics to LLVM IR" | Apache-2.0 WITH LLVM-exception |
-| `clang/` (Fil-C diffs vs clang 20.1.8) | Frontend changes; size TBD | Apache-2.0 WITH LLVM-exception |
-| `libpas/src/libpas/filc_runtime.c`, `filc_*.c/h` | **The runtime** | BSD-2-Clause |
-| `libpas/` (rest) | Allocator substrate, incl. FUGC | BSD-2-Clause |
-| `filc/include/stdfil.h` | Public Fil-C API header for programs | BSD-2-Clause |
-| `filc/tests`, `filc/run-tests` | **Test corpus**, a candidate conformance suite for zilc | BSD-2-Clause (verify per file) |
-| `projects/usermusl`, `projects/yolomusl` | The two-level libc | MIT |
-| `yolounwind/` | Unwinder | verify |
-| `invisicap.txt`, `invisicaps_by_example.md`, `gimso_semantics.md`, `Manifesto.md` | **Design docs**, read first | n/a (docs) |
-| `README.md` | Build and license overview | n/a |
+| Upstream path                                                                     | What it is                                              | License                        |
+| --------------------------------------------------------------------------------- | ------------------------------------------------------- | ------------------------------ |
+| `llvm/lib/Transforms/Instrumentation/FilPizlonator.cpp`                           | **The pass.** "Apply GIMSO semantics to LLVM IR"        | Apache-2.0 WITH LLVM-exception |
+| `clang/` (Fil-C diffs vs clang 20.1.8)                                            | Frontend changes; size TBD                              | Apache-2.0 WITH LLVM-exception |
+| `libpas/src/libpas/filc_runtime.c`, `filc_*.c/h`                                  | **The runtime**                                         | BSD-2-Clause                   |
+| `libpas/` (rest)                                                                  | Allocator substrate, incl. FUGC                         | BSD-2-Clause                   |
+| `filc/include/stdfil.h`                                                           | Public Fil-C API header for programs                    | BSD-2-Clause                   |
+| `filc/tests`, `filc/run-tests`                                                    | **Test corpus**, a candidate conformance suite for zilc | BSD-2-Clause (verify per file) |
+| `projects/usermusl`, `projects/yolomusl`                                          | The two-level libc                                      | MIT                            |
+| `yolounwind/`                                                                     | Unwinder                                                | verify                         |
+| `invisicap.txt`, `invisicaps_by_example.md`, `gimso_semantics.md`, `Manifesto.md` | **Design docs**, read first                             | n/a (docs)                     |
+| `README.md`                                                                       | Build and license overview                              | n/a                            |
 
 Excluded: `projects/*` other than the musl pair, `pizlix/`, and the glibc variant (see
 `third_party/LICENSES.md` → Copyleft exclusion).
@@ -36,7 +36,7 @@ first passing on the Zig that matches Fil-C.
 
 1. Record the new upstream SHA **and the prebuilt release version** (0.685 today) here, with the date.
 2. **Check Fil-C's LLVM version** (`cmake/Modules/LLVMVersion.cmake`; 20.1.8 at the pinned SHA).
-   Find the Zig release whose bundled LLVM has **the same major**. That is the *compatible Zig*
+   Find the Zig release whose bundled LLVM has **the same major**. That is the _compatible Zig_
    (0.15.2 ↔ LLVM 20 today; verify in Zig's build files **and** with `zig cc --version`, per
    `best-practices.md`).
 3. Diff only the files in the table above between the old and new SHA. Port the changes to anything
@@ -50,8 +50,8 @@ first passing on the Zig that matches Fil-C.
    same release, then run `zig build gate-zig-modules -Dzig-modules=<dir> -Dzig-modules-filc=<release>`
    — the same gate with Fil-C's modules swapped for them (`testing.md` "The gate with pure-Zig
    modules"). zilc is the corpus of truth for both.
-7. **Rebuild everything and recheck for the same results** (owner, 2026-11-06: *"whenever we
-   perform the Fil-C updates we would rebuild everything and recheck for the same results"*):
+7. **Rebuild everything and recheck for the same results** (owner, 2026-11-06: _"whenever we
+   perform the Fil-C updates we would rebuild everything and recheck for the same results"_):
    `zig build patched-clang` and the installed tree; both chains from source
    (`build-filc-from-source.ts` MODE=zig and MODE=upstream, the reference GCCs rebuilt by `zig
    build gcc-reference` if their pins moved) and `compare-chains.ts` 14/14; the benchmark suite
@@ -59,13 +59,19 @@ first passing on the Zig that matches Fil-C.
    `results.json`: step 5's stage-C numbers). The tools not yet run under Bun since the port —
    `build-patched-clang.ts` (its tree-assembly half) and `build-cosmo.ts` — are run, rewritten or
    retired at that update, not before; their old outputs are simply overwritten (owner, same day:
-   *"we probaly need to just leave them and overwrite them when we update"*).
-8. **The small checks carried to that update** (owner, 2026-11-06: *"the small check will be taken
-   care of when we update"*): review the upstream commits after the current tag (today
+   _"we probaly need to just leave them and overwrite them when we update"_).
+8. **The small checks carried to that update** (owner, 2026-11-06: _"the small check will be taken
+   care of when we update"_): review the upstream commits after the current tag (today
    `f565a56`, the callee roots its arguments, an ABI change; `7d4ed7b`, symbol visibility; "Review
    of Fil-C 0.687" below); re-run W-7's reduced case (`../zailc/tests/link/eh_dtor_writes_global.cpp`,
    C++ at `-O1`; found on 0.686) against the new release; re-test KI-7's remainder (`getcontext`,
    `known-issues.md`) in case std or Fil-C moved. Each gets its result recorded where it lives.
+9. **How the upgrade is released — decide BEFORE the release** (owner, 2026-11-15: "c", review
+   round 1, KI-30): `tools/release/check-reviews.ts` (CI, `release.ts`) requires the bump commit to
+   be exactly `bumpEdits` of its parent (N + 1, three files), which a Fil-C or Zig move (every pin,
+   N back to 1) cannot be. Choose then: (a) an `upgrade` kind in `bump.ts` whose edits the check
+   recomputes the same way, or (b) the upgrade commit reviewed as code and a bump commit that only
+   sets the version; change the guard and its tests under the review process, before the release.
 
 > 🔒 **2026-10-27 (owner): zilc does stage A only, always.** It stays on the Zig whose LLVM
 > matches Fil-C's; stages B and C below are **not done in zilc** and are kept as the procedure
@@ -99,12 +105,12 @@ Compare **previous reference → new reference (A) → latest-Zig port (B)**, on
 Since 2026-10-27 only the first comparison (one reference against the next, both on the
 compatible Zig) is zilc's; the latest-Zig column belongs to whoever does stage B.
 
-| metric | why |
-| --- | --- |
+| metric                                                              | why                                                                         |
+| ------------------------------------------------------------------- | --------------------------------------------------------------------------- |
 | run time of each benchmark program, zilc vs. plain `zig` (baseline) | **zilc's own slowdown figure**, which `vision.md` still lists as unmeasured |
-| run time, version vs. version | did an upgrade make the checked code slower or faster |
-| `zilc build` wall time per program | compile-time cost of the upgrade |
-| binary size (ReleaseSafe and Debug) | Debug is already 108× (KI-4); watch it |
+| run time, version vs. version                                       | did an upgrade make the checked code slower or faster                       |
+| `zilc build` wall time per program                                  | compile-time cost of the upgrade                                            |
+| binary size (ReleaseSafe and Debug)                                 | Debug is already 108× (KI-4); watch it                                      |
 
 ⚠️ Performance claims need **repeats and a stated noise floor** (`best-practices.md` §1). The suite
 exists since 2026-11-06: `tools/bench/bench.ts` (run; `compare <old> <new>` for version against
@@ -112,8 +118,8 @@ version), first baseline and method in `testing.md` "Benchmark suite".
 
 ### Recommendations for a newer-Zig upgrade (0.17.0 and later; not done here)
 
-🔒 Owner, 2026-10-27: zilc *"can make some recommendations for the newest zig version upgrade
-procedures to 0.17.0 but not do them here"*. These are notes for whoever ports to a newer Zig
+🔒 Owner, 2026-10-27: zilc _"can make some recommendations for the newest zig version upgrade
+procedures to 0.17.0 but not do them here"_. These are notes for whoever ports to a newer Zig
 (zailc owns that path), from what zilc measured; each is a claim with a date, to re-check on the
 target Zig.
 
@@ -264,16 +270,16 @@ LLVM fork is now the `fil-c` repo (was `llvm-project-deluge`; same history).
 
 The 10 commits to `FilPizlonator.cpp`, oldest first:
 
-| commit | what | for zilc |
-| --- | --- | --- |
-| `1bb4c53`, `57c71fa` | stack checks under the large code model (+PIC) | not used (Zig, zilc: small model) |
-| `886e4bd` (#312) | GC fences: ARM64 weak loads; a store-store fence after inline allocation (`dmb ishst` on ARM64, an empty compiler barrier on x86) | relevant, small: stops the COMPILER moving a new object's initialising stores past its publication |
-| `47a39b2` (#325) | ARM `hint` intrinsic allowed | not x86 |
-| `097f7b7` | always-live explicit stack auxes (locals without lifetime markers) get their own GC slots; before, they shared ONE and the collector saw only one | **relevant**: Zig's IR has NO lifetime markers. A Zig port of upstream's reproducer did not fail on 0.685 (`bad = 0`, all modes, GC stress), but the shape is Zig's. It inserts edges just before zilc's stack-aux colouring edit, which still applies |
-| `26a97be` | C++20 coroutines; `musttail` honoured when the caller roots every pointer argument | **relevant, MEASURED**: Zig's `@call(.always_tail, …)` emits `musttail`. 10 million tail calls: **0.685 → `filc safety error: stack overflow`; 0.686 → completes**, Debug and ReleaseSafe |
-| `006ab97` + `81c1c3f` | misaligned constant pointers, then reverted | no net change |
-| `635e0b7` | `setjmp` recognised by name (`-fno-builtin`); C common symbols → weak | C inputs with unusual flags only |
-| `45adc76` | `zunsafe_call` only with `-yolo-assembler` | a safety tightening; Zig does not use it |
+| commit                | what                                                                                                                                              | for zilc                                                                                                                                                                                                                                               |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `1bb4c53`, `57c71fa`  | stack checks under the large code model (+PIC)                                                                                                    | not used (Zig, zilc: small model)                                                                                                                                                                                                                      |
+| `886e4bd` (#312)      | GC fences: ARM64 weak loads; a store-store fence after inline allocation (`dmb ishst` on ARM64, an empty compiler barrier on x86)                 | relevant, small: stops the COMPILER moving a new object's initialising stores past its publication                                                                                                                                                     |
+| `47a39b2` (#325)      | ARM `hint` intrinsic allowed                                                                                                                      | not x86                                                                                                                                                                                                                                                |
+| `097f7b7`             | always-live explicit stack auxes (locals without lifetime markers) get their own GC slots; before, they shared ONE and the collector saw only one | **relevant**: Zig's IR has NO lifetime markers. A Zig port of upstream's reproducer did not fail on 0.685 (`bad = 0`, all modes, GC stress), but the shape is Zig's. It inserts edges just before zilc's stack-aux colouring edit, which still applies |
+| `26a97be`             | C++20 coroutines; `musttail` honoured when the caller roots every pointer argument                                                                | **relevant, MEASURED**: Zig's `@call(.always_tail, …)` emits `musttail`. 10 million tail calls: **0.685 → `filc safety error: stack overflow`; 0.686 → completes**, Debug and ReleaseSafe                                                              |
+| `006ab97` + `81c1c3f` | misaligned constant pointers, then reverted                                                                                                       | no net change                                                                                                                                                                                                                                          |
+| `635e0b7`             | `setjmp` recognised by name (`-fno-builtin`); C common symbols → weak                                                                             | C inputs with unusual flags only                                                                                                                                                                                                                       |
+| `45adc76`             | `zunsafe_call` only with `-yolo-assembler`                                                                                                        | a safety tightening; Zig does not use it                                                                                                                                                                                                               |
 
 Other watched files: `configure_llvm.sh` (cosmo aarch64, not our configuration), `libpas/common.sh`
 (cross builds added and reverted: no net change), `filc/include/stdfil.h` (versioning, a doc change),
@@ -297,12 +303,12 @@ between the two nothing changes under `llvm/`, `clang/`, `libpas/` or `filc/` bu
 
 The 4 commits to `FilPizlonator.cpp`, oldest first:
 
-| commit | what | for zilc |
-| --- | --- | --- |
-| `3485bcd` | byval arguments checked over their full allocation (tail padding), not the type's store size; "Anthropic" report | **relevant**: Zig passes large structs by value through the C ABI; a correctness fix |
-| `995fb4c` | values live across a setjmp in a loop always spilled, lowers restored | C inputs with `setjmp` only (Zig has none); superseded by the next |
+| commit    | what                                                                                                                                     | for zilc                                                                                                                                                         |
+| --------- | ---------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `3485bcd` | byval arguments checked over their full allocation (tail padding), not the type's store size; "Anthropic" report                         | **relevant**: Zig passes large structs by value through the C ABI; a correctness fix                                                                             |
+| `995fb4c` | values live across a setjmp in a loop always spilled, lowers restored                                                                    | C inputs with `setjmp` only (Zig has none); superseded by the next                                                                                               |
 | `43d345a` | setjmp-in-a-loop, the hammer: one `zjmp_buf` per setjmp site per frame; reverts most of `995fb4c`; **"an ABI break"** (`filc_runtime.h`) | the pass and the runtime must come from the same release: true for zilc (pass and prebuilt runtime both 0.687); the reason `gate-zig-modules` checks the release |
-| `e714461` | the pass's model of safepoints: alloca, memcpy and friends; `filc_test_support.h` | relevant to all code, Zig's included (GC rooting); a correctness fix |
+| `e714461` | the pass's model of safepoints: alloca, memcpy and friends; `filc_test_support.h`                                                        | relevant to all code, Zig's included (GC rooting); a correctness fix                                                                                             |
 
 Also read: **KillUB** (`2de1327`, "Kill UB harder"): shift amounts masked to the width, vector
 lane indices clamped, division / remainder by zero (and signed `MIN / -1`) made defined. It runs on

@@ -23,8 +23,8 @@ At publish time:
 ## 🔖 THE VERSION IS **`0.15.2-0.686.1`** — `<Zig>-<Fil-C>.<zilc release>` (owner, 2026-10-05)
 
 When zilc moved to Fil-C 0.686, the owner asked for the version to name the Fil-C release too:
-*"we may need to make our release version 0.15.2.686-? to indicate the zig release version, the
-Fil-C release version and the zilc release version."*
+_"we may need to make our release version 0.15.2.686-? to indicate the zig release version, the
+Fil-C release version and the zilc release version."_
 
 - **`0.15.2.686-N` cannot be used:** Zig rejects four numbers (`InvalidVersion`, as `0.15.2.3` was on
   2026-09-30), and `build.zig.zon` needs Zig's form.
@@ -65,7 +65,7 @@ line, `open-work.md`'s State table (INDEX's STATE table until 2026-10-27) and `R
 **`<Zig line>-<zilc release>`**, e.g. **`0.15.2-3`**: zilc release 3 of the Zig 0.15.2 line.
 (First proposed as `0.15.2.3`; see the spelling decision below.)
 
-⚠️ **Corrected 2026-09-30:** this section first said the Zig part names the *compatible* Zig (the one
+⚠️ **Corrected 2026-09-30:** this section first said the Zig part names the _compatible_ Zig (the one
 user code needs). The owner's own example, **`0.16.2-1` based on `0.15.2-100`** while Fil-C is still
 on the old LLVM, shows that it names **the Zig the release line is built with**. User code may need
 an older Zig than the line's (upgrade stage B). **So the version does NOT tell users which Zig their
@@ -102,7 +102,7 @@ code needs.** `zilc --version` and the release notes must state it, along with t
   - Carrying later reference changes to a latest line is a **merge or cherry-pick** from the
     reference branch, and the resulting release names its new basis.
   - An old line stays buildable with its own Zig indefinitely; nothing forces it forward.
-  - ⚠️ *Upstream detail, unverified:* as far as we know, Zig itself keeps one branch per **minor**
+  - ⚠️ _Upstream detail, unverified:_ as far as we know, Zig itself keeps one branch per **minor**
     series (e.g. `0.15.x`) and tags patch releases. zilc goes finer, one branch per patch release,
     because patch releases break things too (owner). Check Zig's repository before quoting this.
   - ✅ **Settled (owner, 2026-09-30):**
@@ -130,7 +130,7 @@ maps directly to **`0.15.2-3`**, keeping our release number `3`, and it sorts ab
 - `0.15.2+zilc.3` is accepted, but the part after `+` is ignored when comparing versions, so
   `+zilc.3` and `+zilc.4` compare **equal**. Unusable.
 - `0.15.2-zilc.3` is accepted and our releases sort correctly among themselves, but every one sorts
-  *below* `0.15.2`, which reads like a Zig pre-release.
+  _below_ `0.15.2`, which reads like a Zig pre-release.
 - `0.3.0+zig.0.15.2` is valid and sorts correctly, but puts our number first.
 
 ✅ **SPELLING CHOSEN (owner, 2026-09-30): `0.15.2-N`**, e.g. **`0.15.2-3`**, used everywhere
@@ -140,7 +140,7 @@ numbers, not text), today's `0.3.0 < 0.15.2-3` so the switch sorts upward, and `
 The one cost: `0.15.2-3 < 0.15.2` to generic semver tools, which read it as a pre-release. Harmless,
 since nothing of ours is ever versioned plain `0.15.2`.
 
-❌ **`0.15.2_3` was considered and REJECTED:** Zig *accepts* it, but its number parser treats `_` as a
+❌ **`0.15.2_3` was considered and REJECTED:** Zig _accepts_ it, but its number parser treats `_` as a
 digit separator (as in `1_000`), so it is **patch 23**: `0.15.2_3 == 0.15.23`. That would collide
 with a real Zig release. Accepted is not the same as understood (`best-practices.md`).
 
@@ -206,8 +206,8 @@ the P2 exit criterion (C programs panic correctly under Zig's toolchain). Confir
 4. `README.md` → the status line
 5. `RELEASE-NOTES.md` → a new section per release, with its table (line, user Zig, Fil-C, basis)
 
-⚠️ **`minimum_zig_version` is a SEPARATE number.** It names the Zig that *builds* zilc. The version's
-leading `0.15.2` names the Zig that compiles *user code*. They match at upgrade stage A, and they
+⚠️ **`minimum_zig_version` is a SEPARATE number.** It names the Zig that _builds_ zilc. The version's
+leading `0.15.2` names the Zig that compiles _user code_. They match at upgrade stage A, and they
 **separate at stage B**, where `minimum_zig_version` moves to the latest Zig and the version's Zig
 part stays on the compatible one (`upstream.md`, `design-decisions.md` invariant 4).
 
@@ -228,41 +228,41 @@ the page).
 - [ ] Version synced in all five places above (`bun tools/release/bump.ts --check`).
 - [ ] `RELEASE-NOTES.md` has the release's section: **the basis** (latest-line releases), **the Zig
       user code needs**, **the Fil-C release**, what changed, what to know. Its claims are checked
-      against the gates (2026-10-05: a "C++" claim was removed, C++ is untested). A new Zig line
-      also gets its `ports/<version>.md` entry.
+  against the gates (2026-10-05: a "C++" claim was removed, C++ is untested). A new Zig line
+  also gets its `ports/<version>.md` entry.
 - [ ] `zilc --version` on the release machine shows `ok` for Zig and Fil-C.
 - [ ] Fil-C's own test suite: stock vs zilc's patched clang, **0 differences**
-      (`tools/filc/run-filc-tests.ts`; `testing.md`).
+  (`tools/filc/run-filc-tests.ts`; `testing.md`).
 - [ ] `third_party/LICENSES.md` ledger matches what is actually in the tree. Any license that must
-      travel with `zig-out/` is installed by `build.zig`.
+  travel with `zig-out/` is installed by `build.zig`.
 - [ ] `cmem/open-work.md` State updated.
 - [ ] **After a Fil-C update has passed every item above** (owner, 2026-10-27): once pure-Zig
-      builds of the changed modules exist for that release, run the same gate with Fil-C's modules
-      swapped for them — `zig build gate-zig-modules -Dzig-modules=<dir> -Dzig-modules-filc=<release>`
-      (with `ZILC_FILC` at the release's toolchain; `testing.md` "The gate with pure-Zig modules").
-      Record which modules were pure Zig AND linked (the step prints it and writes
-      `ZIG-MODULES.txt`); the corpus and the output comparison run against the same copy with
-      `ZILC_FILC` set to the clang it prints.
-- [ ] **On a Fil-C move, every reference moves together** (owner, 2026-10-30: *"all of these
-      references should be updated each time Fil-C updates"*; `design-decisions.md` top row):
-      1. `build.zig.zon` `filc`: the archive URL at the new compiler commit, and its hash from
-         `zig fetch <url>` (it prints the hash and fills Zig's cache);
-      2. the other pins: `src/gen/signatures.zig` (re-run the importers), `src/root.zig`,
-         `tools/lib/tool.ts`, `tools/p1/setup-wsl.ts` (prebuilt SHA-256), the three
-         `src/runtime/*_sources.zig` tables, `third_party/filc-patches/README.md`, `Fil-C.md` § 1;
-         **`zig build check-pins`** (also in `zig build test`) lists any that disagree;
-      3. `bun tools/upstream/verify-filc-package.ts`: the fetched tree equals the commit as checked
-         out (blob ids; upstream's `eol=crlf` files by `git check-attr`; Zig's executable rule);
-      4. `zig build patched-clang` rebuilds the clang from the fetched tree; then
-         `MODE=zig bun tools/filc/build-filc-from-source.ts` (no compiler on PATH) and
-         `MODE=upstream` (the maintainer's GCC chain), Fil-C's suite on both (0 differences), and
-         the chain-against-chain comparison (exports, self-binding relocations, gate, corpus,
-         output comparison: `bun tools/filc/compare-chains.ts`, exit 0), and
-         `zig build pure-zig` the runtime pieces (the `verify-*` tools with
-         `ZILC_FILC_SRC=<package>`);
-      5. `build.zig.zon`'s `cmake` and `ninja` (the `-Dfetch-build-tools` opt-in): check for newer
-         releases; to move one, `zig fetch <url>` for the hash, compare the download's SHA-256
-         with the publisher's (Kitware's `cmake-<v>-SHA-256.txt`; GitHub's asset `digest`), and
-         rebuild `patched-clang` with the option.
-      Replaces the 2026-10-27 "re-sync the project folder's duplicate" step: a clone reaches the
-      pinned download, so there is no duplicate to keep.
+  builds of the changed modules exist for that release, run the same gate with Fil-C's modules
+  swapped for them — `zig build gate-zig-modules -Dzig-modules=<dir> -Dzig-modules-filc=<release>`
+  (with `ZILC_FILC` at the release's toolchain; `testing.md` "The gate with pure-Zig modules").
+  Record which modules were pure Zig AND linked (the step prints it and writes
+  `ZIG-MODULES.txt`); the corpus and the output comparison run against the same copy with
+  `ZILC_FILC` set to the clang it prints.
+- [ ] **On a Fil-C move, every reference moves together** (owner, 2026-10-30: _"all of these
+      references should be updated each time Fil-C updates"_; `design-decisions.md` top row):
+  1. `build.zig.zon` `filc`: the archive URL at the new compiler commit, and its hash from
+     `zig fetch <url>` (it prints the hash and fills Zig's cache);
+  2. the other pins: `src/gen/signatures.zig` (re-run the importers), `src/root.zig`,
+     `tools/lib/tool.ts`, `tools/p1/setup-wsl.ts` (prebuilt SHA-256), the three
+     `src/runtime/*_sources.zig` tables, `third_party/filc-patches/README.md`, `Fil-C.md` § 1;
+     **`zig build check-pins`** (also in `zig build test`) lists any that disagree;
+  3. `bun tools/upstream/verify-filc-package.ts`: the fetched tree equals the commit as checked
+     out (blob ids; upstream's `eol=crlf` files by `git check-attr`; Zig's executable rule);
+  4. `zig build patched-clang` rebuilds the clang from the fetched tree; then
+     `MODE=zig bun tools/filc/build-filc-from-source.ts` (no compiler on PATH) and
+     `MODE=upstream` (the maintainer's GCC chain), Fil-C's suite on both (0 differences), and
+     the chain-against-chain comparison (exports, self-binding relocations, gate, corpus,
+     output comparison: `bun tools/filc/compare-chains.ts`, exit 0), and
+     `zig build pure-zig` the runtime pieces (the `verify-*` tools with
+     `ZILC_FILC_SRC=<package>`);
+  5. `build.zig.zon`'s `cmake` and `ninja` (the `-Dfetch-build-tools` opt-in): check for newer
+     releases; to move one, `zig fetch <url>` for the hash, compare the download's SHA-256
+     with the publisher's (Kitware's `cmake-<v>-SHA-256.txt`; GitHub's asset `digest`), and
+     rebuild `patched-clang` with the option.
+     Replaces the 2026-10-27 "re-sync the project folder's duplicate" step: a clone reaches the
+     pinned download, so there is no duplicate to keep.

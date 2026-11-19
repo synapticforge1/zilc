@@ -1,7 +1,7 @@
 # review-process.md — zilc's slots in the workspace review standard
 
 🔒 **Owner, 2026-11-12 (workspace letter H35):** one review process everywhere —
-`../cmem/review-process.md`, from S3D-ReportCompiler. "review", "security review", "hardening
+`../workspace/cmem/review-process.md`, from S3D-ReportCompiler. "review", "security review", "hardening
 review" each run in rounds by fresh, read-only reviewers and **stop when a round's reviewers find
 nothing**; **a security review and a hardening review are required before every release**, recorded
 in that release's entry in [release.md](release.md) before the bump. The PROCESS is the workspace
@@ -9,18 +9,21 @@ file's and is not copied here; this file fills its **[project]** slots for zilc 
 
 ## The owner's words (beside "commit" / "push" / "release", `working-rules.md` § Owner commands)
 
-| the owner says | it is | none of them commits, pushes or releases |
-| --- | --- | --- |
-| **"review"** | a targeted agent code review, workspace § 2 | |
-| **"security review"** | a security review, workspace § 3 | |
-| **"hardening review"** | a hardening review, workspace § 4 | |
+| the owner says         | it is                                       | none of them commits, pushes or releases |
+| ---------------------- | ------------------------------------------- | ---------------------------------------- |
+| **"review"**           | a targeted agent code review, workspace § 2 |                                          |
+| **"security review"**  | a security review, workspace § 3            |                                          |
+| **"hardening review"** | a hardening review, workspace § 4           |                                          |
 
 ## The slots
 
 **Private data a reviewer never reads (§ 1.1, § 5):** `cmem/local/` (gitignored, machine facts);
 `.claude/`; anything outside the clone except the read-only siblings it is pointed at. A reviewer
 works in its own scratch folder; in WSL that is under `~/zilc-work/` (WSL's `/tmp` was seen
-emptied between invocations, 2026-11-12). 🛑 It never executes anything built by Fil-C, cosmo or zilc on
+emptied between invocations, 2026-11-12). **The brief says:** work only in the folder you are
+given, under the main session's scratchpad or `~/zilc-work/review-<n>/`; the main session deletes
+it — clones, mutants, planted inputs — when the round is triaged (`working-rules.md` § Scratch
+space, letter H43). 🛑 It never executes anything built by Fil-C, cosmo or zilc on
 the Windows host (`workarounds.md`): every run is in WSL or Linux.
 
 **The worst silent case (§ 1.2):** **a memory-unsafe program that zilc compiles and that runs
@@ -32,15 +35,15 @@ test passes. Both rank above any crash.
 **The reference results that must still hold (§ 1.3.4)** — each a dated count in `testing.md` /
 `open-work.md`, re-derived before quoting:
 
-| set | command | holds at |
-| --- | --- | --- |
-| the safety gate | `bun tools/run-gate.ts` (Fil-C in WSL) | **8/8**, every case trapping at its file:line |
-| unit tests | `zig build test --summary all` | **40/40** (2026-11-07) |
-| the corpus | `testing.md` "corpus" | **78/78 as designed in all four modes** |
-| the output comparison | `testing.md` | **0 unexplained** |
-| Fil-C's own suite | `tools/filc/run-filc-tests.ts`, stock vs zilc's clang | **0 differences** on 7,269 |
-| the pure-Zig chain | `tools/filc/compare-chains.ts` | **14/14** |
-| the sarcasm port | `bun tools/sarcasm/check-stages.ts` | **every stage 0 differ** |
+| set                   | command                                               | holds at                                             |
+| --------------------- | ----------------------------------------------------- | ---------------------------------------------------- |
+| the safety gate       | `bun tools/run-gate.ts` (Fil-C in WSL)                | **8/8**, every case trapping at its file:line        |
+| unit tests            | `zig build test --summary all`                        | **41/41** (2026-11-15; +check-pins' own test, KI-38) |
+| the corpus            | `testing.md` "corpus"                                 | **78/78 as designed in all four modes**              |
+| the output comparison | `testing.md`                                          | **0 unexplained**                                    |
+| Fil-C's own suite     | `tools/filc/run-filc-tests.ts`, stock vs zilc's clang | **0 differences** on 7,269                           |
+| the pure-Zig chain    | `tools/filc/compare-chains.ts`                        | **14/14**                                            |
+| the sarcasm port      | `bun tools/sarcasm/check-stages.ts`                   | **every stage 0 differ**                             |
 
 **CI jobs (§ 1.5):** `.github/workflows/release.yml` on every push to `main`, `ubuntu-latest`
 (Linux x86_64): `checks` (zig fmt, `zig build test`, the release scripts' tests, the five version
@@ -77,5 +80,6 @@ Nothing else is a target here; other platforms are zailc's.
 
 **Records (§ 6):** findings → [known-issues.md](known-issues.md) (one `KI-n` row each; the WHY of
 any workaround in [workarounds.md](workarounds.md)); the round → [open-work.md](open-work.md); a
-release's two reviews → that release's entry in [release.md](release.md), before the bump
-(`bump.ts` and `release.ts` refuse without both).
+release's two reviews → that release's entry in [release.md](release.md), before the bump, as the
+two lines of its § "Review records" (`bump.ts`, `release.ts` and CI's `check-reviews.ts` refuse
+without both, and check the range against the history — KI-24).

@@ -9,9 +9,12 @@ name: release
 #
 # - `checks` runs everything that executes repository code with a read-only token on a token-less
 #   clone of the pushed commit, and decides "is this a release?": build.zig.zon's version has no
-#   tag yet (or, on a re-run, its tag is already on THIS commit). It runs what a runner CAN run:
-#   zig fmt, `zig build test` (needs no Fil-C — rehearsed 2026-11-12 on a fresh clone with empty
-#   caches), the release scripts' tests, the five-places check and the privacy scan. The Fil-C
+#   tag yet AND the commit is its bump commit `bump to v<version>` (or, on a re-run, its tag is
+#   already on THIS commit). It runs what a runner CAN run: zig fmt, `zig build test` (needs no
+#   Fil-C — rehearsed 2026-11-12 on a fresh clone with empty caches), the release scripts' tests,
+#   the five-places check, the privacy scan, Biome's Markdown check (tools/md/biome.ts), and on a
+#   release the review check (tools/release/check-reviews.ts, which also asks GitHub's renderer
+#   that every counted place is shown). The Fil-C
 #   safety gate needs a Fil-C toolchain a runner does not have; `bun tools/release/release.ts`
 #   runs it on the owner's machine before it pushes (cmem/release.md § "What runs where").
 # - `tag` creates the annotated tag v<Zig>-<Fil-C>.<N> on that commit through the REST API
@@ -77,11 +80,16 @@ jobs:
           version="$(sed -n 's/^ *\.version = "\(.*\)",$/\1/p' build.zig.zon)"
           [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+-[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "::error::cannot read build.zig.zon's .version as <Zig>-<Fil-C>.<N> ($version)"; exit 1; }
           tag="v$version"
+          subject="$(git log -1 --format=%s "${{ github.sha }}")"
           if at="$(git rev-parse -q --verify "refs/tags/$tag^{commit}")"; then
             if [ "$at" = "${{ github.sha }}" ]; then release=true; why="$tag is already on this commit (a re-run)"
             else release=false; why="$tag exists at $at: released before"; fi
+          elif [ "$subject" = "bump to $tag" ]; then
+            release=true; why="$tag does not exist yet and this is its bump commit"
           else
-            release=true; why="$tag does not exist yet"
+            # Only the bump commit is ever released (review round 1, 2026-11-15): a commit pushed
+            # after it, or a plain push of an untagged version, is ordinary work.
+            release=false; why="$tag does not exist yet, but this commit is not \"bump to $tag\""
           fi
           echo "release=$release ($why)"
           echo "release=$release" >> "$GITHUB_OUTPUT"
@@ -118,6 +126,22 @@ jobs:
 
       - name: The five places agree on the version
         run: bun tools/release/bump.ts --check
+
+      # H35: a release needs a security and a hardening review recorded in its cmem/release.md
+      # entry, covering everything since the previous release. Checked here, not only on the
+      # owner's machine, so a plain `git push` cannot skip it (review round 1, 2026-11-15).
+      - name: The required reviews (a release only)
+        if: steps.decide.outputs.release == 'true'
+        run: bun tools/release/check-reviews.ts "$GITHUB_SHA"
+        # GitHub's own renderer checks that every counted place is shown (KI-38); the job's read-only
+        # token lifts the unauthenticated rate limit. A render that fails is a refusal.
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+
+      # Markdown formatting is Biome's (owner, 2026-11-15; biome.jsonc), pinned by version and sha256
+      # in tools/md/biome.ts; `ci` fails on any .md not formatted as Biome would.
+      - name: Markdown formatting (Biome)
+        run: bun tools/md/biome.ts ci --colors=off .
 
       # A scan STOPS a push (workspace review-process.md § 3.1, item 7; cmem/working-rules.md
       # § Privacy). The one permitted hit is the rule's own text in cmem/working-rules.md.

@@ -46,14 +46,14 @@ zilc/
 
 ## Build targets
 
-| Step | What it does |
-| --- | --- |
-| `zig build` | Installs `zilc` exe, `zilc_runtime` static lib, `zilc.h` |
-| `zig build gate` | 🎯 **The safety gate** — builds every example with zilc, asserts each traps at the right line. Needs Fil-C; skips with guidance otherwise |
-| `zig build test` | Unit tests (runtime module + CLI module + the IR rewrite) |
-| `zig build capi-smoke` | Builds and runs `tests/capi_smoke.c` against the runtime (gnu ABI) |
-| `zig build baseline` | Builds `examples/*.c` with plain `zig cc`, the unsafe reference behavior |
-| `zig build run -- …` | Runs the CLI |
+| Step                   | What it does                                                                                                                              |
+| ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| `zig build`            | Installs `zilc` exe, `zilc_runtime` static lib, `zilc.h`                                                                                  |
+| `zig build gate`       | 🎯 **The safety gate** — builds every example with zilc, asserts each traps at the right line. Needs Fil-C; skips with guidance otherwise |
+| `zig build test`       | Unit tests (runtime module + CLI module + the IR rewrite)                                                                                 |
+| `zig build capi-smoke` | Builds and runs `tests/capi_smoke.c` against the runtime (gnu ABI)                                                                        |
+| `zig build baseline`   | Builds `examples/*.c` with plain `zig cc`, the unsafe reference behavior                                                                  |
+| `zig build run -- …`   | Runs the CLI                                                                                                                              |
 
 ⚠️ Use **Zig 0.15.2** inside Linux (WSL's `~/zilc-work/tools/zig-0.15.2/zig`; owner,
 2026-10-27), not a `zig` on PATH, and keep the cache in the Linux home

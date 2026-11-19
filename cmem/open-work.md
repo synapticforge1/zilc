@@ -7,15 +7,127 @@ them, with their dates.
 
 ## State (2026-10-30)
 
-| what | value |
-| --- | --- |
-| version | **`0.15.2-0.687.1`** — `<Zig>-<Fil-C>.<zilc release>`, **published 2026-10-27** (tag `v0.15.2-0.687.1` on `be51808`; `releasing.md`); one of the five places the number lives. Before it: `0.15.2-0.686.1` (2026-10-05) |
-| toolchain | Zig **0.15.2** (user code and build), Fil-C **0.687** with zilc's patched clang (`workarounds.md` KI-22, KI-4) — **since 2026-10-30 compiled by Zig** (`zig build patched-clang`; the GCC-built one kept as `~/zilc-work/tools/filc-0.687-zilc-gcc` for rollback); 0.686's kept installed and archived (`toolchain/filc-0.686/`) |
-| pushed | **2026-11-12:** `main` = `origin/main` = the merge of `work-2026-11-12` (pushed with the branch, read back with `ls-remote`; the first push the new `release.yml` runs on — run 43295657634: `checks` green, `tag` / `release` skipped as designed, `v0.15.2-0.687.1` being already tagged). Before it `79e8040` (2026-11-07), and `beaa4c3` (2026-11-06: `ec3d6da` the benchmark suite, the Zig-clang reference chain, the Bun re-runs; `94020ab` the user libc in `zig build` and the `zig fmt` cleanup of `src/`; `beaa4c3` the two `tests/basics` `50_time` copies formatted; before them `04ac719`, 2026-11-05; each push scanned for personal data first). No new tag: the version line did not move |
-| gates | `zig build gate`, `zig build test`, Fil-C's suite, the corpus in four modes, the output comparison: all re-run 2026-10-27 on Fil-C 0.687, counts in `testing.md` |
-| remote | `origin` = `github.com/synapticforge1/zilc` (since 2026-10-27; was `jrmarcum/zilc`, which GitHub redirects). **Purged history pushed 2026-10-27**: `main` = `origin/main`, `v0.15.2` = tag `v0.15.2-0.686.1` = `13ce96a` (was `19e7172`; map `history-map-2026-10-27.md`) |
-| branches | `main` carries the Bun port (`c2841dd`, was `44e0b1a`), merged `--no-ff` 2026-10-27 (owner: "we will merge all to bun tooling since deno is going away"), and the 2026-10-27 work since; `bun-port` (merged, never pushed) deleted 2026-10-27 (owner). Branches: `main`, `v0.15.2` |
-| sibling | **zailc** (`../zailc`, started 2026-10-08) translates Fil-C into Zig; zilc is its stable reference and test oracle and changes nothing for it (`design-decisions.md`) |
+| what      | value                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| --------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| version   | **`0.15.2-0.687.1`** — `<Zig>-<Fil-C>.<zilc release>`, **published 2026-10-27** (tag `v0.15.2-0.687.1` on `be51808`; `releasing.md`); one of the five places the number lives. Before it: `0.15.2-0.686.1` (2026-10-05)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| toolchain | Zig **0.15.2** (user code and build), Fil-C **0.687** with zilc's patched clang (`workarounds.md` KI-22, KI-4) — **since 2026-10-30 compiled by Zig** (`zig build patched-clang`); only the latest is kept (owner, 2026-11-19): the GCC-built rollback and the 0.685 / 0.686 toolchains, installed and archived, were deleted that day                                                                                                                                                                                                                                                                                                                                                                     |
+| pushed    | **2026-11-12:** `main` = `origin/main` = the merge of `work-2026-11-12` (pushed with the branch, read back with `ls-remote`; the first push the new `release.yml` runs on — run 43295657634: `checks` green, `tag` / `release` skipped as designed, `v0.15.2-0.687.1` being already tagged). Before it `79e8040` (2026-11-07), and `beaa4c3` (2026-11-06: `ec3d6da` the benchmark suite, the Zig-clang reference chain, the Bun re-runs; `94020ab` the user libc in `zig build` and the `zig fmt` cleanup of `src/`; `beaa4c3` the two `tests/basics` `50_time` copies formatted; before them `04ac719`, 2026-11-05; each push scanned for personal data first). No new tag: the version line did not move |
+| gates     | `zig build gate`, `zig build test`, Fil-C's suite, the corpus in four modes, the output comparison: all re-run 2026-10-27 on Fil-C 0.687, counts in `testing.md`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| remote    | `origin` = `github.com/synapticforge1/zilc` (since 2026-10-27; was `jrmarcum/zilc`, which GitHub redirects). **Purged history pushed 2026-10-27**: `main` = `origin/main`, `v0.15.2` = tag `v0.15.2-0.686.1` = `13ce96a` (was `19e7172`; map `history-map-2026-10-27.md`)                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| branches  | `main` carries the Bun port (`c2841dd`, was `44e0b1a`), merged `--no-ff` 2026-10-27 (owner: "we will merge all to bun tooling since deno is going away"), and the 2026-10-27 work since; `bun-port` (merged, never pushed) deleted 2026-10-27 (owner). Branches: `main`, `v0.15.2`                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| sibling   | **zailc** (`../zailc`, started 2026-10-08) translates Fil-C into Zig; zilc is its stable reference and test oracle and changes nothing for it (`design-decisions.md`)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+
+## ⏹️ Review round 1 STOPPED 2026-11-19 — superseded by the final review standard (letter H37)
+
+🔒 **Owner, 2026-11-19 ("yes", to stopping round 1 rather than finishing KI-39):** round 1 ran
+under the 11-12 standard (letter H35). Its class 1 hardened `tools/release/check-reviews.ts` and
+CI's review step — the check that a release entry carries the Security and Hardening record
+paragraphs and that GitHub shows them. The final standard (H37, 2026-11-17) REMOVES both: (d) the
+release script runs the review set as its first step instead of checking record paragraphs; (e)
+the tests leave CI, which only verifies the version, tags and makes the page. Finishing class 1
+would harden code that H37 deletes.
+
+- **Where it stopped:** KI-24–KI-38 committed (`2e557d5`, `be52302`, `0a43dc4`); KI-39's code
+  committed in `cdbb031` (owner, 2026-11-19), all on `work-2026-11-15` (pushed to its own branch;
+  `main` untouched). KI-39's mutant run was NOT re-run; its row records it as superseded.
+- **What carries over:** the lessons (KI-31, KI-38: a guard never forbids valid Markdown; GitHub's
+  renderer decides what is shown) and Biome for `.md`, which stays (`working-rules.md` § Git).
+- **Next:** H42 / H41 / H43 (done this session, workspace letters table below); then the memory
+  guide's steps 1–3 (H38); then H37 (a)–(g), which rewrites `review-process.md`, `release.ts`,
+  `release.yml` and `platforms.md`; then H38 steps 4–7; then ONE full first review under H37's
+  five classes (basic, hardening, licensing, security, privacy).
+- **Not touched:** the sarcasm port waits at x86_64_frame checkpoint 3 (`sarcasm-port.md`).
+
+## 🔎 Review, round 1 — 2026-11-15 (owner: "review"; owner agreed the fix order below the same day) — STOPPED 2026-11-19 (above)
+
+**Progress (branch `work-2026-11-15`):** class 1 fixed (KI-24–KI-27: `tools/release/guards.ts`,
+`check-reviews.ts`, the workflow's decide step and review step; reviewer D's reproducer refuses).
+Class retest 1 (one fresh reviewer): **3 found**, all run (renames, bump content, quoted names) →
+fixed as KI-28. Class retest 2: **5 found** (decoded text, modes, submodule `ignore`, records in
+comments / fences, `Fil-C.md` a sixth version place), plus `bump.ts`'s own UTF-8 round trip →
+fixed as KI-29; `bun test tools/release/` 73/73, 26 of 26 mutants caught on a passing baseline.
+Class retest 3: **no way for unreviewed code through**; 5 smaller of the class found (stale second
+mentions, hidden entry headings, a lax fence parser, unfetched tags, no tests for bump.ts's path or
+the decide step) → fixed as KI-30; `bun test tools/release/` 90/90, 33 of 33 mutants caught.
+Class retest 4: **no way for unreviewed code through**; the Markdown emulation's corners again
+(comments closing fences, PI / CDATA, setext and indented headings, places read raw, no git time
+limit, CR) → KI-31 changed the approach: the guard REFUSES what it cannot read (LF only, no fence but at column 0, no
+comments / HTML blocks, no fence in the Release History section) instead of emulating GitHub;
+`bun test tools/release/` 120/120, 45 of 45 mutants caught. Class retest 5: **1 real hole** (a
+fence inside a list item hides a live comment on GitHub; run end to end) + 3 small (one-dash
+setext, backtick pairing, `run()`'s pipe wait) → KI-32: fences at column 0 only, container
+fences refused; 133/133, 51 of 51 mutants. Class retest 6: **the comment check subtracted code
+spans** (a renderer's call: a backtick in an attribute, a backslash in a span) + inline
+details/summary + the status version in an attribute → KI-33: raw-line checks, no span emulation;
+144/144, 51 of 51 mutants. Class retest 7: records, entry and notes heading HELD; the two
+free-text places (README status line: image alt text, an attribute from the line before; State
+row outside a table) → KI-34; 154/154, 54 of 54 mutants. Class retest 8: the State table's cell
+counts (GFM: same width or no table; excess cells dropped) + 3 small → KI-35; 160/160, 60 of 60
+mutants; the non-Markdown core held. Class retest 9: a fence splitting the State table (walked on
+visible lines), symlinked counted files, an entry past its section, dollar-sign math blocks, the workflow's
+review step untested → KI-36; 168/168, 64 of 64 mutants; the non-Markdown core held.
+**Committed 2026-11-15 on `work-2026-11-15` (owner: "commit"), class 1 NOT yet clear.** Before
+the commit: gate 8/8, `zig build test` 40/40, zig fmt clean, privacy scan = the one permitted
+hit. Class retest 10 (on `2e557d5`): a paragraph line above the State table, `trim()` vs GFM's
+ASCII trim + 5 small → KI-37 (`be52302`); 182/182, 72 of 72 mutants. Retest 11 stopped (owner).
+**🔒 Owner, 2026-11-15, the Markdown side decided:** "Characters that define valid markdown
+elements are not forbidden"; "a markdown record that is not rendered is an error"; formatting by
+"biome. I know it works correctly". → **KI-38:** GitHub's own renderer decides what is shown
+(`renderedProblems`), every forbidden-construct rule of KI-31–KI-37 removed, Biome 2.6.4 formats
+every `.md` (`tools/md/biome.ts`, `biome.jsonc`, CI + `release.ts`), 43 files reformatted;
+117/117, 42 of 42 mutants, the live render against GitHub passes. **Next: one class retest on
+the new design**; class 1 is clear only when a retest finds nothing; then class 2.
+Since retest 3 no retest had found a way for unreviewed code through: every finding was the
+narrower property "what the guard counts is what a reader of the GitHub page sees" — which KI-38
+now asks GitHub itself.
+The mutant harness (a one-off, not committed): each mutant puts one part of `guards.ts` /
+`check-reviews.ts` / `tool.ts`'s `run` back to an earlier round's behaviour; the run refuses to
+start unless the unmutated copy passes first.
+🔒 **Decided (owner, 2026-11-15: "c"), retest 3 item 5:** a Fil-C or Zig move cannot pass
+`check-reviews.ts` (the bump commit must be exactly `bumpEdits`: N + 1, three files; an upgrade moves
+every pin and resets N to 1). **Left as it is; decided at the next Fil-C move.** The options then:
+(a) an `upgrade` mode in the bump tool that recomputes the pin edits the same way; (b) the upgrade
+commit is the reviewed code and the bump commit only sets the version. Carried to `upstream.md`'s
+Fil-C update checklist so the next move meets it before the release, not at it. Queued, met on the way: D8 (`bump.ts`
+`putBack` not reached when a write or `run` throws) stays in class 8. Class 7 (C8) ✅ measured
+2026-11-15, NOT a defect: the Zig-built patched clang keeps its assertions (toolchain-quirks Z-cc-17).
+
+Scope: `v0.15.2-0.687.1..HEAD` (43 commits, the first review of any of it). Four fresh read-only
+reviewers, each in its own clone under `~/zilc-work/review-r1-<a..d>/`: A `src/sarcasm/`; B the
+`.ts` harnesses; C the pure-Zig build chain (`build/`, `src/runtime`, `src/gen`, the Zig tools);
+D `tools/release/` + `release.yml`. Counts: A 3 (all latent / cosmetic, none run; no silent
+wrong output found; isa / fp tables and detect, ir, prof, sarcasm.zig not read), B 9, C 8, D 10.
+Re-run by the session in `~/zilc-work/review-r1-verify/` (marked ✔) or confirmed by reading the
+code (📖); the rest are the reviewers' own and are re-run before their class is fixed.
+
+Classes, in the recommended order (one class at a time, workspace § 1.3):
+
+1. **A guard that passes on text, not on fact** (D1 📖 the two-reviews guard is two phrase
+   regexes, "security review: not run" passes; D5 ✔ `bump --check` passes with the version only in
+   a comment; D6 📖 `startsWith` entry lookup, unbounded last entry; D2 📖 CI never reads the
+   reviews and tags any push to `main` with an untagged version).
+2. **A scan or check that reads a failed tool as clean** (D3 ✔ `git grep` exit 128 = clean in
+   `release.ts` and the workflow; D4 the privacy pattern's coverage and the whole-file exception;
+   B6 `nm` exit ignored in `compare-chains.ts`).
+3. **A harness that passes on nothing** (B2 ✔ `check-stages.ts <unknown stage>` and
+   `ONLY=<no match> compare-sarcasm.ts` print OK, exit 0; empty corpus; `PARTS=typo`; gate regex
+   accepts 0/0; B3 / B4 `bench.ts` build failures exit 0, only the warm-up run validated).
+4. **Coverage a count overstates** (B1 ✔ detect's whole AT&T-evidence block disabled: still
+   "1431 inputs, 0 differ"; B7 echoed F / P / O lines counted as compared; B5 UTF-8 decoding in
+   `compare-sarcasm.ts`; B8, B9; D10 `bump.ts` / `release.ts` / the scan have no tests).
+5. **A pin or cache key that does not cover its input** (C1 usermusl / libc++ compiles not keyed
+   on the clang binary; C2 📖 `check-pins` lacks the usermusl and libc++ tables; C3 `-Dfilc-src`
+   unchecked against the pinned commit; C4 📖 `.paths` omits `build/` and `tools/`; C5 📖
+   `catch null` truncates the libpizlo source list; C6, C7).
+6. **Port divergences, latent** (A1 `ptrflow.zig` `base()` mnemonic fallback, bites when the
+   transform is ported; A2 a different refusal message for a jump to a trailing label; A3 smap
+   dead keys, known).
+7. **Unverified claim to measure** (C8: does the Zig-built patched clang keep the pass's
+   assertions — `NDEBUG` under `zig c++ -O2`; one run of the KI-18 repro settles it).
+8. Low / docs: D7, D8, D9 (`tools/README.md` has no `tools/release/` rows).
+
+Next: the owner chooses scope and order; then each class is fixed, tested with an inversion, and
+retested by fresh reviewers until clear, before the next; then round 2 on the fixes.
 
 ## ▶️ PICK UP HERE — paused 2026-11-07 evening (owner: "need to pause here for today. please note where we are in the fix list")
 
@@ -80,9 +192,9 @@ upstream commits after the tag, KI-7's `getcontext`) are carried to the next Fil
    (x86-64-v2) on the plain side too; n-body's "difference" was a printed pointer (masked);
    upstream binarytrees' 4.5 s plain is real (no frees + 32 threads on musl's malloc lock) and is
    noted, not averaged; build times made honest (warm shared libraries, an empty cache per build,
-   zilc `--no-cache`, one build at a time). Was: **Item 12 — the benchmark suite, IN PROGRESS** (owner's choice of programs: *"upstream's plus our
+   zilc `--no-cache`, one build at a time). Was: **Item 12 — the benchmark suite, IN PROGRESS** (owner's choice of programs: _"upstream's plus our
    zig only ports of upstreams plus new ones that we write to test the zig only version
-   specifically"*). Written: `tools/bench/bench.ts` (run / compare), `tests/bench/zig/` (ports:
+   specifically"_). Written: `tools/bench/bench.ts` (run / compare), `tests/bench/zig/` (ports:
    nbody, spectralnorm, fannkuch, binarytrees; zilc's own: hashmap_churn, sort_format, dispatch,
    slices), `tests/bench/interop/` (interop.zig + kernel.c; needs `--entry zig`: with a `.c`
    input `--entry auto` picked C's main and the link wanted `pizlonated_main`). Smoke test: all 9
@@ -107,46 +219,46 @@ upstream commits after the tag, KI-7's `getcontext`) are carried to the next Fil
 **Start with these, in order** (the numbered list below keeps the history):
 
 A. ✅ **Re-proof read 2026-11-05** (owner: "proceed with item A"): it had completed on 2026-11-04
-   16:11, before the pause. The zig chain rebuilt WITH the CET and archive-name fixes (confirmed in
-   the tested tree: archive member lists = the release's, `endbr64` = the release's) is still
-   **14/14** against the GCC chain: suite 0 differences vs stock and vs the GCC chain, gate 8/8
-   both line for line, corpus verdicts identical in all four modes, output comparison 0
-   unexplained both (one allowed thread-order flip, `36_worker-pools`). `~/zilc-work/equiv-tool/verdicts.txt`.
+16:11, before the pause. The zig chain rebuilt WITH the CET and archive-name fixes (confirmed in
+the tested tree: archive member lists = the release's, `endbr64` = the release's) is still
+**14/14** against the GCC chain: suite 0 differences vs stock and vs the GCC chain, gate 8/8
+both line for line, corpus verdicts identical in all four modes, output comparison 0
+unexplained both (one allowed thread-order flip, `36_worker-pools`). `~/zilc-work/equiv-tool/verdicts.txt`.
 B. ✅ **COMMITTED 2026-11-05 as `4d7b7dc`** (owner: "proceed with B"; not pushed). Before it: gate
-   8/8, `zig build test` 40/40, capi-smoke and baseline ok, path scan clean, `zig fmt --check`
-   clean (it reformatted `tools/gcc-reference.zig` and `tools/patched-clang.zig`, whitespace
-   only). What went in: item 5's `zig build gcc-reference`
-   (`build/gcc_reference.zig`, `tools/gcc-reference.zig`, `tools/gcc-host-shim.zig`, the 5 lazy deps
-   in `build.zig.zon`, `filc_source.named()`), `third_party/gcc-patches/` (GCC's own PR 111632
-   backports + README), the two parity fixes (`tools/archive-rename.zig`, CET in
-   `build/pure_zig.zig`, `verify-libpas.ts`), the hardening fix (`build/pure_zig.zig`,
-   `verify-compiler-rt.ts`), `compare-chains.ts`'s all-or-nothing REUSE, `cmem/toolchain-quirks.md` (new, in INDEX), and the
-   record updates (testing, workarounds W-14, best-practices, LICENSES, README, this file). Run
-   `zig build test`, the gate and the path scan first.
+8/8, `zig build test` 40/40, capi-smoke and baseline ok, path scan clean, `zig fmt --check`
+clean (it reformatted `tools/gcc-reference.zig` and `tools/patched-clang.zig`, whitespace
+only). What went in: item 5's `zig build gcc-reference`
+(`build/gcc_reference.zig`, `tools/gcc-reference.zig`, `tools/gcc-host-shim.zig`, the 5 lazy deps
+in `build.zig.zon`, `filc_source.named()`), `third_party/gcc-patches/` (GCC's own PR 111632
+backports + README), the two parity fixes (`tools/archive-rename.zig`, CET in
+`build/pure_zig.zig`, `verify-libpas.ts`), the hardening fix (`build/pure_zig.zig`,
+`verify-compiler-rt.ts`), `compare-chains.ts`'s all-or-nothing REUSE, `cmem/toolchain-quirks.md` (new, in INDEX), and the
+record updates (testing, workarounds W-14, best-practices, LICENSES, README, this file). Run
+`zig build test`, the gate and the path scan first.
 C. ✅ **DONE 2026-11-05** (owner: "proceed with item C"; proof: see `testing.md` item 8 and the
-   compare-chains run recorded there). Was: **Finish item 5**: both pinned GCCs are BUILT by Zig (`~/zilc-work/tools/gcc-11.4.0`, 174 MB;
-   `gcc-12.3.0`; ~5 min each once staged; smoke-tested 11.4.0: C and C++ run, PIE and SSP on).
-   Remaining: (1) give them Ubuntu's other compile defaults through a GCC `specs` file in each
-   install (`-fcf-protection`, `-fstack-clash-protection`, `-D_FORTIFY_SOURCE=2` when optimizing;
-   GCC reads `<libdir>/gcc/x86_64-linux-gnu/<v>/specs` by itself) — written by
-   `tools/gcc-reference.zig` after `make install-strip`, then checked (endbr64, `__fprintf_chk`);
-   (2) point `build-filc-from-source.ts MODE=upstream` at them per step as the release's
-   `.comment`s say (compiler-rt + projeny: 11.4.0; yolo musl: 12.3.0; libpas/yolounwind stay the
-   host clang — the release used Ubuntu clang 14, not built here); (3) rebuild the GCC chain and
-   rerun `compare-chains.ts` — expected: the GCC chain's `libyolort.a` now equals the release's.
-D. ✅ **DECIDED 2026-11-05** (owner: *"We are looking for the end result being the same. Not
-   specifically that the end compilation product is the same."*): item 8 keeps LLD; item 9's
-   linker family, cosmetic section items and binutils pin are not pursued. Was: **Owner calls
+compare-chains run recorded there). Was: **Finish item 5**: both pinned GCCs are BUILT by Zig (`~/zilc-work/tools/gcc-11.4.0`, 174 MB;
+`gcc-12.3.0`; ~5 min each once staged; smoke-tested 11.4.0: C and C++ run, PIE and SSP on).
+Remaining: (1) give them Ubuntu's other compile defaults through a GCC `specs` file in each
+install (`-fcf-protection`, `-fstack-clash-protection`, `-D_FORTIFY_SOURCE=2` when optimizing;
+GCC reads `<libdir>/gcc/x86_64-linux-gnu/<v>/specs` by itself) — written by
+`tools/gcc-reference.zig` after `make install-strip`, then checked (endbr64, `__fprintf_chk`);
+(2) point `build-filc-from-source.ts MODE=upstream` at them per step as the release's
+`.comment`s say (compiler-rt + projeny: 11.4.0; yolo musl: 12.3.0; libpas/yolounwind stay the
+host clang — the release used Ubuntu clang 14, not built here); (3) rebuild the GCC chain and
+rerun `compare-chains.ts` — expected: the GCC chain's `libyolort.a` now equals the release's.
+D. ✅ **DECIDED 2026-11-05** (owner: _"We are looking for the end result being the same. Not
+   specifically that the end compilation product is the same."_): item 8 keeps LLD; item 9's
+linker family, cosmetic section items and binutils pin are not pursued. Was: **Owner calls
    waiting:** item 8 (link with GNU ld for relocation parity, W-14 family) and the optional
-   cosmetic items listed in item 9.
+cosmetic items listed in item 9.
 
 (Older: paused 2026-10-30; items 1–4 done 2026-11-04.)
 
-In order. The owner's conditions, verbatim: libpas finished and *"make sure that the entire
-compilation no longer needs gcc at all"*; *"before we fully remove the gcc, we should make sure that
-the resulting compilations are functionally the same from gcc or the zig only compilation chain"*;
-GCC then stays **maintainer-only** (*"Yes maintainer only. User no."*); *"document all of this for
-future reference"*.
+In order. The owner's conditions, verbatim: libpas finished and _"make sure that the entire
+compilation no longer needs gcc at all"_; _"before we fully remove the gcc, we should make sure that
+the resulting compilations are functionally the same from gcc or the zig only compilation chain"_;
+GCC then stays **maintainer-only** (_"Yes maintainer only. User no."_); _"document all of this for
+future reference"_.
 
 1. ✅ **The chains are FUNCTIONALLY THE SAME, read 2026-11-04** (owner: "finish item 1"): the
    2026-10-30 run had completed; suite 0 differences (zig vs stock, zig vs GCC chain), gate 8/8
@@ -168,8 +280,8 @@ future reference"*.
    `~/zilc-work/patched-clang/filc-0.687/build-system` — measured **32 GB** (the 25 GB was an
    estimate), its `clang-20` `.comment` = GCC 15.2; `patched-clang/` 44 → 12 GB (`build-zig` 9.8 GB
    and the staged `src` stay). Kept: the system GCC (maintainer QC) and
-   `~/zilc-work/tools/filc-0.687-zilc-gcc`. `-Dclang-cc=system` would rebuild it from scratch
-   (~25 min).
+   `~/zilc-work/tools/filc-0.687-zilc-gcc` — that GCC-built clang deleted 2026-11-19 (owner: only
+   the latest is kept); `-Dclang-cc=system` would rebuild it from scratch (~25 min).
 5. ✅ **Maintainer-only: GCC pinned to upstream's versions (11.4, 12.3), built by Zig** — done
    2026-11-05 (NEXT SESSION C, `62be22d`; item under "Open work" below).
 6. ✅ **Documentation, done 2026-11-04** (owner: "proceed with 5, 6, and 7"): README "Building
@@ -181,8 +293,8 @@ future reference"*.
    1.8 GB each; their `results-*.json` kept). Kept: the two from-source trees (compare-chains'
    inputs), `equiv-tool`, and the suite outputs for stock, patched and both chains.
 
-8. ✅ **DECIDED 2026-11-05: KEEP LLD** (owner: *"We are looking for the end result being the same.
-   Not specifically that the end compilation product is the same."*; `design-decisions.md` top
+8. ✅ **DECIDED 2026-11-05: KEEP LLD** (owner: _"We are looking for the end result being the same.
+   Not specifically that the end compilation product is the same."_; `design-decisions.md` top
    row). W-14 stays documented; no GNU ld switch. The scope below is kept for the record.
    Was: **Owner call: relocation parity for `libpizlo.so` (W-14), scoped 2026-11-04** (owner: "review
    and test the issue … and scope the fix for it to bring it into parity").
@@ -298,16 +410,16 @@ future reference"*.
   unexplained, re-archived, marked reviewed at `e7947f0`. **Release = owner call 0.**
 - ✅ **`gate-zig-modules` on 0.687**: runs on zilc's own 0.687 pure-Zig modules since 2026-10-27
   (`testing.md`).
-- ✅ **Clone-then-build, done 2026-10-30** (owner: *"proceed with the implimentation"*; *"Leave
-  the download of Fil-C and LLVM as is, no distributable in our repo"*; `design-decisions.md` top
+- ✅ **Clone-then-build, done 2026-10-30** (owner: _"proceed with the implimentation"_; _"Leave
+  the download of Fil-C and LLVM as is, no distributable in our repo"_; `design-decisions.md` top
   row). A clone, with Zig, cmake, ninja and the kernel headers installed, builds both sides:
   `zig build pure-zig` (no options; libpas, yolo musl, compiler-rt pass the release oracle) and
   `zig build patched-clang` (**compiled by Zig alone**, 5a: Fil-C's suite 0 differences on 7,269
   against stock, gate 8/8). Fil-C's sources: the lazy `filc` dependency, fetched only when a step
   that reads them is named; measured 2.2 GB download, 11 GB unpacked. Proved equal to the commit as
   checked out (`tools/upstream/verify-filc-package.ts`); every Fil-C reference is checked by
-  `zig build check-pins` (owner: *"all of these references should be updated each time Fil-C
-  updates"*). Numbers and method: `testing.md`; lessons: `best-practices.md` § 5.
+  `zig build check-pins` (owner: _"all of these references should be updated each time Fil-C
+  updates"_). Numbers and method: `testing.md`; lessons: `best-practices.md` § 5.
   **Still open from it:**
   - ✅ **Zig fetches cmake and ninja on the user's opt-in, done 2026-10-30** (owner: "yes, with a
     user opt-in"): `-Dfetch-build-tools`; lazy deps `cmake` (Kitware 4.2.3, 58 MB, SHA-256 =
@@ -332,10 +444,10 @@ future reference"*.
     equals the release's on every count measured (`testing.md` item 8). Upstream's
     libpas stock half was compiled by Ubuntu clang 14; mirroring that too would be one more LLVM
     build. ✅ **Decided and DONE 2026-11-05: not clang 14, and not the host's either — ZIG'S
-    clang** (owner: "proceed with 1-3"; *"if it is using the hosts clang, it could be using any of
+    clang** (owner: "proceed with 1-3"; _"if it is using the hosts clang, it could be using any of
     the latest versions of clang. So just using the one we have would seem to be the recommended
-    path."*; then *"The available clang should be the one that is being uses to compile that
-    corpus, not what is in ubuntu"*; asked which, since Fil-C's own clang instruments everything
+    path."_; then _"The available clang should be the one that is being uses to compile that
+    corpus, not what is in ubuntu"_; asked which, since Fil-C's own clang instruments everything
     it compiles and has no off switch: "Zig's clang"). `MODE=upstream` puts
     `tools/host-clang-shim.zig` on PATH as `clang` for `build_yolounwind.sh` and
     `build_runtime.sh` (libpas's stock half and its link), with Zig's header dir through
@@ -350,8 +462,8 @@ future reference"*.
     `clang-20` and `llvm-split`; assembling the toolchain tree is still `build-patched-clang.ts`'s
     copy-and-replace, done by hand for the 2026-10-30 proofs), and as the oracle.
   - ✅ **zilc's installed patched toolchain is the Zig-built clang since 2026-10-30** (owner: "yes"):
-    `~/zilc-work/tools/filc-0.687-zilc` (the GCC build kept beside it as `filc-0.687-zilc-gcc` for
-    rollback), gate 8/8, re-archived in `toolchain/` (SHA256SUMS now names the compiler).
+    `~/zilc-work/tools/filc-0.687-zilc` (the GCC build kept beside it for rollback until
+    2026-11-19, then deleted: gate 8/8 again on the Zig-built one that day), gate 8/8, re-archived in `toolchain/` (SHA256SUMS now names the compiler).
     `check-toolchain` compares `git diff --full-index` (short blob ids grew 9 → 10 characters
     after 18 blobs were fetched into the clone; the patch file was regenerated with full ids,
     content unchanged). Rebuilt from the re-applied patch: clang-20 and llvm-split
@@ -400,31 +512,53 @@ future reference"*.
   `size-compare` (156 rows = 156; 154 of 156 run with the same exit code under zilc and plain
   Zig, as on 2026-10-05, no row's run columns changed; zilc ReleaseSafe sizes moved by a median
   ×1.001, 0.686 → 0.687). ✅ **Decided 2026-11-06 (owner): the other two are LEFT as they are**
-  — *"whenever we perform the Fil-C updates we would rebuild everything and recheck for the same
-  results. we probaly need to just leave them and overwrite them when we update."* So
+  — _"whenever we perform the Fil-C updates we would rebuild everything and recheck for the same
+  results. we probaly need to just leave them and overwrite them when we update."_ So
   `build-patched-clang` (host GCC; writes the installed tree; its build half superseded by `zig
   build patched-clang`, its tree-assembly half still needed, 5b) and `build-cosmo` (cosmo not
   zilc's) are run, rewritten or retired at the next Fil-C update: `upstream.md` Stage A step 7.
   (`compile-check`, `check-toolchain` and `check-upstream` ran fully on 2026-10-27; so did `all-modes`, which runs
   `zilc-check` for every mode, and `compare-output`, against the swapped toolchain, `testing.md`.)
 
-## Workspace letters (`../cmem/workspace-correspondence.md`)
+## Workspace letters (`../workspace/cmem/workspace-correspondence.md`; each item in `letters/<ID>.md`)
 
-| letter | asks zilc | state (2026-10-27) |
-| --- | --- | --- |
-| H26 | pull line; ★ block; path test; drive paths at HEAD; exFAT recipe; `origin` + stale links; per-repo items | answered in the 2026-10-27 compliance commit: pull line atop `INDEX.md`; ★ block = `best-practices.md` § 6 (28 = 28 text check, inverted); path test in `working-rules.md`; `INDEX.md:11` fixed; recipe recorded (owner call 4); `origin` and the four stale links moved; `tests/basics` BasicsOfCoding links measured still live at `jrmarcum/` (200; 404 at `synapticforge1/`), so they stay; INDEX 45 → under 10 KB. Version scheme is DESIGN (P8), stays. Owner calls 1–3 done 2026-10-27 (above) |
-| H15 | committed scripts in Bun | ✅ done 2026-10-27: tools Bun since 2026-10-22 (`c2841dd`); `setup-wsl.sh` → documented Bun step + `setup-wsl.ts`, proved (owner call 2); `git ls-files '*.sh' '*.ps1' '*.bat' '*.py' '*.nu'` empty |
-| H19 | purge drive paths from history | ✅ **purged and force-pushed 2026-10-27** (`history-map-2026-10-27.md`; owner call 1); a fresh GitHub clone scans clean |
-| H22 | record the path test | `working-rules.md` § Privacy |
-| H27 | old-folder prose (`upstream.md:127`) | sibling-relative now; `git grep -i` for the old folder name is empty |
-| H28 | record-only: maintainer address; wabt-ts/binaryen-ts retired | recorded in `working-rules.md`; zilc carries the address in no tracked file; binaryen-ts is cited only as history |
-| H30 | no `gh`, CI too | 2026-11-12: `working-rules.md` § Tooling; the release jobs use the REST API from Bun (`tools/release/github-*.ts`); `git grep` finds no `gh` invocation; `releasing.md`'s two "no `gh` CLI on this machine" lines are gone (moved to `release.md`, re-worded) |
-| H31 | Bun = latest installed; one current-tense line | 2026-11-12: the `open-work.md` Bun-port line now says "the latest installed — 1.4.4"; the pin moved 2026-11-07 (`tools/README.md`, `roadmap.md`, the workflow's `BUN_VERSION`); rule in `working-rules.md` § Tooling |
-| H32 / H33 | release page from CI; U1–U12 | 2026-11-12: `release.md` (slots, what runs where, § "Release History" with the two releases moved from `releasing.md`), `tools/release/` (bump, release, github-tag, github-release + 27 tests, 3 mutants caught), `.github/workflows/release.yml` (checks → tag → release; no publish: no registry). Not yet run on GitHub: proven at the first push / first release |
-| H34 | owner commands section | kept as written by the workspace; zilc's note on "release" added below it |
-| H35 | review process | 2026-11-12: `review-process.md` (zilc's slots), the three words in `working-rules.md`; `bump.ts` / `release.ts` refuse a release entry without both reviews |
-| C28 (from zailc) | zilc's tests / examples / results are zailc's corpus | 2026-11-12: `working-rules.md` § Records — a move, rename or removal is announced in the release entry or the ledger |
-| C22–C25 (zilc's own) | zailc's answers | verified 2026-11-12 on zailc's local `main` (`84ea70b`/`cd17f16`, `b7cc4ee`/`aa54a81`; not on its `origin/main` `258f0d2` — the push is the owner's); workspace adoptions 7.18–7.20 and 3.17 present. Closed in the ledger |
+Open for zilc, 2026-11-19:
+
+- **H41** (correspondence one file per item) — read; session start and the answer bullet in
+  `working-rules.md` § Before starting work, `INDEX.md`'s pull line. Answer: one bullet, record-only.
+- **H42** (workspace memory in the `workspace` repo) — every `../cmem/` pointer in `cmem/` now names
+  `../workspace/cmem/` (`git grep '\.\./cmem/'` finds only this line).
+- **H43** (scratch space) — rule in `working-rules.md` § Scratch space; reviewer brief in
+  `review-process.md`; the four notes in the assistant's per-project memory folder checked against
+  `cmem/` ("test, don't guess" was missing: now `working-rules.md` § Records) and removed; session
+  scratchpad 0 bytes; WSL `/tmp` 0; `~/zilc-work/` 232 → **57 GB** (owner, 2026-11-19: only the
+  latest toolchain is kept, what is still necessary stays): old suite outputs, the cosmo build, the
+  0.685 / 0.686 toolchains and the GCC-built 0.687 rollback, run outputs recorded in `testing.md`.
+  Kept: Fil-C 0.687's source and clang build tree, the toolchain, the pinned QC GCCs; gate 8/8 after.
+  What stays and why: `cmem/local/zilc-work.md`. No size limit (owner): cleared as things stop
+  being used (`working-rules.md` § Scratch space).
+- **H38** (memory guide) — not started; `check-cmem --summary`: 470 problems (state-missing 1,
+  index-size 1, line-length 459, file-size 9). Steps 1–3 next.
+- **H37** (final review standard) — not started; (a)–(g) after H38 steps 1–3. It supersedes
+  review round 1 (top of this file).
+
+Answered earlier (rows below, kept as history until the workspace closes them):
+
+| letter               | asks zilc                                                                                                | state (2026-10-27)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| -------------------- | -------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| H26                  | pull line; ★ block; path test; drive paths at HEAD; exFAT recipe; `origin` + stale links; per-repo items | answered in the 2026-10-27 compliance commit: pull line atop `INDEX.md`; ★ block = `best-practices.md` § 6 (28 = 28 text check, inverted); path test in `working-rules.md`; `INDEX.md:11` fixed; recipe recorded (owner call 4); `origin` and the four stale links moved; `tests/basics` BasicsOfCoding links measured still live at `jrmarcum/` (200; 404 at `synapticforge1/`), so they stay; INDEX 45 → under 10 KB. Version scheme is DESIGN (P8), stays. Owner calls 1–3 done 2026-10-27 (above) |
+| H15                  | committed scripts in Bun                                                                                 | ✅ done 2026-10-27: tools Bun since 2026-10-22 (`c2841dd`); `setup-wsl.sh` → documented Bun step + `setup-wsl.ts`, proved (owner call 2); `git ls-files '*.sh' '*.ps1' '*.bat' '*.py' '*.nu'` empty                                                                                                                                                                                                                                                                                                   |
+| H19                  | purge drive paths from history                                                                           | ✅ **purged and force-pushed 2026-10-27** (`history-map-2026-10-27.md`; owner call 1); a fresh GitHub clone scans clean                                                                                                                                                                                                                                                                                                                                                                               |
+| H22                  | record the path test                                                                                     | `working-rules.md` § Privacy                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| H27                  | old-folder prose (`upstream.md:127`)                                                                     | sibling-relative now; `git grep -i` for the old folder name is empty                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| H28                  | record-only: maintainer address; wabt-ts/binaryen-ts retired                                             | recorded in `working-rules.md`; zilc carries the address in no tracked file; binaryen-ts is cited only as history                                                                                                                                                                                                                                                                                                                                                                                     |
+| H30                  | no `gh`, CI too                                                                                          | 2026-11-12: `working-rules.md` § Tooling; the release jobs use the REST API from Bun (`tools/release/github-*.ts`); `git grep` finds no `gh` invocation; `releasing.md`'s two "no `gh` CLI on this machine" lines are gone (moved to `release.md`, re-worded)                                                                                                                                                                                                                                         |
+| H31                  | Bun = latest installed; one current-tense line                                                           | 2026-11-12: the `open-work.md` Bun-port line now says "the latest installed — 1.4.4"; the pin moved 2026-11-07 (`tools/README.md`, `roadmap.md`, the workflow's `BUN_VERSION`); rule in `working-rules.md` § Tooling                                                                                                                                                                                                                                                                                  |
+| H32 / H33            | release page from CI; U1–U12                                                                             | 2026-11-12: `release.md` (slots, what runs where, § "Release History" with the two releases moved from `releasing.md`), `tools/release/` (bump, release, github-tag, github-release + 27 tests, 3 mutants caught), `.github/workflows/release.yml` (checks → tag → release; no publish: no registry). Not yet run on GitHub: proven at the first push / first release                                                                                                                                 |
+| H34                  | owner commands section                                                                                   | kept as written by the workspace; zilc's note on "release" added below it                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| H35                  | review process                                                                                           | 2026-11-12: `review-process.md` (zilc's slots), the three words in `working-rules.md`; `bump.ts` / `release.ts` refuse a release entry without both reviews                                                                                                                                                                                                                                                                                                                                           |
+| C28 (from zailc)     | zilc's tests / examples / results are zailc's corpus                                                     | 2026-11-12: `working-rules.md` § Records — a move, rename or removal is announced in the release entry or the ledger                                                                                                                                                                                                                                                                                                                                                                                  |
+| C22–C25 (zilc's own) | zailc's answers                                                                                          | verified 2026-11-12 on zailc's local `main` (`84ea70b`/`cd17f16`, `b7cc4ee`/`aa54a81`; not on its `origin/main` `258f0d2` — the push is the owner's); workspace adoptions 7.18–7.20 and 3.17 present. Closed in the ledger                                                                                                                                                                                                                                                                            |
 
 ## The Bun port (2026-10-22, `c2841dd`, was `44e0b1a`): what was verified
 

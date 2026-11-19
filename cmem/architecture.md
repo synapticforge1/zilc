@@ -12,28 +12,28 @@
                                               safe object ──► link ──► a binary that traps
 ```
 
-| piece | file | state |
-| --- | --- | --- |
-| The IR rewrite | `src/ir.zig` | ✅ done, unit-tested (idempotent; `ni:0` after the `m:` component) |
-| The pipeline | `src/driver.zig` | ✅ done — Zig→IR→rewrite→`filc clang`, C straight through, one link |
-| The CLI | `src/main.zig` | ✅ `zilc build`, with KI-4/5/6 encoded as behavior, not just documented. `--runtime filc` (`zig` was reserved and refused 2026-09-30, removed 2026-10-27 with P3) |
-| Entry shim for whole Zig programs | generated `zilc_entry.zig` | ✅ done (KI-5) |
-| The safety gate | `tools/gate.zig` | ✅ 4/4, inversion-tested |
-| `zilc_runtime` (the Zig runtime) | `src/root.zig`, `src/capi.zig` | ◻️ **a stub, and will stay one** — binaries link **Fil-C's** C runtime. P3 (the Zig runtime) moved to zailc and is abandoned here (owner, 2026-10-27) |
+| piece                             | file                           | state                                                                                                                                                             |
+| --------------------------------- | ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| The IR rewrite                    | `src/ir.zig`                   | ✅ done, unit-tested (idempotent; `ni:0` after the `m:` component)                                                                                                |
+| The pipeline                      | `src/driver.zig`               | ✅ done — Zig→IR→rewrite→`filc clang`, C straight through, one link                                                                                               |
+| The CLI                           | `src/main.zig`                 | ✅ `zilc build`, with KI-4/5/6 encoded as behavior, not just documented. `--runtime filc` (`zig` was reserved and refused 2026-09-30, removed 2026-10-27 with P3) |
+| Entry shim for whole Zig programs | generated `zilc_entry.zig`     | ✅ done (KI-5)                                                                                                                                                    |
+| The safety gate                   | `tools/gate.zig`               | ✅ 4/4, inversion-tested                                                                                                                                          |
+| `zilc_runtime` (the Zig runtime)  | `src/root.zig`, `src/capi.zig` | ◻️ **a stub, and will stay one** — binaries link **Fil-C's** C runtime. P3 (the Zig runtime) moved to zailc and is abandoned here (owner, 2026-10-27)             |
 
 ⚠️ **So zilc today is a DRIVER, not a runtime.** The safety comes entirely from Fil-C; zilc's
 contribution is making Zig's output acceptable to it, and making that one command.
 
 ## Target pipeline
 
-| Stage | Owner | Source of truth upstream |
-| --- | --- | --- |
-| Frontend: Zig → LLVM IR | Zig compiler (unmodified, or patched — open question) | n/a |
-| Frontend: C/C++ → LLVM IR | clang embedded in Zig (`zig cc` / `zig c++`) | Fil-C also patches **clang** (`clang/`); size of those patches is TBD |
-| **zilc pass** (LLVM IR → capability-checked IR) | zilc | `llvm/lib/Transforms/Instrumentation/FilPizlonator.cpp` ("apply GIMSO semantics to LLVM IR") |
-| **zilc_runtime** | zilc (Zig) | `libpas/src/libpas/filc_*.c`, `filc/include/stdfil.h` |
-| libc | ? | Fil-C ships a patched musl (`projects/usermusl`, `yolomusl`) and a glibc variant |
-| C++ runtime | ? | Fil-C's `libcxx/`, `libcxxabi/` |
+| Stage                                           | Owner                                                 | Source of truth upstream                                                                     |
+| ----------------------------------------------- | ----------------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| Frontend: Zig → LLVM IR                         | Zig compiler (unmodified, or patched — open question) | n/a                                                                                          |
+| Frontend: C/C++ → LLVM IR                       | clang embedded in Zig (`zig cc` / `zig c++`)          | Fil-C also patches **clang** (`clang/`); size of those patches is TBD                        |
+| **zilc pass** (LLVM IR → capability-checked IR) | zilc                                                  | `llvm/lib/Transforms/Instrumentation/FilPizlonator.cpp` ("apply GIMSO semantics to LLVM IR") |
+| **zilc_runtime**                                | zilc (Zig)                                            | `libpas/src/libpas/filc_*.c`, `filc/include/stdfil.h`                                        |
+| libc                                            | ?                                                     | Fil-C ships a patched musl (`projects/usermusl`, `yolomusl`) and a glibc variant             |
+| C++ runtime                                     | ?                                                     | Fil-C's `libcxx/`, `libcxxabi/`                                                              |
 
 ## 🔑 The Fil-C IR dialect (measured 2026-09-23 — this constrains every integration option)
 
@@ -50,7 +50,7 @@ target datalayout_after_filc = "e-m:e-p270:32:32-…-S128"     ; "after": plain
 capabilities cannot be forged: with AS 0 non-integral, LLVM's own optimizer is forbidden from
 round-tripping pointers through integers behind the pass's back.
 
-⚖️ **Measured scope of the divergence (2026-09-23):** Fil-C's *output* is ordinary LLVM IR once that
+⚖️ **Measured scope of the divergence (2026-09-23):** Fil-C's _output_ is ordinary LLVM IR once that
 single extra line is removed — stock clang compiles it. `ni` itself is standard LLVM; only `ni:0` is
 the extension. So this is a two-line dialect, not a different IR. Full evidence: `known-issues.md`
 KI-4.
@@ -61,22 +61,22 @@ Fil-C's runtime is **not built into the compiler**. It is a separate library lin
 set of named symbols, which is what makes swapping it one layer at a time possible (P3). The
 prebuilt release's `pizfix/lib/` holds:
 
-| file | role |
-| --- | --- |
-| `libpizlo.so` / `.a` (9.1 / 14 MB) | **the runtime**: capabilities, checks, allocator, GC, OS boundary |
-| `libc.so` / `.a` | **checked musl**, compiled *with* the pass |
-| `libyoloc.a`/`.so`, `libyolort.a`, `libyolounwind.a` | the **trusted** libc/runtime/unwinder beneath `libpizlo` |
-| `lib_gcverify/`, `lib_test/`, `lib_test_gcverify/` | alternative `libpizlo.so` builds, e.g. with GC verification. Useful as references for the GC port |
-| `stdfil-include/*.h` (1,850 lines) | the declared API: `stdfil.h`, `pizlonated_syscalls.h` (419 lines), `pizlonated_runtime.h`, … |
+| file                                                 | role                                                                                              |
+| ---------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| `libpizlo.so` / `.a` (9.1 / 14 MB)                   | **the runtime**: capabilities, checks, allocator, GC, OS boundary                                 |
+| `libc.so` / `.a`                                     | **checked musl**, compiled _with_ the pass                                                        |
+| `libyoloc.a`/`.so`, `libyolort.a`, `libyolounwind.a` | the **trusted** libc/runtime/unwinder beneath `libpizlo`                                          |
+| `lib_gcverify/`, `lib_test/`, `lib_test_gcverify/`   | alternative `libpizlo.so` builds, e.g. with GC verification. Useful as references for the GC port |
+| `stdfil-include/*.h` (1,850 lines)                   | the declared API: `stdfil.h`, `pizlonated_syscalls.h` (419 lines), `pizlonated_runtime.h`, …      |
 
 `libpizlo.so` exports **2,496** symbols in four layers:
 
-| layer | size | what it is |
-| --- | --- | --- |
-| **pass → runtime** | **294** `filc_*` (excluding `filc_native_*`) | allocation, access-check failures, call checks (`filc_cc_args_check_failure`), global init. A small malloc/memcpy/printf C program calls only **11** |
-| **allocator + GC** | **1,032** `pas_*` / `bmalloc_*` / `verse_*` | libpas (WebKit's allocator) + `verse_heap` (FUGC). Largest, and it holds **global state**: two GCs cannot share one heap, so this layer can only be swapped all at once |
-| **OS boundary** | **335** `pizlonated_zsys_*`; checked musl uses **224** of them (of 283 external needs) | `long zsys_read(int fd, void* buf, size_t size)` etc. Implemented by 455 `filc_native_*`. **Fil-C has already drawn the narrow OS boundary a cross-platform port needs**, though it is shaped like Linux (`ioctl`, `readv`, …) |
-| **beneath** | `libpizlo.so` imports **337** symbols | from the trusted libc — where the runtime actually reaches the kernel |
+| layer              | size                                                                                   | what it is                                                                                                                                                                                                                     |
+| ------------------ | -------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **pass → runtime** | **294** `filc_*` (excluding `filc_native_*`)                                           | allocation, access-check failures, call checks (`filc_cc_args_check_failure`), global init. A small malloc/memcpy/printf C program calls only **11**                                                                           |
+| **allocator + GC** | **1,032** `pas_*` / `bmalloc_*` / `verse_*`                                            | libpas (WebKit's allocator) + `verse_heap` (FUGC). Largest, and it holds **global state**: two GCs cannot share one heap, so this layer can only be swapped all at once                                                        |
+| **OS boundary**    | **335** `pizlonated_zsys_*`; checked musl uses **224** of them (of 283 external needs) | `long zsys_read(int fd, void* buf, size_t size)` etc. Implemented by 455 `filc_native_*`. **Fil-C has already drawn the narrow OS boundary a cross-platform port needs**, though it is shaped like Linux (`ioctl`, `readv`, …) |
+| **beneath**        | `libpizlo.so` imports **337** symbols                                                  | from the trusted libc — where the runtime actually reaches the kernel                                                                                                                                                          |
 
 ⚠️ **Code compiled by the pass calls `pizlonated_*` with Fil-C's own internal calling convention**,
 not the normal C one. ✅ **Decoded 2026-09-30 → `filc-abi.md`:** `pizlonated_X` is a getter
@@ -94,7 +94,7 @@ returning a function object, and calls use a fast or generic entry through the t
 ## Components zilc will need that are easy to forget
 
 - **libc.** Instrumented code cannot call an uninstrumented libc directly. Fil-C solves this by
-  compiling musl/glibc *with* Fil-C (the "user" libc) over a small trusted "yolo" libc. zilc must
+  compiling musl/glibc _with_ Fil-C (the "user" libc) over a small trusted "yolo" libc. zilc must
   choose an equivalent. Zig's own bundled libcs (musl, mingw, wasi-libc) are candidates.
 - **The unwinder / exceptions** for C++ (`yolounwind/` upstream).
 - **The ABI boundary.** Instrumented and uninstrumented code have different pointer
