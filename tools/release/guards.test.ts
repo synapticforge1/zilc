@@ -193,9 +193,36 @@ describe("what GitHub shows (KI-38)", () => {
   }
   test("GitHub's details case: the record is there but collapsed (hidden)", async () => {
     const li = (await renderedBlocks(GITHUB.details)).find((b) => b.tag === "li")!;
-    expect(li.text).toContain("HIDDEN-DETAILS");
     expect(li.hidden).toBe(true);
+    expect(await visibleText(GITHUB.details)).not.toContain("HIDDEN-DETAILS");
     expect((await renderedBlocks(GITHUB.details)).find((b) => b.tag === "summary")!.hidden).toBe(false);
+  });
+  // Retest on the render design (KI-39), in the shapes GitHub returned.
+  test("a collapsed <details> inside a list item: its text is not the item's", async () => {
+    const bs = await renderedBlocks("<ul>\n<li><details><summary>Details</summary>Security review: 3 rounds, x</details></li>\n</ul>");
+    const li = bs.find((b) => b.tag === "li")!;
+    expect(li.hidden).toBe(false);
+    expect(li.text).toBe(""); // the record's text was collapsed; only the summary shows
+    expect(bs.find((b) => b.tag === "summary")!.text).toBe("Details");
+  });
+  test("a <summary> inside an outer collapsed <details> is hidden", async () => {
+    const s = (await renderedBlocks("<details><summary>o</summary><details><summary>Security review: x</summary></details></details>")).filter((b) => b.tag === "summary");
+    expect(s.map((b) => b.hidden)).toEqual([false, true]);
+  });
+  test("an open <details> is shown", async () => {
+    const li = (await renderedBlocks("<details open><summary>s</summary>\n<ul>\n<li>Security review: x</li>\n</ul>\n</details>")).find((b) => b.tag === "li")!;
+    expect(li.hidden).toBe(false);
+    expect(li.text).toBe("Security review: x");
+  });
+  for (const tag of ["del", "s", "strike"]) {
+    test(`text inside <${tag}> is not shown`, async () => {
+      const bs = await renderedBlocks(`<${tag}>\n<ul>\n<li><strong>Security review:</strong> x</li>\n</ul>\n</${tag}>\n<p>a <${tag}>gone</${tag}> b</p>`);
+      expect(bs.find((b) => b.tag === "li")!.hidden).toBe(true);
+      expect(bs.find((b) => b.tag === "p")!.text).toBe("a b");
+    });
+  }
+  test("character references are decoded (numeric, hex, nbsp)", async () => {
+    expect((await renderedBlocks("<p>a&#45;b&nbsp;c &#x41;&amp;lt;</p>"))[0].text).toBe("a-b c A&lt;");
   });
   test("GitHub's attribute case: GitHub escaped the tag, so the record IS visible", async () => {
     expect(await visibleText(GITHUB.attribute)).toContain("Security review: HIDDEN-ATTR");
@@ -222,6 +249,21 @@ describe("what GitHub shows (KI-38)", () => {
       expect((await renderedProblems(md4c, { release: entry(body) }, cur, recs)).join("\n")).toContain("does not show the security review record");
     });
   }
+  test("records each in a list item's own collapsed <details> are not shown (KI-39)", async () => {
+    const plain = both.replace(/\*\*/g, "").replace(/`/g, "").split("\n").map((l) => `- <details>${l.slice(2)}</details>`).join("\n");
+    expect((await renderedProblems(md4c, { release: entry(plain) }, cur, recs)).join("\n")).toContain("does not show the security review record");
+  });
+  test("struck-through records are not shown (KI-39)", async () => {
+    expect((await renderedProblems(md4c, { release: entry(`<del>\n\n${both}\n\n</del>`) }, cur, recs)).join("\n")).toContain("does not show the security review record");
+  });
+  test("a visible copy in a code block is not the record (KI-39)", async () => {
+    const copy = both.replace(/\*\*/g, "").replace(/`/g, "").replace(/^- /gm, "");
+    expect((await renderedProblems(md4c, { release: entry(`<!--\n${both}\n-->\n\n\`\`\`\n${copy}\n\`\`\``) }, cur, recs)).join("\n")).toContain("does not show the security review record");
+  });
+  test("a struck-through README status version is not shown (KI-39)", async () => {
+    const readme = read("README.md").replace(/^> \*\*Status: ([^(]*)(\(v[^)]*\))/m, "> **Status: $1<del>$2</del>");
+    expect((await renderedProblems(md4c, { readme }, cur, [])).join("\n")).toContain("README.md: GitHub does not show the status line");
+  });
   test("an entry heading inside a fence is not shown", async () => {
     const md = `# r\n\n## Release History\n\n\`\`\`\n### v${cur.full}\n\`\`\`\n\n${both}\n`;
     expect((await renderedProblems(md4c, { release: md }, cur, recs)).join("\n")).toContain('"v' + cur.full + '" entry headings');

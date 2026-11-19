@@ -17,6 +17,29 @@ them, with their dates.
 | branches  | `main` carries the Bun port (`c2841dd`, was `44e0b1a`), merged `--no-ff` 2026-10-27 (owner: "we will merge all to bun tooling since deno is going away"), and the 2026-10-27 work since; `bun-port` (merged, never pushed) deleted 2026-10-27 (owner). Branches: `main`, `v0.15.2`                                                                                                                                                                                                                                                                                                                                                                                                                         |
 | sibling   | **zailc** (`../zailc`, started 2026-10-08) translates Fil-C into Zig; zilc is its stable reference and test oracle and changes nothing for it (`design-decisions.md`)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 
+## ⏸️ PAUSED 2026-11-15 evening (owner: "I need to pause here for today") — pick up here
+
+- **Committed on `work-2026-11-15`** (not pushed; `main` is untouched): `2e557d5` (KI-24–36),
+  `be52302` (KI-37), `0a43dc4` (KI-38: GitHub's renderer decides what is shown, Biome formats).
+- **UNCOMMITTED in the working tree: KI-39**, the fixes from the render-design retest —
+  `tools/release/guards.ts` (`renderedBlocks`: text inside a collapsed `<details>` at any depth or
+  inside `<del>`/`<s>`/`<strike>` never joins its block; `<details open>` shown; numeric and `&nbsp;`
+  references decoded; records must be list items again; the redundant `seen` filter removed) and
+  `tools/release/guards.test.ts`. Verified before the pause: `bun test tools/release/` 128/128,
+  Biome clean, `bump --check` ok, the live render against GitHub passes. **A mutant run was in
+  flight at the pause — re-run it first** (the one-off harness lives in the session scratchpad and
+  is gone; rebuild it: each mutant puts one part back, the run refuses to start unless the
+  unmutated copy passes). The KI-39 ledger row is NOT written yet.
+- **Then:** write KI-39 in `known-issues.md` (the retest's findings: details nested in a list item
+  or paragraph, a summary inside an outer collapsed details, struck-through records and status
+  version, a visible code-block copy while the counted line is hidden — all RUN against GitHub;
+  accepted, not fixed: a decoy HTML table row showing the State row's facts while the real row is
+  not a table, since the reader sees the right version; loud refusals noted: `/markdown`'s 400 KB
+  limit, `open-work.md` ~60 KB; 60 unauthenticated renders an hour locally, ~11 per release
+  cycle, CI uses its token), Biome-format, gate if a gate-run tool changed, commit, then **one
+  fresh class 1 retest on the render design**. Class 1 clears only on an empty retest; then
+  class 2 (`§ Review` below).
+
 ## 🔎 Review, round 1 — 2026-11-15 (owner: "review"; owner agreed the fix order below the same day)
 
 **Progress (branch `work-2026-11-15`):** class 1 fixed (KI-24–KI-27: `tools/release/guards.ts`,

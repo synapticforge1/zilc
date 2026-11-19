@@ -168,16 +168,26 @@ export type Block = { tag: string; text: string; hidden: boolean; quoted: boolea
 
 const VOID = new Set(["area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "source", "track", "wbr"]);
 const BLOCKS = new Set(["h1", "h2", "h3", "h4", "h5", "h6", "p", "li", "td", "th", "pre", "summary"]);
-const decode = (s: string) => s.replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&amp;/g, "&");
+const NAMED: Record<string, string> = { lt: "<", gt: ">", quot: '"', apos: "'", nbsp: " ", amp: "&" };
+/** HTML character references: the named few GitHub's output carries, and every numeric one. */
+const decode = (s: string) =>
+  s.replace(/&(?:#(\d+)|#[xX]([0-9a-fA-F]+)|([a-zA-Z]+));/g, (m, d, h, n) => (d ? String.fromCodePoint(Number(d)) : h ? String.fromCodePoint(parseInt(h, 16)) : (NAMED[n] ?? m)));
 const norm = (s: string) => s.replace(/\s+/g, " ").trim();
+/** Struck-through text is not the text a reader is meant to take (KI-39). */
+const STRUCK = new Set(["del", "s", "strike"]);
 
 /**
  * The visible text of rendered HTML, block by block, in document order. Only TEXT nodes count —
- * an attribute (`title`, `alt`) is never text, and a comment is no node at all. A block inside a
- * `<details>` (but not its `<summary>`) is `hidden`: collapsed on the page.
+ * an attribute (`title`, `alt`) is never text, and a comment is no node at all. Text is NOT shown
+ * (KI-39) when any element holding it is: inside a collapsed `<details>` (one without `open`) other
+ * than through that details' own `<summary>` — at any depth, inside a list item or paragraph too —
+ * or inside `<del>`, `<s>` or `<strike>`. Such text never joins its block; a block that opens there
+ * is `hidden`.
  */
 export async function renderedBlocks(html: string): Promise<Block[]> {
-  type Open = { tag: string; block: Block | null; row: number | null };
+  // `hide`: this element is not shown. `hideKids`: a collapsed <details> — its children are not
+  // shown, except its <summary>.
+  type Open = { tag: string; block: Block | null; row: number | null; hide: boolean; hideKids: boolean };
   const stack: Open[] = [];
   const blocks: Block[] = [];
   let rows = 0;
@@ -188,13 +198,14 @@ export async function renderedBlocks(html: string): Promise<Block[]> {
         if (VOID.has(tag) || el.selfClosing) return;
         const parent = stack[stack.length - 1];
         const row = tag === "tr" ? ++rows : (parent?.row ?? null);
+        const hide = (parent?.hide ?? false) || ((parent?.hideKids ?? false) && tag !== "summary") || STRUCK.has(tag);
+        const hideKids = tag === "details" && !el.hasAttribute("open");
         let block: Block | null = parent?.block ?? null;
         if (BLOCKS.has(tag)) {
-          const inDetails = stack.some((o) => o.tag === "details");
-          block = { tag, text: "", hidden: inDetails && tag !== "summary" && !stack.some((o) => o.tag === "summary"), quoted: stack.some((o) => o.tag === "blockquote"), row };
+          block = { tag, text: "", hidden: hide, quoted: stack.some((o) => o.tag === "blockquote"), row };
           blocks.push(block);
         }
-        const open: Open = { tag, block, row };
+        const open: Open = { tag, block, row, hide, hideKids };
         stack.push(open);
         el.onEndTag(() => {
           const i = stack.lastIndexOf(open);
@@ -204,8 +215,9 @@ export async function renderedBlocks(html: string): Promise<Block[]> {
     })
     .onDocument({
       text(t) {
-        const b = stack[stack.length - 1]?.block;
-        if (b) b.text += t.text;
+        const top = stack[stack.length - 1];
+        // Text directly in a collapsed <details> (outside its summary) is collapsed too.
+        if (top?.block && !top.hide && !top.hideKids) top.block.text += t.text;
       },
     });
   await rw.transform(new Response(html)).text();
@@ -230,18 +242,19 @@ export async function renderedProblems(render: Render, files: Rendered, v: Versi
       throw new Error(`${name}: ${(e as Error).message}`);
     }
   };
-  const seen = (b: Block) => !b.hidden;
+  // A hidden block (collapsed, struck through) has no text: hidden text never joins a block (KI-39),
+  // so matching the text is the whole test of being shown.
   if (files.release !== undefined) {
     const bs = await blocksOf("cmem/release.md", files.release);
-    const heads = bs.filter((b) => b.tag === "h3" && seen(b) && (b.text === `v${v.full}` || b.text.startsWith(`v${v.full} `)));
+    const heads = bs.filter((b) => b.tag === "h3" && (b.text === `v${v.full}` || b.text.startsWith(`v${v.full} `)));
     if (heads.length !== 1) out.push(`cmem/release.md: GitHub shows ${heads.length} "v${v.full}" entry headings (one is required)`);
     else {
       const start = bs.indexOf(heads[0]);
       let end = start + 1;
       while (end < bs.length && !/^h[1-3]$/.test(bs[end].tag)) end++;
-      // The record's own text, rendered (bold and code applied), shown under the heading. Exact text
-      // only renders from list Markdown, so the block's tag needs no test of its own.
-      const items = bs.slice(start + 1, end).filter(seen);
+      // The record's own text, rendered (bold and code applied), shown as a LIST ITEM under the
+      // heading (KI-39: a visible copy in a code block while the counted line is hidden is not it).
+      const items = bs.slice(start + 1, end).filter((b) => b.tag === "li");
       for (const r of records) {
         const want = `${r.kind} review: ${r.rounds} round${r.rounds === 1 ? "" : "s"}, empty round ${r.date}, reviewed ${r.base}..${r.reviewed}`;
         if (!items.some((b) => b.text === want || b.text.startsWith(`${want} `) || b.text.startsWith(`${want},`) || b.text.startsWith(`${want}.`) || b.text.startsWith(`${want};`) || b.text.startsWith(`${want}:`) || b.text.startsWith(`${want}—`) || b.text.startsWith(`${want}-`))) out.push(`cmem/release.md: GitHub does not show the ${r.kind.toLowerCase()} review record as a list item under "v${v.full}" (a record that is not rendered is an error)`);
@@ -250,18 +263,18 @@ export async function renderedProblems(render: Render, files: Rendered, v: Versi
   }
   if (files.notes !== undefined) {
     const bs = await blocksOf("RELEASE-NOTES.md", files.notes);
-    if (!bs.some((b) => b.tag === "h2" && seen(b) && b.text === v.full)) out.push(`RELEASE-NOTES.md: GitHub does not show a "${v.full}" heading`);
+    if (!bs.some((b) => b.tag === "h2" && b.text === v.full)) out.push(`RELEASE-NOTES.md: GitHub does not show a "${v.full}" heading`);
   }
   if (files.readme !== undefined) {
     const bs = await blocksOf("README.md", files.readme);
     const want = `(v${v.full}: zilc release ${v.n} for Zig ${v.zig} and Fil-C ${v.filc})`;
-    if (!bs.some((b) => b.tag === "p" && b.quoted && seen(b) && b.text.startsWith("Status:") && b.text.includes(want))) out.push(`README.md: GitHub does not show the status line naming ${want}`);
+    if (!bs.some((b) => b.tag === "p" && b.quoted && b.text.startsWith("Status:") && b.text.includes(want))) out.push(`README.md: GitHub does not show the status line naming ${want}`);
   }
   if (files.openWork !== undefined) {
     const bs = await blocksOf("cmem/open-work.md", files.openWork);
     const byRow = new Map<number, Block[]>();
     for (const b of bs) if ((b.tag === "td" || b.tag === "th") && b.row !== null) byRow.set(b.row, [...(byRow.get(b.row) ?? []), b]);
-    const ok = [...byRow.values()].some((cs) => cs.length >= 2 && cs.every(seen) && cs[0].tag === "td" && cs[0].text === "version" && (cs[1].text === v.full || cs[1].text.startsWith(`${v.full} `)));
+    const ok = [...byRow.values()].some((cs) => cs.length >= 2 && cs[0].tag === "td" && cs[0].text === "version" && (cs[1].text === v.full || cs[1].text.startsWith(`${v.full} `)));
     if (!ok) out.push(`cmem/open-work.md: GitHub does not show the State row "version | ${v.full} …" as a table row`);
   }
   return out;
