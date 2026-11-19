@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception OR MIT
 //
 // Build Fil-C FROM SOURCE in COSMO mode (Cosmopolitan libc; upstream `cosmo.txt`), to evaluate it
-// for zilc's other platforms (cmem/platforms.md Finding 1; owner 2026-10-05: "evaluate cosmo mode
+// for zilc's other platforms (cmem/archive/platforms-p6-cosmo-2026-10-08.md Finding 1; owner 2026-10-05: "evaluate cosmo mode
 // by first building Fil-C from source"). Upstream's own scripts do the work, unmodified:
 // `build_base_cosmo.sh` (the normal Fil-C build with the cosmo yolo libc and the cosmo user libc in
 // the two alternate slots). STOCK Fil-C: zilc's pass patches are not applied here, so the result

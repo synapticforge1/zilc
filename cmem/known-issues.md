@@ -1040,4 +1040,6 @@ clean, `bump --check` ok, the live render passes (2026-11-15). **Not done:** the
 flight at the pause, its harness lost with the scratchpad) and the fresh class 1 retest.
 **Superseded (owner, 2026-11-19):** letter H37 replaces the record-paragraph check this guards
 with a run of the review set, and takes the tests out of CI; review round 1 stopped
-(`open-work.md`, top). The code stays until H37 (d) / (e) remove or reshape it.
+(`open-work.md`, top). **Done 2026-11-19:** H37 (d) replaced `check-reviews.ts` and the two
+record lines with `review-gate.ts` and one `- Review complete: <commit>` line (the exact-bump and
+history checks kept); (e) took every test and gate out of CI (`release.md`).

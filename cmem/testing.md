@@ -374,12 +374,13 @@ and so do `argv`, files, stdin, child processes and threads.
 
 ## Current gates (re-run 2026-10-27 in WSL on Fil-C 0.687, commit `b33b6eb`: gate 8/8, tests 29/29, capi-smoke and baseline exit 0, `zilc --version` ok/ok; the same on 0.686 that morning)
 
-**CI (since 2026-11-12; first run 43295657634 on `bba102f`, `checks` green):** `.github/workflows/release.yml` runs, on every
-push to `main`, the steps that need no Fil-C: `zig fmt --check`, `zig build test` (40/40 on a fresh
-clone with empty caches, rehearsed in WSL 2026-11-12), `bun test tools/release/` (117 since
-2026-11-15: 27 against a mock GitHub API, 90 for the release guards in `guards.test.ts`, KI-24–38; +1 live render test, off by default), Biome's Markdown check,
-`bump.ts --check`, the privacy scan, and on a release `check-reviews.ts` (KI-25). The rows below that need Fil-C stay local;
-`tools/release/release.ts` runs the gate before it pushes (`release.md` § "What runs where").
+**Every gate runs locally; CI runs none** (owner, 2026-11-17, letter H37 (e); since 2026-11-19).
+`tools/release/release.ts` runs them before it pushes: the review gate first, `bump.ts --check`,
+the privacy gate, `zig fmt --check`, Biome, `zig build test`, `bun test tools/release/` (2026-11-19:
+**124 pass, 1 skip** — the live GitHub render test, opt-in with `ZILC_LIVE_RENDER=1`; 27 against a
+mock GitHub API, the rest the release guards in `guards.test.ts`), and the Fil-C gate below
+(`release.md` § "What runs where"). From 2026-11-12 to 2026-11-19 CI ran the no-Fil-C half
+(first run 43295657634 on `bba102f`).
 
 | Step                   | Checks                                                                                                                                                                                                                                                                                                         | State                                                                                                                                                  |
 | ---------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |

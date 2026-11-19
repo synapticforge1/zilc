@@ -22,6 +22,60 @@ named below. Method lessons are in [best-practices.md](best-practices.md), not h
   directs that specific write; draft the note here and hand it over. zailc reads zilc as its
   oracle; zilc changes nothing for it.
 
+## Session routine (🔒 owner, 2026-11-17; the memory guide, letter H38)
+
+The guide is `../workspace/cmem/memory-guide.md`. The root `CLAUDE.md` (gitignored) names
+`cmem/STATE.md` and `cmem/INDEX.md` and nothing else.
+
+- **Start:** read [STATE.md](STATE.md), then [INDEX.md](INDEX.md), then the workspace rows
+  addressed to zilc (§ Before starting work); open only the files STATE's "Read next" or the task
+  names in the index.
+- **End:** rewrite `STATE.md` (never append; counts only, no issue content, no machine facts);
+  move what closed to `cmem/archive/`; record decisions in `design-decisions.md` and rules here;
+  run the size check (`check-cmem.ts`) and fix what it reports.
+- **Limits:** `INDEX.md` 3 KB, a router with one line per file under 120 characters; `STATE.md`
+  60 lines; any other live note 25 KB; any line outside a code block 200 characters; `archive/`
+  and `local/` unlimited.
+- **Sub-agents:** a reviewer gets its brief and `STATE.md` and does not browse `cmem/`; any other
+  sub-agent gets the task and the exact files the main session picked from the index.
+
+## 🔒 What bites in the first five minutes (moved from `INDEX.md`, 2026-11-19)
+
+0. 🔒 **zilc is Fil-C on Linux x86_64 only, worked in WSL or Linux — always** (owner,
+   2026-10-27). zailc uses zilc as its base and develops the cross-platform part; no aarch64,
+   macOS, Windows, mobile or cosmo work happens here (`design-decisions.md`). 🔒 **zilc's whole
+   role** (owner, 2026-10-27): track Fil-C releases, follow the Zig whose LLVM matches Fil-C's,
+   keep Zig and C correct under Fil-C on x86_64 Linux, be zailc's reference — and keep the
+   **pure-Zig track**: zailc's build up to a pure-Zig Fil-C running in Linux (the runtime by
+   `zig build`, then the pass in Zig), checked by `zig build gate-zig-modules`; zilc is the corpus
+   of truth (owner, later the same day; `roadmap.md`). zailc keeps its modifications.
+1. 🛑 **Nothing built by Fil-C, cosmo or zilc is ever EXECUTED on the Windows host** (owner,
+   2026-10-08; the machine's EDR, `workarounds.md`). Everything runs in WSL.
+2. **Work happens in WSL2** (Ubuntu), under `~/zilc-work/`; `sudo` needs a password, so install
+   into `$HOME` (`tools/README.md` "First-time setup"). 🔒 **Bun runs inside Linux only** (owner,
+   2026-10-27): `~/.bun/bin/bun` from a WSL shell; the tools refuse Windows' Bun. Ad-hoc commands
+   from Windows: **pass shell text to WSL as a FILE** (KI-1).
+3. **Toolchain: Zig 0.15.2** (owner, 2026-09-18). 🔒 **zilc stays on the Zig whose LLVM matches
+   Fil-C's, always** (owner, 2026-10-27): no newer-Zig line here, only recommendations for one
+   (`upstream.md`). WSL's at `~/zilc-work/tools/zig-0.15.2/zig`
+   (`tools/p1/setup-wsl.ts`); bare `zig` may be a newer Zig that fails to build zilc (KI-3). The
+   repo is on exFAT, so **keep the Zig cache in the Linux home** (KI-2), as `run-gate.ts` does:
+
+   ```sh
+   ZIG_LOCAL_CACHE_DIR=~/.cache/zilc-zig ~/zilc-work/tools/zig-0.15.2/zig build test
+   ```
+
+4. **`zig build gate` must be green before anything is believed**, and it prints `SKIPPED` (exit
+   0) when the Fil-C toolchain is missing — read its first line. `~/.bun/bin/bun tools/run-gate.ts`;
+   everything else in `testing.md`.
+5. 🔒 **Clone zilc, install the build tools, `zig build` either side** (owner, 2026-10-27; done
+   2026-10-30): the first step that needs Fil-C's sources fetches them, GitHub's archive at the
+   build commit as-is, pinned by `build.zig.zon`'s hash — **no Fil-C distributable in zilc, ever**
+   (owner, 2026-10-30). Every reference to the Fil-C release moves together: `zig build check-pins`
+   (`design-decisions.md` top row; `releasing.md` checklist).
+6. **LF everywhere** (owner): `.gitattributes` is `* text=auto eol=lf`; reference clones use
+   `core.autocrlf=false`.
+
 ## Git
 
 - Commit messages go through a file: `git commit -F <file>`, the file written with the file tools.
@@ -50,11 +104,11 @@ named below. Method lessons are in [best-practices.md](best-practices.md), not h
 
 - A change to `src/` (or to a tool a gate runs) triggers the full gate, run on the committed tree
   after the last edit, reading every exit code and diffing OUTPUT, not exit codes: `testing.md`.
-  `testing.md` is the gate's definition. Since 2026-11-12 CI (`.github/workflows/release.yml`,
-  every push to `main`) runs the half that needs no Fil-C — format, `zig build test`, the release
-  scripts' tests, the version places, the privacy scan; the Fil-C gate stays local
-  (`release.md` § "What runs where"). `zig build gate` prints `SKIPPED` and exits 0 without Fil-C
-  — read its first line.
+  `testing.md` is the gate's definition. 🔒 **Every gate and test runs locally; CI only publishes**
+  (owner, 2026-11-17, letter H37 (e)): `.github/workflows/release.yml` decides whether a push is a
+  release, verifies the version (`bump.ts --check`), tags and makes the page; `release.ts` runs
+  every gate before it pushes (`release.md` § "What runs where"). `zig build gate` prints
+  `SKIPPED` and exits 0 without Fil-C — read its first line.
 - 🛑 Nothing built by Fil-C, cosmo or zilc is ever executed on the Windows host
   (`workarounds.md`).
 
@@ -90,7 +144,6 @@ named below. Method lessons are in [best-practices.md](best-practices.md), not h
 - After any scripted edit, read back the changed lines; an edit script asserts each match exactly
   once and writes atomically.
 - When the exit code IS the measurement, do not pipe: redirect to a file, then read the code.
-- Never run a formatter on `cmem/` or on `tests/basics/`.
 
 ## Scratch space (🔒 owner, 2026-11-19; workspace Tooling rule 15, letter H43)
 
@@ -205,9 +258,92 @@ never pushes, a "push" never releases). This repo's own gate and merge rules app
 For zilc, "release" is [release.md](release.md): no registry, so CI's tag and page are the release,
 and the KIND (`release`, N + 1) replaces the level.
 
-## Owner commands: "review", "security review", "hardening review" (owner, 2026-11-12)
+## Owner commands: the seven review words (🔒 owner, 2026-11-17, letter H37)
 
-🔒 Workspace `cmem/review-process.md`, letter H35: a targeted agent code review, a security review,
-a hardening review — fresh read-only reviewers, rounds until a round finds nothing; **the security
-and hardening reviews are required before every release**. zilc's slots:
-[review-process.md](review-process.md). None of them commits, pushes or releases.
+The workspace review standard (`../workspace/cmem/review-process.md`); zilc's slots:
+[review-process.md](review-process.md). **Five reviews are required before every release, in this
+order: basic, hardening, licensing, security, privacy**; an efficiency review is optional and runs
+first when asked.
+
+- **"review"** — all five required classes, by the standard's loop (one agent per class, fixes per
+  class, re-reviews of the fixes only, until one is empty; then the full suite once per platform).
+- **"basic review"**, **"hardening review"**, **"licensing review"**, **"security review"**,
+  **"privacy review"** — that one class, by the same loop.
+- **"efficiency review"** — the optional class alone.
+
+None of them commits, pushes or releases. A completed review is recorded as one line
+`- Review complete: <commit>` in `review-process.md` § Last review; `release.ts` checks it first.
+(Until 2026-11-19: "review", "security review", "hardening review" — letter H35.)
+
+## Memory policy and triggers (moved from `INDEX.md`, 2026-11-19; adopted from wazmrt 2026-09-18)
+
+- **`cmem/` is the single home for ALL project memory**; the status lives in `STATE.md`, once, and
+  `INDEX.md` is a router (§ Session routine).
+- **`README.md` is NOT project memory**: it is the public document; no decision logs in it.
+- **`third_party/LICENSES.md` is the compliance source of truth**; `licensing.md` records the _why_.
+- **Nothing private in a committed file**: the path test and the scan are in § Privacy; private
+  facts go in the gitignored `cmem/local/`.
+- **Outside `cmem/`:** `README.md` (public), `third_party/LICENSES.md` (the compliance ledger),
+  `LICENSE-*` / `NOTICE`; `tools/README.md` (first-time setup, how the Bun tools run, inside Linux
+  only); `Fil-C.md`, `Zig.md` (owner, 2026-10-27): **the notes on how zilc got from base (stock
+  Fil-C and Zig) to pure-Zig parity, for zailc to build on** — the base and its workarounds (KI
+  records), then the route piece by piece (recipe, Zig build, oracle, allowed differences,
+  status); upstream defects stay in `UPSTREAM-ISSUES.md`. Update them with every Fil-C or Zig move
+  and every track step.
+
+### The "update the project memory" trigger (binding on every agent)
+
+When the owner says **"update the project memory"** (or "update memory", "record this", "remember
+this for the project"), do all of the following:
+
+1. **Revise all relevant `cmem/` files.** Fold in the change, rewrite `STATE.md`, convert dates to
+   absolute, and update entries instead of duplicating them. Then AUDIT: grep the old values
+   across `cmem/`, `README.md` and `tools/README.md`; when two files disagree, measure.
+2. **Sync `README.md` only where the change is user-relevant** (build, usage, status).
+3. **If the work produced a transferable METHOD lesson, add it to
+   [`best-practices.md`](best-practices.md)** as one bold rule plus a citation to the incident.
+   Cross-repo lessons are reported to the workspace as well.
+4. **Keep the patched Fil-C clang archived in the project (owner, 2026-10-01).** Run
+   `bun tools/filc/check-toolchain.ts`. If it reports STALE (a new patch
+   or workaround in Fil-C's source in WSL, a rebuilt compiler, or an archive from an older patch),
+   do what it says before finishing. In order:
+   1. Every change to Fil-C's source goes into an edit script, the source of truth:
+      `tools/filc/patch-pass.ts` (the pass) or `tools/filc/patch-split.ts` (`llvm-split`).
+   2. Rebuild with `build-patched-clang.ts`. Then run Fil-C's own test suite with the stock and
+      the patched clang and compare (`tools/filc/run-filc-tests.ts`, `testing.md`): the result
+      must stay **0 differences** (2026-10-05).
+   3. Save the diff to `third_party/filc-patches/zilc-filc-pass.patch`.
+   4. Re-archive with `archive-patched-clang.ts`.
+   5. Update the ledger entry `filc-pass-fixes` and `workarounds.md`.
+
+   `toolchain/` is gitignored, so the archive itself is never committed, but the patch, the
+   scripts and the checksum line in the ledger are.
+
+5. **Check Fil-C upstream for changes (owner, 2026-10-01):** `bun tools/upstream/check-upstream.ts`
+   (in WSL). Record in `upstream.md` anything that touches a watched file, above all whether
+   zilc's pass patch still applies. After reviewing, `--mark-reviewed`, and commit
+   `tools/upstream/REVIEWED`. The reference clone is `upstream/fil-c/` (gitignored, never built).
+6. **Scan the diff for personal information before committing** (§ Privacy).
+
+### The "workaround" rule (binding on every agent; owner, 2026-10-01)
+
+**Every workaround gets copious WHY notes in [`workarounds.md`](workarounds.md) when it is made**,
+whether the cause is an upstream defect or a system limitation: the exact symptom, the class, the
+root cause (measured vs. surmised, kept apart), why the fix is correct, what was ruled out, how it
+was found, how to recognise a relative, and the cost and exit condition. **A new failure is looked
+up in `workarounds.md`'s symptom index and families first.**
+
+### The "adopt upstream code" trigger (binding on every agent)
+
+Before incorporating or adapting code from Fil-C, LLVM or Zig (see `reference-projects.md`,
+`upstream.md`), complete the **Adoption Checklist** in `third_party/LICENSES.md`, add a Component
+Ledger entry, and update `reference-projects.md`. _Looking at_ upstream code is free. _Copying or
+porting_ it always requires the ledger entry, and code that ends up in the **runtime** also needs
+the runtime-linking rule checked.
+
+### Workspace triggers
+
+"look for code issues", "coordinate", "divergence" and the regression gate were defined in the
+workspace INDEX's § Triggers and bind here too. Since the workspace's own memory migration
+(2026-11-19) that text is only in `../workspace/cmem/archive/INDEX-to-2026-11-19.md` § Triggers;
+no live workspace file holds it (checked 2026-11-19).

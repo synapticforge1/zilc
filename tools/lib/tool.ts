@@ -18,6 +18,7 @@ import { cp, mkdir, open, rm, stat } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
+// [linux-x64] zilc is worked in Linux only (owner, 2026-10-27; cmem/platforms.md).
 if (process.platform !== "linux") {
   console.error(
     `zilc's tools run inside Linux only (got ${process.platform}). From Windows, open a WSL shell and run\n` +

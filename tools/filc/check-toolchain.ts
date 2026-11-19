@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception OR MIT
 //
 // Is the project's toolchain/ archive up to date with the patched Fil-C clang in Linux, and is the
-// installed tree healthy? Run on every "update the project memory" (cmem/INDEX.md policy, owner
+// installed tree healthy? Run on every "update the project memory" (cmem/working-rules.md § Memory policy, owner
 // 2026-10-01). Linux; from Windows it runs inside WSL.
 //
 //   bun tools/filc/check-toolchain.ts

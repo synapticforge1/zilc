@@ -18,7 +18,7 @@ deleted that day. An older one is rebuilt from its commit and the patch by `buil
 - **Re-create after changing the patch:** `bun tools/filc/build-patched-clang.ts`, then
   `bun tools/filc/archive-patched-clang.ts` (from a WSL shell; the tools run inside Linux only).
 - **Is it current?** `bun tools/filc/check-toolchain.ts` (exit 0 = yes). It runs on every "update the
-  project memory" (`cmem/INDEX.md` policy, step 4). It detects unsaved edits to the WSL source, a
+  project memory" (`cmem/working-rules.md` § Memory policy, step 4). It detects unsaved edits to the WSL source, a
   patch newer than this archive, and a compiler rebuilt after it.
 - Why a tarball: this drive is exFAT, which has no symlinks (`clang` → `clang-20`) and no Unix
   permissions.

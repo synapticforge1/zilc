@@ -37,6 +37,7 @@ pub const Options = struct {
     /// Zig optimize mode. ⚠️ Debug needs zilc's patched Fil-C clang (KI-4).
     optimize: []const u8 = "ReleaseSafe",
     /// ⚠️ Fil-C's libc is musl; a gnu target fails to link on `*64` symbols (KI-6).
+    /// [linux-x64] Fil-C is x86_64 Linux only: the one target (cmem/platforms.md).
     target: []const u8 = "x86_64-linux-musl",
     /// Emit a linked executable, or stop at objects.
     emit: enum { exe, obj } = .exe,

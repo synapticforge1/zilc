@@ -661,7 +661,7 @@ environment, not zilc's patches: look at links and paths outside the compiler fi
 ## Machine setup — building Fil-C from source in cosmo mode, 2026-10-05
 
 **Context.** The cosmo evaluation (owner: "evaluate cosmo mode by first building Fil-C from
-source"; `platforms.md`) runs upstream's own `build_base_cosmo.sh`, unmodified, through
+source"; `archive/platforms-p6-cosmo-2026-10-08.md`) runs upstream's own `build_base_cosmo.sh`, unmodified, through
 `tools/filc/build-cosmo.ts`. Upstream's reference host is its build container
 (`Dockerfile-build-env`, Ubuntu 25.04) plus `cosmo.txt`'s aarch64 package list. This machine is
 Ubuntu 26.04 in WSL2, so five things differ. None of them changes what Fil-C produces.
@@ -787,7 +787,7 @@ First thing to try: nothing on Windows; move the step into WSL (or Wine in WSL).
 **Cost and exit.** No cost to zilc: Windows is not a build host for zilc. Exit: none; the rule stands
 while this machine is managed.
 
-**Where.** `platforms.md` "Cosmo evaluation"; `best-practices.md` (the rule in one line);
+**Where.** `archive/platforms-p6-cosmo-2026-10-08.md` "Cosmo evaluation"; `best-practices.md` (the rule in one line);
 machine-local memory `no-windows-host-execution`.
 
 ---

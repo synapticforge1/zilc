@@ -11,5 +11,9 @@ toolchain/*
 
 # Machine-only facts and per-machine tool settings: never public (cmem/working-rules.md § Privacy).
 /cmem/local/
-/.claude/settings.local.json
+/.claude/
 /CLAUDE.md
+
+# Open review issues: never on GitHub (the workspace review standard § 10, letter H37 (b)).
+# release.ts's privacy gate refuses them if tracked (tools/release/guards.ts privateFilesTracked).
+/cmem/review-issues.md

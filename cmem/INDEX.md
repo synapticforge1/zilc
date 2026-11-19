@@ -1,159 +1,33 @@
-# cmem — Portable Project Memory for zilc
+# INDEX: zilc
 
-**At session start, read `../workspace/cmem/workspace-correspondence.md`, then the files in
-`../workspace/cmem/letters/` of the items addressed to this repo** — the workspace pull line
-(letters H26, H41, H42); answering: `working-rules.md` § Before starting work. zilc has no
-`CLAUDE.md`, so the line lives here.
+Read [STATE.md](STATE.md) first. Open another file only when the task matches its line.
 
-The **authoritative, portable project memory** for `zilc`, committed with the project; one
-topic file per domain, modeled on wazmrt's (`../wazmrt/cmem`). The workspace floor
-(`../workspace/cmem/working-rules.md`) as it applies here: [working-rules.md](working-rules.md).
-
-**State and everything outstanding: [open-work.md](open-work.md)**, the one status line (the dated
-log this file held until 2026-10-27: `git show c2841dd:cmem/INDEX.md`). Commit ids written before
-2026-10-27 are pre-purge: [history-map-2026-10-27.md](history-map-2026-10-27.md).
-
-## 🔒 What bites in the first five minutes
-
-0. 🔒 **zilc is Fil-C on Linux x86_64 only, worked in WSL or Linux — always** (owner,
-   2026-10-27). zailc uses zilc as its base and develops the cross-platform part; no aarch64,
-   macOS, Windows, mobile or cosmo work happens here (`design-decisions.md`). 🔒 **zilc's whole
-   role** (owner, 2026-10-27): track Fil-C releases, follow the Zig whose LLVM matches Fil-C's,
-   keep Zig and C correct under Fil-C on x86_64 Linux, be zailc's reference — and keep the
-   **pure-Zig track**: zailc's build up to a pure-Zig Fil-C running in Linux (the runtime by
-   `zig build`, then the pass in Zig), checked by `zig build gate-zig-modules`; zilc is the corpus
-   of truth (owner, later the same day; `roadmap.md`). zailc keeps its modifications.
-1. 🛑 **Nothing built by Fil-C, cosmo or zilc is ever EXECUTED on the Windows host** (owner,
-   2026-10-08; the machine's EDR, `workarounds.md`). Everything runs in WSL.
-2. **Work happens in WSL2** (Ubuntu), under `~/zilc-work/`; `sudo` needs a password, so install
-   into `$HOME` (`tools/README.md` "First-time setup"). 🔒 **Bun runs inside Linux only** (owner,
-   2026-10-27): `~/.bun/bin/bun` from a WSL shell; the tools refuse Windows' Bun. Ad-hoc commands
-   from Windows: **pass shell text to WSL as a FILE** (KI-1).
-3. **Toolchain: Zig 0.15.2** (owner, 2026-09-18). 🔒 **zilc stays on the Zig whose LLVM matches
-   Fil-C's, always** (owner, 2026-10-27): no newer-Zig line here, only recommendations for one
-   (`upstream.md`). WSL's at `~/zilc-work/tools/zig-0.15.2/zig`
-   (`tools/p1/setup-wsl.ts`); bare `zig` may be a newer Zig that fails to build zilc (KI-3). The
-   repo is on exFAT, so **keep the Zig cache in the Linux home** (KI-2), as `run-gate.ts` does:
-
-   ```sh
-   ZIG_LOCAL_CACHE_DIR=~/.cache/zilc-zig ~/zilc-work/tools/zig-0.15.2/zig build test
-   ```
-4. **`zig build gate` must be green before anything is believed**, and it prints `SKIPPED` (exit
-   0) when the Fil-C toolchain is missing — read its first line. `~/.bun/bin/bun tools/run-gate.ts`;
-   everything else in `testing.md`.
-5. 🔒 **Clone zilc, install the build tools, `zig build` either side** (owner, 2026-10-27; done
-   2026-10-30): the first step that needs Fil-C's sources fetches them, GitHub's archive at the
-   build commit as-is, pinned by `build.zig.zon`'s hash — **no Fil-C distributable in zilc, ever**
-   (owner, 2026-10-30). This replaced the 2026-10-27 rule of a duplicate in the project folder.
-   Every reference to the Fil-C release moves together: `zig build check-pins`
-   (`design-decisions.md` top row; `releasing.md` checklist).
-6. **LF everywhere** (owner): `.gitattributes` is `* text=auto eol=lf`; reference clones use
-   `core.autocrlf=false`.
-
-## Policy (durable — adopted from wazmrt 2026-09-18)
-
-- **`cmem/` is the single home for ALL project memory**; this index stays one line per file and
-  under about 10 KB; state goes in `open-work.md`, once.
-- **`README.md` is NOT project memory**: it is the public document; no decision logs in it.
-- **`third_party/LICENSES.md` is the compliance source of truth**; `licensing.md` records the _why_.
-- **Nothing private in a committed file**: the path test and the scan are in
-  [working-rules.md](working-rules.md) § Privacy; private facts go in the gitignored `cmem/local/`.
-- **Never run a formatter on `cmem/`.**
-
-### The "update the project memory" trigger (binding on every agent)
-
-When the owner says **"update the project memory"** (or "update memory", "record this", "remember
-this for the project"), do all of the following:
-
-1. **Revise all relevant `cmem/` files.** Fold in the change, refresh the Files-table pointer,
-   convert dates to absolute, and update entries instead of duplicating them. Then AUDIT: grep the
-   old values across `cmem/`, `README.md` and `tools/README.md`; when two files disagree, measure.
-2. **Sync `README.md` only where the change is user-relevant** (build, usage, status).
-3. **If the work produced a transferable METHOD lesson, add it to
-   [`best-practices.md`](best-practices.md)** as one bold rule plus a citation to the incident.
-   Cross-repo lessons are reported to the workspace as well.
-4. **Keep the patched Fil-C clang archived in the project (owner, 2026-10-01).** Run
-   `bun tools/filc/check-toolchain.ts`. If it reports STALE (a new patch
-   or workaround in Fil-C's source in WSL, a rebuilt compiler, or an archive from an older patch),
-   do what it says before finishing. In order:
-   1. Every change to Fil-C's source goes into an edit script, the source of truth:
-      `tools/filc/patch-pass.ts` (the pass) or `tools/filc/patch-split.ts` (`llvm-split`).
-   2. Rebuild with `build-patched-clang.ts`. Then run Fil-C's own test suite with the stock and
-      the patched clang and compare (`tools/filc/run-filc-tests.ts`, `testing.md`): the result
-      must stay **0 differences** (2026-10-05).
-   3. Save the diff to `third_party/filc-patches/zilc-filc-pass.patch`.
-   4. Re-archive with `archive-patched-clang.ts`.
-   5. Update the ledger entry `filc-pass-fixes` and `workarounds.md`.
-
-   `toolchain/` is gitignored, so the archive itself is never committed, but the patch, the
-   scripts and the checksum line in the ledger are.
-5. **Check Fil-C upstream for changes (owner, 2026-10-01):** `bun tools/upstream/check-upstream.ts`
-   (in WSL). Record in `upstream.md` anything that touches a watched file, above all whether
-   zilc's pass patch still applies. After reviewing, `--mark-reviewed`, and commit
-   `tools/upstream/REVIEWED`. The reference clone is `upstream/fil-c/` (gitignored, never built).
-6. **Scan the diff for personal information before committing** ([working-rules.md](working-rules.md)
-   § Privacy).
-
-### The "workaround" rule (binding on every agent; owner, 2026-10-01)
-
-**Every workaround gets copious WHY notes in [`workarounds.md`](workarounds.md) when it is made**,
-whether the cause is an upstream defect or a system limitation: the exact symptom, the class, the
-root cause (measured vs. surmised, kept apart), why the fix is correct, what was ruled out, how it
-was found, how to recognise a relative, and the cost and exit condition. **A new failure is looked
-up in `workarounds.md`'s symptom index and families first.**
-
-### The "adopt upstream code" trigger (binding on every agent)
-
-Before incorporating or adapting code from Fil-C, LLVM or Zig (see `reference-projects.md`,
-`upstream.md`), complete the **Adoption Checklist** in `third_party/LICENSES.md`, add a Component
-Ledger entry, and update `reference-projects.md`. _Looking at_ upstream code is free. _Copying or
-porting_ it always requires the ledger entry, and code that ends up in the **runtime** also needs
-the runtime-linking rule checked.
-
-### Workspace triggers
-
-"look for code issues", "coordinate", "divergence" and the regression gate are defined in
-`../workspace/cmem/INDEX.md` § Triggers and bind here too.
-
----
-
-## Files
-
-| File                                                   | What it holds                                                                                                                                                                                                                                                                                                                                             |
-| ------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [open-work.md](open-work.md)                           | **The state (version, gates, branches) and everything outstanding**: owner calls, open work, workspace letters, the summarized dated log.                                                                                                                                                                                                                 |
-| [working-rules.md](working-rules.md)                   | The checklist for every increment: the workspace floor as it applies here — git, gate, tooling (Bun, no `gh`), privacy and the path test, the owner's commands, zailc's dependency on zilc's tests.                                                                                                                                                       |
-| [overview.md](overview.md)                             | What zilc is, repo layout, key files, build steps.                                                                                                                                                                                                                                                                                                        |
-| [vision.md](vision.md)                                 | The goal: one `zig` binary compiling Zig, C and C++ to one memory-safe target; unverified claims marked.                                                                                                                                                                                                                                                  |
-| [architecture.md](architecture.md)                     | The pipeline, InvisiCap and FUGC, and the runtime contract measured 2026-09-30 (`libpizlo`'s four layers).                                                                                                                                                                                                                                                |
-| [design-decisions.md](design-decisions.md)             | Invariants, dated decisions with who decided, and the open questions for the owner.                                                                                                                                                                                                                                                                       |
-| [upstream.md](upstream.md)                             | How zilc tracks Fil-C: pinned release, watched files, the `upstream/fil-c/` monitor, the 0.686 and 0.687 reviews, the upgrade procedure.                                                                                                                                                                                                                  |
-| [licensing.md](licensing.md)                           | `Apache-2.0 WITH LLVM-exception OR MIT`: why, the runtime-linking rule, the copyleft exclusion.                                                                                                                                                                                                                                                           |
-| [reference-projects.md](reference-projects.md)         | Fil-C, LLVM, Zig: verified licenses, what to mine each for, adoption status.                                                                                                                                                                                                                                                                              |
-| [zig-filc-scope.md](zig-filc-scope.md)                 | Scope of a Zig version of Fil-C on 0.15.2 (2026-10-05) — the brief zailc started from.                                                                                                                                                                                                                                                                    |
-| [platforms.md](platforms.md)                           | The P6 scope pass and the cosmo evaluation (closed 2026-10-08) — since 2026-10-27 the record zailc's platform work starts from.                                                                                                                                                                                                                           |
-| [roadmap.md](roadmap.md)                               | Closed for zilc 2026-10-27: P0–P2 done; P3–P6 moved to zailc (abandoned here), kept as the record.                                                                                                                                                                                                                                                        |
-| [security-model.md](security-model.md)                 | The safety guarantees targeted, and what is out of scope.                                                                                                                                                                                                                                                                                                 |
-| [testing.md](testing.md)                               | Every gate with its command and dated count; the output comparison; corpus results per mode; planned gates.                                                                                                                                                                                                                                               |
-| [known-issues.md](known-issues.md)                     | The defect log, KI-1…KI-23: root cause, fix, status.                                                                                                                                                                                                                                                                                                      |
-| [workarounds.md](workarounds.md)                       | The WHY of every workaround (owner rule): symptom index, failure families. **Look up new failures here first.**                                                                                                                                                                                                                                           |
-| [sarcasm-port.md](sarcasm-port.md)                     | The porting map for sarcasm, Fil-C's assembler (Luau → Zig, owner 2026-11-06): pipeline, data shapes, diagnostics, the oracle, and what a byte-identical port must reproduce (Luau table iteration order, f64 numbers, Lua patterns), and the progress (ported and proven through x86_64_fp / x86_64_isa, 2026-11-07). **Read before touching the port.** |
-| [toolchain-quirks.md](toolchain-quirks.md)             | C, C++, Zig, linker and build-system peculiarities by TOOL (`zig cc`, clang vs GCC, LLD vs GNU ld, Zig's build/fetch, CMake/GCC/musl, git): symptom, cause, fix, where. **Look here when swapping a compiler or linker** (owner, 2026-11-04).                                                                                                             |
-| [releasing.md](releasing.md)                           | The version scheme `<Zig>-<Fil-C>.<zilc release>` (DESIGN, workspace P8), where the number lives, the release checklist.                                                                                                                                                                                                                                  |
-| [release.md](release.md)                               | **How a release runs** (workspace U1–U12: `tools/release/bump.ts`, `release.ts` pushes `main`, CI's `release.yml` checks → tag → page; no registry) and **§ "Release History"**, newest first.                                                                                                                                                            |
-| [review-process.md](review-process.md)                 | zilc's slots in the workspace review standard ("review", "security review", "hardening review"; both of the last two required before every release).                                                                                                                                                                                                      |
-| [filc-abi.md](filc-abi.md)                             | Fil-C 0.685's runtime ABI as observed (P3 scoping; P3 moved to zailc 2026-10-27, kept as its record).                                                                                                                                                                                                                                                     |
-| [zig-upstream-notes.md](zig-upstream-notes.md)         | Zig behaviours we may need to report (Z-1…Z-5), each with whether it is really a Zig bug.                                                                                                                                                                                                                                                                 |
-| [ports/](ports/README.md)                              | Port notes, one file per new Zig line: basis, API changes, sites touched.                                                                                                                                                                                                                                                                                 |
-| [history-map-2026-10-27.md](history-map-2026-10-27.md) | The 2026-10-27 history purge (drive paths): what was removed, how it was checked, every old → new commit id.                                                                                                                                                                                                                                              |
-| [best-practices.md](best-practices.md)                 | Method rules: zilc's own (§§ 1–5) and the workspace ★ block copied verbatim (§ 6).                                                                                                                                                                                                                                                                        |
-| `local/`                                               | Gitignored, machine-only facts. Absent in a clone.                                                                                                                                                                                                                                                                                                        |
-
-## Related files outside cmem
-
-- `README.md` (public), `third_party/LICENSES.md` (the compliance ledger), `LICENSE-*` / `NOTICE`.
-- `tools/README.md`: first-time setup, and how the Bun tools run (inside Linux only).
-- `Fil-C.md`, `Zig.md` (owner, 2026-10-27): **the notes on how zilc got from base (stock Fil-C and
-  Zig) to pure-Zig parity, for zailc to build on** — the base and its workarounds (KI records),
-  then the route piece by piece (recipe, Zig build, oracle, allowed differences, status); upstream
-  defects stay in `UPSTREAM-ISSUES.md`. Update them with every Fil-C or Zig move and every track step.
+- [working-rules.md](working-rules.md): before the first command or commit of a session
+- [open-work.md](open-work.md): when choosing the next item; owner calls; the workspace letters
+- [design-decisions.md](design-decisions.md): when a change touches a recorded decision or invariant
+- [testing.md](testing.md): before running or adding a gate or test; holds every gate's command
+- [workarounds.md](workarounds.md): when anything fails — look the symptom up here first
+- [known-issues.md](known-issues.md): when a KI-n is cited, or a defect is found or fixed
+- [toolchain-quirks.md](toolchain-quirks.md): when swapping a compiler, linker or build step
+- [upstream.md](upstream.md): when Fil-C moves, or at the upstream check
+- [releasing.md](releasing.md): when the version number or a Zig line changes
+- [release.md](release.md): only when releasing; holds the Release History
+- [review-process.md](review-process.md): only during a review; holds the review record
+- `review-issues.md`: gitignored; only during a review — the open issues
+- [platforms.md](platforms.md): the support matrix; when a platform question comes up
+- [sarcasm-port.md](sarcasm-port.md): before touching the sarcasm port
+- [roadmap.md](roadmap.md): when working on the pure-Zig track (Z1, Z2) or the toolchain pins
+- [overview.md](overview.md): when you need the repo layout or the build steps
+- [architecture.md](architecture.md): when working on the pipeline, InvisiCap, FUGC or the runtime
+- [vision.md](vision.md): when the goal or scope of zilc is in question
+- [security-model.md](security-model.md): when a safety guarantee is in question
+- [licensing.md](licensing.md): when licensing or the runtime-linking rule is in question
+- [reference-projects.md](reference-projects.md): before looking at or adopting upstream code
+- [filc-abi.md](filc-abi.md): when Fil-C's runtime ABI is needed (P3 record, now zailc's)
+- [zig-filc-scope.md](zig-filc-scope.md): when the Zig version of Fil-C's scope is needed
+- [zig-upstream-notes.md](zig-upstream-notes.md): when a Zig bug may need reporting (Z-1…Z-5)
+- [ports/](ports/README.md): when moving to a new Zig line
+- [best-practices.md](best-practices.md): when recording a method lesson; holds the ★ block
+- [history-map-2026-10-27.md](history-map-2026-10-27.md): when a commit id is from before 2026-10-27
+- [archive/](archive/): do not read unless the owner asks about past work
+- `local/`: gitignored machine facts; never given to a reviewer
