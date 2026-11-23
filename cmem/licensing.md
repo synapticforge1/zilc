@@ -39,12 +39,14 @@ variant. **Proposed by Claude and pending owner confirmation**, since the owner 
 
 ### Why this combination
 
-| Upstream                                   | License                        | How our choice fits                                                                                                     |
-| ------------------------------------------ | ------------------------------ | ----------------------------------------------------------------------------------------------------------------------- |
-| LLVM, Fil-C compiler (`FilPizlonator.cpp`) | Apache-2.0 WITH LLVM-exception | The Apache arm is **identical**, so pass code can move between zilc and LLVM-derived trees with no relicensing friction |
-| Zig                                        | MIT                            | The MIT arm is **identical**, so runtime code could move into Zig's ecosystem as-is                                     |
-| Fil-C runtime (libpas)                     | BSD-2-Clause                   | Compatible with both arms (permissive). Adapted files stay BSD-2                                                        |
-| musl                                       | MIT                            | Same as Zig                                                                                                             |
+- LLVM, Fil-C compiler (`FilPizlonator.cpp`) — Apache-2.0 WITH LLVM-exception
+  - How our choice fits: The Apache arm is **identical**, so pass code can move between zilc and LLVM-derived trees with no relicensing friction
+- Zig — MIT
+  - How our choice fits: The MIT arm is **identical**, so runtime code could move into Zig's ecosystem as-is
+- Fil-C runtime (libpas) — BSD-2-Clause
+  - How our choice fits: Compatible with both arms (permissive). Adapted files stay BSD-2
+- musl — MIT
+  - How our choice fits: Same as Zig
 
 **Why the LLVM exception matters here specifically:** zilc is a _compiler_, and its runtime gets
 **embedded in other people's binaries**. Under plain Apache-2.0, §4 would technically require every

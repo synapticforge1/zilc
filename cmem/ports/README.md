@@ -18,12 +18,19 @@ a patch set for it.
 ⚠️ **Every Zig move must also re-check the workarounds whose TRIGGER is Zig's IR or std**
 (`../workarounds.md`). The defect may live in Fil-C, but Zig decides whether it fires:
 
-| workaround                       | where the defect is                                                                  | what to re-check on the new Zig                                                                                                                                                                                                                                                                    |
-| -------------------------------- | ------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| KI-18 three-byte globals         | Fil-C's pass (`paddedConstant`)                                                      | still emitted? (`grep` the IR for `constant i1[7-9]\|i2[0-4] ` and 3-byte vectors). The wrap stays harmless either way                                                                                                                                                                             |
-| KI-20 `madvise` probe            | std (`crypto/tlcsprng.zig`) vs Fil-C's policy                                        | does std still probe with an invalid advice, and does `crypto_always_getrandom` still exist?                                                                                                                                                                                                       |
-| KI-21 dead stack-trace code      | std's run-time-only switch                                                           | which functions still reach `captureStackTrace` / `StackTrace.format` / the DWARF unwinder? Re-run the namespace breakdown of the IR. 0.16 reworked `std.debug`, and it has no patch set yet                                                                                                       |
-| KI-22 cubic frame-slot colouring | **Fil-C's pass only, independent of the LLVM version** (stock LLVM has no such pass) | Zig's IR shape: allocas per function and lifetime markers. **Measured 2026-10-01: Zig 0.16.0 still emits NO lifetime markers, and its unoptimized IR has about 2× the allocas of 0.15.2** (test module: Debug 18,241 vs 9,202; ReleaseSafe 10,559 vs 4,755). So 0.16 makes KI-22 worse, not better |
+- KI-18 three-byte globals — Fil-C's pass (`paddedConstant`)
+  - what to re-check on the new Zig: still emitted? (`grep` the IR for `constant i1[7-9]\|i2[0-4] ` and 3-byte vectors). The wrap stays harmless either way
+- KI-20 `madvise` probe — std (`crypto/tlcsprng.zig`) vs Fil-C's policy
+  - what to re-check on the new Zig: does std still probe with an invalid advice, and does `crypto_always_getrandom` still exist?
+- KI-21 dead stack-trace code — std's run-time-only switch
+  - what to re-check on the new Zig: which functions still reach `captureStackTrace` /
+    `StackTrace.format` / the DWARF unwinder? Re-run the namespace breakdown of the IR. 0.16
+    reworked `std.debug`, and it has no patch set yet
+- KI-22 cubic frame-slot colouring — **Fil-C's pass only, independent of the LLVM version** (stock LLVM has no such pass)
+  - what to re-check on the new Zig: Zig's IR shape: allocas per function and lifetime markers.
+    **Measured 2026-10-01: Zig 0.16.0 still emits NO lifetime markers, and its unoptimized IR has
+    about 2× the allocas of 0.15.2** (test module: Debug 18,241 vs 9,202; ReleaseSafe 10,559 vs
+    4,755). So 0.16 makes KI-22 worse, not better
 
 **Per file:** the new line and its **basis**, the Zig versions from → to, each API change with its
 fix and the sites it touched, anything that surprised us, and how long it took. Copy the template
@@ -55,24 +62,25 @@ checkout and its caches were removed. The facts gathered are kept for when the p
 Linux and Windows. That gives the list zilc's own 0.15.2 → 0.16 port will meet, with file counts
 from that corpus:
 
-| change                                                                                                                                                                                                                                                                                                                            | files      |
-| --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------- |
-| **`pub fn main(init: std.process.Init)`**, `const io = init.io`                                                                                                                                                                                                                                                                   | 64         |
-| stdio: `std.Io.File.stdout().writerStreaming(io, &.{})` + `.interface` (stderr and stdin alike)                                                                                                                                                                                                                                   | 54 + 2 + 1 |
-| `GeneralPurposeAllocator(.{}){}` → `DebugAllocator(.{}) = .init`                                                                                                                                                                                                                                                                  | 27         |
-| **`io` threaded into helpers and thread entry points**; `Thread.spawn` args carry `io`                                                                                                                                                                                                                                            | 12 / 9     |
-| `std.Thread.Mutex`/`Condition` → **`std.Io.Mutex`/`Condition`** (`lockUncancelable(io)`, `unlock(io)`, `waitUncancelable(io, &m)`); `timedWait` → `Io.Event` + `waitTimeout`                                                                                                                                                      | 5 / 4 / 1  |
-| `std.time.sleep(ns)` → `io.sleep(.fromNanoseconds(ns), .awake)`                                                                                                                                                                                                                                                                   | 9          |
-| clocks → `std.Io.Timestamp.now(io, .real)` (`.nanoseconds`, `.toSeconds()`, `.toMilliseconds()`)                                                                                                                                                                                                                                  | 8          |
-| **`std.fs` → `std.Io.Dir`**, and every call takes `io` (`openFile`, `createFile`, `writeFile`, `readFileAlloc(io, p, a, .limited(n))`, `statFile`, `openDir`, `iterate().next(io)`, `deleteTree`, `close(io)`); `makeDir` → `createDir(io, p, .default_dir)`, `makePath` → `createDirPath`; `*Absolute` variants move to `Io.Dir` | 6          |
-| `File.read`/`seekTo` → a `File.Reader`; `bufferedReader`/`bufferedWriter` → `reader`/`writerStreaming(io, &buf)`; `sync(io)`                                                                                                                                                                                                      | 5          |
-| `std.io.fixedBufferStream` → `std.Io.Writer.fixed(&buf)`                                                                                                                                                                                                                                                                          | 1          |
-| **args**: `init.minimal.args.toSlice(arena)`; **env**: `Environ.getAlloc` / `Environ.createMap`; `changeCurDir` → `setCurrentPath(io, …)`                                                                                                                                                                                         | 3 / 2 / 1  |
-| `std.fs.path.relative` gains `cwd` + `environ_map` args                                                                                                                                                                                                                                                                           | 1          |
-| **processes**: `std.process.spawn(io, .{ .argv, .stdout = .pipe })` + `wait(io)`; `Term` tags lowercase; `execveZ` gone → `std.c.execve`                                                                                                                                                                                          | 2          |
-| **net**: `std.net` → `std.Io.net` (`IpAddress.parse`, `listen(io, …)`, `accept(io)` returns a `Stream`); `http.Server.init(&reader.interface, &writer.interface)`; `http.Client` needs `.io`                                                                                                                                      | 4          |
-| `std.mem.trimRight` → `trimEnd`                                                                                                                                                                                                                                                                                                   | 3          |
-| `std.posix.SIG` is an enum; dropped kernel32 bindings (`SetEnvironmentVariableW`, `SetConsoleCtrlHandler`) → local `extern`                                                                                                                                                                                                       | 1 / 2      |
+- **`pub fn main(init: std.process.Init)`**, `const io = init.io` — 64
+- stdio: `std.Io.File.stdout().writerStreaming(io, &.{})` + `.interface` (stderr and stdin alike) — 54 + 2 + 1
+- `GeneralPurposeAllocator(.{}){}` → `DebugAllocator(.{}) = .init` — 27
+- **`io` threaded into helpers and thread entry points**; `Thread.spawn` args carry `io` — 12 / 9
+- `std.Thread.Mutex`/`Condition` → **`std.Io.Mutex`/`Condition`** (`lockUncancelable(io)`, `unlock(io)`, `waitUncancelable(io, &m)`); `timedWait` → `Io.Event` + `waitTimeout` — 5 / 4 / 1
+- `std.time.sleep(ns)` → `io.sleep(.fromNanoseconds(ns), .awake)` — 9
+- clocks → `std.Io.Timestamp.now(io, .real)` (`.nanoseconds`, `.toSeconds()`, `.toMilliseconds()`) — 8
+- **`std.fs` → `std.Io.Dir`**, and every call takes `io` (`openFile`, `createFile`, `writeFile`,
+  `readFileAlloc(io, p, a, .limited(n))`, `statFile`, `openDir`, `iterate().next(io)`, `deleteTree`,
+  `close(io)`); `makeDir` → `createDir(io, p, .default_dir)`, `makePath` → `createDirPath`;
+  `*Absolute` variants move to `Io.Dir` — 6
+- `File.read`/`seekTo` → a `File.Reader`; `bufferedReader`/`bufferedWriter` → `reader`/`writerStreaming(io, &buf)`; `sync(io)` — 5
+- `std.io.fixedBufferStream` → `std.Io.Writer.fixed(&buf)` — 1
+- **args**: `init.minimal.args.toSlice(arena)`; **env**: `Environ.getAlloc` / `Environ.createMap`; `changeCurDir` → `setCurrentPath(io, …)` — 3 / 2 / 1
+- `std.fs.path.relative` gains `cwd` + `environ_map` args — 1
+- **processes**: `std.process.spawn(io, .{ .argv, .stdout = .pipe })` + `wait(io)`; `Term` tags lowercase; `execveZ` gone → `std.c.execve` — 2
+- **net**: `std.net` → `std.Io.net` (`IpAddress.parse`, `listen(io, …)`, `accept(io)` returns a `Stream`); `http.Server.init(&reader.interface, &writer.interface)`; `http.Client` needs `.io` — 4
+- `std.mem.trimRight` → `trimEnd` — 3
+- `std.posix.SIG` is an enum; dropped kernel32 bindings (`SetEnvironmentVariableW`, `SetConsoleCtrlHandler`) → local `extern` — 1 / 2
 
 🔑 **For zilc's own port:** the counted version-sensitive sites (`design-decisions.md` invariant 4:
 `std.fs` 10, `std.process` 13, `ArrayListUnmanaged` 8) all fall in the rows above, most of them

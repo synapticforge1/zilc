@@ -32,7 +32,8 @@ The guide is `../workspace/cmem/memory-guide.md`. The root `CLAUDE.md` (gitignor
   names in the index.
 - **End:** rewrite `STATE.md` (never append; counts only, no issue content, no machine facts);
   move what closed to `cmem/archive/`; record decisions in `design-decisions.md` and rules here;
-  run the size check (`check-cmem.ts`) and fix what it reports.
+  run the size check, `bun scripts/check-cmem.ts` (the workspace's script, verbatim; `--summary`
+  for counts), and fix what it reports.
 - **Limits:** `INDEX.md` 3 KB, a router with one line per file under 120 characters; `STATE.md`
   60 lines; any other live note 25 KB; any line outside a code block 200 characters; `archive/`
   and `local/` unlimited.

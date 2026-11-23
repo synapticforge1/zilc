@@ -35,6 +35,8 @@ zilc/
 │   ├── run-gate.ts    # run that gate inside WSL, where Fil-C lives
 │   ├── p1/                # feasibility scripts: install, reference behavior, IR spike
 │   └── p2/                # integration scripts, the Debug-crash repro, llreduce.ts
+├── scripts/
+│   └── check-cmem.ts      # the memory size check (the workspace's, verbatim; letter H38)
 ├── third_party/
 │   ├── LICENSES.md        # Compliance ledger (EMPTY) + adoption checklist + inventory
 │   ├── fil-c/             # LLVM-LICENSE.txt, PAS-LICENSE.txt, MUSL-LICENSE.txt (staged)
