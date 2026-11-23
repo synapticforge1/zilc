@@ -31,16 +31,34 @@ out-of-bounds access (`filc safety error`, exit 133). Only the pieces below were
 -lpizlo -lyolort -lyoloc -lyolom -lyolort -lyolounwind crtend.o crtn.o`, dynamic linker
 `ld-fil1-x86_64.so`; C++ adds `-lc++ -lc++abi -lm`.
 
-| piece                                            | source                                                                                                     | built by today            | Zig alone?                                                                                                                                                                                                    |
-| ------------------------------------------------ | ---------------------------------------------------------------------------------------------------------- | ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| yolo musl (`libyoloc`, crt files)                | `projects/yolomusl` (musl 1.2.4, patched) ~109k lines                                                      | gcc                       | ✅ (configure + generated headers to redo in build.zig, or vendor)                                                                                                                                            |
-| compiler-rt builtins (`libyolort`), crtbegin/end | `compiler-rt/lib/builtins` ~10k                                                                            | gcc                       | ✅ (or Zig's own compiler_rt + `cpu_model/x86.c`)                                                                                                                                                             |
-| `libyolounwind`                                  | 60 lines of trap stubs                                                                                     | clang                     | ✅                                                                                                                                                                                                            |
-| libpizlo, the pas + runtime part                 | `libpas/src/libpas`, 179 files ~136k (runtime `filc_*` 22k hand-written)                                   | stock clang `-O3 -Werror` | ✅ with 3 quirks: `-march=x86_64_v2` spelling; `-target x86_64-linux-none` (with `-musl`, Zig's own musl headers win over Fil-C's patched ones); `__cpu_indicator_init` needs compiler-rt's `cpu_model/x86.c` |
-| the forwarder generator                          | `generate_pizlonated_forwarders.rb` 852 lines → `filc_native.h` + `filc_native_forwarders.c` (24.6k lines) | Ruby                      | ✅ port to Zig is mechanical (453 + 13 signature tables + ~240 lines of emitters, reads NO inputs, deterministic, diffable), or vendor the output; `find_clang_include_dir.rb` becomes `<zig>/lib/include`    |
-| **libpizlo, the `filc/src` part**                | runtime, snprintf, EH landing pad, unwind, personality: ~2.5k lines                                        | **Fil-C clang**           | ❌ until step 3                                                                                                                                                                                               |
-| **user libc** (`libc.a/.so`)                     | `projects/usermusl` ~102k; 303 files differ from yolomusl, 258 carry Fil-C markers                         | **Fil-C clang**           | ❌ until step 3                                                                                                                                                                                               |
-| **libc++ / libc++abi**                           | LLVM 20 + light Fil-C edits                                                                                | **Fil-C clang**           | ❌ until step 3                                                                                                                                                                                               |
+- yolo musl (`libyoloc`, crt files) — `projects/yolomusl` (musl 1.2.4, patched) ~109k lines
+  - built by today: gcc
+  - Zig alone?: ✅ (configure + generated headers to redo in build.zig, or vendor)
+- compiler-rt builtins (`libyolort`), crtbegin/end — `compiler-rt/lib/builtins` ~10k
+  - built by today: gcc
+  - Zig alone?: ✅ (or Zig's own compiler_rt + `cpu_model/x86.c`)
+- `libyolounwind` — 60 lines of trap stubs
+  - built by today: clang
+  - Zig alone?: ✅
+- libpizlo, the pas + runtime part — `libpas/src/libpas`, 179 files ~136k (runtime `filc_*` 22k hand-written)
+  - built by today: stock clang `-O3 -Werror`
+  - Zig alone?: ✅ with 3 quirks: `-march=x86_64_v2` spelling; `-target x86_64-linux-none` (with
+    `-musl`, Zig's own musl headers win over Fil-C's patched ones); `__cpu_indicator_init` needs
+    compiler-rt's `cpu_model/x86.c`
+- the forwarder generator — `generate_pizlonated_forwarders.rb` 852 lines → `filc_native.h` + `filc_native_forwarders.c` (24.6k lines)
+  - built by today: Ruby
+  - Zig alone?: ✅ port to Zig is mechanical (453 + 13 signature tables + ~240 lines of emitters,
+    reads NO inputs, deterministic, diffable), or vendor the output; `find_clang_include_dir.rb`
+    becomes `<zig>/lib/include`
+- **libpizlo, the `filc/src` part** — runtime, snprintf, EH landing pad, unwind, personality: ~2.5k lines
+  - built by today: **Fil-C clang**
+  - Zig alone?: ❌ until step 3
+- **user libc** (`libc.a/.so`) — `projects/usermusl` ~102k; 303 files differ from yolomusl, 258 carry Fil-C markers
+  - built by today: **Fil-C clang**
+  - Zig alone?: ❌ until step 3
+- **libc++ / libc++abi** — LLVM 20 + light Fil-C edits
+  - built by today: **Fil-C clang**
+  - Zig alone?: ❌ until step 3
 
 **So step 2 alone gives "Zig + Fil-C's clang as a build tool", not "only Zig".** The real limit:
 `libpizlo.a` itself mixes stock-compiled and Fil-C-compiled objects. Interim options: build those

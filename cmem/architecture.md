@@ -12,28 +12,36 @@
                                               safe object ──► link ──► a binary that traps
 ```
 
-| piece                             | file                           | state                                                                                                                                                             |
-| --------------------------------- | ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| The IR rewrite                    | `src/ir.zig`                   | ✅ done, unit-tested (idempotent; `ni:0` after the `m:` component)                                                                                                |
-| The pipeline                      | `src/driver.zig`               | ✅ done — Zig→IR→rewrite→`filc clang`, C straight through, one link                                                                                               |
-| The CLI                           | `src/main.zig`                 | ✅ `zilc build`, with KI-4/5/6 encoded as behavior, not just documented. `--runtime filc` (`zig` was reserved and refused 2026-09-30, removed 2026-10-27 with P3) |
-| Entry shim for whole Zig programs | generated `zilc_entry.zig`     | ✅ done (KI-5)                                                                                                                                                    |
-| The safety gate                   | `tools/gate.zig`               | ✅ 4/4, inversion-tested                                                                                                                                          |
-| `zilc_runtime` (the Zig runtime)  | `src/root.zig`, `src/capi.zig` | ◻️ **a stub, and will stay one** — binaries link **Fil-C's** C runtime. P3 (the Zig runtime) moved to zailc and is abandoned here (owner, 2026-10-27)             |
+- The IR rewrite — `src/ir.zig`
+  - state: ✅ done, unit-tested (idempotent; `ni:0` after the `m:` component)
+- The pipeline — `src/driver.zig`
+  - state: ✅ done — Zig→IR→rewrite→`filc clang`, C straight through, one link
+- The CLI — `src/main.zig`
+  - state: ✅ `zilc build`, with KI-4/5/6 encoded as behavior, not just documented. `--runtime filc` (`zig` was reserved and refused 2026-09-30, removed 2026-10-27 with P3)
+- Entry shim for whole Zig programs — generated `zilc_entry.zig`
+  - state: ✅ done (KI-5)
+- The safety gate — `tools/gate.zig`
+  - state: ✅ 4/4, inversion-tested
+- `zilc_runtime` (the Zig runtime) — `src/root.zig`, `src/capi.zig`
+  - state: ◻️ **a stub, and will stay one** — binaries link **Fil-C's** C runtime. P3 (the Zig runtime) moved to zailc and is abandoned here (owner, 2026-10-27)
 
 ⚠️ **So zilc today is a DRIVER, not a runtime.** The safety comes entirely from Fil-C; zilc's
 contribution is making Zig's output acceptable to it, and making that one command.
 
 ## Target pipeline
 
-| Stage                                           | Owner                                                 | Source of truth upstream                                                                     |
-| ----------------------------------------------- | ----------------------------------------------------- | -------------------------------------------------------------------------------------------- |
-| Frontend: Zig → LLVM IR                         | Zig compiler (unmodified, or patched — open question) | n/a                                                                                          |
-| Frontend: C/C++ → LLVM IR                       | clang embedded in Zig (`zig cc` / `zig c++`)          | Fil-C also patches **clang** (`clang/`); size of those patches is TBD                        |
-| **zilc pass** (LLVM IR → capability-checked IR) | zilc                                                  | `llvm/lib/Transforms/Instrumentation/FilPizlonator.cpp` ("apply GIMSO semantics to LLVM IR") |
-| **zilc_runtime**                                | zilc (Zig)                                            | `libpas/src/libpas/filc_*.c`, `filc/include/stdfil.h`                                        |
-| libc                                            | ?                                                     | Fil-C ships a patched musl (`projects/usermusl`, `yolomusl`) and a glibc variant             |
-| C++ runtime                                     | ?                                                     | Fil-C's `libcxx/`, `libcxxabi/`                                                              |
+- Frontend: Zig → LLVM IR — Zig compiler (unmodified, or patched — open question)
+  - Source of truth upstream: n/a
+- Frontend: C/C++ → LLVM IR — clang embedded in Zig (`zig cc` / `zig c++`)
+  - Source of truth upstream: Fil-C also patches **clang** (`clang/`); size of those patches is TBD
+- **zilc pass** (LLVM IR → capability-checked IR) — zilc
+  - Source of truth upstream: `llvm/lib/Transforms/Instrumentation/FilPizlonator.cpp` ("apply GIMSO semantics to LLVM IR")
+- **zilc_runtime** — zilc (Zig)
+  - Source of truth upstream: `libpas/src/libpas/filc_*.c`, `filc/include/stdfil.h`
+- libc — ?
+  - Source of truth upstream: Fil-C ships a patched musl (`projects/usermusl`, `yolomusl`) and a glibc variant
+- C++ runtime — ?
+  - Source of truth upstream: Fil-C's `libcxx/`, `libcxxabi/`
 
 ## 🔑 The Fil-C IR dialect (measured 2026-09-23 — this constrains every integration option)
 
@@ -71,12 +79,16 @@ prebuilt release's `pizfix/lib/` holds:
 
 `libpizlo.so` exports **2,496** symbols in four layers:
 
-| layer              | size                                                                                   | what it is                                                                                                                                                                                                                     |
-| ------------------ | -------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **pass → runtime** | **294** `filc_*` (excluding `filc_native_*`)                                           | allocation, access-check failures, call checks (`filc_cc_args_check_failure`), global init. A small malloc/memcpy/printf C program calls only **11**                                                                           |
-| **allocator + GC** | **1,032** `pas_*` / `bmalloc_*` / `verse_*`                                            | libpas (WebKit's allocator) + `verse_heap` (FUGC). Largest, and it holds **global state**: two GCs cannot share one heap, so this layer can only be swapped all at once                                                        |
-| **OS boundary**    | **335** `pizlonated_zsys_*`; checked musl uses **224** of them (of 283 external needs) | `long zsys_read(int fd, void* buf, size_t size)` etc. Implemented by 455 `filc_native_*`. **Fil-C has already drawn the narrow OS boundary a cross-platform port needs**, though it is shaped like Linux (`ioctl`, `readv`, …) |
-| **beneath**        | `libpizlo.so` imports **337** symbols                                                  | from the trusted libc — where the runtime actually reaches the kernel                                                                                                                                                          |
+- **pass → runtime** — **294** `filc_*` (excluding `filc_native_*`)
+  - what it is: allocation, access-check failures, call checks (`filc_cc_args_check_failure`), global init. A small malloc/memcpy/printf C program calls only **11**
+- **allocator + GC** — **1,032** `pas_*` / `bmalloc_*` / `verse_*`
+  - what it is: libpas (WebKit's allocator) + `verse_heap` (FUGC). Largest, and it holds **global state**: two GCs cannot share one heap, so this layer can only be swapped all at once
+- **OS boundary** — **335** `pizlonated_zsys_*`; checked musl uses **224** of them (of 283 external needs)
+  - what it is: `long zsys_read(int fd, void* buf, size_t size)` etc. Implemented by 455
+    `filc_native_*`. **Fil-C has already drawn the narrow OS boundary a cross-platform port needs**,
+    though it is shaped like Linux (`ioctl`, `readv`, …)
+- **beneath** — `libpizlo.so` imports **337** symbols
+  - what it is: from the trusted libc — where the runtime actually reaches the kernel
 
 ⚠️ **Code compiled by the pass calls `pizlonated_*` with Fil-C's own internal calling convention**,
 not the normal C one. ✅ **Decoded 2026-09-30 → `filc-abi.md`:** `pizlonated_X` is a getter

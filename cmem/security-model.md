@@ -2,12 +2,14 @@
 
 ## What zilc is meant to guarantee (target, inherited from Fil-C)
 
-| Property                       | Mechanism                                                                                                           | Bug class stopped                                   |
-| ------------------------------ | ------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------- |
-| **Spatial safety**             | Every pointer carries an InvisiCap (bounds + type info). Every access is checked                                    | Buffer overflow/underflow, OOB read/write           |
-| **Temporal safety**            | `free()` marks objects freed, and FUGC reclaims only unreachable memory. Escaping stack allocas move to the GC heap | Use-after-free, double free, stack-use-after-return |
-| **Type confusion on pointers** | Capabilities distinguish pointer slots from data. Integers cannot be forged into usable pointers                    | Pointer forging, `int → ptr` smuggling              |
-| **Race safety of the above**   | Pointer + capability updated atomically                                                                             | Pointer tearing under data races                    |
+- **Spatial safety** — Every pointer carries an InvisiCap (bounds + type info). Every access is checked
+  - Bug class stopped: Buffer overflow/underflow, OOB read/write
+- **Temporal safety** — `free()` marks objects freed, and FUGC reclaims only unreachable memory. Escaping stack allocas move to the GC heap
+  - Bug class stopped: Use-after-free, double free, stack-use-after-return
+- **Type confusion on pointers** — Capabilities distinguish pointer slots from data. Integers cannot be forged into usable pointers
+  - Bug class stopped: Pointer forging, `int → ptr` smuggling
+- **Race safety of the above** — Pointer + capability updated atomically
+  - Bug class stopped: Pointer tearing under data races
 
 **A violation is a deterministic panic**, never silent corruption. Fil-C's precise formulation is
 "GIMSO" (see upstream `gimso_semantics.md`). Quote that, not the "100% exploit-proof" summary.
