@@ -97,7 +97,7 @@ hardening review — letter H35, KI-24.)
 (`POST /markdown`, `gfm`; the REST API, never `gh`) and require, as visible text, the `v<version>`
 entry heading, the notes' `## <version>` heading, the README's status version in its quote, and
 the State row as a table row. A render that fails is a refusal; without `GITHUB_TOKEN` GitHub can
-refuse it for its rate limit (seen 2026-11-19; `review-issues.md` H1). The four files are LF only.
+refuse it for its rate limit (seen 2026-11-19; H18, closed 2026-11-24: wait and re-run, or set a token for that run). The four files are LF only.
 **Formatting is Biome's** (`bun tools/md/biome.ts ci .`, `biome.jsonc`; `release.ts` runs it).
 
 ## Release History (newest first)

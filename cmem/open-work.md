@@ -12,10 +12,10 @@ record. Closed items and the dated session logs moved on 2026-11-23 to
 | --------- | ------------------------------------------------------------------------------------------------ |
 | version   | **`0.15.2-0.687.1`** — published 2026-10-27, tag `v0.15.2-0.687.1` on `be51808` (`releasing.md`) |
 | toolchain | Zig **0.15.2**, Fil-C **0.687** with zilc's patched clang, compiled by Zig since 2026-10-30      |
-| pushed    | 2026-11-23: `main` = `origin/main`, the merge of `work-2026-11-15` (H38 steps 4–7)               |
-| gates     | full suite 2026-11-23 on linux-x64 (review 1), gate 10/10; counts in `testing.md`               |
+| pushed    | 2026-11-24: `main` = `origin/main`, the merge of `review/0.15.2-0.687.2` (review 1, H37)         |
+| gates     | full suite 2026-11-23 on linux-x64 (review 1), gate 10/10; counts in `testing.md`                |
 | remote    | `origin` = `github.com/synapticforge1/zilc`; purged history pushed 2026-10-27                    |
-| branches  | `main`, `v0.15.2`, `work-2026-11-15`; `review/0.15.2-0.687.2` (review 1, `4f377a5`, not pushed)  |
+| branches  | `main`, `v0.15.2`, `work-2026-11-15`; `review/0.15.2-0.687.2` (review 1, pushed 2026-11-24)      |
 | sibling   | **zailc** (`../zailc`) translates Fil-C into Zig; zilc is its reference and test oracle          |
 
 The full rows as they stood on 2026-11-19 (every push, the purge, the branch history):
@@ -39,7 +39,7 @@ would harden code that H37 deletes.
 - **Done since:** H38 steps 4–7 (2026-11-23); review 1 under H37's five classes, complete at
   `4f377a5` (2026-11-24; `review-process.md` § Last review; L1, the sarcasm licence, closed by
   the owner the same day).
-- **Next:** the owner's "push" for `review/0.15.2-0.687.2`; then the triage of round 1's 24
+- **Next:** (pushed 2026-11-24) the triage of round 1's 24
   carried findings under H37's classes (`review-issues.md`).
 - **Not touched:** the sarcasm port waits at x86_64_frame checkpoint 3 (`sarcasm-port.md`).
 

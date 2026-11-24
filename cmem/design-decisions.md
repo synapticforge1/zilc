@@ -7,6 +7,10 @@ the questions for the owner in [open-questions.md](open-questions.md); the Zig 0
 
 ## Decisions made
 
+- **2026-11-24** — 🔒 **FIL-C COMPONENTS MOVE ONLY WITH A FIL-C RELEASE** (owner: "until a new
+  release is released do not update the associated components"). The patched clang, the runtime
+  pieces and the sarcasm port stay on the pinned release's commit; `deluge` commits between
+  releases are watched and noted, never adopted (`upstream.md`, `sarcasm-port.md`).
 - **2026-11-24** — 🔒 **THE SARCASM PORT IS BSD-2-CLAUSE, THE TERMS OF `projects/sarcasm/install.sh`**
   (owner, review 1 L1: "it is referenced in the same location, so it does"). The `.luau` files
   carry no header, but `install.sh`'s licence header also describes what it installs, the sarcasm

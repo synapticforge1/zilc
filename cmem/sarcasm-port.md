@@ -5,6 +5,11 @@ Owner, 2026-11-06: _"Port sarcasm to Zig"_ (`design-decisions.md` top row; plan 
 byte-identical port has to reproduce. Measured from Fil-C 0.687's `projects/sarcasm` (paths below
 relative to it) on 2026-11-06; a claim with a date, re-check when the pin moves.
 
+🔒 The port follows the pinned Fil-C **release** only, never `deluge` (owner, 2026-11-24;
+`upstream.md`). Seen on `deluge`, not adopted: `5bf5b21` (2026-11-11, "use LAHF/SAHF for
+arithmetic flag snapshots": `transform.luau`, `x86_64_codegen.luau`, `DESIGN.md`) — port it when a
+release carries it, with the rest of that release.
+
 ## What it is
 
 Fil-C's "pizlonating assembler": `.s` with Fil-C annotations in, a memory-safe object out. Fil-C's
