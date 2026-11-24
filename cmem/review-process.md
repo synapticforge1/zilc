@@ -39,10 +39,13 @@ None of them commits, pushes or releases.
     edits from Windows (`toolchain-quirks-build-systems.md` Z-b-9);
   - never write to shared outputs under `~/zilc-work` (`outcmp/`, `equiv/`, the toolchain trees):
     one reviewer overwrote them; copy what you need into your folder;
-  - every git command in a checkout under `~/zilc-work/filc-src` runs as `timeout 60 git
-    --no-optional-locks …`: it is a partial clone (`blob:none`), so `git status` fetches missing
-    blobs from GitHub. One such fetch hung for 15 hours and held `.git/index.lock`, until the main
-    session killed it on 2026-11-24.
+  - every git command in a checkout under `~/zilc-work/filc-src` runs as `GIT_NO_LAZY_FETCH=1 git
+    --no-optional-locks …`: it is a partial clone (`blob:none`), so `git status` or `git show`
+    fetches missing blobs from GitHub. One such fetch hung for 15 hours and held
+    `.git/index.lock` (killed 2026-11-24). `timeout` does NOT help: it stops git, not the
+    `git fetch` child git waits on (two more hung that way in review 2's licensing pass). With
+    the variable a missing blob is an error; read upstream's text from the release package or
+    the checkout's working tree instead.
 
 ## Last review
 
