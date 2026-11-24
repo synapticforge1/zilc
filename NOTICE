@@ -96,6 +96,14 @@ code adapted from those components is linked into a program, that program's
 distribution inherits the obligation. See third_party/LICENSES.md,
 "The runtime-linking rule".
 
+What a program built by zilc carries: every one links Fil-C's runtime
+(BSD-2-Clause) and Fil-C's musl libc (MIT). One built from a Zig input also
+contains code from Zig's standard library (MIT); one that uses 128-bit floats
+also contains Zig's compiler-rt (MIT), as does the <output>.f128.o that
+`zilc build -c` leaves beside an object. A binary distribution of such a
+program should include those notices; the texts are installed under
+share/licenses/zilc/.
+
 Status: the Component Ledger in third_party/LICENSES.md is the record of what
 has actually been incorporated (as of 2026-11-23: test programs, a Zig std
 backport, local patches to Fil-C's compiler and llvm-split, the ported test
