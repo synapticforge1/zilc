@@ -26,7 +26,7 @@ for (let i = 0; i < 20; i++) strKeys.push(`k${i}`);
 for (let i = 0; i < 6; i++) strKeys.push(`a-long-string-key-of-more-than-32-bytes-number-${i}`);
 const pool: ({ n: number } | { s: string })[] = [...numKeys.map((n) => ({ n })), ...strKeys.map((s) => ({ s }))];
 
-let seed = envInt("SEED", 1) >>> 0;
+let seed = envInt("SEED", 1, 0) >>> 0;
 const rnd = (m: number) => {
   seed = (Math.imul(seed, 1103515245) + 12345) >>> 0;
   return (seed >>> 8) % m;

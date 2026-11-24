@@ -36,7 +36,7 @@ The slots (§ 5):
   `origin/main` an ancestor of `main`, the tag absent locally and on origin, the `v*` tags here
   equal origin's (fetched; KI-30), `bump.ts --check`, the privacy gate (no private file tracked,
   then the path scan), and the gates — `zig fmt --check`, Biome, `zig build test`, the release
-  scripts' tests, **the Fil-C gate** (`bun tools/run-gate.ts`, 8/8); then `git push origin main`
+  scripts' tests, **the Fil-C gate** (`bun tools/run-gate.ts`, 10/10); then `git push origin main`
   and a read-back with `ls-remote`. **It makes and pushes no tag.** Never `git tag -f`, never a
   forced tag push.
 - **U5 `checks`.** `.github/workflows/release.yml` on the pushed `main` commit, `contents: read`, a
@@ -68,7 +68,7 @@ The slots (§ 5):
 
 - **The owner's machine (`release.ts`):** every gate and test — the review gate, the version
   places, the privacy gate, format, `zig build test`, the release scripts' tests, the Fil-C safety
-  gate (`run-gate.ts`, 8/8). Fil-C's own suite, the corpus and the output comparison are the
+  gate (`run-gate.ts`, 10/10). Fil-C's own suite, the corpus and the output comparison are the
   per-release checklist in `releasing.md`, run before the notes are written.
 - **CI:** "is this a release?", the version check, the tag, the page. Nothing else.
 - **History:** CI ran the no-Fil-C half (format, unit and release-script tests, version places,
@@ -97,7 +97,7 @@ hardening review — letter H35, KI-24.)
 (`POST /markdown`, `gfm`; the REST API, never `gh`) and require, as visible text, the `v<version>`
 entry heading, the notes' `## <version>` heading, the README's status version in its quote, and
 the State row as a table row. A render that fails is a refusal; without `GITHUB_TOKEN` GitHub can
-refuse it for its rate limit (seen 2026-11-19; `review-issues.md` H1). The four files are LF only.
+refuse it for its rate limit (seen 2026-11-19; H18, closed 2026-11-24: wait and re-run, or set a token for that run). The four files are LF only.
 **Formatting is Biome's** (`bun tools/md/biome.ts ci .`, `biome.jsonc`; `release.ts` runs it).
 
 ## Release History (newest first)

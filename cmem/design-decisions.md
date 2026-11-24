@@ -7,6 +7,25 @@ the questions for the owner in [open-questions.md](open-questions.md); the Zig 0
 
 ## Decisions made
 
+- **2026-11-24** — 🔒 **FIL-C COMPONENTS MOVE ONLY WITH A FIL-C RELEASE** (owner: "until a new
+  release is released do not update the associated components"). The patched clang, the runtime
+  pieces and the sarcasm port stay on the pinned release's commit; `deluge` commits between
+  releases are watched and noted, never adopted (`upstream.md`, `sarcasm-port.md`).
+- **2026-11-24** — 🔒 **THE SARCASM PORT IS BSD-2-CLAUSE, THE TERMS OF `projects/sarcasm/install.sh`**
+  (owner, review 1 L1: "it is referenced in the same location, so it does"). The `.luau` files
+  carry no header, but `install.sh`'s licence header also describes what it installs, the sarcasm
+  logic in `../lib/sarcasm`. The 17 `src/sarcasm/*.zig` headers, `SARCASM-LICENSE.txt`, the ledger
+  entry `sarcasm-port` and NOTICE say so; the word ASSUMED is gone. No question to the author;
+  the release no longer waits on one.
+- **2026-11-23** — 🔒 **NO TIME LIMIT ON THE COMPILER DRIVER'S OR THE BUILD TOOLS' SUBPROCESSES**
+  (owner, review 1 triage, H12: "No limit; document it"). `zilc build` runs zig, Fil-C's clang, ld
+  and llvm-split; `zig build patched-clang` and `gcc-reference` run ninja and make for many
+  minutes. Like zig, gcc and clang themselves, a compile takes as long as it takes, and Ctrl-C
+  stops it. The release scripts' gate steps DO have limits (`release.ts`, `bump.ts`), and every
+  network request has one.
+  - Why: a fixed limit would kill legitimate builds (KI-22: single modules took many minutes before
+    the patched clang); a hung tool is visible to the person running it.
+
 - **2026-11-19** — 🔒 **THE MEMORY GUIDE'S LAYOUT: `STATE.md` + A ROUTER `INDEX.md`** (owner,
   2026-11-17, letter H38; steps 1–3 done 2026-11-19). The status moved from `open-work.md`'s State
   table to `STATE.md`; `INDEX.md` (20 KB) became a 2.4 KB router; its rules moved to

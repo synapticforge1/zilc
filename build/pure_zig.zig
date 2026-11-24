@@ -402,7 +402,12 @@ fn buildLibpizlo(b: *std.Build, step: *std.Build.Step, pas: Pas, filc_src: []con
     defer dir.close();
     var names: std.ArrayList([]const u8) = .empty;
     var it = dir.iterate();
-    while (it.next() catch null) |e| if (e.kind == .file and std.mem.endsWith(u8, e.name, ".c")) names.append(b.allocator, b.dupe(e.name)) catch @panic("OOM");
+    // A listing that fails part-way fails the step, never a silently short runtime archive; a
+    // symlinked .c is a source too (review 1, H16).
+    while (it.next() catch |err| {
+        step.dependOn(&b.addFail(b.fmt("cannot list {s}: {s}", .{ src_dir, @errorName(err) })).step);
+        return null;
+    }) |e| if ((e.kind == .file or e.kind == .sym_link) and std.mem.endsWith(u8, e.name, ".c")) names.append(b.allocator, b.dupe(e.name)) catch @panic("OOM");
     std.mem.sort([]const u8, names.items, {}, struct {
         fn lt(_: void, x: []const u8, y: []const u8) bool {
             return std.mem.lessThan(u8, x, y);

@@ -29,6 +29,12 @@ multi-licensed (see `licensing.md`).
 Excluded: `projects/*` other than the musl pair, `pizlix/`, and the glibc variant (see
 `third_party/LICENSES.md` → Copyleft exclusion).
 
+🔒 **Releases only (owner, 2026-11-24: "until a new release is released do not update the associated
+components"):** zilc's Fil-C components — the patched clang, the runtime pieces, the sarcasm port —
+stay on the pinned release's commit until Fil-C tags a new release. Commits on `deluge` between
+releases are watched (`check-upstream.ts`, report only) and noted, never adopted. On 2026-11-24:
+146 commits past `e7947f0`, no tag after v0.687, zilc's patches still apply; `REVIEWED` unchanged.
+
 ## 🔄 Upgrade procedure: Fil-C first, then the latest Zig (owner, 2026-09-30)
 
 Every upgrade runs in **three stages**. Stage A produces a known-good **reference**, stage B is

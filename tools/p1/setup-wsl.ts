@@ -24,17 +24,24 @@ const ZIG_URL = "https://ziglang.org/download/0.15.2/zig-x86_64-linux-0.15.2.tar
 const ZIG_SHA = "02aa270f183da276e5b5920b1dac44a63f1a49e55050ebde3aecc9eb82f93239";
 // Fil-C: the release zilc builds on (tools/lib/tool.ts FILC_VERSION). Upstream publishes no
 // checksum; these are the SHA-256s of the files as downloaded (0.686 on 2026-10-05, 0.687 on
-// 2026-10-27), recorded so a later download can be checked against them. FILC_VERSION=0.685 still
-// installs the release the phase experiments (tools/p1–p3) record (its SHA was only printed then,
-// so it is not checked).
+// 2026-10-27), recorded so a later download can be checked against them. Every download is
+// checked against a pinned SHA-256 before anything in it runs (review 1, S2): a version with no
+// recorded SHA is refused — record its SHA here first (FILC_SHA=<sha256> for a one-off).
 const FILC_VERSION = env("FILC_VERSION", ZILC_FILC_VERSION);
 const FILC_URL = `https://github.com/pizlonator/fil-c/releases/download/v${FILC_VERSION}/filc-${FILC_VERSION}-linux-x86_64.tar.xz`;
 const FILC_SHAS: Record<string, string> = {
   "0.686": "60bfbe8ee63d7e462394aa8d5e44fee675de892bcf800d9cc80d86378cad6b07",
   "0.687": "aab538401f78a47ab261ee79afed8c6b99e1d4848e263ae159a75b03c1288da1",
 };
-const FILC_SHA = FILC_SHAS[FILC_VERSION] ?? "";
+const FILC_SHA = env("FILC_SHA", FILC_SHAS[FILC_VERSION] ?? "");
+if (!/^[0-9a-f]{64}$/.test(FILC_SHA)) {
+  console.error(`no pinned SHA-256 for Fil-C ${FILC_VERSION}: add it to FILC_SHAS in tools/p1/setup-wsl.ts (or set FILC_SHA) before installing it`);
+  process.exit(1);
+}
 const PATCHELF_URL = "https://github.com/NixOS/patchelf/releases/download/0.19.1/patchelf-0.19.1-x86_64.tar.gz";
+// Measured 2026-11-23 at the source; the archive's bin/patchelf is byte-identical to the one this
+// machine had run since 2026-09-23 (review 1, S2: it was downloaded and run unchecked).
+const PATCHELF_SHA = "a6818fef80128fb354423234ecacdcca3e993913d774e5d8346bc63f70fed4cf";
 
 /** Runs a step with its output on this terminal; a failure ends the tool with that exit code, as `set -e` did. */
 async function step(argv: string[], o: { cwd?: string; env?: Record<string, string> } = {}): Promise<void> {
@@ -84,7 +91,7 @@ if (await exists(FILC)) {
   const got = line.split(" ")[0];
   console.log(`${got}  ${T}`);
   await writeFile(`${DL}/filc-${FILC_VERSION}.sha256`, `${got}  ${T}\n`);
-  if (FILC_SHA && got !== FILC_SHA) {
+  if (got !== FILC_SHA) {
     console.error(`SHA MISMATCH: got ${got} want ${FILC_SHA}`);
     process.exit(1);
   }
@@ -102,6 +109,10 @@ if (await exists(`${PBIN}/patchelf`)) {
   const line = await sha256(`${DL}/patchelf.tar.gz`);
   console.log(line);
   await writeFile(`${DL}/patchelf.sha256`, `${line}\n`);
+  if (line.split(" ")[0] !== PATCHELF_SHA) {
+    console.error(`SHA MISMATCH: got ${line.split(" ")[0]} want ${PATCHELF_SHA}`);
+    process.exit(1);
+  }
   await mkdirp(`${DL}/patchelf`);
   await step(["tar", "-xzf", `${DL}/patchelf.tar.gz`, "-C", `${DL}/patchelf`]);
   await step(["cp", `${DL}/patchelf/bin/patchelf`, `${PBIN}/patchelf`]);

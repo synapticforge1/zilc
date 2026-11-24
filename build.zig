@@ -228,7 +228,8 @@ pub fn build(b: *std.Build) void {
     test_step.dependOn(&b.addRunArtifact(exe_tests).step);
     // The generators: byte-identity with Ruby's output (SHA-256 pinned per Fil-C release) and the
     // musl header rules.
-    for ([_][]const u8{ "src/gen/forwarders.zig", "src/gen/musl_headers.zig" }) |root| {
+    // And sarcasm's own unit tests (table keys, the parser's depth limit — review 1, H1).
+    for ([_][]const u8{ "src/gen/forwarders.zig", "src/gen/musl_headers.zig", "src/sarcasm/sarcasm.zig", "tools/archive-rename.zig", "tools/patched-clang.zig" }) |root| {
         const t = b.addTest(.{ .root_module = b.createModule(.{
             .root_source_file = b.path(root),
             .target = target,
@@ -236,6 +237,24 @@ pub fn build(b: *std.Build) void {
         }) });
         test_step.dependOn(&b.addRunArtifact(t).step);
     }
+    // No HOME, XDG_CACHE_HOME or ZILC_CACHE_DIR: a named refusal, not a silent exit 1 (review 1, H6).
+    const no_home = b.addRunArtifact(exe);
+    no_home.clearEnvironment();
+    no_home.setEnvironmentVariable("PATH", "/usr/bin:/bin");
+    if (b.graph.global_cache_root.path) |p| no_home.setEnvironmentVariable("ZIG_GLOBAL_CACHE_DIR", p);
+    no_home.addArgs(&.{ "build", "-c", "--zig", b.graph.zig_exe });
+    no_home.addFileArg(b.path("examples/interop/bounds.zig"));
+    no_home.addArg("-o");
+    _ = no_home.addOutputFileArg("bounds.o");
+    no_home.expectExitCode(1);
+    no_home.addCheck(.{ .expect_stderr_match = "zilc: no cache directory: set ZILC_CACHE_DIR, XDG_CACHE_HOME or HOME" });
+    test_step.dependOn(&no_home.step);
+    // zilc-gen refuses an unwritable path in one named line, exit 1, no error trace (review 1, B4).
+    const gen_refuses = b.addRunArtifact(gen);
+    gen_refuses.addArgs(&.{ "header", "/nonexistent-zilc-dir/filc_native.h" });
+    gen_refuses.expectExitCode(1);
+    gen_refuses.expectStdErrEqual("zilc-gen: cannot write /nonexistent-zilc-dir/filc_native.h: FileNotFound\n");
+    test_step.dependOn(&gen_refuses.step);
 }
 
 /// `.version` from build.zig.zon: exactly one line `    .version = "X.Y.Z",`, or the build fails.

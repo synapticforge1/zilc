@@ -21,7 +21,8 @@ const usage =
     \\  -o <path>        output (default: a.out)
     \\  -O <mode>        Zig optimize mode (default: ReleaseSafe)
     \\  --target <t>     Zig target (default: x86_64-linux-musl)
-    \\  -c               emit an object instead of linking
+    \\  -c               emit an object instead of linking (one .zig input per run);
+    \\                   link any <output>.*.o it hands over beside it as well
     \\  --entry <who>    who owns main: auto (default), zig, or c.
     \\                   `zig` wraps your `pub fn main` in a generated C-ABI entry,
     \\                   because Zig's own start code cannot run under Fil-C (KI-5).
@@ -29,7 +30,7 @@ const usage =
     \\  --zig <path>     zig binary    (env ZILC_ZIG)
     \\  --filc <path>    Fil-C's clang (env ZILC_FILC)
     \\  -j <n>           parallel code generation parts for big modules
-    \\                   (default: cores, at most 16; 1 = off; env ZILC_JOBS)
+    \\                   (0 or unset: cores, at most 16; 1 = off; at most 256; env ZILC_JOBS)
     \\  --no-cache       always run Fil-C's clang, even for an unchanged module
     \\                   (env ZILC_CACHE=0; the cache is in $ZILC_CACHE_DIR,
     \\                   else $XDG_CACHE_HOME/zilc, else ~/.cache/zilc)
@@ -52,6 +53,8 @@ const usage =
 ;
 
 const exit_usage = 2;
+/// The largest `-j` accepted (the automatic count stops at 16).
+const max_jobs = 256;
 
 pub fn main() !void {
     var arena_state: std.heap.ArenaAllocator = .init(std.heap.page_allocator);
@@ -61,7 +64,13 @@ pub fn main() !void {
     const args = try std.process.argsAlloc(arena);
     const code: u8 = run(arena, args) catch |e| blk: {
         // The driver already reported these; don't bury them under an error name.
-        if (e == driver.Error.ToolFailed) break :blk 1;
+        if (e == driver.Error.ToolFailed or e == driver.Error.InputNotFound or e == driver.Error.BadOptions or
+            e == driver.Error.TempDirExists) break :blk 1;
+        if (e == driver.Error.NoCacheDir) {
+            // `--clean-cache` reaches it here; a build already printed it.
+            if (args.len > 1 and std.mem.eql(u8, args[1], "--clean-cache")) std.debug.print(driver.no_cache_dir_message, .{});
+            break :blk 1;
+        }
         std.debug.print("zilc: {s}\n", .{@errorName(e)});
         break :blk 1;
     };
@@ -156,6 +165,13 @@ fn run(arena: std.mem.Allocator, args: []const []const u8) !u8 {
             keep_temps = true;
         } else if (isFlag(a, "-v", "--verbose")) {
             verbose = true;
+        } else if (isFlag(a, "-h", "--help")) {
+            // The usage text lists these under `zilc build [options]` (review 1, B1).
+            std.debug.print(usage, .{zilc.version_string});
+            return 0;
+        } else if (std.mem.eql(u8, a, "--version")) {
+            try printVersion(arena);
+            return 0;
         } else if (std.mem.startsWith(u8, a, "-")) {
             std.debug.print("zilc: unknown option '{s}'\n", .{a});
             return exit_usage;
@@ -173,6 +189,12 @@ fn run(arena: std.mem.Allocator, args: []const []const u8) !u8 {
         std.debug.print("zilc: -j / ZILC_JOBS must be a number (got '{s}')\n", .{t});
         return exit_usage;
     } else 0;
+    // Each part is a clang process (up to ~0.75 GB); an explicit count is bounded too (review 1,
+    // H11: `-j 4000000000` would try to spawn that many).
+    if (jobs > max_jobs) {
+        std.debug.print("zilc: -j / ZILC_JOBS is at most {d} (got {d}; 0 = automatic, 1 = off)\n", .{ max_jobs, jobs });
+        return exit_usage;
+    }
 
     if (std.mem.indexOf(u8, target, "-musl") == null) {
         std.debug.print(
@@ -262,4 +284,21 @@ fn cleanCache(arena: std.mem.Allocator) !void {
 
 test {
     _ = driver;
+}
+
+test "zilc build -h and --help print the usage and exit 0 (review 1, B1)" {
+    var arena_state: std.heap.ArenaAllocator = .init(std.testing.allocator);
+    defer arena_state.deinit();
+    const arena = arena_state.allocator();
+    // `--version` is the same code path; it prints to stdout, which the test runner owns.
+    try std.testing.expectEqual(@as(u8, 0), try run(arena, &.{ "zilc", "build", "-h" }));
+    try std.testing.expectEqual(@as(u8, 0), try run(arena, &.{ "zilc", "build", "x.zig", "--help" }));
+    try std.testing.expectEqual(@as(u8, exit_usage), try run(arena, &.{ "zilc", "build", "--bogus" }));
+}
+
+test "an explicit -j is bounded (review 1, H11)" {
+    var arena_state: std.heap.ArenaAllocator = .init(std.testing.allocator);
+    defer arena_state.deinit();
+    try std.testing.expectEqual(@as(u8, exit_usage), try run(arena_state.allocator(), &.{ "zilc", "build", "-j", "4000000000", "x.zig" }));
+    try std.testing.expectEqual(@as(u8, exit_usage), try run(arena_state.allocator(), &.{ "zilc", "build", "-j", "257", "x.zig" }));
 }

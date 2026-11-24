@@ -4,7 +4,7 @@
  * correctly" — the tool the other projects chose; replacing the release guards' own Markdown
  * rules, review round 1 KI-38).
  *
- *   bun tools/md/biome.ts ci .              # check every tracked .md (CI's `checks`, release.ts)
+ *   bun tools/md/biome.ts ci .              # check every tracked .md (release.ts runs it; CI runs no gate)
  *   bun tools/md/biome.ts format --write .  # reformat them
  *
  * Any arguments are passed to Biome; the configuration is at the repository root

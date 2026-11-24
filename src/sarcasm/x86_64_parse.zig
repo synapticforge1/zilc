@@ -1,4 +1,31 @@
-// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+// SPDX-License-Identifier: BSD-2-Clause
+// A port of Fil-C's sarcasm (projects/sarcasm). These are the terms of projects/sarcasm/install.sh,
+// the folder's licence text, whose header names the sarcasm sources it installs (owner, 2026-11-24;
+// third_party/fil-c/SARCASM-LICENSE.txt; ledger entry `sarcasm-port`).
+// The port to Zig is zilc's (the module comment below says what was ported and how).
+//
+// Copyright (c) 2026 Filip Pizlo. All Rights Reserved.
+//
+// Redistribution and use in source and binary forms, with or without
+// modification, are permitted provided that the following conditions
+// are met:
+// 1. Redistributions of source code must retain the above copyright
+//    notice, this list of conditions and the following disclaimer.
+// 2. Redistributions in binary form must reproduce the above copyright
+//    notice, this list of conditions and the following disclaimer in the
+//    documentation and/or other materials provided with the distribution.
+//
+// THIS SOFTWARE IS PROVIDED BY FILIP PIZLO ``AS IS AND ANY
+// EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+// IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+// PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL FILIP PIZLO OR
+// CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+// EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+// PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+// PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY
+// OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //! The x86_64 assembly parser, AT&T and Intel syntax (a port of lines 1–946 of
 //! projects/sarcasm/sarcasm/x86_64_parse.luau, Fil-C 0.687: parseString and everything it uses;
 //! the `.byte` machine-code decoder, decodeByteInsns, is ported separately). Every string.match
@@ -230,6 +257,13 @@ const Parser = struct {
     text: []const u8,
     what: []const u8,
     pos: usize = 0,
+    /// How deep `factor` is: every nesting level (`(`, unary `-` `+` `~`) passes through it once.
+    depth: u32 = 0,
+
+    /// Deeper than any real operand; past it the parse is refused by name instead of overflowing
+    /// the stack (review 1, H1: 20000 `(` crashed with SIGSEGV). Upstream's Luau has no such
+    /// refusal; it would fail on its own stack limit instead, so no real input differs.
+    const max_depth = 1000;
 
     fn peekOp(p: *Parser) ?[]const u8 {
         if (p.pos >= p.tokens.len) return null;
@@ -246,6 +280,9 @@ const Parser = struct {
         return v.@"const";
     }
     fn factor(p: *Parser) E!Disp {
+        p.depth += 1;
+        defer p.depth -= 1;
+        if (p.depth > max_depth) return err.here(try fmt(p.alloc, "{s} expression nested more than {d} levels deep: {s}", .{ p.what, max_depth, p.text[0..@min(p.text.len, 80)] }));
         if (p.pos >= p.tokens.len) {
             p.pos += 1;
             return err.here(try fmt(p.alloc, "missing operand in {s} expression: {s}", .{ p.what, p.text }));
@@ -660,4 +697,24 @@ pub fn parseString(alloc: Allocator, text_in: []const u8, syntax: []const u8, fi
     err.endParse();
     try numlabel.resolve(alloc, out.items);
     return out.items;
+}
+
+test "deep nesting is refused by name, not a stack overflow (review 1, H1)" {
+    var arena_state: std.heap.ArenaAllocator = .init(std.testing.allocator);
+    defer arena_state.deinit();
+    const a = arena_state.allocator();
+    for ([_][]const u8{ "(", "-", "~", "+" }) |open| {
+        var text: std.ArrayList(u8) = .empty;
+        for (0..20000) |_| try text.appendSlice(a, open);
+        try text.append(a, '1');
+        if (std.mem.eql(u8, open, "(")) for (0..20000) |_| try text.append(a, ')');
+        try std.testing.expectError(error.Sarcasm, parseDispExpr(a, text.items, "displacement"));
+        try std.testing.expect(std.mem.indexOf(u8, err.message, "nested more than 1000 levels") != null);
+    }
+    // Real depth still folds.
+    var ok: std.ArrayList(u8) = .empty;
+    for (0..100) |_| try ok.append(a, '(');
+    try ok.append(a, '7');
+    for (0..100) |_| try ok.append(a, ')');
+    try std.testing.expectEqual(@as(f64, 7), (try parseDispExpr(a, ok.items, "displacement")).@"const");
 }

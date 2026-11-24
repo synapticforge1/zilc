@@ -34,11 +34,25 @@ None of them commits, pushes or releases.
   the main session deletes it (clones, mutants, planted inputs) at triage (`working-rules.md`
   § Scratch space); 🛑 never execute anything built by Fil-C, cosmo or zilc on the Windows host —
   every run is in WSL or Linux (`workarounds.md`); never commit, push or release.
+- **Also in every brief (lessons of review 1, 2026-11-23/24):**
+  - a fresh `ZIG_LOCAL_CACHE_DIR` in your folder: a shared cache served a stale compile after
+    edits from Windows (`toolchain-quirks-build-systems.md` Z-b-9);
+  - never write to shared outputs under `~/zilc-work` (`outcmp/`, `equiv/`, the toolchain trees):
+    one reviewer overwrote them; copy what you need into your folder;
+  - every git command in a checkout under `~/zilc-work/filc-src` runs as `timeout 60 git
+    --no-optional-locks …`: it is a partial clone (`blob:none`), so `git status` fetches missing
+    blobs from GitHub. One such fetch hung for 15 hours and held `.git/index.lock`, until the main
+    session killed it on 2026-11-24.
 
 ## Last review
 
-- None under this standard yet. Review round 1 (H35) stopped 2026-11-19; its open findings are in
-  `cmem/review-issues.md` (`open-work.md` § Review, round 1).
+- Review complete: 4f377a5
+
+Review 1 under this standard, 2026-11-23/24 (owner: "review"), from `a38387a` on branch
+`review/0.15.2-0.687.2`: 28 findings at the floor fixed, six re-reviews (the sixth empty), then
+the full suite once on linux-x64, all passing (`testing.md`; record in `review-issues.md`).
+Licence L1 closed by the owner on 2026-11-24 (`design-decisions.md`). Round 1 (H35), stopped on
+2026-11-19: its 24 carried findings are still to be triaged (`review-issues.md`).
 
 ## Slots
 
@@ -47,10 +61,10 @@ None of them commits, pushes or releases.
   reviewer is pointed at.
 - **Reference results** (basic: "reference results hold"; each a dated count in `testing.md`,
   re-derived before quoting; any change is a finding until explained):
-  - the safety gate, `bun tools/run-gate.ts` (Fil-C in WSL): **8/8**, each case trapping at its
+  - the safety gate, `bun tools/run-gate.ts` (Fil-C in WSL): **10/10** (2026-11-23), each case trapping at its
     file:line;
-  - `zig build test --summary all`: **41/41** (2026-11-15);
-  - `bun test tools/release/`: **124 pass, 1 skip** (the live GitHub render, opt-in; 2026-11-19);
+  - `zig build test --summary all`: **56/56** (2026-11-23);
+  - `bun test tools/release/ tools/lib/`: **132 pass, 1 skip** (the live GitHub render, opt-in; 2026-11-23);
   - the corpus (`testing.md` "corpus"): **78/78 as designed in all four modes**;
   - the output comparison (`testing.md`): **0 unexplained**;
   - Fil-C's own suite, stock vs zilc's clang (`tools/filc/run-filc-tests.ts`): **0 differences on

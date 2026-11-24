@@ -84,16 +84,32 @@ if (ARGS[0] === "compare") {
   console.log(`old: ${a.label} (${a.date}) → new: ${b.label} (${b.date})\n`);
   console.log("| program | mode | variant | old s | new s | new/old | noise | build new/old | size new/old |");
   console.log("| --- | --- | --- | --- | --- | --- | --- | --- | --- |");
+  // Every row is accounted for (review 1, B2): one only in the new file is listed; one whose run
+  // has no median (its build failed) makes the comparison fail.
+  const skipped: string[] = [];
+  let failed = 0;
   for (const e of b.entries as Entry[]) {
     const o = (a.entries as Entry[]).find((x) => x.program === e.program && x.mode === e.mode && x.variant === e.variant);
-    if (!o || !o.median || !e.median) continue;
+    const what = `${e.program} ${e.mode} ${e.variant}`;
+    if (!o) {
+      skipped.push(`${what}: not in the old file`);
+      continue;
+    }
+    if (!o.median || !e.median) {
+      skipped.push(`${what}: no time in the ${!e.median ? "new" : "old"} file (a failed build or run)`);
+      failed++;
+      continue;
+    }
     const r = e.median / o.median, nz = Math.max(o.noise ?? 0, e.noise ?? 0);
     const sameInput = JSON.stringify(o.args ?? null) === JSON.stringify(e.args ?? null);
     const flag = !sameInput ? " ⚠️ different input" : Math.abs(r - 1) <= 2 * nz ? " (within noise)" : "";
     const ratio = (x: number | null, y: number | null) => (x && y ? (x / y).toFixed(2) : "—");
     console.log(`| ${e.program} | ${e.mode} | ${e.variant} | ${f(o.median)} | ${f(e.median)} | ${r.toFixed(2)}${flag} | ${(nz * 100).toFixed(1)}% | ${ratio(e.buildSeconds, o.buildSeconds)} | ${ratio(e.strippedSize, o.strippedSize)} |`);
   }
-  process.exit(0);
+  const gone = (a.entries as Entry[]).filter((o) => !(b.entries as Entry[]).some((e) => e.program === o.program && e.mode === o.mode && e.variant === o.variant));
+  for (const o of gone) skipped.push(`${o.program} ${o.mode} ${o.variant}: not in the new file`);
+  if (skipped.length) console.log(`\nnot compared:\n${skipped.map((s) => `- ${s}`).join("\n")}`);
+  process.exit(failed ? 1 : 0);
 }
 
 // ---- the programs ----
@@ -241,6 +257,8 @@ for (let i = 0; i < jobs.length; i += 2) {
   const pair = [jobs[i], jobs[i + 1]], b = [built[i], built[i + 1]];
   const runs: number[][] = [[], []];
   const first: ({ code: number; out: Uint8Array } | null)[] = [null, null];
+  // A build that failed is a failed comparison, never a "—" in a table that exits 0 (review 1, B2).
+  for (let k = 0; k < 2; k++) if (!b[k].ok) notes.push(`BUILD FAILED: ${pair[k].p.name} ${pair[k].mode} ${pair[k].variant} (${pair[k].bin}.build.log)`);
   if (b[0].ok && b[1].ok) {
     for (let k = 0; k < 2; k++) first[k] = await once(pair[k]);
     for (let r = 0; r < repeats; r++) for (let k = 0; k < 2; k++) runs[k].push((await once(pair[k])).secs);

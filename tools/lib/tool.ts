@@ -293,9 +293,17 @@ export function since(t0: number): string {
   return ((Date.now() - t0) / 1000).toFixed(1);
 }
 /** Integer from an environment variable, or a default. */
-export function envInt(name: string, fallback: number): number {
+export function envInt(name: string, fallback: number, min = 1): number {
   const v = process.env[name];
-  return v ? Number(v) : fallback;
+  if (!v) return fallback;
+  // A whole number at least `min`, or a named refusal (review 1, H15: SCENARIOS=abc ran 0 cases and
+  // printed OK; JOBS=0 or REPEATS=0 did the same).
+  const n = /^\d+$/.test(v) ? Number(v) : Number.NaN;
+  if (!Number.isSafeInteger(n) || n < min) {
+    console.error(`${name} must be a whole number of at least ${min} (got "${v}")`);
+    process.exit(2);
+  }
+  return n;
 }
 /** The program's first line matching `re`, or "". */
 export function firstMatch(text: string, re: RegExp): string {
