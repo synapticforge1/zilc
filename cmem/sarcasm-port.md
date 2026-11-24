@@ -193,24 +193,18 @@ stderr and assembly byte for byte. Against itself: 0 differ (746 accepted, 685 r
 
 ## x86_64_frame (in progress, started 2026-11-07)
 
-8,934 lines (5,112 code); two entry points: `analyzeFrame` (lines 677–7221, ONE function of
-~6,500 lines, closures throughout) and `rewrite` (7222–8922), plus helpers (137–676) and the
-stack-buffer API (beginStackBufResolution / endStackBufResolution / stackBufCanonOf /
-recordStackBufCanon / stackBufLayout / stackBufGroupBaseFor / resolveStackBufDeclAt) and
-frameBaseDepth / rbpNormalization. Requires x86_64_isa, x86_64_parse, x86_64_fp, sig, frame,
+8,934 lines (5,112 code); two entry points: `analyzeFrame` (677–7221, ONE function of ~6,500
+lines, closures throughout) and `rewrite` (7222–8922), plus helpers (137–676), the stack-buffer
+API and frameBaseDepth (archive). Requires x86_64_isa, x86_64_parse, x86_64_fp, sig, frame,
 err. Module state carried from analyzeFrame to rewrite (D0, rbpNorm, maskScratchNum,
 frameAlignReq / frameAndDepth / frameAndIdx / frameAndSeen, slotGranules, cloneRetProofRan,
 yoloCount / yoloBase, sbLayout) and across a FILE (sbCanon, sbResolving).
 
-The boundary, measured on the corpus under upstream's driver (2026-11-07): analyzeFrame runs
-4,576 times (1,530 with regions = nil: transform's early geometry run, which skips the cloneRet
-proof), rewrite 23,949 times. Statements arrive with the parse fields plus transform's
-(b2clone, cloneRet, crossJumpEntry, localClone, localCloneEntry, localCall, localRet,
-stackBufAnno, tailCall, tailRet; 68 also carry stale x86_* marks — copied clones, cleared by
-analyzeFrame first); analyzeFrame ADDS 25 x86_* fields (x86_depth number or "dyn", x86_saves
-table or string, x86_smap, x86_fp, x86_prologue, x86_teardown*, …, x86StackBufRep); rewrite adds
-none to its input (it emits). Regions carry base (number or table), size, align, anchored,
-frameRegion; sigDesc is sig's Descriptor.
+The boundary (corpus, upstream's driver, 2026-11-07): analyzeFrame runs 4,576 times (1,530 with
+regions = nil: transform's early geometry run), rewrite 23,949 times. Statements arrive with the
+parse fields plus transform's (b2clone, cloneRet, localClone, localCall, localRet, stackBufAnno,
+tailCall, …; stale x86_* marks on copied clones are cleared first); analyzeFrame ADDS 25 x86_*
+fields; rewrite adds none. Regions carry base, size, align, anchored, frameRegion.
 
 The check — stage **xframe** in `check-stages.ts` (built 2026-11-07): under the real driver,
 every analyzeFrame call writes its full input (`A <iser>`: statements with table identity —
@@ -223,28 +217,58 @@ dumps its locals (`K<n>`). The port reads each capture (`tools/sarcasm/luau_valu
 prints its K. Progress:
 - ✅ **checkpoint 1** — upstream 677–1189 (setup, stack-buffer probes, sigHasFp, yolo count,
   labelAt / nextInsn, the prologue prefix scan, D0 / rbpNorm / frameSize): 4,576 calls, 0 differ
-  (233 fp frames, 87 alignment notes, 18 spill pushes, 45 with stack args, 173 buffer probes, 13
-  b2 declarations); inverted twice (13 and 6 differ).
+  (233 fp frames, 13 b2 declarations); inverted twice (13 and 6 differ).
 - ✅ **checkpoint 2** (2026-11-07) — upstream 1191–3211 (transferCore, the carrier map, transfer,
   the merges, successors, leaSaveUsesMemoryOnly, flagsDeadAfter, the depth fixpoint) in
   `src/sarcasm/x86_64_frame_flow.zig`: per statement the fixpoint's depth / saves / fp / smap
   (smap a Luau table — its order is upstream's output: the use check names the first offending
-  carrier) and the marks it sets. 83,131 K lines, 0 differ (73,844 statement states; 95 at dyn
-  depth, 2,495 with an established fp, 3,682 non-empty smaps, 646 slot carriers, 12 conflicts, 1,027
-  region pointers, 8 rejections). Inverted: the call poison 63,367 differ, REVERSED smap copy order
-  451, a no-op control 0. Two branches no Fil-C test reaches (measured: 0 hits) are driven by zilc's
+  carrier) and the marks it sets. 83,131 K lines, 0 differ (73,844 statement states, 8
+  rejections). Inverted: call poison 63,367 differ, reversed smap copy 451. Two branches no Fil-C test reaches (measured: 0 hits) are driven by zilc's
   own inputs `tests/sarcasm/frame-branches/` (xframe runs them after the corpus): the saveIdx merge
   (saveidx-merge.s — both keep and rewrite traced directly) and D-space slot carriers /
   clearDynSlots (dyn-slot.s); with them a fault in each is caught (27 and 12 differ). Table depths
-  are unreachable (corpus: x86_depth only number / "dyn"), so Depth is number | dyn. The replay
-  seeds the parser's pseudo-register registry from the captured operands (classifyReg in
-  leaSaveUsesMemoryOnly).
-  Harness bugs found and fixed: the patched upstream module was written back UTF-8-re-encoded
-  (now latin1, verified byte-identical to the release minus the inserted line), and the sequential
-  comparator decoded the two sides differently (now both as bytes). Open curiosity: an in-harness
-  stderr probe undercounted a branch the direct trace shows hit; trace the checker binary directly.
-- next: **checkpoint 3** — upstream 3213–3750 (validateTeardown, checkLostReload, the annotation
-  pass that sets x86_prologue / x86_depth / x86_saves / … on every statement).
+  are unreachable (corpus: x86_depth only number / "dyn"), so Depth is number | dyn.
+  Harness bugs fixed: the patched module is written back latin1 (byte-identical), both sides
+  compared as bytes. Full record: `archive/sarcasm-port-frame-cp1-2.md`.
+- ✅ **checkpoint 3** (2026-11-24) — upstream 3213–3749 (validateTeardown, checkLostReload,
+  retIsGpr, the annotation loop) in `src/sarcasm/x86_64_frame_annotate.zig`; hook after 3749
+  (anchor `\tend`, next line 3751), K3 = per insn statement pro / depth / saves / fp / smap /
+  aliasOff / aliasSaveIdx / the flag marks, then frameAlignReq / frameAndDepth / frameAndSeen.
+  The harness runs each stop separately (`Stop.annotate`), so K err after K2 = a rejection in
+  this span. Result: 0 differ over 163,254 lines (K1 4,589, K3 4,575 calls). 74,017 statements
+  annotated (teardownStart 1,054, teardown 1,949, leaSave 147, spSave 140, aliasOff 286, …); 20 rejections (8 in the fixpoint, 12 here).
+  Planted faults (differ): starter `leave` inverted 257; aliasSaveIdx dropped 286; frameAndDepth
+  update dropped 53; spillPop depth test inverted 48; midSp `nd >= 0` → `> 0` 3; probe `or
+  localClone` dropped 4; 16-byte `and` note rule 11; checkLostReload worklist reversed 0 (1 with
+  reject-lostreload-order.s). Driven by `frame-branches/` inputs: restore load into %rax
+  (reject-restore-rax.s), redefined restore (reject-restore-redef.s), teardown pop of a redefined
+  save at dyn depth (reject-teardown-redef.s), rbp restore-base lea (rbp-restore-lea.s); the last
+  two open branches are settled under checkpoint 4. Table depths: regionCarrierAccess and the {anchored} restore-base lea are dead
+  (no-ops, documented); x86_depth / fp / saves / smap are the fixpoint's arrays, not copied.
+- ✅ **checkpoint 4** (11-24) — upstream 3751–4069 (andDomOf, reachedFromAnd, preAnd /
+  postAnd marks, the governing-`and` dataflow, the crossing rejection and its dropRestore
+  exemption, the prologue-`and` fill) in `x86_64_frame_and.zig` (`Stop.andWalk`; andDomOf and
+  reachedFromAnd are Analysis fields). Hook after 4069 (next line 4071); K4 = per index
+  1..#body+1 (successors can name #body+1) pre / post / andDomOf / reachedFromAnd, indexed (no
+  table order); a rejection is `K err` after K3. 0 differ over 170,769 lines. Corpus: 67
+  functions with a mid `and`; preAnd 295, postAnd 535, reachedFromAnd 600; 6 rejections. Planted faults (differ): gandJoin's
+  disagreement keeps the first 7; `leave` out of the rsp-moves-up list 3; preAnd / postAnd on the
+  `and` 71 / 71; crossing test inverted 139,472; exemption's reachedFromAnd test inverted
+  128,149; prologue fill skipping "none" 45; name test inverted 127,853. New inputs
+  in `frame-branches/`: and-join.s (gandJoin's equal arm), exempt-restore-and.s (exemption
+  succeeds), reject-restore-loop-park.s (park reached from an `and`). Unreachable by
+  construction (kept as ported): a nil `out` in gandJoin, a non-insn or depth-less `and` in the
+  walk, dropRestore's nil guards (restoreLoadOf implies them), a save-depth miss; a walk to
+  `#body+1` panics here (upstream: Lua indexing error). `sIdx >` → `>=`: 0 (equivalent).
+  Checkpoint 3's open branches: (1) validateTeardown's `if st.localCall then return nil` (3230)
+  is dead: localCall sits only on `call` / `callq` statements (localcall.luau 92–96, 118–123,
+  872 / 915 / 948; tailcall.luau 399–408), and the next test `b == "call"` returns nil for
+  them, so removing the line changes nothing (no input). (2) The B2-clone buffer probe (fixpoint
+  1957–1975, annotation 3486–3500) is driven by `b2clone-lea-probe.s` (b2clone.s plus a
+  value-used `leaq 0(%rsp)` in the shared tail): `k >= lo` → `k > lo` gives 4 differ (fixpoint)
+  and 1 (annotation).
+- next: **checkpoint 5** — upstream 4070–4359 (anyMidAnd, parkPostOf, the clone subframe balance
+  check); after it 4361 onward the movq-restore loads.
 
 ## What a byte-identical port must reproduce (the foundations)
 

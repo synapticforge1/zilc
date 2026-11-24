@@ -265,7 +265,7 @@ fn truncateSaves(a: *A, sv: Saves, nd: f64) E!Saves {
     return newSaves(a, c.items);
 }
 
-fn classOf(a: *A, st: *const Stmt) E!*ir.Class {
+pub fn classOf(a: *A, st: *const Stmt) E!*ir.Class {
     if (a.classCache.get(st)) |c| return c;
     const c = try a.alloc.create(ir.Class);
     c.* = try isa.classify(a.alloc, st);
@@ -420,7 +420,7 @@ fn newEntry(a: *A, e: SmapEntry) E!*const SmapEntry {
     p.* = e;
     return p;
 }
-fn newSmap(a: *A) E!*Smap {
+pub fn newSmap(a: *A) E!*Smap {
     const p = try a.alloc.create(Smap);
     p.* = Smap.init(a.alloc, 0, 0) catch return error.OutOfMemory;
     return p;
@@ -432,7 +432,7 @@ fn copySmap(a: *A, src: *Smap) E!*Smap {
     while (it.next()) |e| o.set(e.key, e.val) catch return error.OutOfMemory;
     return o;
 }
-fn sget(m: ?*Smap, k: ?[]const u8) ?*const SmapEntry {
+pub fn sget(m: ?*Smap, k: ?[]const u8) ?*const SmapEntry {
     const mm = m orelse return null;
     const kk = k orelse return null;
     return mm.get(.{ .str = kk });
@@ -552,7 +552,7 @@ fn carrierCopyOf(a: *A, st: *const Stmt, smap: *Smap) E!?*const SmapEntry {
 const StoreSrc = struct { e: *const SmapEntry, key: SlotKey };
 
 /// saveStoreOf (1716).
-fn saveStoreOf(a: *A, st: *const Stmt, smap: *Smap, d: ?Depth) E!?StoreSrc {
+pub fn saveStoreOf(a: *A, st: *const Stmt, smap: *Smap, d: ?Depth) E!?StoreSrc {
     const ops = st.operands.items;
     if (!eq(u8, try base(a, st), "mov")) return null;
     const mem = at(ops, 0) orelse return null;
@@ -565,7 +565,7 @@ fn saveStoreOf(a: *A, st: *const Stmt, smap: *Smap, d: ?Depth) E!?StoreSrc {
 }
 
 /// carrierLoadOf (1732).
-fn carrierLoadOf(a: *A, st: *const Stmt, smap: *Smap, d: ?Depth) E!?*const SmapEntry {
+pub fn carrierLoadOf(a: *A, st: *const Stmt, smap: *Smap, d: ?Depth) E!?*const SmapEntry {
     const ops = st.operands.items;
     if (!eq(u8, try base(a, st), "mov")) return null;
     if (!gprFull(a, at(ops, 0))) return null;
@@ -576,7 +576,7 @@ fn carrierLoadOf(a: *A, st: *const Stmt, smap: *Smap, d: ?Depth) E!?*const SmapE
 }
 
 /// restoreLoadOf (1749).
-fn restoreLoadOf(a: *A, st: *const Stmt, smap: *Smap, sv: ?Saves) E!?SaveEntry {
+pub fn restoreLoadOf(a: *A, st: *const Stmt, smap: *Smap, sv: ?Saves) E!?SaveEntry {
     const ops = st.operands.items;
     if (!eq(u8, try base(a, st), "mov")) return null;
     const o0 = at(ops, 0) orelse return null;
@@ -992,7 +992,7 @@ pub fn successors(a: *A, i: usize) E![]const usize {
 const CDepth = union(enum) { num: f64, dyn };
 const Work = struct { i: usize, s: u8, dv: CDepth };
 
-fn leaSaveUsesMemoryOnly(a: *A, st: *const Stmt, idx: usize, parkedDepth: f64) E!bool {
+pub fn leaSaveUsesMemoryOnly(a: *A, st: *const Stmt, idx: usize, parkedDepth: f64) E!bool {
     if (a.leaMemOnlyCache.get(st)) |x| return x;
     const res = try leaMemOnlyScan(a, st, idx, parkedDepth);
     try a.leaMemOnlyCache.put(a.alloc, st, res);

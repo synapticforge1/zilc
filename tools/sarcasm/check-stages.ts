@@ -603,6 +603,18 @@ const XF_CHECKPOINTS: Checkpoint[] = [{
   anchor: "\tend",
   next: "\t-- Verify epilogue teardown regions: from the instruction after a teardown starter to a",
   dump: "{ body = body, depthIn = depthIn, savesIn = savesIn, fpIn = fpIn, smapIn = smapIn, leaMemOnlyCache = leaMemOnlyCache }",
+}, {
+  n: 3,
+  afterLine: 3749,
+  anchor: "\tend",
+  next: "\tlocal andDomOf = {}",
+  dump: "{ body = body, frameAlignReq = frameAlignReq, frameAndDepth = frameAndDepth, frameAndSeen = frameAndSeen }",
+}, {
+  n: 4,
+  afterLine: 4069,
+  anchor: "\tend",
+  next: "\t-- alignment `and` (so the parked value carries the and's dynamic slack",
+  dump: "{ body = body, andDomOf = andDomOf, reachedFromAnd = reachedFromAnd }",
 }];
 const XF_STOP = Math.max(...XF_CHECKPOINTS.map((c) => c.n));
 const XF_CLEARED = ["x86_prologue", "x86_depth", "x86_saves", "x86_unpairedPop", "x86_spillPop", "x86_flagsPop", "x86_teardownStart", "x86_teardown", "x86_fp", "x86_spRecover", "x86_saveStore", "x86_carrierLoad", "x86_leaSave", "x86_carrierCallArg", "x86_spSave", "x86_dropRestore", "x86_midSp", "x86_regionCarrier", "x86_aliasOff", "x86_aliasSaveIdx", "x86_midAnd", "x86_preAnd", "x86_postAnd", "x86_smap", "x86_b2band", "x86StackBufAccess", "x86StackBufIdx", "x86StackBufRep", "x86StackBufLea", "x86StackBufAddr", "x86StackBufLeaValue", "x86StackBufLeaValueComputed", "x86_alignKeyed", "x86_alignAndBase"];
@@ -806,6 +818,34 @@ seqStages.push({
     "    end",
     "  end",
     "  table.insert(lines, 'K2 end')",
+    "  return table.concat(lines, '\\n')",
+    "end",
+    // checkpoint 3: per insn statement every mark the annotation loop sets (the fixpoint's own
+    // x86_depth / x86_saves / x86_fp / x86_smap included), then the module's alignment state
+    "local K3F = { 'x86_spRecover', 'x86_spSave', 'x86_saveStore', 'x86_carrierLoad', 'x86_regionCarrier', 'x86_dropRestore', 'x86_leaSave', 'x86_spillPop', 'x86_unpairedPop', 'x86_flagsPop', 'x86_teardownStart', 'x86_teardown', 'x86_midSp', 'x86_midAnd' }",
+    "DUMP[3] = function(K)",
+    "  local lines = {}",
+    "  for i, st in K.body do",
+    "    if st.kind == 'insn' then",
+    "      local fl = {} for _, f in K3F do if st[f] ~= nil then table.insert(fl, f .. '=' .. tostring(st[f])) end end",
+    "      table.insert(lines, 'K3 ' .. i .. ' pro=' .. nv(st.x86_prologue) .. ' d=' .. dDump(st.x86_depth) .. ' s=' .. svDump(st.x86_saves) .. ' f=' .. nv(st.x86_fp) .. ' m=' .. smDump(st.x86_smap) .. ' ao=' .. nv(st.x86_aliasOff) .. ' ai=' .. nv(st.x86_aliasSaveIdx) .. ' fl=[' .. table.concat(fl, ',') .. ']')",
+    "    end",
+    "  end",
+    "  table.insert(lines, 'K3 end frameAlignReq=' .. nv(K.frameAlignReq) .. ' frameAndDepth=' .. nv(K.frameAndDepth) .. ' frameAndSeen=' .. nv(K.frameAndSeen))",
+    "  return table.concat(lines, '\\n')",
+    "end",
+    // checkpoint 4: per statement index 1..#body+1 (successors can name #body+1) the pre / post
+    // marks, andDomOf and reachedFromAnd, wherever any is set; indexed, so no table order matters
+    "DUMP[4] = function(K)",
+    "  local lines = {}",
+    "  for i = 1, #K.body + 1 do",
+    "    local st = K.body[i]",
+    "    local pre, post, ad, ra = st and st.x86_preAnd, st and st.x86_postAnd, K.andDomOf[i], K.reachedFromAnd[i]",
+    "    if pre ~= nil or post ~= nil or ad ~= nil or ra ~= nil then",
+    "      table.insert(lines, 'K4 ' .. i .. ' pre=' .. nv(pre) .. ' post=' .. nv(post) .. ' ad=' .. nv(ad) .. ' ra=' .. nv(ra))",
+    "    end",
+    "  end",
+    "  table.insert(lines, 'K4 end')",
     "  return table.concat(lines, '\\n')",
     "end",
     "local out = {}",

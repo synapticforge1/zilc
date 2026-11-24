@@ -39,7 +39,10 @@
 //! rewrite reads it; the stack-buffer table lives for a file).
 //!
 //! Ported so far: upstream lines 128–339 (module state, the helpers the early phases use) and
-//! 677–1189 (analyzeFrame up to the end of the prologue prefix scan: checkpoint 1).
+//! 677–1189 (analyzeFrame up to the end of the prologue prefix scan: checkpoint 1), 1191–3211
+//! (the depth fixpoint, x86_64_frame_flow.zig: checkpoint 2) and 3213–3749 (the annotation pass,
+//! x86_64_frame_annotate.zig: checkpoint 3) and 3751�4069 (the pre/post-`and` walks,
+//! x86_64_frame_and.zig: checkpoint 4).
 
 const std = @import("std");
 const err = @import("err.zig");
@@ -52,6 +55,8 @@ const ln = @import("luau_number.zig");
 const lt = @import("luau_table.zig");
 const u = @import("util.zig");
 const flow = @import("x86_64_frame_flow.zig");
+const annotate = @import("x86_64_frame_annotate.zig");
+const andwalk = @import("x86_64_frame_and.zig");
 
 const Allocator = std.mem.Allocator;
 const E = err.Error;
@@ -221,7 +226,11 @@ pub const SmapEntry = struct {
 pub const Smap = lt.Table(*const SmapEntry);
 
 /// Where analyzeFrame stops (for the stage check's checkpoints); `none` runs to the end.
-pub const Stop = enum { none, prologue, fixpoint };
+/// The governing `and` of a statement (upstream's andDomOf values): the depth of the last
+/// `and $-N, %rsp` on every path, "none", or "dyn".
+pub const Gand = union(enum) { num: f64, none, dyn };
+
+pub const Stop = enum { none, prologue, fixpoint, annotate, andWalk };
 
 /// analyzeFrame's locals. Field names are upstream's.
 pub const Analysis = struct {
@@ -260,6 +269,11 @@ pub const Analysis = struct {
     smapIn: []?*Smap = &.{},
     classCache: std.AutoHashMapUnmanaged(*const Stmt, *ir.Class) = .empty,
     leaMemOnlyCache: std.AutoHashMapUnmanaged(*const Stmt, bool) = .empty,
+
+    // the pre/post-`and` walks (upstream 3751�4069; x86_64_frame_and.zig): a slot per body index
+    // 1..#body+1 (index i at [i])
+    andDomOf: []?Gand = &.{},
+    reachedFromAnd: []bool = &.{},
 
     pub fn st_(a: *Analysis, i: usize) *Stmt {
         return a.body[i - 1];
@@ -504,5 +518,9 @@ pub fn analyzeFrameTo(alloc: Allocator, body: []const *Stmt, sigDesc: ?*const si
     if (stop == .prologue) return a;
     try flow.fixpoint(a);
     if (stop == .fixpoint) return a;
-    @panic("x86_64_frame: analyzeFrame is ported only to the fixpoint checkpoint");
+    try annotate.annotate(a);
+    if (stop == .annotate) return a;
+    try andwalk.andWalk(a);
+    if (stop == .andWalk) return a;
+    @panic("x86_64_frame: analyzeFrame is ported only to the and-walk checkpoint");
 }

@@ -775,8 +775,92 @@ fn nvB(v: ?bool) []const u8 {
     return if (v) |x| tsB(x) else "nil";
 }
 
-fn dumpK2(gpa: Alloc, an: *s.x86_64_frame.Analysis) ![]const u8 {
+fn dumpSaves(gpa: Alloc, o: *std.ArrayList(u8), saves: ?s.x86_64_frame.Saves) !void {
+    if (saves) |sv| {
+        if (s.x86_64_frame.isDynSaves(sv)) {
+            try o.appendSlice(gpa, "dyn");
+        } else {
+            try o.append(gpa, '[');
+            for (sv.items, 0..) |e, j| {
+                if (j > 0) try o.append(gpa, ',');
+                try o.print(gpa, "{s}/{s}/{s}/{s}/{s}", .{ try qstr(gpa, e.name), try tsN(gpa, e.num), try tsN(gpa, e.depth), nvB(e.spill), tsB(e.redefined) });
+            }
+            try o.append(gpa, ']');
+        }
+    } else try o.appendSlice(gpa, "nil");
+}
+
+fn dumpSmap(gpa: Alloc, o: *std.ArrayList(u8), smap: ?*s.x86_64_frame.Smap) !void {
+    if (smap) |m| {
+        try o.append(gpa, '{');
+        var it = m.iterator();
+        var j: usize = 0;
+        while (it.next()) |pe| : (j += 1) {
+            if (j > 0) try o.append(gpa, ';');
+            const e = pe.val;
+            try o.print(gpa, "{s}:{s},{s},{s},{s},{s},{s},{s},{s},{s},{s},{s},{s},{s}", .{
+                try qstr(gpa, pe.key.str), try nvS(gpa, e.name),  try tsN(gpa, e.num),    try tsN(gpa, e.depth), try tsN(gpa, e.saveIdx),
+                nvB(e.redefined),          try nvS(gpa, e.form),  nvB(e.slot),            try tsN(gpa, e.off),   try nvS(gpa, e.space),
+                try tsN(gpa, e.roff),      try tsN(gpa, e.rbase), try nvS(gpa, e.rspace), nvB(e.conflict),
+            });
+        }
+        try o.append(gpa, '}');
+    } else try o.appendSlice(gpa, "nil");
+}
+
+/// Checkpoint 3: per insn statement the annotation pass's marks (x86_depth / x86_saves / x86_fp /
+/// x86_smap are the fixpoint's arrays), then the alignment state.
+fn dumpK3(gpa: Alloc, an: *s.x86_64_frame.Analysis) ![]const u8 {
     const XF = s.x86_64_frame;
+    var o: std.ArrayList(u8) = .empty;
+    for (an.body, 1..) |st, i| {
+        if (st.kind != .insn) continue;
+        const m = st.x86;
+        try o.print(gpa, "K3 {d} pro={s} d=", .{ i, nvB(m.prologue) });
+        if (an.depthIn[i - 1]) |x| try o.appendSlice(gpa, if (x == .dyn) "dyn" else try tsN(gpa, x.num)) else try o.appendSlice(gpa, "nil");
+        try o.appendSlice(gpa, " s=");
+        try dumpSaves(gpa, &o, an.savesIn[i - 1]);
+        try o.print(gpa, " f={s} m=", .{if (an.fpIn[i - 1]) |f| try qstr(gpa, @tagName(f)) else "nil"});
+        try dumpSmap(gpa, &o, an.smapIn[i - 1]);
+        try o.print(gpa, " ao={s} ai={s} fl=[", .{ try tsN(gpa, m.aliasOff), try tsN(gpa, m.aliasSaveIdx) });
+        var first = true;
+        inline for (.{ "spRecover", "spSave", "saveStore", "carrierLoad", "regionCarrier", "dropRestore", "leaSave", "spillPop", "unpairedPop", "flagsPop", "teardownStart", "teardown", "midSp", "midAnd" }) |f| {
+            if (@field(m, f)) {
+                if (!first) try o.append(gpa, ',');
+                first = false;
+                try o.print(gpa, "x86_{s}=true", .{f});
+            }
+        }
+        try o.appendSlice(gpa, "]\n");
+    }
+    try o.print(gpa, "K3 end frameAlignReq={s} frameAndDepth={s} frameAndSeen={s}\n", .{ try tsN(gpa, XF.frameAlignReq), try tsN(gpa, XF.frameAndDepth), tsB(XF.frameAndSeen) });
+    return o.items;
+}
+
+/// Checkpoint 4: per statement index 1..#body+1 the pre / post marks, andDomOf and reachedFromAnd,
+/// wherever any is set.
+fn dumpK4(gpa: Alloc, an: *s.x86_64_frame.Analysis) ![]const u8 {
+    var o: std.ArrayList(u8) = .empty;
+    for (1..an.body.len + 2) |i| {
+        const m: ?s.ir.FrameMarks = if (i <= an.body.len) an.body[i - 1].x86 else null;
+        const pre = m != null and m.?.preAnd;
+        const post = m != null and m.?.postAnd;
+        const ad = an.andDomOf[i];
+        const ra = an.reachedFromAnd[i];
+        if (!pre and !post and ad == null and !ra) continue;
+        try o.print(gpa, "K4 {d} pre={s} post={s} ad=", .{ i, if (pre) "true" else "nil", if (post) "true" else "nil" });
+        if (ad) |g| switch (g) {
+            .num => |x| try o.appendSlice(gpa, try tsN(gpa, x)),
+            .none => try o.appendSlice(gpa, "\"none\""),
+            .dyn => try o.appendSlice(gpa, "\"dyn\""),
+        } else try o.appendSlice(gpa, "nil");
+        try o.print(gpa, " ra={s}\n", .{if (ra) "true" else "nil"});
+    }
+    try o.appendSlice(gpa, "K4 end\n");
+    return o.items;
+}
+
+fn dumpK2(gpa: Alloc, an: *s.x86_64_frame.Analysis) ![]const u8 {
     var o: std.ArrayList(u8) = .empty;
     for (an.body, 1..) |st, i| {
         const d = an.depthIn[i - 1];
@@ -788,34 +872,9 @@ fn dumpK2(gpa: Alloc, an: *s.x86_64_frame.Analysis) ![]const u8 {
         try o.print(gpa, "K2 {d} d=", .{i});
         if (d) |x| try o.appendSlice(gpa, if (x == .dyn) "dyn" else try tsN(gpa, x.num)) else try o.appendSlice(gpa, "nil");
         try o.appendSlice(gpa, " s=");
-        if (an.savesIn[i - 1]) |sv| {
-            if (XF.isDynSaves(sv)) {
-                try o.appendSlice(gpa, "dyn");
-            } else {
-                try o.append(gpa, '[');
-                for (sv.items, 0..) |e, j| {
-                    if (j > 0) try o.append(gpa, ',');
-                    try o.print(gpa, "{s}/{s}/{s}/{s}/{s}", .{ try qstr(gpa, e.name), try tsN(gpa, e.num), try tsN(gpa, e.depth), nvB(e.spill), tsB(e.redefined) });
-                }
-                try o.append(gpa, ']');
-            }
-        } else try o.appendSlice(gpa, "nil");
+        try dumpSaves(gpa, &o, an.savesIn[i - 1]);
         try o.print(gpa, " f={s} m=", .{if (an.fpIn[i - 1]) |f| try qstr(gpa, @tagName(f)) else "nil"});
-        if (an.smapIn[i - 1]) |m| {
-            try o.append(gpa, '{');
-            var it = m.iterator();
-            var j: usize = 0;
-            while (it.next()) |pe| : (j += 1) {
-                if (j > 0) try o.append(gpa, ';');
-                const e = pe.val;
-                try o.print(gpa, "{s}:{s},{s},{s},{s},{s},{s},{s},{s},{s},{s},{s},{s},{s}", .{
-                    try qstr(gpa, pe.key.str), try nvS(gpa, e.name),  try tsN(gpa, e.num),    try tsN(gpa, e.depth), try tsN(gpa, e.saveIdx),
-                    nvB(e.redefined),          try nvS(gpa, e.form),  nvB(e.slot),            try tsN(gpa, e.off),   try nvS(gpa, e.space),
-                    try tsN(gpa, e.roff),      try tsN(gpa, e.rbase), try nvS(gpa, e.rspace), nvB(e.conflict),
-                });
-            }
-            try o.append(gpa, '}');
-        } else try o.appendSlice(gpa, "nil");
+        try dumpSmap(gpa, &o, an.smapIn[i - 1]);
         try o.print(gpa, " lvc={s} cca=", .{nvB(lvc)});
         if (cca) |c| try o.print(gpa, "{s}/{s}", .{ try qstr(gpa, c.name), try nvS(gpa, c.form) }) else try o.appendSlice(gpa, "nil");
         try o.appendSlice(gpa, " rep=");
@@ -889,6 +948,20 @@ fn xframeRecord(gpa: Alloc, out: *std.ArrayList(u8), rec: []const u8) !void {
     }
     if (XF.analyzeFrameTo(gpa, in.body, in.sd, regs, .fixpoint)) |an| {
         try out.appendSlice(gpa, try dumpK2(gpa, an));
+    } else |e| {
+        if (e != error.Sarcasm) return e;
+        try out.print(gpa, "K err {s}\n", .{s.err.message});
+        return;
+    }
+    if (XF.analyzeFrameTo(gpa, in.body, in.sd, regs, .annotate)) |an| {
+        try out.appendSlice(gpa, try dumpK3(gpa, an));
+    } else |e| {
+        if (e != error.Sarcasm) return e;
+        try out.print(gpa, "K err {s}\n", .{s.err.message});
+        return;
+    }
+    if (XF.analyzeFrameTo(gpa, in.body, in.sd, regs, .andWalk)) |an| {
+        try out.appendSlice(gpa, try dumpK4(gpa, an));
     } else |e| {
         if (e != error.Sarcasm) return e;
         try out.print(gpa, "K err {s}\n", .{s.err.message});
