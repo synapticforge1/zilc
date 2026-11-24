@@ -243,22 +243,24 @@ prints its K. Progress:
   exempt-restore-and.s, reject-restore-loop-park.s. A walk to `#body+1` panics (upstream: a Lua
   indexing error). Full record of 3 and 4 (faults, dead branches): `archive/sarcasm-port-frame-cp3-4.md`.
 - ✅ **checkpoint 5** (11-24) — upstream 4070–4359 (anyMidAnd, parkPostOf, the clone subframe
-  balance check with its direct-carrier hatch) in `x86_64_frame_clone.zig` (`Stop.cloneBalance`;
-  anyMidAnd an Analysis field, parkPostOf `XF.parkPostOf`); hook after 4359 (next 4361). K5 =
-  anyMidAnd, parkPostOf(nil), each index where parkPostOf holds; the span sets no marks, a
-  rejection is `K err` after K4. 0 differ (xframe 183,037 lines with 15 of zilc's inputs): corpus
-  4,568 spans pass, 10 rejections (3 clone + 1 local unbalanced, 5 + 1 unknown depth); 67
-  anyMidAnd, 2,665 parkPostOf-true indices. Measured: depth mismatch 52 calls (teardown hatch
-  48), cloneRet without regions skipped 101. New inputs: b2clone-carrier-zero.s (lea and mov
-  recovery accepted), reject-b2clone-push.s, -norecover.s, -redef.s. Planted faults (differ):
-  hatch `teardown` test inverted 174,388; `park >` → `>=` 173,055; regions guard dropped 38,281;
-  depthEq `==` → `>=` 37,780; recovery `rd == 0` → `!=` 1,057; ret-carrier saveIdx test
-  inverted 1,117; mov `depth == 0` → `!=` 919. Pop arm of the push/pop test: 0 differ (kept).
-  0 hits, no input (kept as ported): ret depth nil (CFG-reachable: an analysis-gap guard; or
-  dead), clone entry depth nil, dyn / non-empty saves at a clone point, no smap at the ret.
-  Dead: cloneRet without b2clone (tailcall 636–637, 651–652), carrierToZeroOk's entry depth 0 /
-  non-number (depthEq or the dyn test already decided).
-- next: **checkpoint 6** — upstream 4361–4422 (the epilogue movq-restore loads); 4424 on: B2 bands.
+  balance check) in `x86_64_frame_clone.zig` (`Stop.cloneBalance`); K5 = anyMidAnd, parkPostOf
+  per index; a rejection is `K err`. 0 differ; 10 rejections; 7 planted faults caught; inputs
+  b2clone-carrier-zero.s, reject-b2clone-{push,norecover,redef}.s. Faults, measured hits and dead
+  branches (cloneRet without b2clone, carrierToZeroOk's entry depth):
+  `archive/sarcasm-port-frame-cp5.md`.
+- ✅ **checkpoint 6** (11-24) — upstream 4361–4422 (the epilogue movq-restore loads: an rsp / rbp
+  save-slot `mov` load of a save redefined after its push, proven dead by checkLostReload, marked
+  x86_dropRestore) in `x86_64_frame_restore.zig` (`Stop.epilogueRestore`; checkLostReload now
+  pub); hook after 4422 (next 4424). K6 = the indices marked dropRestore; a rejection is `K err`.
+  0 differ (xframe 187,831 lines with 18 of zilc's inputs). Measured: 4,622 rsp / rbp loads, 185
+  not 8 wide, 4,175 with saves, 3 at dyn depth (skipped), 165 rbp-based (156 with rbpNorm != 0),
+  17 corpus marks (0 already marked by 3406), no corpus rejection. Inputs: epilogue-restore-rbp.s,
+  reject-epilogue-restore-{rax,reload}.s. Planted faults (differ): `redefined` test dropped 41,760;
+  offset `D0 - d` → `+ d` 41,552; width `!= 8` inverted 41,552; mark dropped 41,552; retIsGpr
+  inverted 35,325; spill skip dropped 20,180; rbpNorm dropped 0 on the corpus, 830 with the rbp
+  input; checkLostReload skipped 316; dyn-depth guard dropped: stage-check crashed. Not caught
+  (kept as ported): the rbp-slot skip (225 hits skipped, none redefined); 0 hits: depth nil.
+- next: **checkpoint 7** — upstream 4424 on: the B2 clone coordinate bands (bandBase layout).
 
 ## What a byte-identical port must reproduce (the foundations)
 

@@ -103,7 +103,7 @@ const DEFAULT_WHY = "transient-pad pop that restores its save (the register was 
 
 /// checkLostReload (3265): walk forward from the pop (CFG, stopping at a fresh definition of the
 /// register); reject at the first use.
-fn checkLostReload(a: *A, popIdx: usize, save: SaveEntry, why: ?[]const u8) E!void {
+pub fn checkLostReload(a: *A, popIdx: usize, save: SaveEntry, why: ?[]const u8) E!void {
     const alloc = a.alloc;
     var work: std.ArrayList(usize) = .empty;
     var seen: std.AutoHashMapUnmanaged(usize, void) = .empty;

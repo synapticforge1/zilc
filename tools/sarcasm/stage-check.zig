@@ -872,6 +872,16 @@ fn dumpK5(gpa: Alloc, an: *s.x86_64_frame.Analysis) ![]const u8 {
     return o.items;
 }
 
+/// Checkpoint 6: the insn indices marked x86_dropRestore (after the whole annotation + this span).
+fn dumpK6(gpa: Alloc, an: *s.x86_64_frame.Analysis) ![]const u8 {
+    var o: std.ArrayList(u8) = .empty;
+    for (an.body, 1..) |st, i| {
+        if (st.kind == .insn and st.x86.dropRestore) try o.print(gpa, "K6 {d} dropRestore\n", .{i});
+    }
+    try o.appendSlice(gpa, "K6 end\n");
+    return o.items;
+}
+
 fn dumpK2(gpa: Alloc, an: *s.x86_64_frame.Analysis) ![]const u8 {
     var o: std.ArrayList(u8) = .empty;
     for (an.body, 1..) |st, i| {
@@ -981,6 +991,13 @@ fn xframeRecord(gpa: Alloc, out: *std.ArrayList(u8), rec: []const u8) !void {
     }
     if (XF.analyzeFrameTo(gpa, in.body, in.sd, regs, .cloneBalance)) |an| {
         try out.appendSlice(gpa, try dumpK5(gpa, an));
+    } else |e| {
+        if (e != error.Sarcasm) return e;
+        try out.print(gpa, "K err {s}\n", .{s.err.message});
+        return;
+    }
+    if (XF.analyzeFrameTo(gpa, in.body, in.sd, regs, .epilogueRestore)) |an| {
+        try out.appendSlice(gpa, try dumpK6(gpa, an));
     } else |e| {
         if (e != error.Sarcasm) return e;
         try out.print(gpa, "K err {s}\n", .{s.err.message});

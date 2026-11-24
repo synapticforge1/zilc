@@ -621,6 +621,12 @@ const XF_CHECKPOINTS: Checkpoint[] = [{
   anchor: "\tend",
   next: "\t-- Epilogue movq-restore loads (the perlasm shape: `movq (%rsp), %r15; movq",
   dump: "{ body = body, anyMidAnd = anyMidAnd, parkPostOf = parkPostOf }",
+}, {
+  n: 6,
+  afterLine: 4422,
+  anchor: "\tend",
+  next: "\t-- B2 shared-tail clone coordinate bands (tailcall.luau st.b2clone = the",
+  dump: "{ body = body }",
 }];
 const XF_STOP = Math.max(...XF_CHECKPOINTS.map((c) => c.n));
 const XF_CLEARED = ["x86_prologue", "x86_depth", "x86_saves", "x86_unpairedPop", "x86_spillPop", "x86_flagsPop", "x86_teardownStart", "x86_teardown", "x86_fp", "x86_spRecover", "x86_saveStore", "x86_carrierLoad", "x86_leaSave", "x86_carrierCallArg", "x86_spSave", "x86_dropRestore", "x86_midSp", "x86_regionCarrier", "x86_aliasOff", "x86_aliasSaveIdx", "x86_midAnd", "x86_preAnd", "x86_postAnd", "x86_smap", "x86_b2band", "x86StackBufAccess", "x86StackBufIdx", "x86StackBufRep", "x86StackBufLea", "x86StackBufAddr", "x86StackBufLeaValue", "x86StackBufLeaValueComputed", "x86_alignKeyed", "x86_alignAndBase"];
@@ -862,6 +868,16 @@ seqStages.push({
     "    if K.parkPostOf(i) then table.insert(lines, 'K5 ' .. i .. ' park') end",
     "  end",
     "  table.insert(lines, 'K5 end')",
+    "  return table.concat(lines, '\\n')",
+    "end",
+    // checkpoint 6: the statements the epilogue movq-restore loop marks x86_dropRestore (the
+    // only mark it sets; its other result is a rejection, `K err`)
+    "DUMP[6] = function(K)",
+    "  local lines = {}",
+    "  for i, st in K.body do",
+    "    if st.kind == 'insn' and st.x86_dropRestore then table.insert(lines, 'K6 ' .. i .. ' dropRestore') end",
+    "  end",
+    "  table.insert(lines, 'K6 end')",
     "  return table.concat(lines, '\\n')",
     "end",
     "local out = {}",
