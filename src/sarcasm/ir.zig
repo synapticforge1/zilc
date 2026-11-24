@@ -82,6 +82,28 @@ pub const LocalRet = struct { conts: []const []const u8, clone: ?f64 = null, ent
 pub const FrameMarks = struct {
     /// x86_prologue (set by the annotation pass, after the fixpoint; nil during it)
     prologue: ?bool = null,
+    // set by the annotation pass (upstream 3302â€“3749; x86_depth / x86_fp / x86_saves / x86_smap
+    // are the fixpoint's own arrays, Analysis.depthIn / fpIn / savesIn / smapIn)
+    spRecover: bool = false,
+    spSave: bool = false,
+    saveStore: bool = false,
+    carrierLoad: bool = false,
+    /// x86_regionCarrier: never true (it needs a table depth; unreachable)
+    regionCarrier: bool = false,
+    aliasOff: ?f64 = null,
+    aliasSaveIdx: ?f64 = null,
+    dropRestore: bool = false,
+    leaSave: bool = false,
+    spillPop: bool = false,
+    unpairedPop: bool = false,
+    flagsPop: bool = false,
+    teardownStart: bool = false,
+    teardown: bool = false,
+    midSp: bool = false,
+    midAnd: bool = false,
+    // set by the pre/post-`and` walks (upstream 3751–4069)
+    preAnd: bool = false,
+    postAnd: bool = false,
     // set by the depth fixpoint's transfer
     stackBufLeaValueComputed: ?bool = null,
     carrierCallArg: ?CarrierCallArg = null,

@@ -7,6 +7,14 @@ the questions for the owner in [open-questions.md](open-questions.md); the Zig 0
 
 ## Decisions made
 
+- **2026-11-24** — 🔒 **THE BASICS CORPUS TAKES THE OWNER'S CURRENT C, C++ AND ZIG LESSONS; ZILC LINKS
+  C++** (owner: "Please add … BasicsOfCodingC / Cpp / Zig", then three answers). (1) `tests/basics/c`
+  and `zig-0.15.2` are replaced by the repositories' current heads (12 C and 13 Zig lessons renamed
+  since 2026-09-30); `zig-0.16.0` is dropped (zilc stays on 0.15.2; the repo now targets 0.17.1);
+  a `cpp/` set is added (78 lessons, C++23); the reference results are re-derived once.
+  (2) The driver links with Fil-C's `clang++` when any input is C++ (today it links with `clang`
+  and no C++ program links: R2-B3), and gains a `-std=<std>` option passed to C and C++ compiles;
+  the default stays the compiler's. (3) Done AFTER review 2's fixes (`STATE.md` § Next item 4).
 - **2026-11-24** — 🔒 **FIL-C COMPONENTS MOVE ONLY WITH A FIL-C RELEASE** (owner: "until a new
   release is released do not update the associated components"). The patched clang, the runtime
   pieces and the sarcasm port stay on the pinned release's commit; `deluge` commits between
