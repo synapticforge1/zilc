@@ -231,44 +231,34 @@ prints its K. Progress:
   Harness bugs fixed: the patched module is written back latin1 (byte-identical), both sides
   compared as bytes. Full record: `archive/sarcasm-port-frame-cp1-2.md`.
 - ✅ **checkpoint 3** (2026-11-24) — upstream 3213–3749 (validateTeardown, checkLostReload,
-  retIsGpr, the annotation loop) in `src/sarcasm/x86_64_frame_annotate.zig`; hook after 3749
-  (anchor `\tend`, next line 3751), K3 = per insn statement pro / depth / saves / fp / smap /
-  aliasOff / aliasSaveIdx / the flag marks, then frameAlignReq / frameAndDepth / frameAndSeen.
-  The harness runs each stop separately (`Stop.annotate`), so K err after K2 = a rejection in
-  this span. Result: 0 differ over 163,254 lines (K1 4,589, K3 4,575 calls). 74,017 statements
-  annotated (teardownStart 1,054, teardown 1,949, leaSave 147, spSave 140, aliasOff 286, …); 20 rejections (8 in the fixpoint, 12 here).
-  Planted faults (differ): starter `leave` inverted 257; aliasSaveIdx dropped 286; frameAndDepth
-  update dropped 53; spillPop depth test inverted 48; midSp `nd >= 0` → `> 0` 3; probe `or
-  localClone` dropped 4; 16-byte `and` note rule 11; checkLostReload worklist reversed 0 (1 with
-  reject-lostreload-order.s). Driven by `frame-branches/` inputs: restore load into %rax
-  (reject-restore-rax.s), redefined restore (reject-restore-redef.s), teardown pop of a redefined
-  save at dyn depth (reject-teardown-redef.s), rbp restore-base lea (rbp-restore-lea.s); the last
-  two open branches are settled under checkpoint 4. Table depths: regionCarrierAccess and the {anchored} restore-base lea are dead
-  (no-ops, documented); x86_depth / fp / saves / smap are the fixpoint's arrays, not copied.
-- ✅ **checkpoint 4** (11-24) — upstream 3751–4069 (andDomOf, reachedFromAnd, preAnd /
-  postAnd marks, the governing-`and` dataflow, the crossing rejection and its dropRestore
-  exemption, the prologue-`and` fill) in `x86_64_frame_and.zig` (`Stop.andWalk`; andDomOf and
-  reachedFromAnd are Analysis fields). Hook after 4069 (next line 4071); K4 = per index
-  1..#body+1 (successors can name #body+1) pre / post / andDomOf / reachedFromAnd, indexed (no
-  table order); a rejection is `K err` after K3. 0 differ over 170,769 lines. Corpus: 67
-  functions with a mid `and`; preAnd 295, postAnd 535, reachedFromAnd 600; 6 rejections. Planted faults (differ): gandJoin's
-  disagreement keeps the first 7; `leave` out of the rsp-moves-up list 3; preAnd / postAnd on the
-  `and` 71 / 71; crossing test inverted 139,472; exemption's reachedFromAnd test inverted
-  128,149; prologue fill skipping "none" 45; name test inverted 127,853. New inputs
-  in `frame-branches/`: and-join.s (gandJoin's equal arm), exempt-restore-and.s (exemption
-  succeeds), reject-restore-loop-park.s (park reached from an `and`). Unreachable by
-  construction (kept as ported): a nil `out` in gandJoin, a non-insn or depth-less `and` in the
-  walk, dropRestore's nil guards (restoreLoadOf implies them), a save-depth miss; a walk to
-  `#body+1` panics here (upstream: Lua indexing error). `sIdx >` → `>=`: 0 (equivalent).
-  Checkpoint 3's open branches: (1) validateTeardown's `if st.localCall then return nil` (3230)
-  is dead: localCall sits only on `call` / `callq` statements (localcall.luau 92–96, 118–123,
-  872 / 915 / 948; tailcall.luau 399–408), and the next test `b == "call"` returns nil for
-  them, so removing the line changes nothing (no input). (2) The B2-clone buffer probe (fixpoint
-  1957–1975, annotation 3486–3500) is driven by `b2clone-lea-probe.s` (b2clone.s plus a
-  value-used `leaq 0(%rsp)` in the shared tail): `k >= lo` → `k > lo` gives 4 differ (fixpoint)
-  and 1 (annotation).
-- next: **checkpoint 5** — upstream 4070–4359 (anyMidAnd, parkPostOf, the clone subframe balance
-  check); after it 4361 onward the movq-restore loads.
+  retIsGpr, the annotation loop) in `x86_64_frame_annotate.zig` (`Stop.annotate`); K3 = per insn
+  the marks, depth / saves / fp / smap, then frameAlignReq / frameAndDepth / frameAndSeen. 0 differ
+  over 163,254 lines; 74,017 statements annotated; 20 rejections (8 fixpoint, 12 here); 8 planted
+  faults caught; four `frame-branches/` inputs (reject-restore-rax / -restore-redef /
+  -teardown-redef, rbp-restore-lea). Dead: the `localCall` guard (3230), table depths.
+- ✅ **checkpoint 4** (11-24) — upstream 3751–4069 (andDomOf, reachedFromAnd, preAnd / postAnd,
+  the governing-`and` dataflow, the crossing rejection, the prologue-`and` fill) in
+  `x86_64_frame_and.zig` (`Stop.andWalk`); K4 per index 1..#body+1. 0 differ over 170,769 lines;
+  67 functions with a mid `and`; 6 rejections; 7 planted faults caught; new inputs and-join.s,
+  exempt-restore-and.s, reject-restore-loop-park.s. A walk to `#body+1` panics (upstream: a Lua
+  indexing error). Full record of 3 and 4 (faults, dead branches): `archive/sarcasm-port-frame-cp3-4.md`.
+- ✅ **checkpoint 5** (11-24) — upstream 4070–4359 (anyMidAnd, parkPostOf, the clone subframe
+  balance check with its direct-carrier hatch) in `x86_64_frame_clone.zig` (`Stop.cloneBalance`;
+  anyMidAnd an Analysis field, parkPostOf `XF.parkPostOf`); hook after 4359 (next 4361). K5 =
+  anyMidAnd, parkPostOf(nil), each index where parkPostOf holds; the span sets no marks, a
+  rejection is `K err` after K4. 0 differ (xframe 183,037 lines with 15 of zilc's inputs): corpus
+  4,568 spans pass, 10 rejections (3 clone + 1 local unbalanced, 5 + 1 unknown depth); 67
+  anyMidAnd, 2,665 parkPostOf-true indices. Measured: depth mismatch 52 calls (teardown hatch
+  48), cloneRet without regions skipped 101. New inputs: b2clone-carrier-zero.s (lea and mov
+  recovery accepted), reject-b2clone-push.s, -norecover.s, -redef.s. Planted faults (differ):
+  hatch `teardown` test inverted 174,388; `park >` → `>=` 173,055; regions guard dropped 38,281;
+  depthEq `==` → `>=` 37,780; recovery `rd == 0` → `!=` 1,057; ret-carrier saveIdx test
+  inverted 1,117; mov `depth == 0` → `!=` 919. Pop arm of the push/pop test: 0 differ (kept).
+  0 hits, no input (kept as ported): ret depth nil (CFG-reachable: an analysis-gap guard; or
+  dead), clone entry depth nil, dyn / non-empty saves at a clone point, no smap at the ret.
+  Dead: cloneRet without b2clone (tailcall 636–637, 651–652), carrierToZeroOk's entry depth 0 /
+  non-number (depthEq or the dyn test already decided).
+- next: **checkpoint 6** — upstream 4361–4422 (the epilogue movq-restore loads); 4424 on: B2 bands.
 
 ## What a byte-identical port must reproduce (the foundations)
 

@@ -615,6 +615,12 @@ const XF_CHECKPOINTS: Checkpoint[] = [{
   anchor: "\tend",
   next: "\t-- alignment `and` (so the parked value carries the and's dynamic slack",
   dump: "{ body = body, andDomOf = andDomOf, reachedFromAnd = reachedFromAnd }",
+}, {
+  n: 5,
+  afterLine: 4359,
+  anchor: "\tend",
+  next: "\t-- Epilogue movq-restore loads (the perlasm shape: `movq (%rsp), %r15; movq",
+  dump: "{ body = body, anyMidAnd = anyMidAnd, parkPostOf = parkPostOf }",
 }];
 const XF_STOP = Math.max(...XF_CHECKPOINTS.map((c) => c.n));
 const XF_CLEARED = ["x86_prologue", "x86_depth", "x86_saves", "x86_unpairedPop", "x86_spillPop", "x86_flagsPop", "x86_teardownStart", "x86_teardown", "x86_fp", "x86_spRecover", "x86_saveStore", "x86_carrierLoad", "x86_leaSave", "x86_carrierCallArg", "x86_spSave", "x86_dropRestore", "x86_midSp", "x86_regionCarrier", "x86_aliasOff", "x86_aliasSaveIdx", "x86_midAnd", "x86_preAnd", "x86_postAnd", "x86_smap", "x86_b2band", "x86StackBufAccess", "x86StackBufIdx", "x86StackBufRep", "x86StackBufLea", "x86StackBufAddr", "x86StackBufLeaValue", "x86StackBufLeaValueComputed", "x86_alignKeyed", "x86_alignAndBase"];
@@ -846,6 +852,16 @@ seqStages.push({
     "    end",
     "  end",
     "  table.insert(lines, 'K4 end')",
+    "  return table.concat(lines, '\\n')",
+    "end",
+    // checkpoint 5: anyMidAnd, then parkPostOf at nil and at every index 1..#body+1 where it holds
+    // (the span sets no marks; its other result is a rejection, `K err`)
+    "DUMP[5] = function(K)",
+    "  local lines = { 'K5 anyMidAnd=' .. tostring(K.anyMidAnd) .. ' parkNil=' .. tostring(K.parkPostOf(nil)) }",
+    "  for i = 1, #K.body + 1 do",
+    "    if K.parkPostOf(i) then table.insert(lines, 'K5 ' .. i .. ' park') end",
+    "  end",
+    "  table.insert(lines, 'K5 end')",
     "  return table.concat(lines, '\\n')",
     "end",
     "local out = {}",

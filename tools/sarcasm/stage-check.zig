@@ -860,6 +860,18 @@ fn dumpK4(gpa: Alloc, an: *s.x86_64_frame.Analysis) ![]const u8 {
     return o.items;
 }
 
+/// Checkpoint 5: anyMidAnd, parkPostOf(nil), then every index 1..#body+1 where parkPostOf holds.
+fn dumpK5(gpa: Alloc, an: *s.x86_64_frame.Analysis) ![]const u8 {
+    var o: std.ArrayList(u8) = .empty;
+    const park = s.x86_64_frame.parkPostOf;
+    try o.print(gpa, "K5 anyMidAnd={s} parkNil={s}\n", .{ if (an.anyMidAnd) "true" else "false", if (park(an, null)) "true" else "false" });
+    for (1..an.body.len + 2) |i| {
+        if (park(an, @floatFromInt(i))) try o.print(gpa, "K5 {d} park\n", .{i});
+    }
+    try o.appendSlice(gpa, "K5 end\n");
+    return o.items;
+}
+
 fn dumpK2(gpa: Alloc, an: *s.x86_64_frame.Analysis) ![]const u8 {
     var o: std.ArrayList(u8) = .empty;
     for (an.body, 1..) |st, i| {
@@ -962,6 +974,13 @@ fn xframeRecord(gpa: Alloc, out: *std.ArrayList(u8), rec: []const u8) !void {
     }
     if (XF.analyzeFrameTo(gpa, in.body, in.sd, regs, .andWalk)) |an| {
         try out.appendSlice(gpa, try dumpK4(gpa, an));
+    } else |e| {
+        if (e != error.Sarcasm) return e;
+        try out.print(gpa, "K err {s}\n", .{s.err.message});
+        return;
+    }
+    if (XF.analyzeFrameTo(gpa, in.body, in.sd, regs, .cloneBalance)) |an| {
+        try out.appendSlice(gpa, try dumpK5(gpa, an));
     } else |e| {
         if (e != error.Sarcasm) return e;
         try out.print(gpa, "K err {s}\n", .{s.err.message});
