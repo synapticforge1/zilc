@@ -23,7 +23,7 @@
  * mechanical places (build.zig.zon, src/root.zig's `release` and its test literals, the README
  * status line), runs `zig build test` (and puts every file back if it fails), then commits.
  */
-import { lstatSync, readFileSync, writeFileSync } from "node:fs";
+import { lstatSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { ARGS, REPO, ZIG, linuxOnly, must, run } from "../lib/tool.ts";
 import { BUMP_FILES, REVIEW_RECORD_FILE, bumpEdits, bumpSubject, findEntry, gitIn, githubRender, renderedProblems, tagsDifferFrom, disagreements as placeDisagreements, reviewCoversRelease, zonVersion, type Places, type Version } from "./guards.ts";
@@ -117,29 +117,50 @@ try {
 }
 
 const originals = new Map<string, string>();
-for (const [f, t] of edits) {
-  originals.set(f, readBytes(f));
-  writeFileSync(P(f), t, "latin1");
-}
-for (const f of edits.keys()) console.log(`  wrote ${f}`);
-
-const putBack = () => {
-  for (const [f, t] of originals) writeFileSync(P(f), t, "latin1");
-};
-const left = disagreements(nextV);
-if (left.length) {
-  putBack();
-  fail(`after the edits the places still disagree (every file put back):\n  ${left.join("\n  ")}`);
-}
-console.log(`bump: zig build test on ${next} …`);
-const t = await run([ZIG, "build", "test", "--summary", "all"], { cwd: REPO });
-if (t.code !== 0 || !/Build Summary: (\d+)\/\1 steps succeeded/.test(t.out)) {
-  putBack();
-  console.error(t.out.trimEnd());
-  fail(`zig build test failed on ${next} (exit ${t.code}); every file put back`);
-}
 const msgFile = join(REPO, ".git", "BUMP_MSG");
-writeFileSync(msgFile, `${bumpSubject(next)}\n`);
-await must(["git", "-C", REPO, "add", "--", ...edits.keys()]);
-await must(["git", "-C", REPO, "commit", "-q", "-F", msgFile]);
+let committed = false;
+// Every way out before the commit puts the files back, unstaged, and removes the message file:
+// a refusal, a thrown error (git add / commit) or Ctrl-C (review 1, H14).
+const putBack = () => {
+  if (committed) return;
+  for (const [f, t] of originals) writeFileSync(P(f), t, "latin1");
+  Bun.spawnSync(["git", "-C", REPO, "reset", "-q", "--", ...originals.keys()]);
+  rmSync(msgFile, { force: true });
+};
+for (const sig of ["SIGINT", "SIGTERM"] as const) {
+  process.on(sig, () => {
+    putBack();
+    console.error(`bump: stopped by ${sig}; every file put back`);
+    process.exit(130);
+  });
+}
+try {
+  for (const [f, t] of edits) {
+    originals.set(f, readBytes(f));
+    writeFileSync(P(f), t, "latin1");
+  }
+  for (const f of edits.keys()) console.log(`  wrote ${f}`);
+
+  const left = disagreements(nextV);
+  if (left.length) {
+    putBack();
+    fail(`after the edits the places still disagree (every file put back):\n  ${left.join("\n  ")}`);
+  }
+  console.log(`bump: zig build test on ${next} …`);
+  // A time limit (review 1, H12): measured ~40 s here.
+  const t = await run([ZIG, "build", "test", "--summary", "all"], { cwd: REPO, timeout: 1800 });
+  if (t.code !== 0 || !/Build Summary: (\d+)\/\1 steps succeeded/.test(t.out)) {
+    putBack();
+    console.error(t.out.trimEnd());
+    fail(`zig build test failed on ${next} (exit ${t.code}${t.timedOut ? ", stopped after 1800 s" : ""}); every file put back`);
+  }
+  writeFileSync(msgFile, `${bumpSubject(next)}\n`);
+  await must(["git", "-C", REPO, "add", "--", ...edits.keys()]);
+  await must(["git", "-C", REPO, "commit", "-q", "-F", msgFile]);
+  committed = true;
+  rmSync(msgFile, { force: true });
+} catch (e) {
+  putBack();
+  fail(`${(e as Error).message}; every file put back`);
+}
 console.log(`bump: committed "bump to v${next}" (${(await must(["git", "-C", REPO, "rev-parse", "--short", "HEAD"])).trim()}). Next: bun tools/release/release.ts`);

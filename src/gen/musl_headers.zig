@@ -115,19 +115,35 @@ pub fn installGenerated(gpa: Allocator, musl_src: []const u8, out_dir: []const u
 }
 
 fn write(arena: Allocator, src: std.fs.Dir, out: std.fs.Dir, list: []const Input, what: enum { all, generated_only }) !void {
+    // The generated headers first, from every input: a bad input stops the run before anything is
+    // written. If a copy or a write fails after that, the files this run wrote are removed, so a
+    // failed run leaves no partial tree (review 1, H16).
     var alltypes: Out = .empty;
     var syscall: Out = .empty;
     for (list) |in| switch (in.use) {
-        .copy => |dir| if (what == .all) {
-            var dest = try out.makeOpenPath(dir, .{});
-            defer dest.close();
-            try src.copyFile(in.path, dest, std.fs.path.basename(in.path), .{});
-        },
+        .copy => {},
         .alltypes => try allTypes(arena, try readFile(arena, src, in.path), &alltypes),
         .syscall => try syscallHeader(arena, try readFile(arena, src, in.path), &syscall),
     };
+    var written: std.ArrayList([]const u8) = .empty;
+    errdefer for (written.items) |p| out.deleteFile(p) catch {};
+    if (what == .all) for (list) |in| switch (in.use) {
+        .copy => |dir| {
+            var dest = try out.makeOpenPath(dir, .{});
+            defer dest.close();
+            const name = std.fs.path.basename(in.path);
+            // Only a file this run CREATED is removed on failure: one that was already there is
+            // overwritten, never deleted (re-review note: a failed rerun turned 220 files into 142).
+            const existed = if (dest.access(name, .{})) |_| true else |_| false;
+            try src.copyFile(in.path, dest, name, .{});
+            if (!existed) try written.append(arena, try std.fs.path.join(arena, &.{ dir, name }));
+        },
+        else => {},
+    };
     try out.makePath("bits");
+    const alltypes_existed = if (out.access("bits/alltypes.h", .{})) |_| true else |_| false;
     try out.writeFile(.{ .sub_path = "bits/alltypes.h", .data = alltypes.items });
+    if (!alltypes_existed) try written.append(arena, "bits/alltypes.h");
     try out.writeFile(.{ .sub_path = "bits/syscall.h", .data = syscall.items });
 }
 
@@ -137,7 +153,8 @@ fn listHeaders(arena: Allocator, src: std.fs.Dir, from: []const u8, to: []const 
     defer dir.close();
     var it = dir.iterate();
     while (try it.next()) |e| {
-        if (e.kind != .file or !std.mem.endsWith(u8, e.name, ".h")) continue;
+        // A symlinked header is a header too (review 1, H16: it was skipped silently).
+        if ((e.kind != .file and e.kind != .sym_link) or !std.mem.endsWith(u8, e.name, ".h")) continue;
         try list.append(arena, .{ .path = try std.fs.path.join(arena, &.{ from, e.name }), .use = .{ .copy = to } });
     }
 }
@@ -155,6 +172,9 @@ fn readFile(gpa: Allocator, dir: std.fs.Dir, path: []const u8) ![]u8 {
 /// `tools/mkalltypes.sed`, applied to one input file: every line is copied, except that a line
 /// matching one of the three rules becomes its `#if … #endif` block followed by an empty line.
 pub fn allTypes(gpa: Allocator, in: []const u8, out: *Out) !void {
+    // musl's sources are LF. A CR before the newline would make every rule miss (`;$`) and pass the
+    // raw TYPEDEF / STRUCT / UNION lines into bits/alltypes.h (review 1, H16): refused instead.
+    if (std.mem.indexOfScalar(u8, in, '\r') != null) return error.CrlfInput;
     var lines = std.mem.splitScalar(u8, in, '\n');
     while (lines.next()) |line| {
         // A file ending in '\n' yields a final empty segment that is not a line.
@@ -261,4 +281,11 @@ test "syscall.h: copy, then the __NR_ lines as SYS_" {
         "#define __NR_read 0\n#define __NR_write 1\n/* none */\n#define SYS_read 0\n#define SYS_write 1\n",
         out.items,
     );
+}
+
+test "mkalltypes: a CRLF input is refused, never passed through raw (review 1, H16)" {
+    var out: Out = .empty;
+    defer out.deinit(std.testing.allocator);
+    try std.testing.expectError(error.CrlfInput, allTypes(std.testing.allocator, "TYPEDEF int x;\r\n", &out));
+    try std.testing.expectEqual(@as(usize, 0), out.items.len);
 }

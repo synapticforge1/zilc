@@ -19,7 +19,9 @@ const filc_source = @import("filc_source.zig");
 
 pub fn addStep(b: *std.Build) void {
     const version = b.option([]const u8, "gcc-version", "gcc-reference: 11.4.0 or 12.3.0 (default: both)");
-    const jobs = b.option(u32, "gcc-jobs", "gcc-reference: make jobs (default 16)") orelse 16;
+    const jobs = b.option(u32, "gcc-jobs", "gcc-reference: make jobs, 1..64 (default 16)") orelse 16;
+    // make reads -j0 as no job server limit (review 1, H11): refused, as is a count past any machine.
+    if (jobs == 0 or jobs > 64) std.process.fatal("-Dgcc-jobs must be 1..64 (got {d})", .{jobs});
     const home = b.graph.env_map.get("HOME") orelse ".";
     const prefix_opt = b.option([]const u8, "gcc-prefix", "gcc-reference: install directory (default ~/zilc-work/tools/gcc-<version>; only with one -Dgcc-version)");
     const work = b.option([]const u8, "gcc-work", "gcc-reference: staging and build directory (default ~/zilc-work/gcc-reference)") orelse

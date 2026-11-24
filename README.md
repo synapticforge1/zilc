@@ -192,6 +192,27 @@ for one build and fails with `error: Unexpected` on every build after that:
 export ZIG_LOCAL_CACHE_DIR=~/.cache/zilc-zig
 ```
 
+## Privacy
+
+`zilc` collects nothing and sends nothing: no telemetry, no update check, no network access of its
+own. The only downloads are the ones `zig build` makes when you name a step that needs them (Fil-C's
+sources, and with `-Dfetch-build-tools` cmake and ninja; the maintainer-only `gcc-reference` step
+fetches GCC, GMP, MPFR and MPC), from the URLs and hashes pinned in `build.zig.zon`.
+
+What it reads: your inputs, `PATH`, `HOME`, `XDG_CACHE_HOME` and its own `ZILC_*` variables. What
+it keeps: compiled objects in its cache (`$ZILC_CACHE_DIR`, else `$XDG_CACHE_HOME/zilc`, else
+`~/.cache/zilc`; `zilc --clean-cache` empties it), and the intermediates in `<output>.zilc-tmp`,
+a folder each build creates for itself (one already at that path is refused, never reused) and
+deletes afterwards unless you pass `--keep-temps`.
+
+What it writes into your programs: debug information with paths relative to your working
+directory (`./src/x.zig`), your home directory shown as `~`, so traps still name the file and line
+without your absolute paths or account name. A source outside both keeps its absolute path; so
+does Zig's raw IR in a `--keep-temps` folder (`<stem>.ll`, before zilc's rewrite). For C code built
+in a working directory whose path contains `=`, which clang's prefix map cannot express, the
+directory shows as `~/…` rather than `.`. The toolchain's
+own location stays in the program's interpreter and library path, which it needs to run.
+
 ## Layout
 
 ```text

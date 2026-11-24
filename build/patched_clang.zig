@@ -20,7 +20,9 @@ const vc_repository = "git@github.com:pizlonator/llvm-project-deluge.git";
 
 pub fn addStep(b: *std.Build, filc_src: ?[]const u8) void {
     const cc = b.option(enum { zig, system }, "clang-cc", "Compilers for patched-clang: zig (zig cc/c++, the default) or system (cc/c++)") orelse .zig;
-    const jobs = b.option(u32, "clang-jobs", "ninja jobs for patched-clang (default 12: one per core exhausted a 31 GB VM)") orelse 12;
+    const jobs = b.option(u32, "clang-jobs", "ninja jobs for patched-clang, 1..64 (default 12: one per core exhausted a 31 GB VM)") orelse 12;
+    // ninja reads -j0 as "unlimited" (review 1, H11): refused, as is a count past any machine here.
+    if (jobs == 0 or jobs > 64) std.process.fatal("-Dclang-jobs must be 1..64 (got {d})", .{jobs});
     const home = b.graph.env_map.get("HOME") orelse ".";
     // Off the repo: the build tree holds ~100k files and the repo may be on exFAT (KI-2).
     const work = b.option([]const u8, "clang-work", "patched-clang's staging and build directory (default ~/zilc-work/patched-clang/filc-<release>)") orelse

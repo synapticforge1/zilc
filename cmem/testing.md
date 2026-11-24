@@ -4,7 +4,7 @@ The gates, their commands and dated counts. Split on 2026-11-23 (letter H38 step
 [testing-corpus.md](testing-corpus.md) (`tests/basics`, the output comparison, the benchmark suite)
 and [testing-filc-suite.md](testing-filc-suite.md) (Fil-C's own suite against zilc's clang).
 
-## 🎯 `zig build gate` — THE SAFETY GATE (new 2026-09-23). **8/8 green** (2026-10-02: + the KI-5 environ case and 3 library-mode cases, which must RUN)
+## 🎯 `zig build gate` — THE SAFETY GATE (new 2026-09-23). **10/10 green** (2026-11-23: + interop in two steps, f128 in a -c object; 2026-10-02: + KI-5 environ, 3 library-mode cases)
 
 Builds every example with the zilc driver and asserts each one **traps at the right source line**.
 This is the gate the whole project exists to keep green.
@@ -58,14 +58,14 @@ committed copies.
 
 **Every gate runs locally; CI runs none** (owner, 2026-11-17, letter H37 (e); since 2026-11-19).
 `tools/release/release.ts` runs them before it pushes: the review gate first, `bump.ts --check`,
-the privacy gate, `zig fmt --check`, Biome, `zig build test`, `bun test tools/release/` (2026-11-19:
-**124 pass, 1 skip** — the live GitHub render test, opt-in with `ZILC_LIVE_RENDER=1`; 27 against a
+the privacy gate, `zig fmt --check`, Biome, `zig build test`, `bun test tools/release/ tools/lib/` (2026-11-23:
+**132 pass, 1 skip** — the live GitHub render test, opt-in with `ZILC_LIVE_RENDER=1`; 27 against a
 mock GitHub API, the rest the release guards in `guards.test.ts`), and the Fil-C gate below
 (`release.md` § "What runs where"). From 2026-11-12 to 2026-11-19 CI ran the no-Fil-C half
 (first run 43295657634 on `bba102f`).
 
 - `zig build gate` — Every bug example traps at the right line; the library-mode example runs (needs Fil-C)
-  - State: **8/8** (2026-10-05 on Fil-C 0.686; 2026-10-02, KI-5 environ and library mode added; earlier 4/4 with the parallel code generation of KI-22 lever (a))
+  - State: **10/10** (2026-11-23 on Fil-C 0.687; 2026-10-05 on Fil-C 0.686; 2026-10-02, KI-5 environ and library mode added; earlier 4/4 with the parallel code generation of KI-22 lever (a))
 - `zig build test` — Runtime module + CLI module + the IR rewrites (incl. the KI-18
   three-byte-global wrap) + the std-overlay patches (incl. the KI-21 guards) + the runtime values
   (`filc` only; `zig` refused 2026-09-30, removed 2026-10-27) + the version round-trip + the object

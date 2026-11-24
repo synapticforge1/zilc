@@ -1,7 +1,7 @@
 {
 	// Biome checks zilc's Markdown formatting, and nothing else (owner, 2026-11-15: "biome. I know it
 	// works correctly"; review round 1, KI-38). Run it with the pinned binary:
-	//   bun tools/md/biome.ts ci .              (CI's `checks` and release.ts run this)
+	//   bun tools/md/biome.ts ci .              (release.ts runs this; CI runs no gate since 2026-11-19)
 	//   bun tools/md/biome.ts format --write .  (before a commit that touches Markdown)
 	// Zig is formatted by `zig fmt`; the .ts tools are not linted by Biome here.
 	"$schema": "https://biomejs.dev/schemas/2.6.4/schema.json",

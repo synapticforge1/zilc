@@ -105,6 +105,8 @@ if (mode === "upstream") {
   const gccEnv = async (v: string) => {
     const d = gccRef(v);
     if (!(await exists(`${d}/lib/gcc/x86_64-linux-gnu/${v}/specs`))) throw new Error(`missing GCC ${v} with Ubuntu's defaults in ${d} (run \`zig build gcc-reference\` first)`);
+    // Written last by tools/gcc-reference.zig, after every check passed (review 1, H13).
+    if (!(await exists(`${d}/.zilc-validated`))) throw new Error(`GCC ${v} in ${d} was not validated (its gcc-reference run did not finish); run \`zig build gcc-reference\` again`);
     return { CC: `${d}/bin/gcc`, CXX: `${d}/bin/g++` };
   };
   const byStep: Record<string, string> = { "build_projeny_yolo.sh": "11.4.0", "build_compiler_rt.sh": "11.4.0", "build_yolomusl.sh": "12.3.0" };

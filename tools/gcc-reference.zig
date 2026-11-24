@@ -27,8 +27,17 @@
 
 const std = @import("std");
 
+/// The `specs` file this run wrote into the prefix: removed by `fail`, so a prefix whose specs
+/// failed its own checks is never left looking finished (review 1, H13).
+var specs_written: ?[]const u8 = null;
+
+/// Written into <prefix> last, after every check passed; removed first. Consumers require it
+/// (tools/filc/build-filc-from-source.ts `gccEnv`).
+pub const validated_marker = ".zilc-validated";
+
 fn fail(comptime fmt: []const u8, args: anytype) noreturn {
     std.debug.print("gcc-reference: " ++ fmt ++ "\n", args);
+    if (specs_written) |p| std.fs.cwd().deleteFile(p) catch {};
     std.process.exit(1);
 }
 
@@ -51,6 +60,9 @@ pub fn main() !void {
     const work = args[6];
     const prefix = args[7];
     const jobs = args[8];
+    // Not validated until the end of this run (H13).
+    const marker = try std.fs.path.join(gpa, &.{ prefix, validated_marker });
+    std.fs.cwd().deleteFile(marker) catch |e| if (e != error.FileNotFound) return e;
 
     // 1. Stage.
     const src = try std.fs.path.join(gpa, &.{ work, try std.fmt.allocPrint(gpa, "src-{s}", .{version}) });
@@ -173,6 +185,7 @@ pub fn main() !void {
     }
     try file.appendSlice(gpa, ubuntu_specs);
     try std.fs.cwd().writeFile(.{ .sub_path = specs_path, .data = file.items });
+    specs_written = specs_path;
     try checkDefaults(gpa, gcc, probes.c, version);
     for (variants, 0..) |vr, i| try checkCommands(gpa, version, vr, before[i], try driverCommands(gpa, vr));
     std.debug.print("gcc-reference: {s} specs file: the driver's commands are unchanged but for our flags on cc1 ({d} variants)\n", .{ version, variants.len });
@@ -180,6 +193,9 @@ pub fn main() !void {
     try runIn(gpa, work, &.{ gxx, "-O2", "-pthread", "-o", exe, probes.cxx }, null);
     try runIn(gpa, work, &.{exe}, null);
     std.debug.print("gcc-reference: {s} a C++ throw links (shared libgcc) and runs\n", .{version});
+    // Every check passed: only now is the prefix a finished reference GCC (H13).
+    specs_written = null;
+    try std.fs.cwd().writeFile(.{ .sub_path = marker, .data = version });
 }
 
 /// What init_spec() computes and a specs file must therefore carry (gcc.c, GCC 11 and 12).

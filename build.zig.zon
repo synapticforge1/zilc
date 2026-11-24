@@ -60,11 +60,18 @@
             .lazy = true,
         },
     },
+    // Everything `zig build` and `zig build test` read, so a fetched copy builds (review 1, H10:
+    // build/ and tools/ were missing, and `zig build --help` failed on build/filc_source.zig).
     .paths = .{
         "build.zig",
         "build.zig.zon",
+        "build",
         "src",
         "include",
+        "tools",
+        "examples",
+        "tests",
+        "Fil-C.md",
         "third_party",
         "LICENSE-MIT",
         "LICENSE-APACHE",

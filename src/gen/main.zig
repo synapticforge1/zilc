@@ -40,9 +40,21 @@ const version_text = std.fmt.comptimePrint(
 
 const Kind = enum { header, forwarders };
 
-pub fn main() !void {
+/// What the run was doing when it failed, for the one-line refusal (review 1, B4): never a Zig
+/// error return trace for a missing or unreadable path.
+var doing: []const u8 = "zilc-gen";
+
+pub fn main() void {
+    runMain() catch |e| {
+        std.debug.print("zilc-gen: {s}: {s}\n", .{ doing, @errorName(e) });
+        std.process.exit(1);
+    };
+}
+
+fn runMain() !void {
     const gpa = std.heap.page_allocator;
     const args = try std.process.argsAlloc(gpa);
+    if (args.len >= 4) doing = try std.fmt.allocPrint(gpa, "{s} {s} -> {s}", .{ args[1], args[2], args[3] });
     if (args.len == 2 and std.mem.eql(u8, args[1], "--version")) {
         try std.fs.File.stdout().writeAll(version_text);
         return;
@@ -70,6 +82,7 @@ pub fn main() !void {
         std.debug.print(usage, .{});
         std.process.exit(2);
     };
+    doing = try std.fmt.allocPrint(gpa, "cannot write {s}", .{path});
     var out: std.ArrayList(u8) = .empty;
     defer out.deinit(gpa);
     switch (k) {

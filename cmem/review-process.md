@@ -47,10 +47,10 @@ None of them commits, pushes or releases.
   reviewer is pointed at.
 - **Reference results** (basic: "reference results hold"; each a dated count in `testing.md`,
   re-derived before quoting; any change is a finding until explained):
-  - the safety gate, `bun tools/run-gate.ts` (Fil-C in WSL): **8/8**, each case trapping at its
+  - the safety gate, `bun tools/run-gate.ts` (Fil-C in WSL): **10/10** (2026-11-23), each case trapping at its
     file:line;
-  - `zig build test --summary all`: **41/41** (2026-11-15);
-  - `bun test tools/release/`: **124 pass, 1 skip** (the live GitHub render, opt-in; 2026-11-19);
+  - `zig build test --summary all`: **56/56** (2026-11-23);
+  - `bun test tools/release/ tools/lib/`: **132 pass, 1 skip** (the live GitHub render, opt-in; 2026-11-23);
   - the corpus (`testing.md` "corpus"): **78/78 as designed in all four modes**;
   - the output comparison (`testing.md`): **0 unexplained**;
   - Fil-C's own suite, stock vs zilc's clang (`tools/filc/run-filc-tests.ts`): **0 differences on

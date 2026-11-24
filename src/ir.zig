@@ -492,6 +492,98 @@ fn foldExtract(gpa: std.mem.Allocator, out: *std.ArrayListUnmanaged(u8), line: [
 // those would quietly replace Fil-C's own libm functions for any C code in it.
 // So every function definition not in `keep` becomes `internal`.
 
+/// One path prefix and what it becomes in the debug info.
+pub const PathMap = struct { from: []const u8, to: []const u8 };
+
+/// The user's paths out of the debug info (review 1, P1; owner, 2026-11-23: "Map paths to
+/// relative"): on metadata lines only (`!…`), a quoted string that starts with `from` — followed by
+/// `/` or the closing quote — starts with `to` instead. The first map that matches wins, so the
+/// caller lists the longest (the working directory) before the shorter (the home directory). Code
+/// and string constants are never touched, so the program is the same; Fil-C's traps still name
+/// file and line, now as `./src/x.zig:12` rather than an absolute path with the account name in it.
+pub fn mapDebugPaths(gpa: std.mem.Allocator, ir: []const u8, maps_raw: []const PathMap) ![]u8 {
+    // The IR holds each path as LLVM prints a string: a byte outside printable ASCII, `"` and `\`
+    // as `\XX` (printEscapedString). Match the prefixes the same way, or a folder named `ü` or
+    // `q"x` is never mapped (re-review RH1).
+    var arena_state = std.heap.ArenaAllocator.init(gpa);
+    defer arena_state.deinit();
+    const maps = try arena_state.allocator().alloc(PathMap, maps_raw.len);
+    for (maps_raw, maps) |m, *e| e.* = .{ .from = try llvmEscaped(arena_state.allocator(), m.from), .to = try llvmEscaped(arena_state.allocator(), m.to) };
+    var out: std.ArrayListUnmanaged(u8) = .{};
+    errdefer out.deinit(gpa);
+    try out.ensureTotalCapacity(gpa, ir.len);
+    var lines = std.mem.splitScalar(u8, ir, '\n');
+    var first = true;
+    while (lines.next()) |line| {
+        if (!first) try out.append(gpa, '\n');
+        first = false;
+        if (line.len == 0 or line[0] != '!') {
+            try out.appendSlice(gpa, line);
+            continue;
+        }
+        var i: usize = 0;
+        while (i < line.len) {
+            if (line[i] == '"') {
+                try out.append(gpa, '"');
+                i += 1;
+                const rest = line[i..];
+                for (maps) |m| {
+                    if (m.from.len == 0 or !std.mem.startsWith(u8, rest, m.from)) continue;
+                    const after = if (rest.len > m.from.len) rest[m.from.len] else 0;
+                    if (after != '/' and after != '"') continue;
+                    try out.appendSlice(gpa, m.to);
+                    i += m.from.len;
+                    break;
+                }
+                continue;
+            }
+            try out.append(gpa, line[i]);
+            i += 1;
+        }
+    }
+    return out.toOwnedSlice(gpa);
+}
+
+/// `s` as LLVM's printEscapedString writes it inside a quoted string.
+fn llvmEscaped(a: std.mem.Allocator, s: []const u8) ![]u8 {
+    var out: std.ArrayListUnmanaged(u8) = .{};
+    for (s) |c| {
+        if (c >= 0x20 and c <= 0x7e and c != '"' and c != '\\') {
+            try out.append(a, c);
+        } else try out.print(a, "\\{X:0>2}", .{c});
+    }
+    return out.toOwnedSlice(a);
+}
+
+test "debug paths: a folder name LLVM escapes is mapped too (re-review RH1)" {
+    const gpa = std.testing.allocator;
+    // How LLVM prints `/home/ann/proj ü/q"x`: `ü` = C3 BC, `"` = 22.
+    const in = "!1 = !DIFile(filename: \"x.zig\", directory: \"/home/ann/proj \\C3\\BC/q\\22x\")";
+    const out = try mapDebugPaths(gpa, in, &.{ .{ .from = "/home/ann/proj ü/q\"x", .to = "." }, .{ .from = "/home/ann", .to = "~" } });
+    defer gpa.free(out);
+    try std.testing.expectEqualStrings("!1 = !DIFile(filename: \"x.zig\", directory: \".\")", out);
+}
+
+test "debug paths: the working and home directories are mapped, code is untouched (review 1, P1)" {
+    const gpa = std.testing.allocator;
+    const in =
+        \\@s = private constant [22 x i8] c"/home/ann/proj/x.zig\00"
+        \\!1 = !DIFile(filename: "x.zig", directory: "/home/ann/proj")
+        \\!2 = !DIFile(filename: "/home/ann/.cache/zilc/std-overlay/std/std.zig", directory: "/home/ann/proj")
+        \\!3 = !DIFile(filename: "/home/annex/other.zig", directory: "/home/ann/projects")
+        \\!4 = !DIFile(filename: "/usr/lib/y.zig", directory: "")
+    ;
+    const out = try mapDebugPaths(gpa, in, &.{ .{ .from = "/home/ann/proj", .to = "." }, .{ .from = "/home/ann", .to = "~" } });
+    defer gpa.free(out);
+    try std.testing.expectEqualStrings(
+        \\@s = private constant [22 x i8] c"/home/ann/proj/x.zig\00"
+        \\!1 = !DIFile(filename: "x.zig", directory: ".")
+        \\!2 = !DIFile(filename: "~/.cache/zilc/std-overlay/std/std.zig", directory: ".")
+        \\!3 = !DIFile(filename: "/home/annex/other.zig", directory: "~/projects")
+        \\!4 = !DIFile(filename: "/usr/lib/y.zig", directory: "")
+    , out);
+}
+
 /// Linkage and visibility words that may precede a definition's return type.
 const linkage_words = [_][]const u8{
     "external", "weak",      "weak_odr", "linkonce",  "linkonce_odr",    "available_externally",

@@ -21,7 +21,7 @@
  *   - the privacy gate: no private file tracked (`cmem/review-issues.md`, `cmem/local/`, `.claude/`,
  *     `CLAUDE.md`; H37 (b)), and the path scan (cmem/working-rules.md § Privacy) finds nothing;
  *   - the gates: `zig fmt --check`, Biome's Markdown check, `zig build test`, the release scripts'
- *     tests, and `bun tools/run-gate.ts` (the Fil-C safety gate, 8/8).
+ *     tests, and `bun tools/run-gate.ts` (the Fil-C safety gate, 10/10).
  * Then `git push origin main` (no tags, no force) and a read-back of `refs/heads/main`.
  */
 import { readFileSync } from "node:fs";
@@ -80,18 +80,20 @@ for (const flag of ["-I", "-a"]) {
 }
 
 // ---- the gates (all local: CI runs none of them, H37 (e))
-const steps: [string, string[], RegExp | null][] = [
-  ["zig fmt --check", [ZIG, "fmt", "--check", "build.zig", "build", "tools", "tests", "src"], null],
-  ["Markdown formatting (Biome)", ["bun", "tools/md/biome.ts", "ci", "--colors=off", "."], null],
-  ["zig build test", [ZIG, "build", "test", "--summary", "all"], /Build Summary: (\d+)\/\1 steps succeeded/],
-  ["release scripts' tests", ["bun", "test", "tools/release/"], / 0 fail/],
-  ["the Fil-C gate", ["bun", "tools/run-gate.ts"], /gate: (\d+)\/\1 cases passed/],
+// Each with a time limit (review 1, H12): a hung step is a refusal, never a wait forever. The
+// limits are several times the runs measured here (zig build test ~40 s, the Fil-C gate minutes).
+const steps: [string, string[], RegExp | null, number][] = [
+  ["zig fmt --check", [ZIG, "fmt", "--check", "build.zig", "build", "tools", "tests", "src"], null, 300],
+  ["Markdown formatting (Biome)", ["bun", "tools/md/biome.ts", "ci", "--colors=off", "."], null, 600],
+  ["zig build test", [ZIG, "build", "test", "--summary", "all"], /Build Summary: (\d+)\/\1 steps succeeded/, 1800],
+  ["the tools' tests", ["bun", "test", "tools/release/", "tools/lib/"], / 0 fail/, 1800],
+  ["the Fil-C gate", ["bun", "tools/run-gate.ts"], /gate: (\d+)\/\1 cases passed/, 3600],
 ];
-for (const [name, argv, want] of steps) {
-  const r = await run(argv, { cwd: REPO });
+for (const [name, argv, want, timeout] of steps) {
+  const r = await run(argv, { cwd: REPO, timeout });
   if (r.code !== 0 || (want && !want.test(r.out))) {
     console.error(r.out.trimEnd().split("\n").slice(-20).join("\n"));
-    fail(`${name} failed (exit ${r.code})`);
+    fail(r.timedOut ? `${name} took longer than ${timeout} s and was stopped` : `${name} failed (exit ${r.code})`);
   }
   console.log(`release: ${name} — ok`);
 }

@@ -36,6 +36,9 @@ const Case = struct {
     origin: []const u8 = "",
     /// A distinctive phrase from the expected violation, output line or panic message.
     fault: []const u8,
+    /// Built alone first with `zilc build -c`, and its object linked with `inputs` (the object
+    /// path of the driver; review 1 re-review OC1: `-c` once wrote no object at all).
+    object_first: ?[]const u8 = null,
 };
 
 const library = [_][]const u8{ "examples/library/main.c", "examples/library/hooks.zig" };
@@ -46,6 +49,20 @@ const cases = [_]Case{
         .inputs = &.{ "examples/interop/c_caller.c", "examples/interop/bounds.zig" },
         .origin = "bounds.zig:13:6",
         .fault = "ptr >= upper",
+    },
+    .{
+        .name = "interop, in two steps: the Zig object by -c, then the link",
+        .inputs = &.{"examples/interop/c_caller.c"},
+        .object_first = "examples/interop/bounds.zig",
+        .origin = "bounds.zig:13:6",
+        .fault = "ptr >= upper",
+    },
+    .{
+        .name = "f128 in a -c object: the module, its compiler-rt helpers beside it (KI-9)",
+        .inputs = &.{"examples/f128/main.c"},
+        .object_first = "examples/f128/mul.zig",
+        .expect = .runs,
+        .fault = "mulq: 6",
     },
     .{
         .name = "whole Zig program (generated entry shim)",
@@ -157,6 +174,29 @@ pub fn main() !void {
         try argv.appendSlice(gpa, &.{ zilc, "build", "-O", case.optimize, "-o", out_path });
         for (case.inputs) |in| {
             try argv.append(gpa, try std.fmt.allocPrint(gpa, "{s}/{s}", .{ root, in }));
+        }
+        if (case.object_first) |src| {
+            const obj = try std.fmt.allocPrint(gpa, "{s}.first.o", .{out_path});
+            const c = try std.process.Child.run(.{
+                .allocator = gpa,
+                .argv = &.{ zilc, "build", "-c", "-O", case.optimize, "-o", obj, try std.fmt.allocPrint(gpa, "{s}/{s}", .{ root, src }) },
+                .max_output_bytes = max_output,
+            });
+            const made = switch (c.term) {
+                .Exited => |code| code == 0,
+                else => false,
+            } and if (std.fs.cwd().access(obj, .{})) |_| true else |_| false;
+            if (!made) {
+                std.debug.print("      FAIL: zilc build -c did not write {s}\n{s}\n", .{ obj, c.stderr[0..@min(c.stderr.len, 4096)] });
+                failures += 1;
+                continue;
+            }
+            try argv.append(gpa, obj);
+            // As the driver's note says: the raw-syscall helper is handed over beside the object.
+            for ([_][]const u8{ "zilc_syscall", "f128" }) |kind| {
+                const helper = try std.fmt.allocPrint(gpa, "{s}.{s}.o", .{ obj, kind });
+                if (std.fs.cwd().access(helper, .{})) |_| try argv.append(gpa, helper) else |_| {}
+            }
         }
 
         // A broken toolchain can make a build print megabytes (2026-10-27: a libc exporting 8

@@ -14,14 +14,15 @@ for license compliance. The _why_ behind the choices lives in `cmem/licensing.md
 
 ## License obligations at a glance
 
-| License                                                               | To reuse code you MUST                                                                                | Patent grant | Reaches user binaries?                   |
-| --------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- | ------------ | ---------------------------------------- |
-| **MIT** (Zig, musl)                                                   | Preserve the copyright + permission notice in source; reproduce it in binary distributions' docs.     | No           | **Yes** — notice must accompany binaries |
-| **BSD-2-Clause** (Fil-C runtime / libpas)                             | Retain notice in source; **reproduce notice in binary distributions' docs**.                          | No           | **Yes** — notice must accompany binaries |
-| **BSD-3-Clause** (OpenSSH `setproctitle` inside libpas)               | As BSD-2, plus no use of contributors' names for endorsement.                                         | No           | Yes                                      |
-| **Apache-2.0**                                                        | Preserve notices; include the license; **propagate NOTICE**; **mark changes** in modified files (§4). | **Yes** (§3) | Yes                                      |
-| **Apache-2.0 WITH LLVM-exception** (LLVM, Fil-C compiler)             | As Apache-2.0, **except** §4(a)(b)(d) are waived for portions embedded into compiled/object output.   | Yes          | **No** (the exception covers it)         |
-| **LGPL-2.1-or-later** (glibc, _Fil-C's `/opt/fil` distribution only_) | Copyleft. **Not adopted — see below.**                                                                | —            | —                                        |
+| License                                                                    | To reuse code you MUST                                                                                                | Patent grant | Reaches user binaries?                           |
+| -------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- | ------------ | ------------------------------------------------ |
+| **MIT** (Zig, musl)                                                        | Preserve the copyright + permission notice in source; reproduce it in binary distributions' docs.                     | No           | **Yes** — notice must accompany binaries         |
+| **BSD-2-Clause** (Fil-C runtime / libpas)                                  | Retain notice in source; **reproduce notice in binary distributions' docs**.                                          | No           | **Yes** — notice must accompany binaries         |
+| **BSD-3-Clause** (OpenSSH `setproctitle` inside libpas)                    | As BSD-2, plus no use of contributors' names for endorsement.                                                         | No           | Yes                                              |
+| **Apache-2.0**                                                             | Preserve notices; include the license; **propagate NOTICE**; **mark changes** in modified files (§4).                 | **Yes** (§3) | Yes                                              |
+| **Apache-2.0 WITH LLVM-exception** (LLVM, Fil-C compiler)                  | As Apache-2.0, **except** §4(a)(b)(d) are waived for portions embedded into compiled/object output.                   | Yes          | **No** (the exception covers it)                 |
+| **LGPL-2.1-or-later** (glibc, _Fil-C's `/opt/fil` distribution only_)      | Copyleft. **Not adopted — see below.**                                                                                | —            | —                                                |
+| **GPL-3.0-or-later** (GCC's own patch files in `third_party/gcc-patches/`) | Ship the licence text with them (`third_party/gcc-patches/COPYING3`); keep them separate files, never in zilc's code. | Yes (§11)    | **No** — never compiled into anything zilc ships |
 
 **Practical rules for this repo:**
 
@@ -345,7 +346,48 @@ Newest first. Copy the template for each adopted component.
   to build Fil-C's runtime the upstream way for comparison (`tools/filc/build-filc-from-source.ts
   MODE=upstream`); **never distributed**, never in zilc's outputs. The GCC runtime library
   exception covers whatever it compiles, as for any GCC
-- **Obligations satisfied:** none arise while nothing is distributed
+- **Obligations satisfied:** the built GCCs: none arise while nothing is distributed. **The two
+  patch files ARE distributed** (in the tag's source archive): [x] the GPL-3.0 text ships beside
+  them, `third_party/gcc-patches/COPYING3` (GCC's own, byte-identical in 11.4.0 and 12.3.0)
+  [x] provenance in each header (corrected 2026-11-23, review 1, L3)
+
+### sarcasm-port (Fil-C's sarcasm assembler, ported from Luau to Zig; IN PROGRESS, not wired into zilc)
+
+- **Source:** Fil-C, `projects/sarcasm/sarcasm/*.luau` at the pinned commit (Fil-C 0.687); the port
+  started 2026-11-06 (owner: "Port sarcasm to Zig"; `cmem/sarcasm-port.md`)
+- **License (SPDX):** `BSD-2-Clause` (Copyright (c) 2026 Filip Pizlo), from
+  `projects/sarcasm/install.sh`, the folder's only licence text (pinned commit:
+  https://github.com/pizlonator/fil-c/blob/e7947f079c976fb167108f7407c20240bca0ca89/projects/sarcasm/install.sh).
+  None of the 28 `.luau` files carries its own header (review 1, L1, 2026-11-23); the licence
+  covers them because the same header describes what the script installs: `PREFIX/bin/sarcasm`,
+  which loads "the sarcasm logic from ../lib/sarcasm", the `.luau` sources (owner, 2026-11-24:
+  "it is referenced in the same location, so it does"). L1 closed; no question to the author.
+- **License file:** `third_party/fil-c/SARCASM-LICENSE.txt` (install.sh's terms, verbatim, with the
+  note above), and the full text with the copyright line in the header of every ported file
+- **What we reused:** the modules' logic, line by line, so every stage's output equals upstream's
+  (`tools/sarcasm/check-stages.ts`)
+- **Where it lives in zilc:** `src/sarcasm/*.zig` (17 files: BSD-2-Clause), except the three
+  Luau ports below; `tools/sarcasm/*` are zilc's own
+- **Artifact destination:** none yet (source only; not built into `zilc` or any step)
+- **Modifications:** a port to Zig; Luau tables become Zig structures; one added refusal (expression
+  nesting past 1000 levels, review 1 H1). Listed in each file's module comment
+- **Obligations satisfied:** [x] licence text present [x] copyright line and conditions
+  in every file [x] NOTICE updated [x] SPDX headers (L1 closed 2026-11-24)
+
+### luau-ports (parts of Luau ported to Zig, for the sarcasm port)
+
+- **Source:** Luau as Fil-C carries it, `projects/lute-1.0.0/extern/luau` at the pinned commit
+- **Upstream path(s):** `VM/src/lstrlib.cpp` (the pattern matcher), `VM/src/lnumprint.cpp`
+  (`luai_num2str`), `VM/src/ltable.cpp` (the table)
+- **License (SPDX):** `MIT` (Copyright (c) 2019-2025 Roblox Corporation; Copyright (c) 1994–2019
+  Lua.org, PUC-Rio)
+- **License file:** `third_party/luau/LICENSE.txt` and `lua_LICENSE.txt` (verbatim), and the full
+  MIT notice in the header of each ported file (added 2026-11-23, review 1, L2)
+- **Where it lives in zilc:** `src/sarcasm/lua_pattern.zig`, `luau_number.zig`, `luau_table.zig`
+- **What we reused:** the algorithms, re-expressed in Zig so the results equal Luau's
+  (`tools/sarcasm/check-lua-pattern.ts`, `check-luau-number.ts`, `check-luau-table.ts`)
+- **Artifact destination:** none yet (source only)
+- **Obligations satisfied:** [x] licence present [x] notice in each file [x] NOTICE updated [x] SPDX
 
 ### filc-benchmarks (Fil-C's `filc/benchmarks` programs, run as BENCHMARKS; nothing copied)
 

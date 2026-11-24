@@ -42,6 +42,18 @@ const stage_dirs = [_][]const u8{ "llvm", "clang", "cmake", "third-party" };
 const Hunk = struct { old_start: usize, lines: []const []const u8 };
 const FilePatch = struct { path: []const u8, old_id: []const u8, new_id: []const u8, hunks: []const Hunk };
 
+/// Why the patch was refused (valid after `error.BadPatch`): a malformed patch is a named refusal,
+/// never a panic (review 1, H9: a lone `index` line was "attempt to use null value").
+var refuse_buf: [512]u8 = undefined;
+var refuse_len: usize = 0;
+fn refuse(comptime fmt: []const u8, args: anytype) error{BadPatch} {
+    refuse_len = (std.fmt.bufPrint(&refuse_buf, fmt, args) catch &refuse_buf).len;
+    return error.BadPatch;
+}
+fn refused() []const u8 {
+    return refuse_buf[0..refuse_len];
+}
+
 /// A `git diff` with `index <old>..<new> <mode>` lines; nothing else (no renames, no binary).
 fn parsePatch(gpa: std.mem.Allocator, text: []const u8) ![]FilePatch {
     var files: std.ArrayListUnmanaged(FilePatch) = .{};
@@ -52,6 +64,9 @@ fn parsePatch(gpa: std.mem.Allocator, text: []const u8) ![]FilePatch {
 
     var it = std.mem.splitScalar(u8, text, '\n');
     while (it.next()) |line| {
+        const header = std.mem.startsWith(u8, line, "index ") or std.mem.startsWith(u8, line, "--- ") or
+            std.mem.startsWith(u8, line, "+++ ") or std.mem.startsWith(u8, line, "@@ -");
+        if (header and cur == null) return refuse("'{s}' before any 'diff --git' line", .{line});
         if (std.mem.startsWith(u8, line, "diff --git ")) {
             if (old_start) |s| try hunks.append(gpa, .{ .old_start = s, .lines = try body.toOwnedSlice(gpa) });
             old_start = null;
@@ -62,25 +77,28 @@ fn parsePatch(gpa: std.mem.Allocator, text: []const u8) ![]FilePatch {
             cur = .{ .path = "", .old_id = "", .new_id = "", .hunks = &.{} };
         } else if (std.mem.startsWith(u8, line, "index ")) {
             const ids = std.mem.sliceTo(line["index ".len..], ' ');
-            const dots = std.mem.indexOf(u8, ids, "..") orelse fail("bad index line: {s}", .{line});
+            const dots = std.mem.indexOf(u8, ids, "..") orelse return refuse("bad index line: {s}", .{line});
             cur.?.old_id = ids[0..dots];
             cur.?.new_id = ids[dots + 2 ..];
         } else if (std.mem.startsWith(u8, line, "--- ")) {
-            if (!std.mem.startsWith(u8, line, "--- a/")) fail("only modifications are supported: {s}", .{line});
+            if (!std.mem.startsWith(u8, line, "--- a/")) return refuse("only modifications are supported: {s}", .{line});
         } else if (std.mem.startsWith(u8, line, "+++ ")) {
-            if (!std.mem.startsWith(u8, line, "+++ b/")) fail("only modifications are supported: {s}", .{line});
+            if (!std.mem.startsWith(u8, line, "+++ b/")) return refuse("only modifications are supported: {s}", .{line});
             cur.?.path = line["+++ b/".len..];
         } else if (std.mem.startsWith(u8, line, "@@ -")) {
             if (old_start) |s| try hunks.append(gpa, .{ .old_start = s, .lines = try body.toOwnedSlice(gpa) });
             const rest = line["@@ -".len..];
-            const end = std.mem.indexOfAny(u8, rest, ", ") orelse fail("bad hunk header: {s}", .{line});
-            old_start = try std.fmt.parseInt(usize, rest[0..end], 10);
+            const end = std.mem.indexOfAny(u8, rest, ", ") orelse return refuse("bad hunk header: {s}", .{line});
+            const start = std.fmt.parseInt(usize, rest[0..end], 10) catch return refuse("bad hunk header: {s}", .{line});
+            // A hunk at line 0 creates a file; only modifications are supported (and `- 1` below).
+            if (start == 0) return refuse("hunk at line 0 (a new file) is not supported: {s}", .{line});
+            old_start = start;
         } else if (old_start != null and line.len > 0 and (line[0] == ' ' or line[0] == '-' or line[0] == '+')) {
             try body.append(gpa, line);
         } else if (std.mem.startsWith(u8, line, "\\")) {
-            fail("\"no newline at end of file\" is not supported", .{});
+            return refuse("\"no newline at end of file\" is not supported", .{});
         } else if (line.len != 0 and old_start != null) {
-            fail("unexpected patch line: {s}", .{line});
+            return refuse("unexpected patch line: {s}", .{line});
         }
     }
     if (old_start) |s| try hunks.append(gpa, .{ .old_start = s, .lines = try body.toOwnedSlice(gpa) });
@@ -88,7 +106,7 @@ fn parsePatch(gpa: std.mem.Allocator, text: []const u8) ![]FilePatch {
         c.hunks = try hunks.toOwnedSlice(gpa);
         try files.append(gpa, c.*);
     }
-    for (files.items) |f| if (f.path.len == 0 or f.old_id.len < 7 or f.new_id.len < 7) fail("incomplete file header in the patch", .{});
+    for (files.items) |f| if (f.path.len == 0 or f.old_id.len < 7 or f.new_id.len < 7) return refuse("incomplete file header in the patch", .{});
     return files.items;
 }
 
@@ -104,8 +122,8 @@ fn blobId(bytes: []const u8) [40]u8 {
 fn applyFile(gpa: std.mem.Allocator, src: []const u8, f: FilePatch) ![]const u8 {
     const pre = blobId(src);
     if (!std.mem.startsWith(u8, &pre, f.old_id))
-        fail("{s} is not the patch's base (blob {s}, the patch expects {s}): the source is not at zilc's Fil-C commit", .{ f.path, pre[0..12], f.old_id });
-    if (src.len == 0 or src[src.len - 1] != '\n') fail("{s}: no final newline", .{f.path});
+        return refuse("{s} is not the patch's base (blob {s}, the patch expects {s}): the source is not at zilc's Fil-C commit", .{ f.path, pre[0..12], f.old_id });
+    if (src.len == 0 or src[src.len - 1] != '\n') return refuse("{s}: no final newline", .{f.path});
 
     var lines: std.ArrayListUnmanaged([]const u8) = .{};
     var it = std.mem.splitScalar(u8, src[0 .. src.len - 1], '\n');
@@ -115,13 +133,14 @@ fn applyFile(gpa: std.mem.Allocator, src: []const u8, f: FilePatch) ![]const u8 
     var next: usize = 0; // index into lines of the next unconsumed line
     for (f.hunks) |h| {
         const at = h.old_start - 1;
-        if (at < next) fail("{s}: hunks overlap or are out of order", .{f.path});
+        if (at < next) return refuse("{s}: hunks overlap or are out of order", .{f.path});
+        if (at > lines.items.len) return refuse("{s}: hunk @@ -{d} starts past the file's {d} lines", .{ f.path, h.old_start, lines.items.len });
         for (lines.items[next..at]) |l| try out.print(gpa, "{s}\n", .{l});
         var i = at;
         for (h.lines) |hl| switch (hl[0]) {
             ' ', '-' => {
                 if (i >= lines.items.len or !std.mem.eql(u8, lines.items[i], hl[1..]))
-                    fail("{s}: hunk @@ -{d} does not match at line {d}", .{ f.path, h.old_start, i + 1 });
+                    return refuse("{s}: hunk @@ -{d} does not match at line {d}", .{ f.path, h.old_start, i + 1 });
                 if (hl[0] == ' ') try out.print(gpa, "{s}\n", .{hl[1..]});
                 i += 1;
             },
@@ -134,7 +153,7 @@ fn applyFile(gpa: std.mem.Allocator, src: []const u8, f: FilePatch) ![]const u8 
 
     const post = blobId(out.items);
     if (!std.mem.startsWith(u8, &post, f.new_id))
-        fail("{s}: the patched result is blob {s}, the patch says {s}", .{ f.path, post[0..12], f.new_id });
+        return refuse("{s}: the patched result is blob {s}, the patch says {s}", .{ f.path, post[0..12], f.new_id });
     return out.items;
 }
 
@@ -211,7 +230,7 @@ fn stage(gpa: std.mem.Allocator, filc_src: []const u8, work: []const u8, files: 
     // The patched files: replace the copies (never the package's files, which are linked).
     for (files) |f| {
         const before = try to.readFileAlloc(gpa, f.path, 64 << 20);
-        const after = try applyFile(gpa, before, f);
+        const after = applyFile(gpa, before, f) catch |e| if (e == error.BadPatch) fail("{s}", .{refused()}) else return e;
         try to.deleteFile(f.path);
         try to.writeFile(.{ .sub_path = f.path, .data = after });
         std.debug.print("patched-clang: patched {s} (blob {s} -> {s})\n", .{ f.path, f.old_id, f.new_id });
@@ -269,7 +288,7 @@ pub fn main() !void {
     };
 
     const patch_text = try std.fs.cwd().readFileAlloc(gpa, patch_path, 16 << 20);
-    const files = try parsePatch(gpa, patch_text);
+    const files = parsePatch(gpa, patch_text) catch |e| if (e == error.BadPatch) fail("{s}: {s}", .{ patch_path, refused() }) else return e;
     var digest: [32]u8 = undefined;
     std.crypto.hash.sha2.Sha256.hash(patch_text, &digest, .{});
     const stamp = try std.fmt.allocPrint(gpa, "source {s}\npatch sha256 {s}\n", .{ filc_src, std.fmt.bytesToHex(digest, .lower) });
@@ -344,4 +363,22 @@ pub fn main() !void {
     const version = try std.process.Child.run(.{ .allocator = gpa, .argv = &.{ try std.fs.path.join(gpa, &.{ bin, "clang-20" }), "--version" } });
     std.debug.print("patched-clang: {s}", .{std.mem.sliceTo(version.stdout, '\n')});
     std.debug.print("\npatched-clang: built with {s}; installed {s}/clang-20 and llvm-split\n", .{ if (zig_tools != null) "Zig's clang" else "the system's cc/c++", bin });
+}
+
+test "a malformed patch is refused by name, never a panic (review 1, H9)" {
+    var arena_state: std.heap.ArenaAllocator = .init(std.testing.allocator);
+    defer arena_state.deinit();
+    const a = arena_state.allocator();
+    // A header line before any file; a hunk at line 0; a bad start.
+    for ([_][]const u8{
+        "index abc1234..def5678 100644\n",
+        "diff --git a/x b/x\nindex abc1234..def5678 100644\n--- a/x\n+++ b/x\n@@ -0,0 +1 @@\n+y\n",
+        "diff --git a/x b/x\nindex abc1234..def5678 100644\n--- a/x\n+++ b/x\n@@ -q,1 +1 @@\n",
+    }) |text| try std.testing.expectError(error.BadPatch, parsePatch(a, text));
+    // A hunk that starts past the end of the file (the base id is the file's own, so only that check stops it).
+    const src = "one\n";
+    const id = blobId(src);
+    const f: FilePatch = .{ .path = "x", .old_id = id[0..12], .new_id = id[0..12], .hunks = &.{.{ .old_start = 99, .lines = &.{" one"} }} };
+    try std.testing.expectError(error.BadPatch, applyFile(a, src, f));
+    try std.testing.expect(std.mem.indexOf(u8, refused(), "past the file") != null);
 }

@@ -14,7 +14,7 @@
 //             differs between the chains must be defined in that library or be a weak undefined,
 //             so a call still reaches the same function
 //   suite     Fil-C's suite on each tree: 0 differences zig vs stock and zig vs the GCC chain
-//   gate      `zig build gate` with each tree's clang: 8/8 both, the same lines
+//   gate      `zig build gate` with each tree's clang: N/N both (10/10 on 2026-11-23), the same lines
 //   corpus    tests/basics, C and Zig, all four modes, per chain; the output comparison against
 //             native per chain (0 unexplained each); then chain against chain: the same verdicts
 //             (the PID in Fil-C's panic prefix masked) and the same comparison report

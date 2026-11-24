@@ -39,6 +39,15 @@
     names AND order (`zig ar q`, so repeated names survive; `zig ranlib`); all four now list exactly
     as the release's
   - Where: `testing.md` "Parity inventory" (libyoloc.a 1,343, libpizlo.a 183, libyolort.a 167, libyolounwind.a 1)
+- Z-b-9 — After an edit made from Windows to a file on the exFAT drive, `zig build` in WSL
+  installed a `zilc` built from the OLD source: the new behaviour was missing, while `grep` in WSL
+  showed the new text (2026-11-23, review 1 re-review 3, `src/driver.zig`)
+  - Cause: _surmised_ — Zig's cache manifest trusted the file's stat (drvfs / 9p on exFAT) and
+    reused the earlier compile; a brand-new `ZIG_LOCAL_CACHE_DIR` built the new code at once
+  - Fix: before a result is believed after editing from Windows, build with a fresh local cache
+    (or empty `~/.cache/zilc-zig`, zilc's own) and check the new behaviour is there; the review's
+    final runs were made on an emptied cache (`zig build test` 56/56, gate 10/10)
+  - Where: every local build of the repo from WSL (`run-gate.ts`, `zig build test`)
 
 ## CMake, LLVM, GCC, musl as build systems
 

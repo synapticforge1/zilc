@@ -53,7 +53,10 @@ pub const Options = struct {
     cache: bool = true,
 };
 
-pub const Error = error{ ToolFailed, NoInputs, UnsupportedInput };
+pub const Error = error{ ToolFailed, NoInputs, UnsupportedInput, InputNotFound, BadOptions, TempDirExists, NoCacheDir };
+
+/// The message for `Error.NoCacheDir` (review 1, H6: it used to be an exit 1 with no message).
+pub const no_cache_dir_message = "zilc: no cache directory: set ZILC_CACHE_DIR, XDG_CACHE_HOME or HOME\n";
 
 /// Debug's Fil-C step runs at `-O1` like every mode since 2026-10-01. From 2026-09-23 it ran at
 /// `-O0`, because Debug IR segfaulted Fil-C's pass at `-O1` (KI-4). The cause is Fil-C's
@@ -288,13 +291,18 @@ fn zonString(gpa: std.mem.Allocator, zon: []const u8, key: []const u8) ![]u8 {
 
 /// zilc's cache: $ZILC_CACHE_DIR, else $XDG_CACHE_HOME/zilc, else $HOME/.cache/zilc.
 fn cacheRoot(gpa: std.mem.Allocator) ![]u8 {
-    if (std.process.getEnvVarOwned(gpa, "ZILC_CACHE_DIR")) |d| return d else |_| {}
+    // An empty value counts as unset (re-review RH3: `ZILC_CACHE_DIR=` made the cache `/`).
+    if (std.process.getEnvVarOwned(gpa, "ZILC_CACHE_DIR")) |d| {
+        if (d.len > 0) return d;
+        gpa.free(d);
+    } else |_| {}
     if (std.process.getEnvVarOwned(gpa, "XDG_CACHE_HOME")) |d| {
         defer gpa.free(d);
-        return std.fmt.allocPrint(gpa, "{s}/zilc", .{d});
+        if (d.len > 0) return std.fmt.allocPrint(gpa, "{s}/zilc", .{d});
     } else |_| {}
-    const home = std.process.getEnvVarOwned(gpa, "HOME") catch return Error.ToolFailed;
+    const home = std.process.getEnvVarOwned(gpa, "HOME") catch return Error.NoCacheDir;
     defer gpa.free(home);
+    if (home.len == 0) return Error.NoCacheDir;
     return std.fmt.allocPrint(gpa, "{s}/.cache/zilc", .{home});
 }
 
@@ -490,7 +498,12 @@ fn compileZig(
     }
 
     // 2. The rewrite: two lines, and the whole reason this driver exists.
-    const plain = try std.fs.cwd().readFileAlloc(gpa, ll_path, 512 * 1024 * 1024);
+    const raw = try std.fs.cwd().readFileAlloc(gpa, ll_path, 512 * 1024 * 1024);
+    defer gpa.free(raw);
+    // 2a. The user's working and home directories out of the debug info (review 1, P1).
+    const pm = try PathMaps.get(gpa);
+    defer pm.deinit(gpa);
+    const plain = try ir.mapDebugPaths(gpa, raw, pm.maps());
     defer gpa.free(plain);
     const dialect = ir.toFilCDialect(gpa, plain) catch |e| {
         std.debug.print("zilc: cannot rewrite IR for '{s}': {s}\n", .{ src, @errorName(e) });
@@ -864,27 +877,151 @@ fn runParallel(gpa: std.mem.Allocator, cmds: []const []const []const u8, verbose
     return first;
 }
 
+/// The two prefixes taken out of every binary's debug info (review 1, P1; owner, 2026-11-23): the
+/// working directory becomes `.`, the home directory `~` (so the account name is gone from paths
+/// under it: Zig's lib, the caches, the toolchain's sources).
+const PathMaps = struct {
+    cwd: []u8,
+    home: ?[]u8,
+    list: [2]ir.PathMap = undefined,
+    len: usize = 0,
+
+    fn get(gpa: std.mem.Allocator) !PathMaps {
+        var self: PathMaps = .{ .cwd = try std.process.getCwdAlloc(gpa), .home = std.process.getEnvVarOwned(gpa, "HOME") catch null };
+        // Without a trailing `/`: `HOME=/home/u/` would otherwise never match `/home/u/…`
+        // (re-review RH2). Views into the owned buffers, which `deinit` frees whole.
+        const cwd = std.mem.trimRight(u8, self.cwd, "/");
+        // The longest first: the working directory is usually under the home directory.
+        if (cwd.len > 1) {
+            self.list[self.len] = .{ .from = cwd, .to = "." };
+            self.len += 1;
+        }
+        if (self.home) |h_owned| {
+            const h = std.mem.trimRight(u8, h_owned, "/");
+            if (h.len > 1) {
+                self.list[self.len] = .{ .from = h, .to = "~" };
+                self.len += 1;
+            }
+        }
+        return self;
+    }
+    fn maps(self: *const PathMaps) []const ir.PathMap {
+        return self.list[0..self.len];
+    }
+    fn deinit(self: PathMaps, gpa: std.mem.Allocator) void {
+        gpa.free(self.cwd);
+        if (self.home) |h| gpa.free(h);
+    }
+    /// The same maps for clang compiling C: `-ffile-prefix-map` (debug info and `__FILE__`).
+    /// Clang applies the LAST matching one (LLVM 16 on, as GCC), so the working directory is last.
+    fn clangArgs(self: *const PathMaps, gpa: std.mem.Allocator, out: *std.ArrayListUnmanaged([]const u8), owned: *std.ArrayListUnmanaged([]u8)) !void {
+        var i = self.len;
+        while (i > 0) {
+            i -= 1;
+            // Clang splits `old=new` at an `=`: a folder name holding one cannot be mapped
+            // reliably, so it is left as it is rather than mapped wrongly (re-review note).
+            if (std.mem.indexOfScalar(u8, self.list[i].from, '=') != null) continue;
+            const a = try std.fmt.allocPrint(gpa, "-ffile-prefix-map={s}={s}", .{ self.list[i].from, self.list[i].to });
+            try owned.append(gpa, a);
+            try out.append(gpa, a);
+        }
+    }
+};
+
+/// What the build may write, checked before any tool runs (review 1, H2, H3).
+fn checkOutput(gpa: std.mem.Allocator, opts: Options) !void {
+    // `-c` copies its objects to the one output path: more than one would overwrite each other,
+    // and C/C++ inputs are not compiled in this mode at all (H2).
+    if (opts.emit == .obj) {
+        var zig_inputs: usize = 0;
+        for (opts.inputs) |input| switch (try classify(input)) {
+            .zig => zig_inputs += 1,
+            .native => {
+                std.debug.print("zilc: -c takes .zig inputs only; compile '{s}' with Fil-C's clang -c\n", .{input});
+                return Error.BadOptions;
+            },
+        };
+        if (zig_inputs > 1) {
+            std.debug.print("zilc: -c makes one object per input, but -o names one file; give one .zig input per run\n", .{});
+            return Error.BadOptions;
+        }
+    }
+    // The output is never one of the inputs (H3): the copy or the link would replace the source.
+    const out_real = std.fs.cwd().realpathAlloc(gpa, opts.output) catch null;
+    defer if (out_real) |r| gpa.free(r);
+    for (opts.inputs) |input| {
+        const same = if (out_real) |o| blk: {
+            const in_real = std.fs.cwd().realpathAlloc(gpa, input) catch break :blk false;
+            defer gpa.free(in_real);
+            break :blk std.mem.eql(u8, o, in_real);
+        } else false;
+        if (same or std.mem.eql(u8, input, opts.output)) {
+            std.debug.print("zilc: the output '{s}' is an input; choose another -o\n", .{opts.output});
+            return Error.BadOptions;
+        }
+    }
+}
+
 pub fn build(gpa: std.mem.Allocator, opts: Options) !void {
     if (opts.inputs.len == 0) return Error.NoInputs;
+    // Every input is there before any tool runs: a missing one is named, not reported by Zig as a
+    // line in the generated wrapper (review 1, B4).
+    for (opts.inputs) |input| std.fs.cwd().access(input, .{}) catch |e| {
+        std.debug.print("zilc: cannot read input '{s}': {s}\n", .{ input, @errorName(e) });
+        return Error.InputNotFound;
+    };
+    try checkOutput(gpa, opts);
 
     // Temps live beside the output so a failed build leaves them inspectable
     // with --keep-temps, which is how KI-4/KI-5 were diagnosed in the first place.
+    // The folder is made HERE, exclusively, private to this user (review 1, H4, H5, S1): whatever
+    // already sits at that path — a kept or interrupted build's folder, another build of the same
+    // output running now, or a symlink someone planted next to the output — is refused, never
+    // reused, followed or deleted. Its name stays fixed: the debug info, and so the object cache
+    // key, carries it.
     const tmp_path = try std.fmt.allocPrint(gpa, "{s}.zilc-tmp", .{opts.output});
     defer gpa.free(tmp_path);
-    try std.fs.cwd().makePath(tmp_path);
+    // The output's folder is made as before (`-o newdir/prog`; re-review RB2); only the temp
+    // folder itself must be new.
+    if (std.fs.path.dirname(opts.output)) |parent| std.fs.cwd().makePath(parent) catch |e| {
+        std.debug.print("zilc: cannot create the output folder {s}: {s}\n", .{ parent, @errorName(e) });
+        return Error.ToolFailed;
+    };
+    std.posix.mkdir(tmp_path, 0o700) catch |e| switch (e) {
+        error.PathAlreadyExists => {
+            std.debug.print("zilc: {s} already exists: a kept or interrupted build's intermediates, or another build of the same output; remove it first\n", .{tmp_path});
+            return Error.TempDirExists;
+        },
+        else => {
+            std.debug.print("zilc: cannot create {s}: {s}\n", .{ tmp_path, @errorName(e) });
+            return Error.ToolFailed;
+        },
+    };
     defer if (!opts.keep_temps) {
         std.fs.cwd().deleteTree(tmp_path) catch {};
     } else std.debug.print("zilc: kept intermediates in {s}/\n", .{tmp_path});
 
     var link_args: std.ArrayListUnmanaged([]const u8) = .{};
     defer link_args.deinit(gpa);
+    // The objects this build made: `-c` copies exactly these out (and nothing else may go in).
     var owned: std.ArrayListUnmanaged([]u8) = .{};
     defer {
         for (owned.items) |p| gpa.free(p);
         owned.deinit(gpa);
     }
+    // Other strings the commands borrow (the prefix maps), kept apart from the objects: in one
+    // list, `-c` tried to copy the map arguments as objects (review 1 re-review, privacy, OC1).
+    var arg_strings: std.ArrayListUnmanaged([]u8) = .{};
+    defer {
+        for (arg_strings.items) |p| gpa.free(p);
+        arg_strings.deinit(gpa);
+    }
 
     try link_args.appendSlice(gpa, &.{ opts.filc, "-O1", "-g" });
+    // C inputs are compiled by this command: their debug info gets the same maps (P1).
+    const pm = try PathMaps.get(gpa);
+    defer pm.deinit(gpa);
+    try pm.clangArgs(gpa, &link_args, &arg_strings);
 
     // Which input owns `main`? In `.auto`, a lone Zig file declaring `pub fn main`
     // with no C/C++ beside it gets the generated entry shim; anything else
@@ -929,7 +1066,10 @@ pub fn build(gpa: std.mem.Allocator, opts: Options) !void {
             \\  (its LLVM must match Fil-C's). Set ZILC_ZIG or --zig; `zilc --version` checks the setup.
             \\
         , .{ opts.zig, env.?.version, @import("zilc").version_string, want });
-        const cache = try cacheRoot(gpa);
+        const cache = cacheRoot(gpa) catch |e| {
+            if (e == Error.NoCacheDir) std.debug.print(no_cache_dir_message, .{});
+            return e;
+        };
         defer gpa.free(cache);
         overlay = ir_std.ensureOverlay(gpa, env.?.lib_dir, env.?.version, cache) catch |e| {
             std.debug.print("zilc: cannot prepare the std backports for Zig {s}: {s}\n" ++
@@ -983,21 +1123,84 @@ pub fn build(gpa: std.mem.Allocator, opts: Options) !void {
         const o_path = try std.fmt.allocPrint(gpa, "{s}/{s}.o", .{ tmp_path, ir.syscall_helper });
         helper_obj = o_path;
         try std.fs.cwd().writeFile(.{ .sub_path = c_path, .data = syscall_helper_c });
-        try run(gpa, &.{ opts.filc, "-O1", "-g", "-c", "-o", o_path, c_path }, opts.verbose);
+        var helper_args: std.ArrayListUnmanaged([]const u8) = .{};
+        defer helper_args.deinit(gpa);
+        try helper_args.appendSlice(gpa, &.{ opts.filc, "-O1", "-g" });
+        try pm.clangArgs(gpa, &helper_args, &arg_strings);
+        try helper_args.appendSlice(gpa, &.{ "-c", "-o", o_path, c_path });
+        try run(gpa, helper_args.items, opts.verbose);
         try link_args.append(gpa, o_path);
     }
 
     if (opts.emit == .obj) {
-        // Object-only: the .o files are the product, so copy them out.
-        for (owned.items) |obj| {
-            try std.fs.cwd().copyFile(obj, std.fs.cwd(), opts.output, .{});
+        // Object-only: the one input's object is the product (checkOutput allows one .zig input).
+        // The f128 compiler-rt helpers, when the module uses them, are joined into ONE relocatable
+        // beside it — copying every object to -o in turn left the last helper there and dropped
+        // the module (review 1, re-review 2, found by the main session from the security note).
+        // Every product is made in the temp folder FIRST; only when all exist are they copied out,
+        // so a failure (no `ld`, `ld -r` failing) leaves `-o` and its neighbours as they were
+        // (re-review 3, R3H1). A helper this run did not make is then removed from beside the
+        // output, so a stale one from an earlier build cannot be linked in.
+        var f128_obj: ?[]u8 = null;
+        defer if (f128_obj) |p| gpa.free(p);
+        if (owned.items.len > 1) {
+            f128_obj = try std.fmt.allocPrint(gpa, "{s}/f128.o", .{tmp_path});
+            var r_args: std.ArrayListUnmanaged([]const u8) = .{};
+            defer r_args.deinit(gpa);
+            // The linker itself: Fil-C's clang driver adds its start files even with -r -nostdlib.
+            try r_args.appendSlice(gpa, &.{ "ld", "-r", "-o", f128_obj.? });
+            for (owned.items[1..]) |obj| try r_args.append(gpa, obj);
+            try run(gpa, r_args.items, opts.verbose);
         }
-        if (helper_obj) |o| {
-            // Without it the final link fails on `zilc_syscall`; hand it over beside the output.
-            const dest = try std.fmt.allocPrint(gpa, "{s}.{s}.o", .{ opts.output, ir.syscall_helper });
-            defer gpa.free(dest);
-            try std.fs.cwd().copyFile(o, std.fs.cwd(), dest, .{});
-            std.debug.print("zilc: note: also link {s} (raw syscalls routed through Fil-C's libc)\n", .{dest});
+        // Three steps, so a failure leaves -o and its neighbours as they were, and says where
+        // (re-review 4, R4H1: a failing helper copy came AFTER -o was replaced, as a bare `IsDir`):
+        // 1. every destination checked (a folder there is refused by name);
+        // 2. every product staged beside its destination as `<dest>.zilc-new` (removed on failure);
+        // 3. the helpers renamed into place and stale ones removed, then `-o` renamed LAST (R5H1);
+        //    every failure is named.
+        const Out = struct { src: ?[]const u8, dest: []u8, why: []const u8 };
+        var outs: [3]Out = undefined;
+        outs[0] = .{ .src = owned.items[0], .dest = try gpa.dupe(u8, opts.output), .why = "" };
+        outs[1] = .{ .src = f128_obj, .dest = try std.fmt.allocPrint(gpa, "{s}.f128.o", .{opts.output}), .why = "the 128-bit float helpers from compiler-rt" };
+        outs[2] = .{ .src = helper_obj, .dest = try std.fmt.allocPrint(gpa, "{s}.{s}.o", .{ opts.output, ir.syscall_helper }), .why = "raw syscalls routed through Fil-C's libc" };
+        defer for (outs) |o| gpa.free(o.dest);
+        for (outs) |o| {
+            const st = std.fs.cwd().statFile(o.dest) catch continue;
+            if (st.kind == .directory) {
+                std.debug.print("zilc: {s} is a folder; it must be a file (remove or rename it)\n", .{o.dest});
+                return Error.ToolFailed;
+            }
+        }
+        var staged: [3]?[]u8 = .{ null, null, null };
+        defer for (staged) |s| if (s) |p| gpa.free(p);
+        errdefer for (staged) |s| if (s) |p| std.fs.cwd().deleteFile(p) catch {};
+        for (outs, 0..) |o, i| if (o.src) |src| {
+            const tmp_dest = try std.fmt.allocPrint(gpa, "{s}.zilc-new", .{o.dest});
+            staged[i] = tmp_dest;
+            std.fs.cwd().copyFile(src, std.fs.cwd(), tmp_dest, .{}) catch |e| {
+                std.debug.print("zilc: cannot write {s}: {s}\n", .{ tmp_dest, @errorName(e) });
+                return Error.ToolFailed;
+            };
+        };
+        // The helpers first and `-o` LAST (re-review 5, R5H1): a failure before the last step leaves
+        // the old `-o` in place; only the final rename replaces it.
+        for ([_]usize{ 1, 2, 0 }) |i| {
+            const o = outs[i];
+            if (staged[i]) |tmp_dest| {
+                std.fs.cwd().rename(tmp_dest, o.dest) catch |e| {
+                    std.debug.print("zilc: cannot replace {s}: {s}{s}\n", .{ o.dest, @errorName(e), if (i == 0) " (the helpers beside it are already the new ones)" else "; the old output is unchanged" });
+                    return Error.ToolFailed;
+                };
+                gpa.free(tmp_dest);
+                staged[i] = null;
+                if (i > 0) std.debug.print("zilc: note: also link {s} ({s})\n", .{ o.dest, o.why });
+            } else if (i > 0) std.fs.cwd().deleteFile(o.dest) catch |e| switch (e) {
+                error.FileNotFound => {},
+                else => {
+                    std.debug.print("zilc: cannot remove the stale {s}: {s} (an old helper there would be linked in)\n", .{ o.dest, @errorName(e) });
+                    return Error.ToolFailed;
+                },
+            };
         }
         return;
     }
@@ -1077,6 +1280,111 @@ test "--clean-cache removes the cached objects, keeps the rest of the cache, and
     // Cleaning again, with no objects folder, is not an error.
     const again = try cleanCacheAt(root);
     try std.testing.expectEqual(@as(usize, 0), again.files);
+}
+
+test "a missing input is refused by name before any tool runs (review 1, B4)" {
+    var tmp = std.testing.tmpDir(.{});
+    defer tmp.cleanup();
+    const gpa = std.testing.allocator;
+    const dir = try tmp.dir.realpathAlloc(gpa, ".");
+    defer gpa.free(dir);
+    const missing = try std.fmt.allocPrint(gpa, "{s}/nonexist.zig", .{dir});
+    defer gpa.free(missing);
+    const out = try std.fmt.allocPrint(gpa, "{s}/a.out", .{dir});
+    defer gpa.free(out);
+    // zig and filc point nowhere: reaching any tool would be a different error.
+    // Its own error: without the check, the same call fails later as ToolFailed (no zig to run).
+    try std.testing.expectError(Error.InputNotFound, build(gpa, .{ .inputs = &.{missing}, .output = out, .zig = "/nonexistent/zig", .filc = "/nonexistent/clang" }));
+    // Nothing was made beside the output.
+    try std.testing.expectError(error.FileNotFound, tmp.dir.access("a.out.zilc-tmp", .{}));
+}
+
+/// A scratch folder under /tmp for the tests that need symlinks: `std.testing.tmpDir` lives in
+/// the repository's `.zig-cache`, and the repository's drive here is exFAT, which has none (KI-2).
+const LinuxTmp = struct {
+    dir: std.fs.Dir,
+    path: []u8,
+    fn make(gpa: std.mem.Allocator) !LinuxTmp {
+        var r: [8]u8 = undefined;
+        std.crypto.random.bytes(&r);
+        const path = try std.fmt.allocPrint(gpa, "/tmp/zilc-test-{s}", .{std.fmt.bytesToHex(r, .lower)});
+        errdefer gpa.free(path);
+        try std.fs.makeDirAbsolute(path);
+        return .{ .dir = try std.fs.openDirAbsolute(path, .{}), .path = path };
+    }
+    fn cleanup(self: *LinuxTmp, gpa: std.mem.Allocator) void {
+        self.dir.close();
+        std.fs.deleteTreeAbsolute(self.path) catch {};
+        gpa.free(self.path);
+    }
+};
+
+/// A build in `tmp` whose tools point nowhere: reaching any tool is a different error.
+fn tryBuild(gpa: std.mem.Allocator, dir: []const u8, inputs: []const []const u8, output: []const u8, emit: @FieldType(Options, "emit")) !void {
+    var full: std.ArrayListUnmanaged([]const u8) = .{};
+    defer {
+        for (full.items) |p| gpa.free(p);
+        full.deinit(gpa);
+    }
+    for (inputs) |i| try full.append(gpa, try std.fmt.allocPrint(gpa, "{s}/{s}", .{ dir, i }));
+    const out = try std.fmt.allocPrint(gpa, "{s}/{s}", .{ dir, output });
+    defer gpa.free(out);
+    return build(gpa, .{ .inputs = full.items, .output = out, .emit = emit, .zig = "/nonexistent/zig", .filc = "/nonexistent/clang" });
+}
+
+test "-c refuses several .zig inputs and C inputs instead of dropping objects (review 1, H2)" {
+    var tmp = std.testing.tmpDir(.{});
+    defer tmp.cleanup();
+    const gpa = std.testing.allocator;
+    const dir = try tmp.dir.realpathAlloc(gpa, ".");
+    defer gpa.free(dir);
+    for ([_][]const u8{ "a.zig", "b.zig", "m.c" }) |f| try tmp.dir.writeFile(.{ .sub_path = f, .data = "x\n" });
+    try std.testing.expectError(Error.BadOptions, tryBuild(gpa, dir, &.{ "a.zig", "b.zig" }, "x.o", .obj));
+    try std.testing.expectError(Error.BadOptions, tryBuild(gpa, dir, &.{"m.c"}, "c.o", .obj));
+}
+
+test "an output that is an input is refused and the input is kept (review 1, H3)" {
+    const gpa = std.testing.allocator;
+    var tmp = try LinuxTmp.make(gpa);
+    defer tmp.cleanup(gpa);
+    const dir = tmp.path;
+    try tmp.dir.writeFile(.{ .sub_path = "keep.c", .data = "int main(void){return 0;}\n" });
+    try std.testing.expectError(Error.BadOptions, tryBuild(gpa, dir, &.{"keep.c"}, "keep.c", .exe));
+    // The same file under another name (a symlink) is the same file.
+    try tmp.dir.symLink("keep.c", "alias", .{});
+    try std.testing.expectError(Error.BadOptions, tryBuild(gpa, dir, &.{"keep.c"}, "alias", .exe));
+    var buf: [64]u8 = undefined;
+    try std.testing.expectEqualStrings("int main(void){return 0;}\n", try tmp.dir.readFile("keep.c", &buf));
+}
+
+test "a temp folder already at <output>.zilc-tmp is refused, never reused or deleted (review 1, H4, H5, S1)" {
+    const gpa = std.testing.allocator;
+    var tmp = try LinuxTmp.make(gpa);
+    defer tmp.cleanup(gpa);
+    const dir = tmp.path;
+    try tmp.dir.writeFile(.{ .sub_path = "m.c", .data = "int main(void){return 0;}\n" });
+    // A real folder with the user's data in it (H5).
+    try tmp.dir.makePath("keepme.zilc-tmp");
+    try tmp.dir.writeFile(.{ .sub_path = "keepme.zilc-tmp/data.txt", .data = "mine" });
+    try std.testing.expectError(Error.TempDirExists, tryBuild(gpa, dir, &.{"m.c"}, "keepme", .exe));
+    var buf: [8]u8 = undefined;
+    try std.testing.expectEqualStrings("mine", try tmp.dir.readFile("keepme.zilc-tmp/data.txt", &buf));
+    // A planted symlink to another folder (S1): refused, and nothing is written through it.
+    try tmp.dir.makePath("victim");
+    try tmp.dir.symLink("victim", "prog.zilc-tmp", .{});
+    try std.testing.expectError(Error.TempDirExists, tryBuild(gpa, dir, &.{"m.c"}, "prog", .exe));
+    var victim = try tmp.dir.openDir("victim", .{ .iterate = true });
+    defer victim.close();
+    var it = victim.iterate();
+    try std.testing.expect((try it.next()) == null);
+    // A fresh build makes its folder private to the user, and removes it when it fails.
+    try std.testing.expectError(Error.ToolFailed, tryBuild(gpa, dir, &.{"m.c"}, "fresh", .exe));
+    try std.testing.expectError(error.FileNotFound, tmp.dir.access("fresh.zilc-tmp", .{}));
+    // An output in a folder that does not exist yet: the folder is made, as before (re-review RB2);
+    // the build gets as far as the (missing) tool.
+    try std.testing.expectError(Error.ToolFailed, tryBuild(gpa, dir, &.{"m.c"}, "newdir/sub/prog", .exe));
+    try tmp.dir.access("newdir/sub", .{});
+    try std.testing.expectError(error.FileNotFound, tmp.dir.access("newdir/sub/prog.zilc-tmp", .{}));
 }
 
 test "the only runtime is filc; zig is not a value" {
