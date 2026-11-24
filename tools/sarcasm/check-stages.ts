@@ -627,6 +627,12 @@ const XF_CHECKPOINTS: Checkpoint[] = [{
   anchor: "\tend",
   next: "\t-- B2 shared-tail clone coordinate bands (tailcall.luau st.b2clone = the",
   dump: "{ body = body }",
+}, {
+  n: 7,
+  afterLine: 4543,
+  anchor: "	end",
+  next: "	-- Feature (post-`and` frame extent): a prologue `and $-N, %rsp` is DROPPED",
+  dump: "{ body = body, b2base = b2base }",
 }];
 const XF_STOP = Math.max(...XF_CHECKPOINTS.map((c) => c.n));
 const XF_CLEARED = ["x86_prologue", "x86_depth", "x86_saves", "x86_unpairedPop", "x86_spillPop", "x86_flagsPop", "x86_teardownStart", "x86_teardown", "x86_fp", "x86_spRecover", "x86_saveStore", "x86_carrierLoad", "x86_leaSave", "x86_carrierCallArg", "x86_spSave", "x86_dropRestore", "x86_midSp", "x86_regionCarrier", "x86_aliasOff", "x86_aliasSaveIdx", "x86_midAnd", "x86_preAnd", "x86_postAnd", "x86_smap", "x86_b2band", "x86StackBufAccess", "x86StackBufIdx", "x86StackBufRep", "x86StackBufLea", "x86StackBufAddr", "x86StackBufLeaValue", "x86StackBufLeaValueComputed", "x86_alignKeyed", "x86_alignAndBase"];
@@ -878,6 +884,19 @@ seqStages.push({
     "    if st.kind == 'insn' and st.x86_dropRestore then table.insert(lines, 'K6 ' .. i .. ' dropRestore') end",
     "  end",
     "  table.insert(lines, 'K6 end')",
+    "  return table.concat(lines, '\\n')",
+    "end",
+    // checkpoint 7: per insn the band mark and the (banded) carrier offset wherever either is set,
+    // then b2base in clone-index order (sorted: its only upstream readers are keyed lookups)
+    "DUMP[7] = function(K)",
+    "  local lines = {}",
+    "  for i, st in K.body do",
+    "    if st.kind == 'insn' and (st.x86_b2band ~= nil or st.x86_aliasOff ~= nil) then",
+    "      table.insert(lines, 'K7 ' .. i .. ' band=' .. nv(st.x86_b2band) .. ' ao=' .. nv(st.x86_aliasOff))",
+    "    end",
+    "  end",
+    "  for _, k in numKeys(K.b2base) do table.insert(lines, 'K7 base ' .. tostring(k) .. '=' .. tostring(K.b2base[k])) end",
+    "  table.insert(lines, 'K7 end')",
     "  return table.concat(lines, '\\n')",
     "end",
     "local out = {}",

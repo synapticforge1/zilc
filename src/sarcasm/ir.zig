@@ -93,6 +93,8 @@ pub const FrameMarks = struct {
     aliasOff: ?f64 = null,
     aliasSaveIdx: ?f64 = null,
     dropRestore: bool = false,
+    /// x86_b2band (upstream 4523): the clone's band base; nil off a B2 clone
+    b2band: ?f64 = null,
     leaSave: bool = false,
     spillPop: bool = false,
     unpairedPop: bool = false,

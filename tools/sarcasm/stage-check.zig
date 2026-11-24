@@ -882,6 +882,22 @@ fn dumpK6(gpa: Alloc, an: *s.x86_64_frame.Analysis) ![]const u8 {
     return o.items;
 }
 
+/// Checkpoint 7: per insn the band mark and the (banded) carrier offset wherever either is set,
+/// then b2base in clone-index order.
+fn dumpK7(gpa: Alloc, an: *s.x86_64_frame.Analysis) ![]const u8 {
+    var o: std.ArrayList(u8) = .empty;
+    for (an.body, 1..) |st, i| {
+        if (st.kind == .insn and (st.x86.b2band != null or st.x86.aliasOff != null))
+            try o.print(gpa, "K7 {d} band={s} ao={s}\n", .{ i, try tsN(gpa, st.x86.b2band), try tsN(gpa, st.x86.aliasOff) });
+    }
+    var ks: std.ArrayList(f64) = .empty;
+    for (an.b2base.keys()) |k| try ks.append(gpa, @bitCast(k));
+    std.mem.sort(f64, ks.items, {}, std.sort.asc(f64));
+    for (ks.items) |k| try o.print(gpa, "K7 base {s}={s}\n", .{ try tsN(gpa, k), try tsN(gpa, an.b2base.get(@bitCast(k)).?) });
+    try o.appendSlice(gpa, "K7 end\n");
+    return o.items;
+}
+
 fn dumpK2(gpa: Alloc, an: *s.x86_64_frame.Analysis) ![]const u8 {
     var o: std.ArrayList(u8) = .empty;
     for (an.body, 1..) |st, i| {
@@ -998,6 +1014,13 @@ fn xframeRecord(gpa: Alloc, out: *std.ArrayList(u8), rec: []const u8) !void {
     }
     if (XF.analyzeFrameTo(gpa, in.body, in.sd, regs, .epilogueRestore)) |an| {
         try out.appendSlice(gpa, try dumpK6(gpa, an));
+    } else |e| {
+        if (e != error.Sarcasm) return e;
+        try out.print(gpa, "K err {s}\n", .{s.err.message});
+        return;
+    }
+    if (XF.analyzeFrameTo(gpa, in.body, in.sd, regs, .b2Bands)) |an| {
+        try out.appendSlice(gpa, try dumpK7(gpa, an));
     } else |e| {
         if (e != error.Sarcasm) return e;
         try out.print(gpa, "K err {s}\n", .{s.err.message});

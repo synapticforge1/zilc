@@ -41,7 +41,7 @@ would harden code that H37 deletes.
   review; L1, the sarcasm licence, closed by the owner the same day).
 - **Next:** (pushed 2026-11-24) the triage of round 1's 24
   carried findings under H37's classes (`review-issues.md`).
-- **The sarcasm port** went on first (owner's work order, 2026-11-24): checkpoints 3–6 done.
+- **The sarcasm port** went on first (owner's work order, 2026-11-24): checkpoints 3–7 done.
 
 ## 🔎 Review, round 1 — 2026-11-15 (owner: "review") — STOPPED 2026-11-19 (above)
 
@@ -79,7 +79,7 @@ H37 re-runs each before it is fixed.
   for comparing one reference release with the next (stage C's first column). Abandoned with P3:
   `-Druntime=both`, the byte-identity check.
 - **Partly open defects:** KI-7 (`getcontext`) — `known-issues.md`.
-- **The sarcasm port** (owner, 2026-11-06): in progress; next is x86_64_frame checkpoint 7 — `sarcasm-port.md`.
+- **The sarcasm port** (owner, 2026-11-06): in progress; next is x86_64_frame checkpoint 8 — `sarcasm-port.md`.
 - **5b. Fil-C's prebuilt becomes optional** (from clone-then-build, 2026-10-30): still needed for
   the Fil-C-compiled runtime pieces (Z1 item 3), as the tree the patched clang is installed into,
   and as the oracle. The record: `archive/open-work-to-2026-11-19.md` § Open work.
