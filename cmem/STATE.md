@@ -5,7 +5,7 @@ Updated: 2026-11-24, at the commit of x86_64_frame checkpoint 6
 ## Version
 
 - Released: `0.15.2-0.687.1` on 2026-10-27 (no release since; `release.md` § "Release History")
-- Working branch: `work-2026-11-24` (the sarcasm port; from `review/0.15.2-0.687.2`; pushed 2026-11-24 with `main` = `fb75f38`)
+- Working branch: `work-2026-11-24` (the sarcasm port; from `review/0.15.2-0.687.2`; pushed 2026-11-24 and merged into `main`)
 - Toolchain: Zig 0.15.2, Fil-C 0.687 with zilc's patched clang, built by Zig
 
 ## Now

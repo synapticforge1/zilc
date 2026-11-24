@@ -12,7 +12,7 @@ record. Closed items and the dated session logs moved on 2026-11-23 to
 | --------- | ------------------------------------------------------------------------------------------------ |
 | version   | **`0.15.2-0.687.1`** — published 2026-10-27, tag `v0.15.2-0.687.1` on `be51808` (`releasing.md`) |
 | toolchain | Zig **0.15.2**, Fil-C **0.687** with zilc's patched clang, compiled by Zig since 2026-10-30      |
-| pushed    | 2026-11-24: `main` = `origin/main` = `fb75f38`, the merge of `work-2026-11-24` (port cps 3-6)    |
+| pushed    | 2026-11-24: `main` = `origin/main`, merged from `work-2026-11-24` (port checkpoints 3-6)         |
 | gates     | full suite 2026-11-23 on linux-x64 (review 1), gate 10/10; counts in `testing.md`                |
 | remote    | `origin` = `github.com/synapticforge1/zilc`; purged history pushed 2026-10-27                    |
 | branches  | `main`, `v0.15.2`, `work-2026-11-15`, `review/0.15.2-0.687.2`; `work-2026-11-24` (pushed 11-24)  |
