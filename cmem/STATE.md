@@ -1,16 +1,16 @@
 # STATE: zilc
 
-Updated: 2026-11-24, at the push of review 1
+Updated: 2026-11-24, at the push of R3L1 (NOTICE)
 
 ## Version
 
 - Released: `0.15.2-0.687.1` on 2026-10-27 (no release since; `release.md` § "Release History")
-- Working branch: `review/0.15.2-0.687.2` (review 1 at `4f377a5`; merged into `main` and pushed 2026-11-24)
+- Working branch: `review/0.15.2-0.687.2` (review 1 complete at `5ed1df1`; merged into `main` and pushed 2026-11-24)
 - Toolchain: Zig 0.15.2, Fil-C 0.687 with zilc's patched clang, built by Zig
 
 ## Now
 
-- Final review standard (letter H37): review 1 complete at `4f377a5` (`review-process.md` § Last review)
+- Final review standard (letter H37): review 1 complete at `5ed1df1` (`review-process.md` § Last review)
 - Memory guide (letter H38): all seven steps done 2026-11-23; `bun scripts/check-cmem.ts` holds
 - Sarcasm port to Zig: paused at x86_64_frame checkpoint 3 (`sarcasm-port.md`)
 - Pure-Zig track: runtime pieces built and verified; the Fil-C-compiled pieces are next (`roadmap.md` Z1)
@@ -18,7 +18,7 @@ Updated: 2026-11-24, at the push of review 1
 ## Review
 
 - Run for: review 1 under H37, 2026-11-23/24; complete (re-review 6 empty, full suite passed)
-- Position: done; the review gate accepts a release whose code is `4f377a5` plus memory changes
+- Position: done; the review gate accepts a release whose code is `5ed1df1` plus memory changes
 - Open issues: the 24 carried from round 1 and 1 found 2026-11-19, not yet triaged
   (`review-issues.md`); review 1's below-floor notes are recorded there
 - Platforms passed: linux-x64 on 2026-11-23 (`platforms.md`: the other five are none)
@@ -31,7 +31,6 @@ Updated: 2026-11-24, at the push of review 1
 
 ## Waiting on owner
 
-- R3L1: whether NOTICE says built programs carry MIT code (Zig's std, compiler-rt)
 - Repository settings: branch and tag protection on `main` (not checkable without the API)
 - Owner call 1's follow-up: GitHub Support's purge of the old commits (`open-work.md` § Open work)
 

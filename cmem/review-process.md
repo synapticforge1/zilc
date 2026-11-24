@@ -46,12 +46,14 @@ None of them commits, pushes or releases.
 
 ## Last review
 
-- Review complete: 4f377a5
+- Review complete: 5ed1df1
 
 Review 1 under this standard, 2026-11-23/24 (owner: "review"), from `a38387a` on branch
 `review/0.15.2-0.687.2`: 28 findings at the floor fixed, six re-reviews (the sixth empty), then
 the full suite once on linux-x64, all passing (`testing.md`; record in `review-issues.md`).
-Licence L1 closed by the owner on 2026-11-24 (`design-decisions.md`). Round 1 (H35), stopped on
+Licence L1 closed by the owner on 2026-11-24 (`design-decisions.md`). Then R3L1 fixed at `5ed1df1`
+(NOTICE: what a built program carries; licensing re-reviews 7 and 8 empty; only NOTICE changed
+after `4f377a5`, so the full suite still holds). Round 1 (H35), stopped on
 2026-11-19: its 24 carried findings are still to be triaged (`review-issues.md`).
 
 ## Slots

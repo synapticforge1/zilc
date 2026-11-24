@@ -37,8 +37,8 @@ would harden code that H37 deletes.
 - **What carries over:** the lessons (KI-31, KI-38: a guard never forbids valid Markdown; GitHub's
   renderer decides what is shown) and Biome for `.md`, which stays (`working-rules.md` § Git).
 - **Done since:** H38 steps 4–7 (2026-11-23); review 1 under H37's five classes, complete at
-  `4f377a5` (2026-11-24; `review-process.md` § Last review; L1, the sarcasm licence, closed by
-  the owner the same day).
+  `4f377a5`, then `5ed1df1` with R3L1's NOTICE paragraph (2026-11-24; `review-process.md` § Last
+  review; L1, the sarcasm licence, closed by the owner the same day).
 - **Next:** (pushed 2026-11-24) the triage of round 1's 24
   carried findings under H37's classes (`review-issues.md`).
 - **Not touched:** the sarcasm port waits at x86_64_frame checkpoint 3 (`sarcasm-port.md`).
