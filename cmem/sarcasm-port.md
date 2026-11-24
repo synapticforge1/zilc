@@ -252,15 +252,23 @@ prints its K. Progress:
   save-slot `mov` load of a save redefined after its push, proven dead by checkLostReload, marked
   x86_dropRestore) in `x86_64_frame_restore.zig` (`Stop.epilogueRestore`; checkLostReload now
   pub); hook after 4422 (next 4424). K6 = the indices marked dropRestore; a rejection is `K err`.
-  0 differ (xframe 187,831 lines with 18 of zilc's inputs). Measured: 4,622 rsp / rbp loads, 185
-  not 8 wide, 4,175 with saves, 3 at dyn depth (skipped), 165 rbp-based (156 with rbpNorm != 0),
-  17 corpus marks (0 already marked by 3406), no corpus rejection. Inputs: epilogue-restore-rbp.s,
-  reject-epilogue-restore-{rax,reload}.s. Planted faults (differ): `redefined` test dropped 41,760;
-  offset `D0 - d` → `+ d` 41,552; width `!= 8` inverted 41,552; mark dropped 41,552; retIsGpr
-  inverted 35,325; spill skip dropped 20,180; rbpNorm dropped 0 on the corpus, 830 with the rbp
-  input; checkLostReload skipped 316; dyn-depth guard dropped: stage-check crashed. Not caught
-  (kept as ported): the rbp-slot skip (225 hits skipped, none redefined); 0 hits: depth nil.
-- next: **checkpoint 7** — upstream 4424 on: the B2 clone coordinate bands (bandBase layout).
+  0 differ; 17 corpus marks, no corpus rejection; inputs epilogue-restore-rbp.s and
+  reject-epilogue-restore-{rax,reload}.s; 9 planted faults caught (rbpNorm only with the rbp
+  input; the rbp-slot skip stays uncaught, kept). Measured hits, faults: `archive/sarcasm-port-frame-cp6.md`.
+- ✅ **checkpoint 7** (11-24) — upstream 4424–4543 (the B2 clone coordinate bands: per-clone
+  extents, cumulative bases 128 apart rounded up to 64, the x86_b2band marks, the clone's own
+  carrier accesses banded) in `x86_64_frame_bands.zig` (`Stop.b2Bands`; `Analysis.b2base`,
+  `XF.b2band`, mark `b2band`); hook after 4543 (next 4545). K7 = per insn the band mark and
+  aliasOff where set, then b2base in index order. The span never rejects. 0 differ (xframe
+  195,063 lines, 19 of zilc's inputs). The corpus has one clone per function only, so the new
+  input b2clone-bands.s adds two clones, lo / hi moves, a region skip, an in-clone carrier. 12
+  planted faults caught (24 to 1,583 differ); not caught, 0 hits (kept as ported): alias
+  banding with dropRestore, the prologue skip, the dyn skip with an rsp operand, regionCarrier
+  (never set). Measured hits, every fault: `archive/sarcasm-port-frame-cp7.md`.
+- next: **checkpoint 8** — upstream 4545–4591: the post-`and` frame extent (frameSize grows to
+  the widest post-and rsp access; hook after 4591, next 4593).
+- Lesson (11-24): an interrupted fault run left cp6's rbpNorm fault in the tree; before a
+  report, every fault run ends and `git diff` shows only the checkpoint's own work.
 
 ## What a byte-identical port must reproduce (the foundations)
 
