@@ -7,6 +7,12 @@ the questions for the owner in [open-questions.md](open-questions.md); the Zig 0
 
 ## Decisions made
 
+- **2026-11-25** — 🔒 **THE REVIEW FINDINGS COME AFTER THE FRAME MODULE, NOT AFTER S2** (owner: "I
+  agree", to the proposal). The work order's item 1 now ends with `x86_64_frame.luau` (analyzeFrame
+  and rewrite), not with all of S2; then round 1's carried findings and review 2's findings, then
+  the port resumes (transform, codegen, the rest of S2). Why: S2 is ~16,000 lines away, and
+  several held findings are user-facing bugs that do not touch the port (R2-B3: C++ never links;
+  R2-H3: a failed link deletes the old `-o`). Replaces the order of 2026-11-24 (`STATE.md` § Next).
 - **2026-11-24** — 🔒 **THE BASICS CORPUS TAKES THE OWNER'S CURRENT C, C++ AND ZIG LESSONS; ZILC LINKS
   C++** (owner: "Please add … BasicsOfCodingC / Cpp / Zig", then three answers). (1) `tests/basics/c`
   and `zig-0.15.2` are replaced by the repositories' current heads (12 C and 13 Zig lessons renamed
