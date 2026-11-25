@@ -898,6 +898,11 @@ fn dumpK7(gpa: Alloc, an: *s.x86_64_frame.Analysis) ![]const u8 {
     return o.items;
 }
 
+/// Checkpoint 8: the post-`and` extent sets no mark; its only result is frameSize.
+fn dumpK8(gpa: Alloc, an: *s.x86_64_frame.Analysis) ![]const u8 {
+    return try std.fmt.allocPrint(gpa, "K8 frameSize={s}\nK8 end\n", .{try tsN(gpa, an.frameSize)});
+}
+
 fn dumpK2(gpa: Alloc, an: *s.x86_64_frame.Analysis) ![]const u8 {
     var o: std.ArrayList(u8) = .empty;
     for (an.body, 1..) |st, i| {
@@ -1021,6 +1026,13 @@ fn xframeRecord(gpa: Alloc, out: *std.ArrayList(u8), rec: []const u8) !void {
     }
     if (XF.analyzeFrameTo(gpa, in.body, in.sd, regs, .b2Bands)) |an| {
         try out.appendSlice(gpa, try dumpK7(gpa, an));
+    } else |e| {
+        if (e != error.Sarcasm) return e;
+        try out.print(gpa, "K err {s}\n", .{s.err.message});
+        return;
+    }
+    if (XF.analyzeFrameTo(gpa, in.body, in.sd, regs, .postAnd)) |an| {
+        try out.appendSlice(gpa, try dumpK8(gpa, an));
     } else |e| {
         if (e != error.Sarcasm) return e;
         try out.print(gpa, "K err {s}\n", .{s.err.message});

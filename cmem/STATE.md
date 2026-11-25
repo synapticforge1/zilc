@@ -1,6 +1,6 @@
 # STATE: zilc
 
-Updated: 2026-11-24, at the commit of x86_64_frame checkpoint 7
+Updated: 2026-11-25, at the commit of x86_64_frame checkpoint 8
 
 ## Version
 
@@ -12,8 +12,8 @@ Updated: 2026-11-24, at the commit of x86_64_frame checkpoint 7
 
 - Final review standard (letter H37): review 1 complete at `5ed1df1` (`review-process.md` § Last review)
 - Memory guide (letter H38): all seven steps done 2026-11-23; `bun scripts/check-cmem.ts` holds
-- Sarcasm port to Zig: x86_64_frame checkpoints 3 to 7 done 2026-11-24 (every stage 0 differ;
-  `sarcasm-port.md`); next: checkpoint 8, upstream 4545–4591 (the post-`and` frame extent)
+- Sarcasm port to Zig: x86_64_frame checkpoints 3 to 8 done 2026-11-24..25 (every stage 0 differ;
+  `sarcasm-port.md`); next: checkpoint 9, upstream 4594–4694 (the stack-buffer scan set-up)
 - Pure-Zig track: runtime pieces built and verified; the Fil-C-compiled pieces are next (`roadmap.md` Z1)
 
 ## Review
@@ -27,7 +27,7 @@ Updated: 2026-11-24, at the commit of x86_64_frame checkpoint 7
 
 ## Next
 
-1. Sarcasm port: from x86_64_frame checkpoint 8 through S2 (pinned 0.687 sources only)
+1. Sarcasm port: from x86_64_frame checkpoint 9 through S2 (pinned 0.687 sources only)
 2. Round 1's 24 carried findings: triage and fix (D3, D4, D10 in `release.ts` among them)
 3. Review 2's findings: fix, re-review, the full suite; then a review of the port's new code
 4. The basics corpus: current C / C++ / Zig lessons, C++ linking and `-std=` (R2-B3; `design-decisions.md` 2026-11-24)

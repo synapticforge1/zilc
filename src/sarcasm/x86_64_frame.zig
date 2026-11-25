@@ -45,7 +45,8 @@
 //! x86_64_frame_and.zig: checkpoint 4), 4070–4359 (anyMidAnd, the clone balance check,
 //! x86_64_frame_clone.zig: checkpoint 5) and 4361–4422 (the epilogue movq-restore loads,
 //! x86_64_frame_restore.zig: checkpoint 6) and 4424–4543 (the B2 clone coordinate bands,
-//! x86_64_frame_bands.zig: checkpoint 7).
+//! x86_64_frame_bands.zig: checkpoint 7) and 4545–4591 (the post-`and` frame extent,
+//! x86_64_frame_postand.zig: checkpoint 8).
 
 const std = @import("std");
 const err = @import("err.zig");
@@ -63,6 +64,7 @@ const andwalk = @import("x86_64_frame_and.zig");
 const clone = @import("x86_64_frame_clone.zig");
 const restore = @import("x86_64_frame_restore.zig");
 const bands = @import("x86_64_frame_bands.zig");
+const postand = @import("x86_64_frame_postand.zig");
 pub const b2band = bands.b2band;
 pub const parkPostOf = clone.parkPostOf;
 
@@ -238,7 +240,7 @@ pub const Smap = lt.Table(*const SmapEntry);
 /// `and $-N, %rsp` on every path, "none", or "dyn".
 pub const Gand = union(enum) { num: f64, none, dyn };
 
-pub const Stop = enum { none, prologue, fixpoint, annotate, andWalk, cloneBalance, epilogueRestore, b2Bands };
+pub const Stop = enum { none, prologue, fixpoint, annotate, andWalk, cloneBalance, epilogueRestore, b2Bands, postAnd };
 
 /// analyzeFrame's locals. Field names are upstream's.
 pub const Analysis = struct {
@@ -540,5 +542,7 @@ pub fn analyzeFrameTo(alloc: Allocator, body: []const *Stmt, sigDesc: ?*const si
     if (stop == .epilogueRestore) return a;
     try bands.b2Bands(a);
     if (stop == .b2Bands) return a;
-    @panic("x86_64_frame: analyzeFrame is ported only to the clone-bands checkpoint");
+    try postand.postAndExtent(a);
+    if (stop == .postAnd) return a;
+    @panic("x86_64_frame: analyzeFrame is ported only to the post-and extent checkpoint");
 }

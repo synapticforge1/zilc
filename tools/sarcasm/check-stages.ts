@@ -633,6 +633,12 @@ const XF_CHECKPOINTS: Checkpoint[] = [{
   anchor: "	end",
   next: "	-- Feature (post-`and` frame extent): a prologue `and $-N, %rsp` is DROPPED",
   dump: "{ body = body, b2base = b2base }",
+}, {
+  n: 8,
+  afterLine: 4591,
+  anchor: "	end",
+  next: "	-- -----------------------------------------------------------------------",
+  dump: "{ frameSize = frameSize }",
 }];
 const XF_STOP = Math.max(...XF_CHECKPOINTS.map((c) => c.n));
 const XF_CLEARED = ["x86_prologue", "x86_depth", "x86_saves", "x86_unpairedPop", "x86_spillPop", "x86_flagsPop", "x86_teardownStart", "x86_teardown", "x86_fp", "x86_spRecover", "x86_saveStore", "x86_carrierLoad", "x86_leaSave", "x86_carrierCallArg", "x86_spSave", "x86_dropRestore", "x86_midSp", "x86_regionCarrier", "x86_aliasOff", "x86_aliasSaveIdx", "x86_midAnd", "x86_preAnd", "x86_postAnd", "x86_smap", "x86_b2band", "x86StackBufAccess", "x86StackBufIdx", "x86StackBufRep", "x86StackBufLea", "x86StackBufAddr", "x86StackBufLeaValue", "x86StackBufLeaValueComputed", "x86_alignKeyed", "x86_alignAndBase"];
@@ -898,6 +904,10 @@ seqStages.push({
     "  for _, k in numKeys(K.b2base) do table.insert(lines, 'K7 base ' .. tostring(k) .. '=' .. tostring(K.b2base[k])) end",
     "  table.insert(lines, 'K7 end')",
     "  return table.concat(lines, '\\n')",
+    "end",
+    // checkpoint 8: the post-`and` extent sets no mark; its only result is frameSize
+    "DUMP[8] = function(K)",
+    "  return 'K8 frameSize=' .. tostring(K.frameSize) .. '\\nK8 end'",
     "end",
     "local out = {}",
     "local origA = xf.analyzeFrame",

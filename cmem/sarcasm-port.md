@@ -230,31 +230,12 @@ prints its K. Progress:
   are unreachable (corpus: x86_depth only number / "dyn"), so Depth is number | dyn.
   Harness bugs fixed: the patched module is written back latin1 (byte-identical), both sides
   compared as bytes. Full record: `archive/sarcasm-port-frame-cp1-2.md`.
-- ✅ **checkpoint 3** (2026-11-24) — upstream 3213–3749 (validateTeardown, checkLostReload,
-  retIsGpr, the annotation loop) in `x86_64_frame_annotate.zig` (`Stop.annotate`); K3 = per insn
-  the marks, depth / saves / fp / smap, then frameAlignReq / frameAndDepth / frameAndSeen. 0 differ
-  over 163,254 lines; 74,017 statements annotated; 20 rejections (8 fixpoint, 12 here); 8 planted
-  faults caught; four `frame-branches/` inputs (reject-restore-rax / -restore-redef /
-  -teardown-redef, rbp-restore-lea). Dead: the `localCall` guard (3230), table depths.
-- ✅ **checkpoint 4** (11-24) — upstream 3751–4069 (andDomOf, reachedFromAnd, preAnd / postAnd,
-  the governing-`and` dataflow, the crossing rejection, the prologue-`and` fill) in
-  `x86_64_frame_and.zig` (`Stop.andWalk`); K4 per index 1..#body+1. 0 differ over 170,769 lines;
-  67 functions with a mid `and`; 6 rejections; 7 planted faults caught; new inputs and-join.s,
-  exempt-restore-and.s, reject-restore-loop-park.s. A walk to `#body+1` panics (upstream: a Lua
-  indexing error). Full record of 3 and 4 (faults, dead branches): `archive/sarcasm-port-frame-cp3-4.md`.
-- ✅ **checkpoint 5** (11-24) — upstream 4070–4359 (anyMidAnd, parkPostOf, the clone subframe
-  balance check) in `x86_64_frame_clone.zig` (`Stop.cloneBalance`); K5 = anyMidAnd, parkPostOf
-  per index; a rejection is `K err`. 0 differ; 10 rejections; 7 planted faults caught; inputs
-  b2clone-carrier-zero.s, reject-b2clone-{push,norecover,redef}.s. Faults, measured hits and dead
-  branches (cloneRet without b2clone, carrierToZeroOk's entry depth):
-  `archive/sarcasm-port-frame-cp5.md`.
-- ✅ **checkpoint 6** (11-24) — upstream 4361–4422 (the epilogue movq-restore loads: an rsp / rbp
-  save-slot `mov` load of a save redefined after its push, proven dead by checkLostReload, marked
-  x86_dropRestore) in `x86_64_frame_restore.zig` (`Stop.epilogueRestore`; checkLostReload now
-  pub); hook after 4422 (next 4424). K6 = the indices marked dropRestore; a rejection is `K err`.
-  0 differ; 17 corpus marks, no corpus rejection; inputs epilogue-restore-rbp.s and
-  reject-epilogue-restore-{rax,reload}.s; 9 planted faults caught (rbpNorm only with the rbp
-  input; the rbp-slot skip stays uncaught, kept). Measured hits, faults: `archive/sarcasm-port-frame-cp6.md`.
+- ✅ **checkpoints 3, 4** (11-24) — upstream 3213–3749 (`x86_64_frame_annotate.zig`) and
+  3751–4069 (`x86_64_frame_and.zig`), 0 differ each; entries word for word in
+  `archive/sarcasm-port-frame-cp3-4-entries.md`, full record in `-cp3-4.md`.
+- ✅ **checkpoints 5, 6** (11-24) — upstream 4070–4359 (`x86_64_frame_clone.zig`) and 4361–4422
+  (`x86_64_frame_restore.zig`), 0 differ each; entries word for word in
+  `archive/sarcasm-port-frame-cp5-6-entries.md`, full records in `-cp5.md` / `-cp6.md`.
 - ✅ **checkpoint 7** (11-24) — upstream 4424–4543 (the B2 clone coordinate bands: per-clone
   extents, cumulative bases 128 apart rounded up to 64, the x86_b2band marks, the clone's own
   carrier accesses banded) in `x86_64_frame_bands.zig` (`Stop.b2Bands`; `Analysis.b2base`,
@@ -265,8 +246,22 @@ prints its K. Progress:
   planted faults caught (24 to 1,583 differ); not caught, 0 hits (kept as ported): alias
   banding with dropRestore, the prologue skip, the dyn skip with an rsp operand, regionCarrier
   (never set). Measured hits, every fault: `archive/sarcasm-port-frame-cp7.md`.
-- next: **checkpoint 8** — upstream 4545–4591: the post-`and` frame extent (frameSize grows to
-  the widest post-and rsp access; hook after 4591, next 4593).
+- ✅ **checkpoint 8** (11-25) — upstream 4545–4591 (the post-`and` frame extent: frameSize grows
+  to the widest post-`and` plain rsp access, gated on frameAndSeen) in
+  `x86_64_frame_postand.zig` (`Stop.postAnd`); hook after 4591 (next 4593). K8 = frameSize (the
+  span sets no mark and never rejects). 0 differ (xframe 204,275 lines, 19 of zilc's inputs).
+  Measured (corpus, 151 gated runs): 12 growths (6 changed K8 values), 469 widths, 192 fp / 277
+  gpr paths, 57 lea, 7 dyn skips, 267 below-andDepth skips. Inputs postand-depth0.s (the depth-0
+  note), -prologue-nop.s (`nopl 256(%rsp)` in the prologue), -preand.s, -b2clone.s, -localclone.s
+  (each a store 256 above a 64-byte frame). 10 of 11 faults caught: `>` for `>=` 6 differ, no lea
+  skip 6, fp path as gpr 3, offset sign 115, dyn depth unskipped (panic), and with the inputs the
+  frameAndDepth gate, preAnd / prologue / b2clone / localClone skips 3 differ each. Not caught:
+  last-vs-first mem operand (x86 has one explicit memory operand; string ops carry none).
+  Unreachable: 4579's pcall failure and a nil width (an access the fp knowledge rejects dies in
+  the fixpoint first, 2570; regonly / reject mnemonics with memory die in parse / classify).
+- next: **checkpoint 9** — upstream 4594–4694: the stack-buffer scan's set-up (sbLayout reset, the
+  `regions ~= nil and not sbResolving` gate, sbOutgoing / maxSaves / anyDynSaves / pushTop,
+  cloneEntryDepth); hook after 4694 (the `do` block's `end`; next 4696 checkRangeFits).
 - Lesson (11-24): an interrupted fault run left cp6's rbpNorm fault in the tree; before a
   report, every fault run ends and `git diff` shows only the checkpoint's own work.
 
