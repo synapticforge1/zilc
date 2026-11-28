@@ -25,6 +25,7 @@
 // PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY
 // OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //! x86_64_frame's B2 shared-tail clone coordinate bands: upstream x86_64_frame.luau lines
 //! 4424–4543. Each tailcall clone (st.b2clone = the clone index) gets a PRIVATE band base, laid
 //! out cumulatively after the prologue frame (multiples of 64, 128 apart), so its rsp-relative

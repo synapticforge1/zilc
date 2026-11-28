@@ -591,7 +591,9 @@ stages.push({
 // 685–719) and the checkpoint state ("K ..."); the port reads each A, runs to the same
 // checkpoint, and prints its K. Each checkpoint names its upstream line and the exact text there,
 // so a moved line fails loudly instead of patching the wrong place.
-interface Checkpoint { n: number; afterLine: number; anchor: string; next?: string; dump: string }
+// cond: the hook fires only when it holds; nextAt: how many source lines the `next` text lies after
+// the anchor line (default 2: a blank line between)
+interface Checkpoint { n: number; afterLine: number; anchor: string; next?: string; nextAt?: number; cond?: string; dump: string }
 const XF_CHECKPOINTS: Checkpoint[] = [{
   n: 1,
   afterLine: 1189,
@@ -633,6 +635,29 @@ const XF_CHECKPOINTS: Checkpoint[] = [{
   anchor: "	end",
   next: "	-- Feature (post-`and` frame extent): a prologue `and $-N, %rsp` is DROPPED",
   dump: "{ body = body, b2base = b2base }",
+}, {
+  n: 8,
+  afterLine: 4591,
+  anchor: "	end",
+  next: "	-- -----------------------------------------------------------------------",
+  dump: "{ frameSize = frameSize }",
+}, {
+  // the stack-buffer scan's gate is closed: no set-up state exists
+  n: 9,
+  afterLine: 4640,
+  anchor: "	-- the driver resolves the long forms directly via resolveStackBufDeclAt.)",
+  next: "	if regions ~= nil and not sbResolving then",
+  nextAt: 1,
+  cond: "not (regions ~= nil and not sbResolving)",
+  dump: "{ gated = false }",
+}, {
+  // after the set-up's `do` block, inside the open gate
+  n: 9,
+  afterLine: 4695,
+  anchor: "		end",
+  next: "		local function checkRangeFits(loN, hiN, homeLo, homeHi, id, dDecl, st)",
+  nextAt: 1,
+  dump: "{ gated = true, sbOutgoing = sbOutgoing, maxSaves = maxSaves, anyDynSaves = anyDynSaves, pushTop = pushTop, cloneEntryDepth = cloneEntryDepth }",
 }];
 const XF_STOP = Math.max(...XF_CHECKPOINTS.map((c) => c.n));
 const XF_CLEARED = ["x86_prologue", "x86_depth", "x86_saves", "x86_unpairedPop", "x86_spillPop", "x86_flagsPop", "x86_teardownStart", "x86_teardown", "x86_fp", "x86_spRecover", "x86_saveStore", "x86_carrierLoad", "x86_leaSave", "x86_carrierCallArg", "x86_spSave", "x86_dropRestore", "x86_midSp", "x86_regionCarrier", "x86_aliasOff", "x86_aliasSaveIdx", "x86_midAnd", "x86_preAnd", "x86_postAnd", "x86_smap", "x86_b2band", "x86StackBufAccess", "x86StackBufIdx", "x86StackBufRep", "x86StackBufLea", "x86StackBufAddr", "x86StackBufLeaValue", "x86StackBufLeaValueComputed", "x86_alignKeyed", "x86_alignAndBase"];
@@ -640,7 +665,8 @@ const XF_CLEARED = ["x86_prologue", "x86_depth", "x86_saves", "x86_unpairedPop",
   const src = readFileSync(`${dir}/sarcasm/x86_64_frame.luau`, "latin1").split("\n");
   for (const c of XF_CHECKPOINTS) {
     if (src[c.afterLine - 1] !== c.anchor) throw new Error(`xframe checkpoint ${c.n}: upstream line ${c.afterLine} is ${JSON.stringify(src[c.afterLine - 1])}, not ${JSON.stringify(c.anchor)}`);
-    if (c.next !== undefined && src[c.afterLine + 1] !== c.next) throw new Error(`xframe checkpoint ${c.n}: upstream line ${c.afterLine + 2} is ${JSON.stringify(src[c.afterLine + 1])}, not ${JSON.stringify(c.next)}`);
+    const nx = c.afterLine + (c.nextAt ?? 2) - 1;
+    if (c.next !== undefined && src[nx] !== c.next) throw new Error(`xframe checkpoint ${c.n}: upstream line ${nx + 1} is ${JSON.stringify(src[nx])}, not ${JSON.stringify(c.next)}`);
   }
   const ret = src.lastIndexOf("return x86_64_frame");
   if (ret < 0) throw new Error("xframe: no `return x86_64_frame` in upstream's module");
@@ -655,7 +681,7 @@ const XF_CLEARED = ["x86_prologue", "x86_depth", "x86_saves", "x86_unpairedPop",
   cp.splice(ret, 0, setter);
   for (const c of [...XF_CHECKPOINTS].sort((x, y) => y.afterLine - x.afterLine)) {
     // the hook records every checkpoint it passes and stops the run at the last one
-    cp.splice(c.afterLine, 0, `\tif x86_64_frame.__cp and x86_64_frame.__cp(${c.n}, ${c.dump}) then return 0 end`);
+    cp.splice(c.afterLine, 0, `\tif ${c.cond ? `(${c.cond}) and ` : ""}x86_64_frame.__cp and x86_64_frame.__cp(${c.n}, ${c.dump}) then return 0 end`);
   }
   await writeFile(`${dir}/sarcasm/x86_64_frame_cp.luau`, cp.join("\n"), "latin1");
 }
@@ -897,6 +923,22 @@ seqStages.push({
     "  end",
     "  for _, k in numKeys(K.b2base) do table.insert(lines, 'K7 base ' .. tostring(k) .. '=' .. tostring(K.b2base[k])) end",
     "  table.insert(lines, 'K7 end')",
+    "  return table.concat(lines, '\\n')",
+    "end",
+    // checkpoint 8: the post-`and` extent sets no mark; its only result is frameSize
+    "DUMP[8] = function(K)",
+    "  return 'K8 frameSize=' .. tostring(K.frameSize) .. '\\nK8 end'",
+    "end",
+    // checkpoint 9: the scan's set-up (closed gate, or the gathered state; clone entry depths
+    // sorted by clone id: the table's own order never reaches the output)
+    "DUMP[9] = function(K)",
+    "  if not K.gated then return 'K9 off\\nK9 end' end",
+    "  local lines = { 'K9 sbOutgoing=' .. tostring(K.sbOutgoing) .. ' maxSaves=' .. tostring(K.maxSaves) .. ' anyDynSaves=' .. tostring(K.anyDynSaves) .. ' pushTop=' .. tostring(K.pushTop) }",
+    "  local ids = {}",
+    "  for id in K.cloneEntryDepth do table.insert(ids, id) end",
+    "  table.sort(ids)",
+    "  for _, id in ids do table.insert(lines, 'K9 entry ' .. tostring(id) .. '=' .. tostring(K.cloneEntryDepth[id])) end",
+    "  table.insert(lines, 'K9 end')",
     "  return table.concat(lines, '\\n')",
     "end",
     "local out = {}",

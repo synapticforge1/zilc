@@ -12,7 +12,7 @@ record. Closed items and the dated session logs moved on 2026-11-23 to
 | --------- | ------------------------------------------------------------------------------------------------ |
 | version   | **`0.15.2-0.687.1`** — published 2026-10-27, tag `v0.15.2-0.687.1` on `be51808` (`releasing.md`) |
 | toolchain | Zig **0.15.2**, Fil-C **0.687** with zilc's patched clang, compiled by Zig since 2026-10-30      |
-| pushed    | 2026-11-24: `main` = `origin/main`, merged from `work-2026-11-24` (port checkpoints 3-7)         |
+| pushed    | 2026-11-27: `main` = `origin/main`, merged from `work-2026-11-24` (port checkpoints 3-9)         |
 | gates     | full suite 2026-11-23 on linux-x64 (review 1), gate 10/10; counts in `testing.md`                |
 | remote    | `origin` = `github.com/synapticforge1/zilc`; purged history pushed 2026-10-27                    |
 | branches  | `main`, `v0.15.2`, `work-2026-11-15`, `review/0.15.2-0.687.2`; `work-2026-11-24` (pushed 11-24)  |
@@ -41,7 +41,7 @@ would harden code that H37 deletes.
   review; L1, the sarcasm licence, closed by the owner the same day).
 - **Next:** (pushed 2026-11-24) the triage of round 1's 24
   carried findings under H37's classes (`review-issues.md`).
-- **The sarcasm port** went on first (owner's work order, 2026-11-24): checkpoints 3–7 done.
+- **The sarcasm port** went on first (owner's work order, 2026-11-24): checkpoints 3–9 done.
 
 ## 🔎 Review, round 1 — 2026-11-15 (owner: "review") — STOPPED 2026-11-19 (above)
 
@@ -79,7 +79,7 @@ H37 re-runs each before it is fixed.
   for comparing one reference release with the next (stage C's first column). Abandoned with P3:
   `-Druntime=both`, the byte-identity check.
 - **Partly open defects:** KI-7 (`getcontext`) — `known-issues.md`.
-- **The sarcasm port** (owner, 2026-11-06): in progress; next is x86_64_frame checkpoint 8 — `sarcasm-port.md`.
+- **The sarcasm port** (owner, 2026-11-06): in progress; next is x86_64_frame checkpoint 10 — `sarcasm-port.md`.
 - **5b. Fil-C's prebuilt becomes optional** (from clone-then-build, 2026-10-30): still needed for
   the Fil-C-compiled runtime pieces (Z1 item 3), as the tree the patched clang is installed into,
   and as the oracle. The record: `archive/open-work-to-2026-11-19.md` § Open work.

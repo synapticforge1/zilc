@@ -230,43 +230,42 @@ prints its K. Progress:
   are unreachable (corpus: x86_depth only number / "dyn"), so Depth is number | dyn.
   Harness bugs fixed: the patched module is written back latin1 (byte-identical), both sides
   compared as bytes. Full record: `archive/sarcasm-port-frame-cp1-2.md`.
-- ✅ **checkpoint 3** (2026-11-24) — upstream 3213–3749 (validateTeardown, checkLostReload,
-  retIsGpr, the annotation loop) in `x86_64_frame_annotate.zig` (`Stop.annotate`); K3 = per insn
-  the marks, depth / saves / fp / smap, then frameAlignReq / frameAndDepth / frameAndSeen. 0 differ
-  over 163,254 lines; 74,017 statements annotated; 20 rejections (8 fixpoint, 12 here); 8 planted
-  faults caught; four `frame-branches/` inputs (reject-restore-rax / -restore-redef /
-  -teardown-redef, rbp-restore-lea). Dead: the `localCall` guard (3230), table depths.
-- ✅ **checkpoint 4** (11-24) — upstream 3751–4069 (andDomOf, reachedFromAnd, preAnd / postAnd,
-  the governing-`and` dataflow, the crossing rejection, the prologue-`and` fill) in
-  `x86_64_frame_and.zig` (`Stop.andWalk`); K4 per index 1..#body+1. 0 differ over 170,769 lines;
-  67 functions with a mid `and`; 6 rejections; 7 planted faults caught; new inputs and-join.s,
-  exempt-restore-and.s, reject-restore-loop-park.s. A walk to `#body+1` panics (upstream: a Lua
-  indexing error). Full record of 3 and 4 (faults, dead branches): `archive/sarcasm-port-frame-cp3-4.md`.
-- ✅ **checkpoint 5** (11-24) — upstream 4070–4359 (anyMidAnd, parkPostOf, the clone subframe
-  balance check) in `x86_64_frame_clone.zig` (`Stop.cloneBalance`); K5 = anyMidAnd, parkPostOf
-  per index; a rejection is `K err`. 0 differ; 10 rejections; 7 planted faults caught; inputs
-  b2clone-carrier-zero.s, reject-b2clone-{push,norecover,redef}.s. Faults, measured hits and dead
-  branches (cloneRet without b2clone, carrierToZeroOk's entry depth):
-  `archive/sarcasm-port-frame-cp5.md`.
-- ✅ **checkpoint 6** (11-24) — upstream 4361–4422 (the epilogue movq-restore loads: an rsp / rbp
-  save-slot `mov` load of a save redefined after its push, proven dead by checkLostReload, marked
-  x86_dropRestore) in `x86_64_frame_restore.zig` (`Stop.epilogueRestore`; checkLostReload now
-  pub); hook after 4422 (next 4424). K6 = the indices marked dropRestore; a rejection is `K err`.
-  0 differ; 17 corpus marks, no corpus rejection; inputs epilogue-restore-rbp.s and
-  reject-epilogue-restore-{rax,reload}.s; 9 planted faults caught (rbpNorm only with the rbp
-  input; the rbp-slot skip stays uncaught, kept). Measured hits, faults: `archive/sarcasm-port-frame-cp6.md`.
-- ✅ **checkpoint 7** (11-24) — upstream 4424–4543 (the B2 clone coordinate bands: per-clone
-  extents, cumulative bases 128 apart rounded up to 64, the x86_b2band marks, the clone's own
-  carrier accesses banded) in `x86_64_frame_bands.zig` (`Stop.b2Bands`; `Analysis.b2base`,
-  `XF.b2band`, mark `b2band`); hook after 4543 (next 4545). K7 = per insn the band mark and
-  aliasOff where set, then b2base in index order. The span never rejects. 0 differ (xframe
-  195,063 lines, 19 of zilc's inputs). The corpus has one clone per function only, so the new
-  input b2clone-bands.s adds two clones, lo / hi moves, a region skip, an in-clone carrier. 12
-  planted faults caught (24 to 1,583 differ); not caught, 0 hits (kept as ported): alias
-  banding with dropRestore, the prologue skip, the dyn skip with an rsp operand, regionCarrier
-  (never set). Measured hits, every fault: `archive/sarcasm-port-frame-cp7.md`.
-- next: **checkpoint 8** — upstream 4545–4591: the post-`and` frame extent (frameSize grows to
-  the widest post-and rsp access; hook after 4591, next 4593).
+- ✅ **checkpoints 3, 4** (11-24) — upstream 3213–3749 (`x86_64_frame_annotate.zig`) and
+  3751–4069 (`x86_64_frame_and.zig`), 0 differ each; entries word for word in
+  `archive/sarcasm-port-frame-cp3-4-entries.md`, full record in `-cp3-4.md`.
+- ✅ **checkpoints 5, 6** (11-24) — upstream 4070–4359 (`x86_64_frame_clone.zig`) and 4361–4422
+  (`x86_64_frame_restore.zig`), 0 differ each; entries word for word in
+  `archive/sarcasm-port-frame-cp5-6-entries.md`, full records in `-cp5.md` / `-cp6.md`.
+- ✅ **checkpoints 7, 8** (11-24, 11-25) — upstream 4424–4543 (the B2 clone coordinate bands,
+  `x86_64_frame_bands.zig`, `Stop.b2Bands`) and 4545–4591 (the post-`and` frame extent,
+  `x86_64_frame_postand.zig`, `Stop.postAnd`), 0 differ each; entries word for word in
+  `archive/sarcasm-port-frame-cp7-8-entries.md`, cp7's full record in `-cp7.md`.
+- ✅ **checkpoint 9** (11-25) — upstream 4594–4695 (the stack-buffer scan's set-up: the gate
+  `regions ~= nil and not sbResolving`, sbOutgoing, maxSaves / anyDynSaves / pushTop,
+  cloneEntryDepth) in `x86_64_frame_sbsetup.zig` (`Stop.sbSetup`; `Analysis.sbScan` /
+  `sbOutgoing` / `maxSaves` / `anyDynSaves` / `pushTop` / `cloneEntryDepth`). Hook after 4695,
+  not 4694: 4695 is the `do` block's `end` (next 4696 checkRangeFits). The scan's gate is closed
+  on the early runs, so the harness has TWO K9 hooks (new `cond` / `nextAt` fields of
+  `Checkpoint`): 4640 when the gate is closed (`K9 off`), 4695 when open (`K9 sbOutgoing=…
+  maxSaves=… anyDynSaves=… pushTop=…`, then `K9 entry <clone>=<depth>` sorted by clone id).
+  The span sets no mark and never rejects. 0 differ (xframe 214,551 lines, 25 of zilc's
+  inputs). Measured (counters, removed): gate closed 1,611 (1,545 regions nil, 66 resolving),
+  open 3,019; 358 parsed call annotations, 58 parse failures (skipped), 324 with <= 6 integer
+  words, 28 growths, 6 not larger; 52 dyn saves; maxSaves grows 1,054; entries 104 set, 2
+  duplicates; 3,019 label annotations with `(` (function entry labels) skipped. Input
+  sbsetup-outgoing.s (a 24-byte call before an 8-byte one; 7 ints + 2 doubles). Faults, differ:
+  gate regions ignored 203,144, resolving ignored 66, regions inverted 201,101; parse error
+  propagates 193,364; fp words counted 14; 6 -> 5 28, -> 7 24; outgoing min 294, words 24, last
+  wins 2 (only with the input); saves last-wins 506; dyn saves ignored 22, as a list 22, toggled
+  6; pushTop 16 558; annotation on any kind 20; entries merged to one key 96,377; entry skip
+  of non-flagged statements removed 204,559. Not caught (kept as ported): the `(` test (parse
+  needs one), `>=` for `>` (twice), `>= 0`, saves on non-insns (marks sit on insns), entry
+  flag inverted / all statements / no break / last-wins (the first insn after an entry is
+  itself; the two duplicates agree), dyn entry depth (a clone `ret` at dyn depth dies in
+  checkpoint 5: sbsetup-dyn-entry.s was rejected there, deleted), nil depth / no clone id
+  (0 hits). sbLayout's reset (4636) is not modelled: no sbLayout until 6427 is ported.
+- next: **checkpoint 10** — upstream 4696–4863 (the closures checkRangeFits 4696–4853 and widthOf
+  4854–4863: only their callers observe them, so take the first caller too; boundary to confirm).
 - Lesson (11-24): an interrupted fault run left cp6's rbpNorm fault in the tree; before a
   report, every fault run ends and `git diff` shows only the checkpoint's own work.
 
