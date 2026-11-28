@@ -1,11 +1,11 @@
 # STATE: zilc
 
-Updated: 2026-11-25, at the commit of x86_64_frame checkpoint 9
+Updated: 2026-11-27, before the project drive left the dev machine for the platform checks
 
 ## Version
 
 - Released: `0.15.2-0.687.1` on 2026-10-27 (no release since; `release.md` § "Release History")
-- Working branch: `work-2026-11-24` (the sarcasm port; from `review/0.15.2-0.687.2`; pushed 2026-11-24 and merged into `main`)
+- Working branch: `work-2026-11-24` (the sarcasm port; from `review/0.15.2-0.687.2`; pushed 2026-11-27 and merged into `main`)
 - Toolchain: Zig 0.15.2, Fil-C 0.687 with zilc's patched clang, built by Zig
 
 ## Now
@@ -19,6 +19,12 @@ Updated: 2026-11-25, at the commit of x86_64_frame checkpoint 9
   `check-stages.ts`, `stage-check.zig`. Unverified. One planted fault was found and removed on
   2026-11-27 (`cmem/local/environment.md`; the agent's records in `cmem/local/port-cp10-partial/`).
   Before use: read the diff against upstream 4696–~4964, then the full stage run; or redo it.
+- Project drive away from the dev machine from 2026-11-27 (owner: the platform checks). What
+  existed only on that machine is in `cmem/local/` (gitignored; `environment.md`). The WSL work
+  area, its caches and the session folders stayed behind: on another machine the port needs
+  WSL / Linux, Bun, the tools and Zig's global cache with Fil-C's test corpus rebuilt first
+  (`cmem/local/environment.md`), and the upstream `.luau` modules from the 0.687 release. Sent to
+  the workspace as letter C53 (2026-11-27): an x86_64 Linux guest, the setup steps and their checks.
 - Pure-Zig track: runtime pieces built and verified; the Fil-C-compiled pieces are next (`roadmap.md` Z1)
 
 ## Review
@@ -44,6 +50,7 @@ Order changed 2026-11-25 (owner; `design-decisions.md`): the findings come after
 ## Waiting on owner
 
 - Owner call 1's follow-up: GitHub Support's purge of the old commits (`open-work.md` § Open work)
+- The reviewers' leftover WSL caches, about 2 GB (`cmem/local/environment.md` § Caches): delete or keep
 
 ## Read next
 

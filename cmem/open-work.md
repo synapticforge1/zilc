@@ -15,7 +15,7 @@ record. Closed items and the dated session logs moved on 2026-11-23 to
 | pushed    | 2026-11-27: `main` = `origin/main`, merged from `work-2026-11-24` (port checkpoints 3-9)         |
 | gates     | full suite 2026-11-23 on linux-x64 (review 1), gate 10/10; counts in `testing.md`                |
 | remote    | `origin` = `github.com/synapticforge1/zilc`; purged history pushed 2026-10-27                    |
-| branches  | `main`, `v0.15.2`, `work-2026-11-15`, `review/0.15.2-0.687.2`; `work-2026-11-24` (pushed 11-24)  |
+| branches  | `main`, `v0.15.2`, `work-2026-11-15`, `review/0.15.2-0.687.2`; `work-2026-11-24` (pushed 11-27)  |
 | sibling   | **zailc** (`../zailc`) translates Fil-C into Zig; zilc is its reference and test oracle          |
 
 The full rows as they stood on 2026-11-19 (every push, the purge, the branch history):
@@ -39,9 +39,10 @@ would harden code that H37 deletes.
 - **Done since:** H38 steps 4–7 (2026-11-23); review 1 under H37's five classes, complete at
   `4f377a5`, then `5ed1df1` with R3L1's NOTICE paragraph (2026-11-24; `review-process.md` § Last
   review; L1, the sarcasm licence, closed by the owner the same day).
-- **Next:** (pushed 2026-11-24) the triage of round 1's 24
-  carried findings under H37's classes (`review-issues.md`).
-- **The sarcasm port** went on first (owner's work order, 2026-11-24): checkpoints 3–9 done.
+- **Next:** the triage of round 1's 24 carried findings under H37's classes (`review-issues.md`),
+  once the x86_64_frame module is ported (owner's order of 2026-11-25, `STATE.md` § Next).
+- **The sarcasm port** went on first (owner's work order, 2026-11-24): checkpoints 3–9 done;
+  checkpoint 10 partial and uncommitted; the drive's move to the test machines is letter C53.
 
 ## 🔎 Review, round 1 — 2026-11-15 (owner: "review") — STOPPED 2026-11-19 (above)
 
