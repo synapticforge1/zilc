@@ -57,4 +57,3 @@ prints its K. Progress:
   stderr probe undercounted a branch the direct trace shows hit; trace the checker binary directly.
 - next: **checkpoint 3** — upstream 3213–3750 (validateTeardown, checkLostReload, the annotation
   pass that sets x86_prologue / x86_depth / x86_saves / … on every statement).
-

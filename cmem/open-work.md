@@ -15,7 +15,7 @@ record. Closed items and the dated session logs moved on 2026-11-23 to
 | pushed    | 2026-11-27: `main` = `origin/main`, merged from `work-2026-11-24` (port checkpoints 3-9)         |
 | gates     | full suite 2026-11-23 on linux-x64 (review 1), gate 10/10; counts in `testing.md`                |
 | remote    | `origin` = `github.com/synapticforge1/zilc`; purged history pushed 2026-10-27                    |
-| branches  | `main`, `v0.15.2`, `work-2026-11-15`, `review/0.15.2-0.687.2`; `work-2026-11-24` (pushed 11-27)  |
+| branches  | every branch on GitHub (owner, 11-27): 8 incl. `pure-zig/filc-compiled`, `wip/cp10-partial`      |
 | sibling   | **zailc** (`../zailc`) translates Fil-C into Zig; zilc is its reference and test oracle          |
 
 The full rows as they stood on 2026-11-19 (every push, the purge, the branch history):
