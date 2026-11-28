@@ -84,6 +84,11 @@ The guide is `../workspace/cmem/memory-guide.md`. The root `CLAUDE.md` (gitignor
 - **Nothing is pushed, tagged or published unless the owner says so.**
 - Branches: one branch per Zig line, `main` the base (`releasing.md`); work branches such as
   `bun-port` (merged and deleted 2026-10-27) are merged by the owner's call.
+- 🔒 **Every branch is on GitHub** (owner, 2026-11-27: "any branches that are only local to this
+  machine should be a branch on github so that everything is 100% portable"). No branch lives
+  only on one machine: a new branch is pushed with its first commit's push, and unfinished work
+  that must travel goes on a `wip/<name>` branch, never only in a working tree or a stash. Check:
+  `git for-each-ref refs/heads` against `git ls-remote --heads origin` lists the same tips.
 - Docs and memory land in the same commit as the code they describe.
 - **Every `.zig` file is formatted with the project's Zig (0.15.2 today), and `zig fmt --check
   build.zig build tools tests src` is clean before a commit** — the `tests/basics` copies of the

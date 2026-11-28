@@ -14,17 +14,16 @@ Updated: 2026-11-27, before the project drive left the dev machine for the platf
 - Memory guide (letter H38): all seven steps done 2026-11-23; `bun scripts/check-cmem.ts` holds
 - Sarcasm port to Zig: x86_64_frame checkpoints 3 to 9 done 2026-11-24..25 (every stage 0 differ;
   `sarcasm-port.md`); next: checkpoint 10, upstream 4696– (checkRangeFits, widthOf, first caller)
-- ⚠️ Paused 2026-11-25 (owner) with checkpoint 10 PARTIAL and UNCOMMITTED in the tree (agent stopped
-  mid-run): `x86_64_frame_sbranges.zig`, 4 `sbranges-*.s` inputs, edits to `x86_64_frame.zig`,
-  `check-stages.ts`, `stage-check.zig`. Unverified. One planted fault was found and removed on
-  2026-11-27 (`cmem/local/environment.md`; the agent's records in `cmem/local/port-cp10-partial/`).
-  Before use: read the diff against upstream 4696–~4964, then the full stage run; or redo it.
-- Project drive away from the dev machine from 2026-11-27 (owner: the platform checks). What
-  existed only on that machine is in `cmem/local/` (gitignored; `environment.md`). The WSL work
-  area, its caches and the session folders stayed behind: on another machine the port needs
-  WSL / Linux, Bun, the tools and Zig's global cache with Fil-C's test corpus rebuilt first
-  (`cmem/local/environment.md`), and the upstream `.luau` modules from the 0.687 release. Sent to
-  the workspace as letter C53 (2026-11-27): an x86_64 Linux guest, the setup steps and their checks.
+- ⚠️ Checkpoint 10 is PARTIAL and UNVERIFIED (agent stopped 2026-11-25), committed only on branch
+  `wip/cp10-partial` (pushed 2026-11-27, owner: every branch on GitHub): `x86_64_frame_sbranges.zig`,
+  4 `sbranges-*.s` inputs, edits to `x86_64_frame.zig`, `check-stages.ts`, `stage-check.zig`; the
+  agent's records in `tools/sarcasm/wip-cp10/` (`NOTE.txt`). One planted fault was found and removed
+  2026-11-27. To resume: check out that branch, compare against the clean copies, read the diff
+  against upstream 4696–~4964, run every stage; then fold it into `work-2026-11-24` without the
+  `wip-cp10/` folder, or redo it.
+- The drive leaves the dev machine for the platform checks (owner, 2026-11-27); its machine-only
+  data is in `cmem/local/` (`environment.md`: what stayed in WSL and how to rebuild it). The port
+  needs an x86_64 Linux guest set up first: letter C53 to the workspace (steps and checks).
 - Pure-Zig track: runtime pieces built and verified; the Fil-C-compiled pieces are next (`roadmap.md` Z1)
 
 ## Review
