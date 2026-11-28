@@ -14,6 +14,11 @@ Updated: 2026-11-25, at the commit of x86_64_frame checkpoint 9
 - Memory guide (letter H38): all seven steps done 2026-11-23; `bun scripts/check-cmem.ts` holds
 - Sarcasm port to Zig: x86_64_frame checkpoints 3 to 9 done 2026-11-24..25 (every stage 0 differ;
   `sarcasm-port.md`); next: checkpoint 10, upstream 4696– (checkRangeFits, widthOf, first caller)
+- ⚠️ Paused 2026-11-25 (owner) with checkpoint 10 PARTIAL and UNCOMMITTED in the tree (agent stopped
+  mid-run): `x86_64_frame_sbranges.zig`, 4 `sbranges-*.s` inputs, edits to `x86_64_frame.zig`,
+  `check-stages.ts`, `stage-check.zig`. Unverified. One planted fault was found and removed on
+  2026-11-27 (`cmem/local/environment.md`; the agent's records in `cmem/local/port-cp10-partial/`).
+  Before use: read the diff against upstream 4696–~4964, then the full stage run; or redo it.
 - Pure-Zig track: runtime pieces built and verified; the Fil-C-compiled pieces are next (`roadmap.md` Z1)
 
 ## Review
