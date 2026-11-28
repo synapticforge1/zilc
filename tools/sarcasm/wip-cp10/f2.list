@@ -1,0 +1,20 @@
+short-skip-removed	F	s/if (sb.short and st.localClone != null) continue;//
+short-skip-any	F	s/if (sb.short and st.localClone != null) continue;/if (sb.short) continue;/
+lea-removed	F	s/"lea"))$/"lea") and false)/
+lea-prefix	F	s/if (std.mem.eql(u8, try u.lower(alloc, st.mnemonic.?), "lea"))/if (std.mem.startsWith(u8, try u.lower(alloc, st.mnemonic.?), "lea"))/
+band-home-ignored	F	s/checkRangeFits(a, loN, hiN, loN + band, hiN + band,/checkRangeFits(a, loN, hiN, loN, hiN,/
+band-hi-only	F	s/checkRangeFits(a, loN, hiN, loN + band, hiN + band,/checkRangeFits(a, loN + band, hiN + band, loN + band, hiN + band,/
+band-ranges-ignored	F	s/.lo = loN + band, .hi = hiN + band/.lo = loN, .hi = hiN/
+declidx-off	F	s/.declIdx = ia,/.declIdx = ia - 1,/
+prologue-le	F	s/ia < a.prologueEnd/ia <= a.prologueEnd/
+prologue-flag-false	F	s/ia < a.prologueEnd/false/
+smap-null	F	s/a.smapIn\[ia - 1\], a.fpIn\[ia - 1\]/null, a.fpIn[ia - 1]/
+fp-null	F	s/a.smapIn\[ia - 1\], a.fpIn\[ia - 1\]/a.smapIn[ia - 1], null/
+saves-null	F	s/a.savesIn\[ia - 1\]); \/\/ 4933/null); \/\/ 4933/
+ddecl-null	F	s/hiN + band, sb.id, d, st,/hiN + band, sb.id, null, st,/
+clone-first-wins	F	s/try gop.value_ptr.put(alloc, sb.id, .{ .lo = loN, .hi = hiN });/_ = try gop.value_ptr.getOrPutValue(alloc, sb.id, .{ .lo = loN, .hi = hiN });/
+clone-merged	F	s/a.cloneDeclRanges.getOrPut(alloc, @bitCast(lc))/a.cloneDeclRanges.getOrPut(alloc, 0)/
+own-also-clone	F	s/if (st.localClone) |lc| { \/\/ 4947/try a.ownDeclIds.put(alloc, sb.id, {}); if (st.localClone) |lc| { \/\/ 4947/
+own-removed	F	s/try a.ownDeclIds.put(alloc, sb.id, {}); \/\/ 4955/{}/
+insn-check-removed	F	s/if (st.kind != .insn) continue; \/\/ 4912//
+areq-2	X	s/areq: f64 = 1,/areq: f64 = 2,/

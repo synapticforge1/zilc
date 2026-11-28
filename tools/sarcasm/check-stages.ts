@@ -642,6 +642,17 @@ const XF_CHECKPOINTS: Checkpoint[] = [{
   next: "	-- -----------------------------------------------------------------------",
   dump: "{ frameSize = frameSize }",
 }, {
+  // the gate is closed: pass (a) does not exist either. The hooks at one line run in array
+  // order REVERSED (each is spliced in at the same index), so K10's stop comes first here to
+  // follow K9's dump
+  n: 10,
+  afterLine: 4640,
+  anchor: "	-- the driver resolves the long forms directly via resolveStackBufDeclAt.)",
+  next: "	if regions ~= nil and not sbResolving then",
+  nextAt: 1,
+  cond: "not (regions ~= nil and not sbResolving)",
+  dump: "{ gated = false }",
+}, {
   // the stack-buffer scan's gate is closed: no set-up state exists
   n: 9,
   afterLine: 4640,
@@ -658,6 +669,14 @@ const XF_CHECKPOINTS: Checkpoint[] = [{
   next: "		local function checkRangeFits(loN, hiN, homeLo, homeHi, id, dDecl, st)",
   nextAt: 1,
   dump: "{ gated = true, sbOutgoing = sbOutgoing, maxSaves = maxSaves, anyDynSaves = anyDynSaves, pushTop = pushTop, cloneEntryDepth = cloneEntryDepth }",
+}, {
+  // after pass (a), the declarations loop (4911 to its `end` at 4959), inside the open gate
+  n: 10,
+  afterLine: 4959,
+  anchor: "		end",
+  next: "		-- (a0) buffer-interior VALUE leas (Feature A, by-address accesses): a",
+  nextAt: 1,
+  dump: "{ gated = true, sbRanges = sbRanges, cloneDeclRanges = cloneDeclRanges, ownDeclIds = ownDeclIds }",
 }];
 const XF_STOP = Math.max(...XF_CHECKPOINTS.map((c) => c.n));
 const XF_CLEARED = ["x86_prologue", "x86_depth", "x86_saves", "x86_unpairedPop", "x86_spillPop", "x86_flagsPop", "x86_teardownStart", "x86_teardown", "x86_fp", "x86_spRecover", "x86_saveStore", "x86_carrierLoad", "x86_leaSave", "x86_carrierCallArg", "x86_spSave", "x86_dropRestore", "x86_midSp", "x86_regionCarrier", "x86_aliasOff", "x86_aliasSaveIdx", "x86_midAnd", "x86_preAnd", "x86_postAnd", "x86_smap", "x86_b2band", "x86StackBufAccess", "x86StackBufIdx", "x86StackBufRep", "x86StackBufLea", "x86StackBufAddr", "x86StackBufLeaValue", "x86StackBufLeaValueComputed", "x86_alignKeyed", "x86_alignAndBase"];
@@ -939,6 +958,34 @@ seqStages.push({
     "  table.sort(ids)",
     "  for _, id in ids do table.insert(lines, 'K9 entry ' .. tostring(id) .. '=' .. tostring(K.cloneEntryDepth[id])) end",
     "  table.insert(lines, 'K9 end')",
+    "  return table.concat(lines, '\\n')",
+    "end",
+    // checkpoint 10: the declarations pass: sbRanges in order (every field), then each clone's
+    // declared ranges and the own ids, sorted (upstream reads both tables by key only: the sort
+    // never hides an order that reaches the output)
+    "DUMP[10] = function(K)",
+    "  if not K.gated then return 'K10 off\\nK10 end' end",
+    "  local lines = {}",
+    "  for i, r in K.sbRanges do",
+    "    table.insert(lines, 'K10 range ' .. i .. ' lo=' .. tostring(r.lo) .. ' hi=' .. tostring(r.hi) .. ' areq=' .. tostring(r.areq) .. ' aligns=' .. #r.aligns .. ' id=' .. r.id .. ' declIdx=' .. tostring(r.declIdx) .. ' band=' .. tostring(r.band))",
+    "  end",
+    "  local cids = {}",
+    "  for c in K.cloneDeclRanges do table.insert(cids, c) end",
+    "  table.sort(cids)",
+    "  for _, c in cids do",
+    "    local ids = {}",
+    "    for id in K.cloneDeclRanges[c] do table.insert(ids, id) end",
+    "    table.sort(ids)",
+    "    for _, id in ids do",
+    "      local r = K.cloneDeclRanges[c][id]",
+    "      table.insert(lines, 'K10 clone ' .. tostring(c) .. ' ' .. id .. ' lo=' .. tostring(r.lo) .. ' hi=' .. tostring(r.hi))",
+    "    end",
+    "  end",
+    "  local own = {}",
+    "  for id in K.ownDeclIds do table.insert(own, id) end",
+    "  table.sort(own)",
+    "  for _, id in own do table.insert(lines, 'K10 own ' .. id .. '=' .. tostring(K.ownDeclIds[id])) end",
+    "  table.insert(lines, 'K10 end')",
     "  return table.concat(lines, '\\n')",
     "end",
     "local out = {}",

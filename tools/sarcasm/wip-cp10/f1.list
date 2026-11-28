@@ -1,0 +1,33 @@
+floor-ignored	F	s/frameFloor = XF.D0 - dd.num;/frameFloor = 0;/
+clone8-removed	F	s/frameFloor = frameFloor - 8;/frameFloor = frameFloor;/
+clone8-all	F	s/if (st.localClone != null) if (dDecl) |dd|/if (true) if (dDecl) |dd|/
+floor-le	F	s/if (loN < frameFloor) {/if (loN <= frameFloor) {/
+why-inverted	F	s/if (frameFloor == 0)$/if (frameFloor != 0)/
+floor-dyn-allowed	F	0,/if (!XF.isDynDepth(dd)) {/s//if (true) {/
+top-lo-le	F	s/homeLo < XF.D0 and/homeLo <= XF.D0 and/
+top-hi-ge	F	s/homeHi > a.pushTop) {/homeHi >= a.pushTop) {/
+andtop-noseen	F	s/if (XF.frameAndSeen and a.maxSaves == 0)/if (a.maxSaves == 0)/
+andtop-nomax	F	s/if (XF.frameAndSeen and a.maxSaves == 0)/if (XF.frameAndSeen)/
+andtop-lt	F	s/homeHi <= andTop.?/homeHi < andTop.?/
+clone-top-null-ok	F	s/if (cloneTop == null or hiN > cloneTop.?)/if (cloneTop != null and hiN > cloneTop.?)/
+clone-top-ge	F	s/hiN > cloneTop.?)/hiN >= cloneTop.?)/
+clone-top-no8	F	s/XF.D0 - e - 8 else null/XF.D0 - e else null/
+dynsaves-ok	F	s/if (XF.isDynSaves(s_)) {/if (false) {/
+rbp-skip-removed	F	s/if (a.usesRbp and std.mem.eql(u8, s.name, "rbp")) continue;.*$//
+rbp-skip-any	F	s/if (a.usesRbp and std.mem.eql/if (std.mem.eql/
+spill-skip-removed	F	s/if (s.spill orelse false) continue;.*$//
+slot-hi-16	F	s/XF.D0 - s.depth + 8;/XF.D0 - s.depth + 16;/
+slot-lo-le	F	s/if (loN < shi and hiN > slo)/if (loN <= shi and hiN > slo)/
+slot-hi-ge	F	s/if (loN < shi and hiN > slo)/if (loN < shi and hiN >= slo)/
+slot-home	F	s/if (loN < shi and hiN > slo)/if (homeLo < shi and homeHi > slo)/
+out-lo-le	F	s/homeLo < a.sbOutgoing and/homeLo <= a.sbOutgoing and/
+out-hi-ge	F	s/and homeHi > 0) {/and homeHi >= 0) {/
+out-hi-ignored	F	s/ and homeHi > 0) {/) {/
+out-home	F	s/if (homeLo < a.sbOutgoing and homeHi > 0)/if (loN < a.sbOutgoing and hiN > 0)/
+reg-anchored-ignored	F	s/if (!(r.anchored orelse false) and/if (/
+reg-anchored-inv	F	s/if (!(r.anchored orelse false) and/if ((r.anchored orelse false) and/
+reg-lo-le	F	s/r.base < homeHi and/r.base <= homeHi and/
+reg-hi-ge	F	s/r.base + r.size > homeLo)/r.base + r.size >= homeLo)/
+reg-msg-max	F	s/@max(r.base, homeLo)/@min(r.base, homeLo)/
+reg-msg-min	F	s/@min(r.base + r.size, homeHi)/@max(r.base + r.size, homeHi)/
+reg-ignored	F	s/if (!(r.anchored orelse false) and r.base < homeHi/if (false and r.base < homeHi/

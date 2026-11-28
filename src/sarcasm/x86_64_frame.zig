@@ -47,7 +47,8 @@
 //! x86_64_frame_restore.zig: checkpoint 6) and 4424–4543 (the B2 clone coordinate bands,
 //! x86_64_frame_bands.zig: checkpoint 7) and 4545–4591 (the post-`and` frame extent,
 //! x86_64_frame_postand.zig: checkpoint 8) and 4594–4695 (the stack-buffer scan's set-up,
-//! x86_64_frame_sbsetup.zig: checkpoint 9).
+//! x86_64_frame_sbsetup.zig: checkpoint 9) and 4696–4959 (checkRangeFits, widthOf,
+//! resolveShortRangeFor and the declarations pass (a), x86_64_frame_sbranges.zig: checkpoint 10).
 
 const std = @import("std");
 const err = @import("err.zig");
@@ -67,6 +68,7 @@ const restore = @import("x86_64_frame_restore.zig");
 const bands = @import("x86_64_frame_bands.zig");
 const postand = @import("x86_64_frame_postand.zig");
 const sbsetup = @import("x86_64_frame_sbsetup.zig");
+const sbranges = @import("x86_64_frame_sbranges.zig");
 pub const b2band = bands.b2band;
 pub const parkPostOf = clone.parkPostOf;
 
@@ -242,7 +244,13 @@ pub const Smap = lt.Table(*const SmapEntry);
 /// `and $-N, %rsp` on every path, "none", or "dyn".
 pub const Gand = union(enum) { num: f64, none, dyn };
 
-pub const Stop = enum { none, prologue, fixpoint, annotate, andWalk, cloneBalance, epilogueRestore, b2Bands, postAnd, sbSetup };
+pub const LoHi = struct { lo: f64, hi: f64 };
+
+/// An entry of sbRanges (upstream 4935). `aligns` is the empty list upstream creates there; its
+/// element type is decided where its first writer is ported, so only its length exists yet.
+pub const SbRange = struct { lo: f64, hi: f64, areq: f64 = 1, aligns: usize = 0, id: []const u8, declIdx: usize, band: f64 };
+
+pub const Stop = enum { none, prologue, fixpoint, annotate, andWalk, cloneBalance, epilogueRestore, b2Bands, postAnd, sbSetup, sbRanges };
 
 /// analyzeFrame's locals. Field names are upstream's.
 pub const Analysis = struct {
@@ -300,6 +308,14 @@ pub const Analysis = struct {
     pushTop: f64 = 0,
     /// cloneEntryDepth (4673): clone id (f64 bits) -> the clone's entry depth
     cloneEntryDepth: std.AutoArrayHashMapUnmanaged(u64, f64) = .empty,
+
+    // pass (a), the declarations (upstream 4696–4959; x86_64_frame_sbranges.zig)
+    /// sbRanges (4621): this function's buffer declarations, in body order
+    sbRanges: std.ArrayList(SbRange) = .empty,
+    /// cloneDeclRanges (4634): clone id (f64 bits) -> buffer id -> the clone's own range
+    cloneDeclRanges: std.AutoArrayHashMapUnmanaged(u64, std.StringArrayHashMapUnmanaged(LoHi)) = .empty,
+    /// ownDeclIds (4635): the enclosing function's own declared buffer ids
+    ownDeclIds: std.StringArrayHashMapUnmanaged(void) = .empty,
 
     pub fn st_(a: *Analysis, i: usize) *Stmt {
         return a.body[i - 1];
@@ -558,5 +574,7 @@ pub fn analyzeFrameTo(alloc: Allocator, body: []const *Stmt, sigDesc: ?*const si
     if (stop == .postAnd) return a;
     try sbsetup.sbSetup(a);
     if (stop == .sbSetup) return a;
-    @panic("x86_64_frame: analyzeFrame is ported only to the stack-buffer scan's set-up");
+    if (a.sbScan) try sbranges.declarations(a); // the pass sits inside the scan's open gate
+    if (stop == .sbRanges) return a;
+    @panic("x86_64_frame: analyzeFrame is ported only to the stack-buffer declarations pass");
 }

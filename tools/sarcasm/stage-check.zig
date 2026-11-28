@@ -917,6 +917,37 @@ fn dumpK9(gpa: Alloc, an: *s.x86_64_frame.Analysis) ![]const u8 {
     return o.items;
 }
 
+fn idLess(_: void, x: []const u8, y: []const u8) bool {
+    return std.mem.lessThan(u8, x, y);
+}
+
+/// Checkpoint 10: the declarations pass: sbRanges in order, then each clone's declared ranges and
+/// the own ids, sorted by clone id / buffer id (upstream reads both tables by key only).
+fn dumpK10(gpa: Alloc, an: *s.x86_64_frame.Analysis) ![]const u8 {
+    if (!an.sbScan) return "K10 off\nK10 end\n";
+    var o: std.ArrayList(u8) = .empty;
+    for (an.sbRanges.items, 1..) |r, i| {
+        try o.print(gpa, "K10 range {d} lo={s} hi={s} areq={s} aligns={d} id={s} declIdx={d} band={s}\n", .{ i, try tsN(gpa, r.lo), try tsN(gpa, r.hi), try tsN(gpa, r.areq), r.aligns, r.id, r.declIdx, try tsN(gpa, r.band) });
+    }
+    var cs: std.ArrayList(f64) = .empty;
+    for (an.cloneDeclRanges.keys()) |k| try cs.append(gpa, @bitCast(k));
+    std.mem.sort(f64, cs.items, {}, std.sort.asc(f64));
+    for (cs.items) |c| {
+        const m = an.cloneDeclRanges.get(@bitCast(c)).?;
+        const ids = try gpa.dupe([]const u8, m.keys());
+        std.mem.sort([]const u8, ids, {}, idLess);
+        for (ids) |id| {
+            const r = m.get(id).?;
+            try o.print(gpa, "K10 clone {s} {s} lo={s} hi={s}\n", .{ try tsN(gpa, c), id, try tsN(gpa, r.lo), try tsN(gpa, r.hi) });
+        }
+    }
+    const own = try gpa.dupe([]const u8, an.ownDeclIds.keys());
+    std.mem.sort([]const u8, own, {}, idLess);
+    for (own) |id| try o.print(gpa, "K10 own {s}=true\n", .{id});
+    try o.appendSlice(gpa, "K10 end\n");
+    return o.items;
+}
+
 fn dumpK2(gpa: Alloc, an: *s.x86_64_frame.Analysis) ![]const u8 {
     var o: std.ArrayList(u8) = .empty;
     for (an.body, 1..) |st, i| {
@@ -1054,6 +1085,13 @@ fn xframeRecord(gpa: Alloc, out: *std.ArrayList(u8), rec: []const u8) !void {
     }
     if (XF.analyzeFrameTo(gpa, in.body, in.sd, regs, .sbSetup)) |an| {
         try out.appendSlice(gpa, try dumpK9(gpa, an));
+    } else |e| {
+        if (e != error.Sarcasm) return e;
+        try out.print(gpa, "K err {s}\n", .{s.err.message});
+        return;
+    }
+    if (XF.analyzeFrameTo(gpa, in.body, in.sd, regs, .sbRanges)) |an| {
+        try out.appendSlice(gpa, try dumpK10(gpa, an));
     } else |e| {
         if (e != error.Sarcasm) return e;
         try out.print(gpa, "K err {s}\n", .{s.err.message});

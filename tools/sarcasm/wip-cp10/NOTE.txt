@@ -1,0 +1,20 @@
+TEMPORARY: the records of x86_64_frame checkpoint 10's stopped agent (2026-11-25), on branch
+wip/cp10-partial only, so the work can resume on another machine. Delete this folder when
+checkpoint 10 is finished (cmem/sarcasm-port.md, cmem/STATE.md).
+
+The checkpoint's own partial work is in its real places on this branch:
+src/sarcasm/x86_64_frame_sbranges.zig, four tests/sarcasm/frame-branches/sbranges-*.s, and edits
+to src/sarcasm/x86_64_frame.zig, tools/sarcasm/check-stages.ts, tools/sarcasm/stage-check.zig.
+None of it is verified. One planted fault ("reg-lo-le", line 139) was found in it and removed on
+2026-11-27; the files now equal the agent's clean copies here (x86_64_frame.zig apart from its
+line endings, which git normalizes to LF).
+
+- sbranges.clean.zig.txt, frame.clean.zig.txt: the agent's clean copies of the two files it planted
+  faults in (renamed .txt so zig fmt skips them). Compare the tree against them before any run.
+- body.zig.txt: the agent's draft of the span's body (upstream 4696-4959).
+- f1.list, f2.list, fall.list: the planted faults (name, file, sed expression); fall.out: the
+  xframe differ count each gave (the last ones ran with the stopped agent's inputs in place).
+- inputs/: 8 candidate frame-branches inputs the agent wrote and had not yet kept or deleted.
+
+The agent's fault-running scripts hold the dev machine's paths and stay in the gitignored
+cmem/local/port-cp10-partial/ on the project drive.
